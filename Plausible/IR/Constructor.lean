@@ -83,7 +83,7 @@ def add_size_param (cond: Expr) : MetaM String := do
   let arg_str := (toString (← Meta.ppExpr cond)).drop (fnname.length)
   return fnname ++ " size" ++ arg_str
 
-def gen_IR_at_pos_backtrack (id: FVarId) (cond: Expr) (pos: Nat) : MetaM String := do
+def gen_IR_at_pos_toCode (id: FVarId) (cond: Expr) (pos: Nat) : MetaM String := do
   let new_args := cond.getAppArgs.eraseIdx! pos
   let mut fn_str := "gen_" ++ toString (← Meta.ppExpr cond.getAppFn) ++ "_at_" ++ toString pos ++ " size"
   for a in new_args do
@@ -94,13 +94,19 @@ def gen_IR_at_pos_backtrack (id: FVarId) (cond: Expr) (pos: Nat) : MetaM String 
       fn_str := fn_str ++ "(" ++ toString (← Meta.ppExpr a) ++ ")"
   return "let " ++ toString (id.name)  ++ " ← " ++ fn_str
 
+def gen_nonIR_toCode (id: FVarId) (ty: Expr) : MetaM String := do
+  let mut out:= "let "++ toString (id.name) ++ " ← "
+  out := out ++ "monadLift <| Gen.run (SampleableExt.interpSample "
+  out := out ++ toString (← Meta.ppExpr ty) ++ ") 1"
+  return out
+
 def GenCheckCalls_toCode (c: GenCheckCall): MetaM String := do
   match c with
   | GenCheckCall.check_IR cond => return  "← check_" ++ (← add_size_param cond)
   | GenCheckCall.check_nonIR cond => return  "(" ++ toString (← Meta.ppExpr cond) ++ ")"
-  | GenCheckCall.gen_IR id cond pos => gen_IR_at_pos_backtrack id cond pos
+  | GenCheckCall.gen_IR id cond pos => gen_IR_at_pos_toCode id cond pos
   | GenCheckCall.mat id sp => return  "if let " ++ toString (← Meta.ppExpr sp.cond) ++ " := " ++ toString (id.name) ++ " then "
-  | GenCheckCall.gen_fvar id ty =>  return  "let " ++ toString (id.name) ++ " ← gen_rand_" ++ toString (← Meta.ppExpr ty)
+  | GenCheckCall.gen_fvar id ty =>  gen_nonIR_toCode id ty
   | GenCheckCall.ret e => return "return " ++ toString (← Meta.ppExpr e)
 
 def cbe_match_block (cbe: backtrack_elem) : MetaM String := do
@@ -363,7 +369,7 @@ def backtrack_elem_toString_producer (cbe: backtrack_elem) : MetaM String := do
   return out
 
 
-
+/-
 def backtrack_elem_toString_producer1 (cbe: backtrack_elem) : MetaM String := do
   let mut out := ""
   if cbe.mat_inp.size > 0 then
@@ -407,6 +413,8 @@ def backtrack_elem_toString_producer1 (cbe: backtrack_elem) : MetaM String := do
   if cbe.mat_inp.size > 0 then
     out:= out ++ "\n| " ++ makeUnderscores_commas cbe.mat_inp.size ++ " => throwError \"fail\""
   return out
+-/
+
 
 def producer_where_defs (relation: IR_info) (inpname: List String) (genpos: Nat): MetaM String := do
   let mut out_str := ""

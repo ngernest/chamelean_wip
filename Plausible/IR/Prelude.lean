@@ -3,10 +3,12 @@ import Std
 import Plausible.IR.Example
 import Lean.Elab.Deriving.DecEq
 import Lean.Meta.Tactic.Simp.Main
+
 open Lean.Elab.Deriving.DecEq
 open List Nat Array String
 open Lean Elab Command Meta Term
 open Lean.Parser.Term
+open Except
 
 namespace Plausible.IR
 
@@ -60,6 +62,12 @@ def option_to_MetaM {α : Type} (o : Option α) (errorMsg : String := "Option is
   match o with
   | some a => return a
   | none => throwError errorMsg
+
+
+def option_to_Except {α : Type} (o : Option α) (errorMsg : String := "Option is none") : (Except String) α :=
+  match o with
+  | some a => return a
+  | none => throw errorMsg
 
 partial def get_types_chain (type : Expr) : MetaM (Array Expr) := do
   let rec helper (e : Expr) (acc : Array Expr) : MetaM (Array Expr) := do

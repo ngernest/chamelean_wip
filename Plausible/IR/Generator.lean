@@ -7,9 +7,6 @@ import Plausible.IR.Prototype
 import Plausible.IR.GCCall
 import Plausible.IR.Constructor
 import Plausible.IR.Backtrack
-import Lean.Elab.Deriving.DecEq
-import Lean.Meta.Tactic.Simp.Main
-open Lean.Elab.Deriving.DecEq
 open List Nat Array String
 open Lean Elab Command Meta Term
 open Lean.Parser.Term
@@ -157,10 +154,6 @@ def elabDeriveGenerator : CommandElab := fun stx => do
   | _ => throwError "Invalid syntax"
 
 
-#derive_generator balanced with_name ["h", "T"] backtrack 100
-
-#eval gen_balanced_at_1 2 1
-
 
 def get_enumerator (r: IR_info) (inpname: List String) (genpos: Nat) (iternum: Nat): MetaM String := do
   let gen_prototype ←  prototype_for_producer r inpname genpos
@@ -173,6 +166,8 @@ def get_enumerator (r: IR_info) (inpname: List String) (genpos: Nat) (iternum: N
   body := body ++ "\nreturn out"
   return prototype ++ "\n" ++ body
 
+--#derive_generator balanced with_name ["h", "T"] backtrack 100
 
+--#eval gen_balanced_at_1 2 1
 
 end Plausible.IR

@@ -122,23 +122,26 @@ def MetaM_to_option (m : MetaM α) : MetaM (Option α) := do
   catch _ =>
     pure none
 
-def test (a:Nat) : MetaM Nat :=do
-  if a = 5 then return a else throwError "fail"
-
-#eval MetaM_to_option (test 5)
+def MetaM_to_Except (io : MetaM α) : MetaM (Except String α) := do
+  try
+    let result ← io
+    pure (.ok result)
+  catch _ =>
+    pure (.error "unable to convert")
 
 def uniform_backtracking {α : Type } (a : Array α) : MetaM α := do
   -- Using monadLift to lift the random number generation from IO to MetaM
   let idx ← monadLift <| IO.rand 0 (a.size - 1)
-  let mem ←  option_to_MetaM (a.get? idx)
+  let mem ←  option_to_MetaM (a[idx]?)
   return mem
+
 
 def weight_backtracking {α : Type } (a : Array α) (low_weight_size: Nat) (weight: Nat): MetaM α := do
   -- Using monadLift to lift the random number generation from IO to MetaM
   let maxnum := low_weight_size + (a.size - low_weight_size)*weight -1
   let randnat ← monadLift <| IO.rand 0 maxnum
   let idx := if randnat < low_weight_size then randnat else (randnat - low_weight_size)/weight + low_weight_size
-  let mem ←  option_to_MetaM (a.get? idx)
+  let mem ←  option_to_MetaM (a[idx]?)
   return mem
 
 
