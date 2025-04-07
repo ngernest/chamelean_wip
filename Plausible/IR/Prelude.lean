@@ -64,10 +64,10 @@ def option_to_MetaM {α : Type} (o : Option α) (errorMsg : String := "Option is
   | none => throwError errorMsg
 
 
-def option_to_Except {α : Type} (o : Option α) (errorMsg : String := "Option is none") : (Except String) α :=
+def option_to_IO {α : Type} (o : Option α) (errorMsg : String := "Option is none") : IO α :=
   match o with
   | some a => return a
-  | none => throw errorMsg
+  | none => throw (IO.userError errorMsg)
 
 partial def get_types_chain (type : Expr) : MetaM (Array Expr) := do
   let rec helper (e : Expr) (acc : Array Expr) : MetaM (Array Expr) := do

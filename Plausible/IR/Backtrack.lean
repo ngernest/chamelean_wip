@@ -64,14 +64,14 @@ def uniform_backtrack_codeblock (btarray: Array String) (inps: List String) (bac
   body:= body ++ "  let f ← uniform_backtracking #["
   for bt in btarray do
     body := body ++ bt ++ ", "
-  body:= ⟨body.data.dropLast.dropLast⟩ ++ "]\n  let ret ← MetaM_to_option (f size "
+  body:= ⟨body.data.dropLast.dropLast⟩ ++ "]\n  let ret ← IO_to_option (f size "
   for i in inps do
     body:= body ++ i ++ " "
   body:= ⟨body.data.dropLast⟩ ++ ")\n"
   body:= body ++ "  match ret with\n"
   body:= body ++ "  | some ret => return ret\n"
   body:= body ++ "  | _ => continue\n"
-  body:= body ++ " throwError \"fail\""
+  body:= body ++ " throw (IO.userError \"fail\")"
   return body
 
 def weight_backtrack_codeblock (btarray: Array String) (inps: List String) (backtracknum: Nat) (low_weight_size: Nat): MetaM String := do
@@ -80,14 +80,14 @@ def weight_backtrack_codeblock (btarray: Array String) (inps: List String) (back
   for bt in btarray do
     body := body ++ bt ++ ", "
   body:= ⟨body.data.dropLast.dropLast⟩ ++ "] " ++ toString low_weight_size ++ " size"
-  body:= body ++ "\n  let ret ← MetaM_to_option (f size "
+  body:= body ++ "\n  let ret ← IO_to_option (f size "
   for i in inps do
     body:= body ++ i ++ " "
   body:= ⟨body.data.dropLast⟩ ++ ")\n"
   body:= body ++ "  match ret with\n"
   body:= body ++ "  | some ret => return ret\n"
   body:= body ++ "  | _ => continue\n"
-  body:= body ++ " throwError \"fail\""
+  body:= body ++ " throw (IO.userError \"fail\")"
   return body
 
 def checker_body (r: IR_info) (inpname: List String) (backtracknum: Nat): MetaM (String) := do
@@ -122,26 +122,26 @@ def MetaM_to_option (m : MetaM α) : MetaM (Option α) := do
   catch _ =>
     pure none
 
-def MetaM_to_Except (io : MetaM α) : MetaM (Except String α) := do
+def IO_to_option (io : IO α) : IO (Option α) := do
   try
     let result ← io
-    pure (.ok result)
+    pure (some result)
   catch _ =>
-    pure (.error "unable to convert")
+    pure none
 
-def uniform_backtracking {α : Type } (a : Array α) : MetaM α := do
+def uniform_backtracking {α : Type } (a : Array α) : IO α := do
   -- Using monadLift to lift the random number generation from IO to MetaM
   let idx ← monadLift <| IO.rand 0 (a.size - 1)
-  let mem ←  option_to_MetaM (a[idx]?)
+  let mem ←  option_to_IO (a[idx]?)
   return mem
 
 
-def weight_backtracking {α : Type } (a : Array α) (low_weight_size: Nat) (weight: Nat): MetaM α := do
+def weight_backtracking {α : Type } (a : Array α) (low_weight_size: Nat) (weight: Nat): IO α := do
   -- Using monadLift to lift the random number generation from IO to MetaM
   let maxnum := low_weight_size + (a.size - low_weight_size)*weight -1
   let randnat ← monadLift <| IO.rand 0 maxnum
   let idx := if randnat < low_weight_size then randnat else (randnat - low_weight_size)/weight + low_weight_size
-  let mem ←  option_to_MetaM (a[idx]?)
+  let mem ←  option_to_IO (a[idx]?)
   return mem
 
 

@@ -16,8 +16,8 @@ open Random Gen
 
 #derive_generator balanced with_name ["h", "T"] backtrack 100
 
-#eval gen_balanced_at_1 2 1
-
+#eval gen_balanced_at_1 5 4
+#eval gen_balanced_at_1 5 4
 
 
 

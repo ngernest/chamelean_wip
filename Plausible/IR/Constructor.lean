@@ -97,7 +97,7 @@ def gen_IR_at_pos_toCode (id: FVarId) (cond: Expr) (pos: Nat) : MetaM String := 
 def gen_nonIR_toCode (id: FVarId) (ty: Expr) : MetaM String := do
   let mut out:= "let "++ toString (id.name) ++ " ← "
   out := out ++ "monadLift <| Gen.run (SampleableExt.interpSample "
-  out := out ++ toString (← Meta.ppExpr ty) ++ ") 1"
+  out := out ++ toString (← Meta.ppExpr ty) ++ ") 100"
   return out
 
 def GenCheckCalls_toCode (c: GenCheckCall): MetaM String := do
@@ -340,9 +340,9 @@ def cbe_if_return_producer (cbe: backtrack_elem) (iden: String) (vars: List Stri
   for gcc in cbe.gcc_group.ret do
     out := out ++ (← GenCheckCalls_toCode gcc)
   if cbe.var_eq.size + cbe.gcc_group.check_nonIR_list.size + cbe.gcc_group.check_IR_list.size + cbe.gcc_group.ifsome_list.size > 0 then
-    out := out ++ "\nthrowError \"fail at checkstep\""
+    out := out ++ "\nthrow (IO.userError \"fail at checkstep\")"
   if cbe.mat_inp.size > 0 then
-    out:= out ++ "\n| " ++ makeUnderscores_commas cbe.mat_inp.size ++ " => throwError \"fail\""
+    out:= out ++ "\n| " ++ makeUnderscores_commas cbe.mat_inp.size ++ " => throw (IO.userError \"fail\")"
   return out
 
 

@@ -1,7 +1,9 @@
 import Lean
 import Std
+import Plausible
 open List Nat Array String
 open Lean Elab Command Meta Term
+open Plausible
 
 
 def uniform_backtrack_codeblock (btarray: Array String) (inps: List String) (backtracknum: Nat) : MetaM String := do
@@ -56,15 +58,26 @@ structure IT_constructor where
 
 structure IT_info where
   name : Name
+  noinstance : Array Expr
   constructors : Array IT_constructor
-  nonind_constructors : Array IT_constructor
-  ind_constructors : Array IT_constructor
 
+#check SampleableExt
 
 def is_ind_IT_constructor (ITname: Name )(conargs: List Expr) : Bool := match conargs with
 | [] => false
 | h::t => (h.constName == ITname) || is_ind_IT_constructor ITname t
 
+
+def has_instance (e: Expr) : MetaM Bool := do
+  let exprTyp ← inferType e
+  let .sort u ← whnf (← inferType exprTyp) | throwError m!"{exprTyp} is not a type"
+  let .succ u := u | throwError m!"{exprTyp} is not a type with computational content"
+  let v ← mkFreshLevelMVar
+  let app ← synthInstance? (mkApp (mkConst ``SampleableExt [u, v]) e)
+  let v ← instantiateLevelMVars v
+  match app with
+  | some _ => return true
+  | _ => return false
 
 def extract_IT_info (inpexp : Expr) : MetaM (IT_info) := do
   match inpexp.getAppFn.constName? with
@@ -74,15 +87,19 @@ def extract_IT_info (inpexp : Expr) : MetaM (IT_info) := do
     | none => throwError "Type '{typeName}' not found"
     | some (ConstantInfo.inductInfo info) => do
       let mut constructors : Array IT_constructor := #[]
+      let mut noinstance : Array Expr := #[]
       for ctorName in info.ctors do
         let some ctor := env.find? ctorName
          | throwError "IRConstructor '{ctorName}' not found"
         let ctys ←  get_types_chain ctor.type
         let cargs := ctys.toList.dropLast
+        for a in cargs do
+          if ¬ (← has_instance a) then noinstance:= noinstance.push a
         constructors := constructors.push ⟨typeName, ctor.name, cargs⟩
-      let nonind_constructors:= constructors.filter (fun x => is_ind_IT_constructor typeName x.args)
-      let ind_constructors:= constructors.filter (fun x =>  (is_ind_IT_constructor typeName x.args == false))
-      return ⟨typeName, constructors, nonind_constructors,ind_constructors⟩
+      IO.println s!"No inst {noinstance}"
+      --let nonind_constructors:= constructors.filter (fun x => is_ind_IT_constructor typeName x.args)
+      --let ind_constructors:= constructors.filter (fun x =>  (is_ind_IT_constructor typeName x.args == false))
+      return ⟨typeName, noinstance, constructors⟩
     | some _ =>
       throwError "'{typeName}' is not an inductive type"
   | none => throwError "Not a type"
