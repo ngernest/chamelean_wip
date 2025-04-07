@@ -28,7 +28,7 @@ def prototype_for_checker (r: IR_info) (inpname: List String) : MetaM String := 
     let typeformat ← Meta.ppExpr type
     let typename := elim_dot_for_type (toString typeformat)
     prototype :=  prototype ++ "(" ++ name ++ " : " ++ typename ++ ") "
-  prototype := prototype ++ ": MetaM Bool"
+  prototype := prototype ++ ": IO Bool"
   return prototype
 
 def prototype_for_checker_by_con (r: IR_info) (inpname: List String) (con: Nat): MetaM String := do
@@ -41,7 +41,7 @@ def prototype_for_checker_by_con (r: IR_info) (inpname: List String) (con: Nat):
     let typeformat ← Meta.ppExpr type
     let typename := elim_dot_for_type (toString typeformat)
     prototype :=  prototype ++ "(" ++ name ++ " : " ++ typename ++ ") "
-  prototype := prototype ++ ": MetaM Bool"
+  prototype := prototype ++ ": IO Bool"
   return prototype
 
 
@@ -76,9 +76,9 @@ def prototype_for_producer(r: IR_info) (inpname: List String) (genpos: Nat) : Me
     prototype :=  prototype ++ "(" ++ name ++ " : " ++ typename ++ ") "
   let rettype := elim_dot_for_type (toString (← Meta.ppExpr out.2))
   if rettype.contains ' ' then
-    prototype := prototype ++ ": MetaM (" ++ rettype ++ ")"
+    prototype := prototype ++ ": IO (" ++ rettype ++ ")"
   else
-    prototype := prototype ++ ": MetaM " ++ rettype
+    prototype := prototype ++ ": IO " ++ rettype
   return prototype
 
 def prototype_for_producer_by_con(r: IR_info) (inpname: List String) (genpos: Nat) (con: Nat): MetaM String := do
@@ -95,9 +95,9 @@ def prototype_for_producer_by_con(r: IR_info) (inpname: List String) (genpos: Na
     prototype :=  prototype ++ "(" ++ name ++ " : " ++ typename ++ ") "
   let rettype := elim_dot_for_type (toString (← Meta.ppExpr out.2))
   if rettype.contains ' ' then
-    prototype := prototype ++ ": MetaM (" ++ rettype ++ ")"
+    prototype := prototype ++ ": IO (" ++ rettype ++ ")"
   else
-    prototype := prototype ++ ": MetaM " ++ rettype
+    prototype := prototype ++ ": IO " ++ rettype
   return prototype
 
 
