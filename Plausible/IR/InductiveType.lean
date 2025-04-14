@@ -118,37 +118,17 @@ def nonind_backtrack_list_for_IT (r: IT_info): MetaM (Array String) := do
   return out
 
 
-def uniform_backtracking_IT {α : Type } (a : Array α) (h: a.size > 0): Gen α := do
-  -- Using monadLift to lift the random number generation from IO to MetaM
-  let idx ← choose Nat 0 (a.size -1) (by omega)
-  let mem :=  a[idx.val]'(by omega)
-  return mem
 
-
-
-def weight_backtracking_IT {α : Type } (a : Array α) (low_weight_size: Nat) (weight: Nat)
-      (h1: a.size ≥ low_weight_size  )(h: low_weight_size  > 0): Gen α := do
-  -- Using monadLift to lift the random number generation from IO to MetaM
-  let maxnum := low_weight_size + (a.size - low_weight_size)*weight -1
-  let randnat ← choose Nat 0 maxnum (by omega)
-  let idx := if randnat.val < low_weight_size then randnat.val else (randnat.val - low_weight_size)/weight + low_weight_size
-  have h: idx < a.size :=by
-    simp only [idx]; split ; omega
-    apply Nat.add_lt_of_lt_sub; apply Nat.div_lt_of_lt_mul; apply Nat.sub_lt_left_of_lt_add (by omega)
-    have: low_weight_size + weight * (a.size - low_weight_size) = maxnum + 1 :=by rw[Nat.mul_comm] ;omega
-    omega
-  let mem :=  a[idx]'h
-  return mem
 
 def uniform_backtrack_codeblock_IT (btarray: Array String) : MetaM String := do
-  let mut body := "  ← uniform_backtracking_IT #["
+  let mut body := "  ← uniform_backtracking_Gen #["
   for bt in btarray do
     body := body ++ bt ++ ", "
   body:= ⟨body.data.dropLast.dropLast⟩ ++ "] (by simp)"
   return body
 
 def weight_backtrack_codeblock_IT (btarray: Array String) (low_weight_size: Nat): MetaM String := do
-  let mut body :=  " ← weight_backtracking_IT #["
+  let mut body :=  " ← weight_backtracking_Gen #["
   for bt in btarray do
     body := body ++ bt ++ ", "
   body:= ⟨body.data.dropLast.dropLast⟩ ++ "] " ++ toString low_weight_size ++ " size (by simp) (by omega)"
@@ -167,7 +147,7 @@ def IT_gen (r: IT_info) : MetaM (String) := do
     let con_code ← generatorCode_for_IT_constructor con
     body:=body ++ con_prototype
     if con.is_inductive then
-      body:= body ++ "  if size = 0 then ← uniform_backtracking_IT #["
+      body:= body ++ "  if size = 0 then ← uniform_backtracking_Gen #["
       for bt in bt0 do
         body := body ++ bt ++ ", "
       body:= ⟨body.data.dropLast.dropLast⟩ ++ "] (by simp)\n  else\n"
@@ -207,15 +187,6 @@ def elabGetMutualBlock : CommandElab := fun stx => do
 #gen_IT Tree
 
 
-def parseFunction (input : String) : CommandElabM Unit := do
-  let env ← getEnv
-  match Parser.runParserCategory env `command input with
-  | Except.ok stx =>
-    IO.println s!"Parsed successfully: {stx}"
-    elabCommand stx
-    --runFrontend (processCommand stx) {} {} -- Executes the parsed command
-  | Except.error err => IO.println s!"Parse error: {err}"
-
 syntax (name := derivesamplable) "#derive_sampleable" term "with_size" num : command
 
 @[command_elab derivesamplable]
@@ -227,9 +198,9 @@ def elabDeriveGenerator : CommandElab := fun stx => do
         let size := TSyntax.getNat t2
         let it ←  extract_IT_info e
         instance_def_code it size
-      parseFunction shrinkable
-      parseFunction code
-      parseFunction instance_def
+      parseCommand shrinkable
+      parseCommand code
+      parseCommand instance_def
   | _ => throwError "Invalid syntax"
 
 

@@ -21,20 +21,20 @@ def is_ind_type (typename : Name) : MetaM Bool := do
   | some (ConstantInfo.inductInfo _) => return true
   | some _ => return false
 
-def is_num (n: Expr) : Bool := n.constName ∈ [`Nat]
+def is_builtin (n: Expr) : Bool := n.constName ∈ [`Nat]
 
 
-def is_num_cond (e: Expr) : MetaM Bool := do
+def is_builtin_cond (e: Expr) : MetaM Bool := do
   let fn := e.getAppFn
   let ty ← inferType fn
   let types := (← get_types_chain ty).pop
-  let p := (types.size > 0) ∧ (∀ t ∈ types, is_num t)
+  let p := (types.size > 0) ∧ (∀ t ∈ types, is_builtin t)
   return p
 
 def mkFVars (a: Array Name) : Array Expr:= a.map (fun x => mkFVar ⟨x⟩)
 
 def is_inductive_cond (inpexp : Expr) : MetaM Bool := do
-  if ← is_num_cond inpexp then return false
+  if ← is_builtin_cond inpexp then return false
   match inpexp.getAppFn.constName? with
   | some typeName => is_ind_type typeName
   | none => return false
@@ -117,8 +117,8 @@ def process_constructor (ctortype: Expr) (inpvar: Array Expr) (inptypes: Array E
   match splitLast? list_prop with
   | some (cond_prop, out_prop) =>
     let (var_names, _):= list_name_type.unzip
-    let (numvars, _) := (list_name_type.filter (fun (_,b) => is_num b)).unzip
-    let (notnumvars, _) := (list_name_type.filter (fun (_,b) => ¬ is_num b)).unzip
+    let (numvars, _) := (list_name_type.filter (fun (_,b) => is_builtin b)).unzip
+    let (notnumvars, _) := (list_name_type.filter (fun (_,b) => ¬ is_builtin b)).unzip
     let mut num_conds := #[]
     let mut nonlinear_conds := #[]
     let mut inductive_conds := #[]
@@ -126,7 +126,7 @@ def process_constructor (ctortype: Expr) (inpvar: Array Expr) (inptypes: Array E
     let outprop_args:= out_prop.getAppArgs
     let output ← option_to_MetaM (out_prop.getAppArgs).toList.getLast?
     for cond in cond_prop do
-      if ← is_num_cond cond then
+      if ← is_builtin_cond cond then
         num_conds := num_conds.push cond
       else if cond.getAppFn.constName = relation_name then
         recursive_conds := recursive_conds.push cond
@@ -136,8 +136,8 @@ def process_constructor (ctortype: Expr) (inpvar: Array Expr) (inptypes: Array E
         nonlinear_conds := nonlinear_conds.push cond
     let inp_eq :=  outprop_args.zip inpvar
     let inp_eq_ztype := inp_eq.zip inptypes
-    let (num_inp_eq,_) := (inp_eq_ztype.filter (fun (_, t) => is_num t)).unzip
-    let (notnum_inp_eq,_) := (inp_eq_ztype.filter (fun (_, t) => ¬ is_num t)).unzip
+    let (num_inp_eq,_) := (inp_eq_ztype.filter (fun (_, t) => is_builtin t)).unzip
+    let (notnum_inp_eq,_) := (inp_eq_ztype.filter (fun (_, t) => ¬ is_builtin t)).unzip
     return {
       ctor_expr := ctortype
       var_names := var_names,
@@ -190,8 +190,8 @@ def process_constructor_unify_inpname (ctortype: Expr) (inpvar: Array Expr) (inp
     let out_prop ← replace_FVar_list out_prop0 replist
     let cond_prop ← replace_arrcond_FVar_list cond_prop0 replist
     let (var_names, _):= list_name_type.unzip
-    let (numvars, _) := (list_name_type.filter (fun (_,b) => is_num b)).unzip
-    let (notnumvars, _) := (list_name_type.filter (fun (_,b) => ¬ is_num b)).unzip
+    let (numvars, _) := (list_name_type.filter (fun (_,b) => is_builtin b)).unzip
+    let (notnumvars, _) := (list_name_type.filter (fun (_,b) => ¬ is_builtin b)).unzip
     let mut num_conds := #[]
     let mut nonlinear_conds := #[]
     let mut inductive_conds := #[]
@@ -199,7 +199,7 @@ def process_constructor_unify_inpname (ctortype: Expr) (inpvar: Array Expr) (inp
     let outprop_args:= out_prop.getAppArgs
     let output ← option_to_MetaM (out_prop.getAppArgs).toList.getLast?
     for cond in cond_prop do
-      if ← is_num_cond cond then
+      if ← is_builtin_cond cond then
         num_conds := num_conds.push cond
       else if cond.getAppFn.constName = relation_name then
         recursive_conds := recursive_conds.push cond
@@ -209,8 +209,8 @@ def process_constructor_unify_inpname (ctortype: Expr) (inpvar: Array Expr) (inp
         nonlinear_conds := nonlinear_conds.push cond
     let inp_eq :=  outprop_args.zip inpvar
     let inp_eq_ztype := inp_eq.zip inptypes
-    let (num_inp_eq,_) := (inp_eq_ztype.filter (fun (_, t) => is_num t)).unzip
-    let (notnum_inp_eq,_) := (inp_eq_ztype.filter (fun (_, t) => ¬ is_num t)).unzip
+    let (num_inp_eq,_) := (inp_eq_ztype.filter (fun (_, t) => is_builtin t)).unzip
+    let (notnum_inp_eq,_) := (inp_eq_ztype.filter (fun (_, t) => ¬ is_builtin t)).unzip
     return {
       ctor_expr := ctortype
       var_names := var_names,

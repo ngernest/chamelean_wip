@@ -8,7 +8,7 @@ open Plausible
 
 def uniform_backtrack_codeblock (btarray: Array String) (inps: List String) (backtracknum: Nat) : MetaM String := do
   let mut body := " for _i in [1:" ++ toString backtracknum ++ "] do\n"
-  body:= body ++ "  let f ← uniform_backtracking #["
+  body:= body ++ "  let f ← uniform_backtracking_IO #["
   for bt in btarray do
     body := body ++ bt ++ ", "
   body:= ⟨body.data.dropLast.dropLast⟩ ++ "]\n  let ret ← MetaM_to_option (f size "
@@ -23,7 +23,7 @@ def uniform_backtrack_codeblock (btarray: Array String) (inps: List String) (bac
 
 def weight_backtrack_codeblock (btarray: Array String) (inps: List String) (backtracknum: Nat) (low_weight_size: Nat): MetaM String := do
   let mut body := " for _i in [1:" ++ toString backtracknum ++ "] do\n"
-  body:= body ++ "  let f ← weight_backtracking #["
+  body:= body ++ "  let f ← weight_backtracking_IO #["
   for bt in btarray do
     body := body ++ bt ++ ", "
   body:= ⟨body.data.dropLast.dropLast⟩ ++ "] " ++ toString low_weight_size ++ " size"

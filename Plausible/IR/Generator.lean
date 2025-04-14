@@ -16,10 +16,11 @@ namespace Plausible.IR
 -- Generate function --
 
 
-def get_checker (r: IR_info) (inpname: List String) (btnum: Nat) : MetaM String := do
-  let prototype ←  prototype_for_checker r inpname
-  let body ← checker_body r inpname btnum
-  let where_def ← checker_where_defs r inpname
+def get_checker (r: IR_info) (inpname: List String) (btnum: Nat)
+    (monad: String :="IO") : MetaM String := do
+  let prototype ←  prototype_for_checker r inpname monad
+  let body ← checker_body r inpname btnum monad
+  let where_def ← checker_where_defs r inpname monad
   let checker := where_def ++ "\n" ++ prototype ++ " := do\n" ++ body ++ "\n"
   return checker
 
@@ -43,10 +44,11 @@ def elabGetChecker : CommandElab := fun stx => do
 #gen_checker balanced with_name ["h", "T"] backtrack 100
 #gen_checker bst with_name ["lo", "hi", "T"] backtrack 100
 
-def get_producer (r: IR_info) (inpname: List String) (genpos: Nat) (btnum: Nat): MetaM String := do
-  let prototype ←  prototype_for_producer r inpname genpos
-  let body ← producer_body r inpname genpos btnum
-  let where_def ← producer_where_defs r inpname genpos
+def get_producer (r: IR_info) (inpname: List String) (genpos: Nat) (btnum: Nat)
+    (monad: String :="IO") : MetaM String := do
+  let prototype ←  prototype_for_producer r inpname genpos monad
+  let body ← producer_body r inpname genpos btnum monad
+  let where_def ← producer_where_defs r inpname genpos monad
   let producer := where_def ++ "\n" ++ prototype ++ " := do\n" ++ body ++ "\n"
   return producer
 
@@ -72,33 +74,36 @@ def elabGetProducer : CommandElab := fun stx => do
 #gen_producer bst with_name ["lo", "hi", "T"] for_arg 2 backtrack 100
 
 
-def get_mutual_rec_block (r: IR_info) (inpname: List String) (btnum: Nat) : MetaM String := do
-  let checker ←  get_checker r inpname btnum
+def get_mutual_rec_block (r: IR_info) (inpname: List String) (btnum: Nat) (monad: String :="IO"): MetaM String := do
+  let checker ←  get_checker r inpname btnum monad
   let mut mc_block := "mutual\n-- CHECKER \n " ++ checker
   for pos in [0:r.inp_types.size] do
-    let producer ← get_producer r inpname pos btnum
+    let producer ← get_producer r inpname pos btnum monad
     mc_block := mc_block ++ "\n-- GENERATOR FOR ARG" ++ toString pos ++ "\n" ++ producer
   mc_block := mc_block ++ "\nend"
   return mc_block
 
-syntax (name := genmutualrec) "#gen_mutual_rec" term "with_name" term "backtrack" num: command
+syntax (name := genmutualrec) "#gen_mutual_rec" term "with_name" term "backtrack" num "monad" str: command
 
 @[command_elab genmutualrec]
 def elabGetMutualBlock : CommandElab := fun stx => do
   match stx with
-  | `(#gen_mutual_rec $t with_name $t2:term backtrack $t3) =>
+  | `(#gen_mutual_rec $t with_name $t2:term backtrack $t3 monad $t4) =>
     Command.liftTermElabM do
       let e ← elabTerm t none
       let inpname ← termToStringList t2
       let relation ←  extract_IR_info_with_inpname e inpname
       let btnum := TSyntax.getNat t3
-      let mc_block := get_mutual_rec_block relation inpname btnum
+      let mnad := TSyntax.getString t4
+      let mc_block := get_mutual_rec_block relation inpname btnum mnad
       print_m_string mc_block
   | _ => throwError "Invalid syntax"
 
-#gen_mutual_rec typing with_name ["L", "e", "t"] backtrack 100
-#gen_mutual_rec balanced with_name ["h", "T"] backtrack 100
-#gen_mutual_rec bst with_name ["lo", "hi", "T"] backtrack 100
+#gen_mutual_rec typing with_name ["L", "e", "t"] backtrack 100 monad "IO"
+#gen_mutual_rec typing with_name ["L", "e", "t"] backtrack 100 monad "Gen"
+#gen_mutual_rec balanced with_name ["h", "T"] backtrack 100 monad "IO"
+#gen_mutual_rec bst with_name ["lo", "hi", "T"] backtrack 100 monad "IO"
+#gen_mutual_rec bst with_name ["lo", "hi", "T"] backtrack 100 monad "Gen"
 
 def get_testfile (r: IR_info) (inpname: List String) (btnum: Nat) : MetaM String := do
   let mut importblock := "import Lean \nimport Plausible.IR_example\nimport Plausible.IR_backtrack\n"
@@ -128,29 +133,21 @@ def elabWriteMutualBlock : CommandElab := fun stx => do
 --#writefile_mutual_rec balanced with_name ["h", "T"] backtrack 100 tofile "balanced.lean"
 --#writefile_mutual_rec bst with_name ["lo", "hi", "T"] backtrack 100 tofile "bst.lean"
 
-def parseFunction (input : String) : CommandElabM Unit := do
-  let env ← getEnv
-  match Parser.runParserCategory env `command input with
-  | Except.ok stx =>
-    IO.println s!"Parsed successfully: {stx}"
-    elabCommand stx
-    --runFrontend (processCommand stx) {} {} -- Executes the parsed command
-  | Except.error err => IO.println s!"Parse error: {err}"
 
-
-syntax (name := derivegenerator) "#derive_generator" term "with_name" term "backtrack" num: command
+syntax (name := derivegenerator) "#derive_generator" term "backtrack" num: command
 
 @[command_elab derivegenerator]
 def elabDeriveGenerator : CommandElab := fun stx => do
   match stx with
-  | `(#derive_generator $t with_name $t2:term backtrack $t3) =>
+  | `(#derive_generator $t backtrack $t3) =>
       let mc_block ← Command.liftTermElabM do
         let e ←  elabTerm t none
-        let inpname ← termToStringList t2
+        let r0 ← extract_IR_info e
+        let inpname := makeInputs "in" r0.inp_types.size
         let relation ←  extract_IR_info_with_inpname e inpname
         let btnum := TSyntax.getNat t3
         get_mutual_rec_block relation inpname btnum
-      parseFunction mc_block
+      parseCommand mc_block
   | _ => throwError "Invalid syntax"
 
 

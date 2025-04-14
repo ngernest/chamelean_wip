@@ -94,20 +94,23 @@ def gen_IR_at_pos_toCode (id: FVarId) (cond: Expr) (pos: Nat) : MetaM String := 
       fn_str := fn_str ++ "(" ++ toString (← Meta.ppExpr a) ++ ")"
   return "let " ++ toString (id.name)  ++ " ← " ++ fn_str
 
-def gen_nonIR_toCode (id: FVarId) (ty: Expr) : MetaM String := do
-  let mut out:= "let "++ toString (id.name) ++ " ← "
-  out := out ++ "monadLift <| Gen.run (SampleableExt.interpSample "
-  out := out ++ toString (← Meta.ppExpr ty) ++ ") 100"
+def gen_nonIR_toCode (id: FVarId) (ty: Expr) (monad: String :="IO") : MetaM String := do
+  let mut out:= "let "++ toString (id.name)
+  let typename := afterLastDot (toString (← Meta.ppExpr ty))
+  if monad = "IO" then
+    out := out ++ " ← monadLift <| Gen.run (SampleableExt.interpSample " ++ typename ++ ") 100"
+  else
+    out := out ++ " ←  SampleableExt.interpSample " ++ typename
   return out
 
-def GenCheckCalls_toCode (c: GenCheckCall): MetaM String := do
+def GenCheckCalls_toCode (c: GenCheckCall) (monad: String :="IO"): MetaM String := do
   match c with
   | GenCheckCall.check_IR cond => return  "← check_" ++ (← add_size_param cond)
   | GenCheckCall.check_nonIR cond => return  "(" ++ toString (← Meta.ppExpr cond) ++ ")"
   | GenCheckCall.gen_IR id cond pos => gen_IR_at_pos_toCode id cond pos
   | GenCheckCall.mat id sp => return  "if let " ++ toString (← Meta.ppExpr sp.cond) ++ " := " ++ toString (id.name) ++ " then "
-  | GenCheckCall.gen_fvar id ty =>  gen_nonIR_toCode id ty
-  | GenCheckCall.ret e => return "return " ++ toString (← Meta.ppExpr e)
+  | GenCheckCall.gen_fvar id ty =>  gen_nonIR_toCode id ty monad
+  | GenCheckCall.ret e => return "return " ++ (if monad = "IO" then "" else "some ") ++ toString (← Meta.ppExpr e)
 
 def cbe_match_block (cbe: backtrack_elem) : MetaM String := do
   let mut out := ""
@@ -121,41 +124,41 @@ def cbe_match_block (cbe: backtrack_elem) : MetaM String := do
     out:= ⟨out.data.dropLast.dropLast⟩ ++ " =>  "
   return out
 
-def cbe_gen_block (cbe: backtrack_elem) : MetaM String := do
+def cbe_gen_block (cbe: backtrack_elem) (monad: String :="IO"): MetaM String := do
   let mut out := ""
   for gcc in cbe.gcc_group.gen_list do
-    out := out ++ (← GenCheckCalls_toCode gcc) ++ " \n"
+    out := out ++ (← GenCheckCalls_toCode gcc monad) ++ " \n"
   if cbe.gcc_group.gen_list.size > 0 then
     out := ⟨out.data.dropLast.dropLast⟩
   return out
 
-def cbe_ifsome_block (cbe: backtrack_elem) : MetaM (String × String) := do
+def cbe_ifsome_block (cbe: backtrack_elem) (monad: String :="IO"): MetaM (String × String) := do
   let mut out := ""
   let iden := if cbe.gcc_group.ifsome_list.size > 0 then "  " else ""
   let mut is_ident:= false
   for gcc in cbe.gcc_group.ifsome_list do
     if is_ident then
-      out := out  ++ iden ++ (← GenCheckCalls_toCode gcc) ++ " \n"
+      out := out  ++ iden ++ (← GenCheckCalls_toCode gcc monad) ++ " \n"
     else
-      out := out  ++ (← GenCheckCalls_toCode gcc) ++ " \n"
+      out := out  ++ (← GenCheckCalls_toCode gcc monad) ++ " \n"
       is_ident:= true
   if cbe.gcc_group.ifsome_list.size > 0 then
     out := ⟨out.data.dropLast.dropLast⟩
   return (out, iden)
 
-def cbe_gen_check_IR_block (cbe: backtrack_elem) (iden: String): MetaM (String × (List String)) := do
+def cbe_gen_check_IR_block (cbe: backtrack_elem) (iden: String) (monad: String :="IO"): MetaM (String × (List String)) := do
   let mut out := ""
   let mut vars : List String := []
   let mut checkcount := 1
   for gcc in cbe.gcc_group.check_IR_list do
-    out := out ++ iden ++ "let check" ++ toString checkcount ++ " " ++ (← GenCheckCalls_toCode gcc) ++ " \n"
+    out := out ++ iden ++ "let check" ++ toString checkcount ++ " " ++ (← GenCheckCalls_toCode gcc monad) ++ " \n"
     vars := vars ++ [toString checkcount]
     checkcount := checkcount + 1
   if cbe.gcc_group.check_IR_list.size > 0 then
     out := ⟨out.data.dropLast.dropLast⟩
   return (out, vars)
 
-def cbe_return_checker (cbe: backtrack_elem) (iden: String) (vars: List String): MetaM String := do
+def cbe_return_checker (cbe: backtrack_elem) (iden: String) (vars: List String) (monad: String :="IO"): MetaM String := do
   let mut out := ""
   if cbe.var_eq.size + cbe.gcc_group.check_nonIR_list.size + cbe.gcc_group.check_IR_list.size > 0 then
     out := out ++ iden ++ "return "
@@ -166,7 +169,7 @@ def cbe_return_checker (cbe: backtrack_elem) (iden: String) (vars: List String):
   for i in cbe.var_eq do
     out := out ++  "(" ++ toString (i.1.name) ++ " == " ++ toString (i.2.name) ++ ") && "
   for gcc in cbe.gcc_group.check_nonIR_list do
-    out := out ++ (← GenCheckCalls_toCode gcc) ++ " && "
+    out := out ++ (← GenCheckCalls_toCode gcc monad) ++ " && "
   if cbe.var_eq.size + cbe.gcc_group.check_nonIR_list.size + cbe.gcc_group.check_IR_list.size > 0 then
     out:= ⟨out.data.dropLast.dropLast.dropLast⟩
   if cbe.gcc_group.ifsome_list.size > 0 then
@@ -175,13 +178,13 @@ def cbe_return_checker (cbe: backtrack_elem) (iden: String) (vars: List String):
     out:= out ++ "\n| " ++ makeUnderscores_commas cbe.mat_inp.size ++ " => return false"
   return out
 
-def backtrack_elem_toString_checker (cbe: backtrack_elem) : MetaM String := do
+def backtrack_elem_toString_checker (cbe: backtrack_elem) (monad: String :="IO"): MetaM String := do
   let mut out := ""
   let matchblock ← cbe_match_block cbe
-  let genblock ← cbe_gen_block cbe
-  let (ifsomeblock, iden) ← cbe_ifsome_block cbe
-  let (checkIRblock, vars) ← cbe_gen_check_IR_block cbe iden
-  let returnblock ← cbe_return_checker cbe iden vars
+  let genblock ← cbe_gen_block cbe monad
+  let (ifsomeblock, iden) ← cbe_ifsome_block cbe monad
+  let (checkIRblock, vars) ← cbe_gen_check_IR_block cbe iden monad
+  let returnblock ← cbe_return_checker cbe iden vars monad
   out := out ++ matchblock
   if genblock.length > 0  ∧ out.length > 0 then
     out := out ++ "\n"
@@ -197,52 +200,8 @@ def backtrack_elem_toString_checker (cbe: backtrack_elem) : MetaM String := do
   else out:= out ++ returnblock
   return out
 
-/-
-def backtrack_elem_toString_checker1 (cbe: backtrack_elem) : MetaM String := do
-  let mut out := ""
-  if cbe.mat_inp.size > 0 then
-    out := out ++ "match "
-    for i in cbe.mat_inp do
-      out := out ++  i  ++ " , "
-    out:= ⟨out.data.dropLast.dropLast⟩ ++ " with \n| "
-    for a in cbe.mat_expr do
-      out := out ++ toString (← Meta.ppExpr a) ++ " , "
-    out:= ⟨out.data.dropLast.dropLast⟩ ++ " =>  "
-  for gcc in cbe.gcc_group.gen_list do
-    out := out ++ " \n" ++ (← GenCheckCalls_toCode gcc)
-  let iden := if cbe.gcc_group.ifsome_list.size > 0 then "  " else ""
-  let mut is_ident:= false
-  for gcc in cbe.gcc_group.ifsome_list do
-    if is_ident then
-      out := out ++ " \n" ++ iden ++ (← GenCheckCalls_toCode gcc)
-    else
-      out := out ++ " \n" ++ (← GenCheckCalls_toCode gcc)
-      is_ident:= true
-  let mut checkcount := 1
-  for gcc in cbe.gcc_group.check_IR_list do
-    out := out ++ " \n" ++ iden ++ "let check" ++ toString checkcount ++ " " ++ (← GenCheckCalls_toCode gcc)
-    checkcount := checkcount + 1
-  if cbe.var_eq.size + cbe.gcc_group.check_nonIR_list.size + cbe.gcc_group.check_IR_list.size > 0 then
-    out := out ++ "\n" ++ iden ++ "return "
-  else
-    out := out ++ "return true"
-  for j in [1:checkcount] do
-    out := out ++ "check" ++ toString j ++ " && "
-  for i in cbe.var_eq do
-    out := out ++  "(" ++ toString (i.1.name) ++ " == " ++ toString (i.2.name) ++ ") && "
-  for gcc in cbe.gcc_group.check_nonIR_list do
-    out := out ++ (← GenCheckCalls_toCode gcc) ++ " && "
-  if cbe.var_eq.size + cbe.gcc_group.check_nonIR_list.size + cbe.gcc_group.check_IR_list.size > 0 then
-    out:= ⟨out.data.dropLast.dropLast.dropLast⟩
-  if cbe.gcc_group.ifsome_list.size > 0 then
-      out := out ++ " => return false"
-  if cbe.mat_inp.size > 0 then
-    out:= out ++ "\n| " ++ makeUnderscores_commas cbe.mat_inp.size ++ " => return false"
-  return out
--/
 
-
-def checker_where_defs (relation: IR_info) (inpname: List String): MetaM String := do
+def checker_where_defs (relation: IR_info) (inpname: List String) (monad: String :="IO") : MetaM String := do
   let mut out_str := ""
   let mut i := 0
   for con in relation.constructors do
@@ -250,9 +209,9 @@ def checker_where_defs (relation: IR_info) (inpname: List String): MetaM String 
     let conprops_str := (← con.cond_props.mapM (fun a => Meta.ppExpr a)).map toString
     out_str:= out_str ++ "\n-- Constructor: " ++ toString conprops_str
     out_str:= out_str ++ " → " ++ toString (← Meta.ppExpr con.out_prop) ++ "\n"
-    out_str:= out_str ++ (← prototype_for_checker_by_con relation inpname i) ++ ":= do \n"
+    out_str:= out_str ++ (← prototype_for_checker_by_con relation inpname i monad) ++ ":= do \n"
     let bt ← get_checker_backtrack_elem_from_constructor con inpname
-    let btStr ← backtrack_elem_toString_checker bt
+    let btStr ← backtrack_elem_toString_checker bt monad
     out_str:= out_str ++ btStr ++ "\n"
   return out_str
 
@@ -303,29 +262,7 @@ def get_producer_backtrack_elem_from_constructor (con: IRConstructor) (inpname: 
   }
 
 
-/-
-def get_producer_backtrack_elem_from_constructor (con: IRConstructor) (inpname: List String) (genpos: Nat)
-      : MetaM backtrack_elem := do
-  let out_prop := con.out_prop
-  let args := (out_prop.getAppArgs).toList
-  let zipinp := inpname.zip args
-  let zipinp := zipinp.take (genpos) ++ zipinp.drop (genpos+1)
-  let need_match_zipimp :=  zipinp.filter (fun x => is_inductive_constructor x.2)
-  let (mat_inp, mat_expr) := need_match_zipimp.unzip
-  --Get GenCheckCall
-  let gccs ← GenCheckCalls_for_producer con genpos
-  let gcc_group ← GenCheckCalls_grouping gccs
-  return {
-    inp := (inpname.take (genpos) ++ inpname.drop (genpos+1)).toArray
-    mat_inp:= mat_inp.toArray
-    mat_expr := mat_expr.toArray
-    gcc_group := gcc_group
-    var_eq := gcc_group.var_eq
-  }
--/
-
-
-def cbe_if_return_producer (cbe: backtrack_elem) (iden: String) (vars: List String): MetaM String := do
+def cbe_if_return_producer (cbe: backtrack_elem) (iden: String) (vars: List String) (monad: String :="IO"): MetaM String := do
   let mut out:= ""
   if cbe.var_eq.size + cbe.gcc_group.check_nonIR_list.size + cbe.gcc_group.check_IR_list.size > 0 then
     out := out ++ iden ++ "if "
@@ -334,25 +271,27 @@ def cbe_if_return_producer (cbe: backtrack_elem) (iden: String) (vars: List Stri
   for i in cbe.var_eq do
     out := out ++  "(" ++ toString (i.1.name) ++ " == " ++ toString (i.2.name) ++ ") && "
   for gcc in cbe.gcc_group.check_nonIR_list do
-    out := out ++ (← GenCheckCalls_toCode gcc) ++ " && "
+    out := out ++ (← GenCheckCalls_toCode gcc monad) ++ " && "
   if cbe.var_eq.size + cbe.gcc_group.check_nonIR_list.size + cbe.gcc_group.check_IR_list.size > 0 then
     out:= ⟨out.data.dropLast.dropLast.dropLast⟩ ++ "\n" ++ iden ++  "then "
   for gcc in cbe.gcc_group.ret do
-    out := out ++ (← GenCheckCalls_toCode gcc)
+    out := out ++ (← GenCheckCalls_toCode gcc monad)
   if cbe.var_eq.size + cbe.gcc_group.check_nonIR_list.size + cbe.gcc_group.check_IR_list.size + cbe.gcc_group.ifsome_list.size > 0 then
-    out := out ++ "\nthrow (IO.userError \"fail at checkstep\")"
+    let monad_fail := if monad = "IO" then "throw (IO.userError \"fail at checkstep\")" else "return none"
+    out := out ++ "\n" ++ monad_fail
   if cbe.mat_inp.size > 0 then
-    out:= out ++ "\n| " ++ makeUnderscores_commas cbe.mat_inp.size ++ " => throw (IO.userError \"fail\")"
+    let monad_fail := if monad = "IO" then "throw (IO.userError \"fail\")" else "return none"
+    out:= out ++ "\n| " ++ makeUnderscores_commas cbe.mat_inp.size ++ " => " ++ monad_fail
   return out
 
 
-def backtrack_elem_toString_producer (cbe: backtrack_elem) : MetaM String := do
+def backtrack_elem_toString_producer (cbe: backtrack_elem) (monad: String :="IO"): MetaM String := do
   let mut out := ""
   let matchblock ← cbe_match_block cbe
-  let genblock ← cbe_gen_block cbe
-  let (ifsomeblock, iden) ← cbe_ifsome_block cbe
-  let (checkIRblock, vars) ← cbe_gen_check_IR_block cbe iden
-  let returnblock ← cbe_if_return_producer cbe iden vars
+  let genblock ← cbe_gen_block cbe monad
+  let (ifsomeblock, iden) ← cbe_ifsome_block cbe monad
+  let (checkIRblock, vars) ← cbe_gen_check_IR_block cbe iden monad
+  let returnblock ← cbe_if_return_producer cbe iden vars monad
   out := out ++ matchblock
   if genblock.length > 0  ∧ out.length > 0 then
     out := out ++ "\n"
@@ -369,54 +308,7 @@ def backtrack_elem_toString_producer (cbe: backtrack_elem) : MetaM String := do
   return out
 
 
-/-
-def backtrack_elem_toString_producer1 (cbe: backtrack_elem) : MetaM String := do
-  let mut out := ""
-  if cbe.mat_inp.size > 0 then
-    out := out ++ "match "
-    for i in cbe.mat_inp do
-      out := out ++  i  ++ " , "
-    out:= ⟨out.data.dropLast.dropLast⟩ ++ " with \n| "
-    for a in cbe.mat_expr do
-      out := out ++ toString (← Meta.ppExpr a) ++ " , "
-    out:= ⟨out.data.dropLast.dropLast⟩ ++ " => "
-  for gcc in cbe.gcc_group.gen_list do
-    out := out ++ " \n" ++ (← GenCheckCalls_toCode gcc)
-  let iden := if cbe.gcc_group.ifsome_list.size > 0 then "  " else ""
-  let mut is_ident:= false
-  for gcc in cbe.gcc_group.ifsome_list do
-    if is_ident then
-      out := out ++ " \n" ++ iden ++ (← GenCheckCalls_toCode gcc)
-    else
-      out := out ++ " \n" ++ (← GenCheckCalls_toCode gcc)
-      is_ident:= true
-  let mut checkcount := 1
-  for gcc in cbe.gcc_group.check_IR_list do
-    out := out ++ " \n" ++ iden ++ "let check" ++ toString checkcount ++ " " ++ (← GenCheckCalls_toCode gcc)
-    checkcount := checkcount + 1
-  if cbe.var_eq.size + cbe.gcc_group.check_nonIR_list.size + cbe.gcc_group.check_IR_list.size > 0 then
-    out := out ++ "\n" ++ iden ++ "if "
-  else
-    out := out ++ "\n"
-  for j in [1:checkcount] do
-    out := out ++ "check" ++ toString j ++ " && "
-  for i in cbe.var_eq do
-    out := out ++  "(" ++ toString (i.1.name) ++ " == " ++ toString (i.2.name) ++ ") && "
-  for gcc in cbe.gcc_group.check_nonIR_list do
-    out := out ++ (← GenCheckCalls_toCode gcc) ++ " && "
-  if cbe.var_eq.size + cbe.gcc_group.check_nonIR_list.size + cbe.gcc_group.check_IR_list.size > 0 then
-    out:= ⟨out.data.dropLast.dropLast.dropLast⟩ ++ "\n" ++ iden ++  "then "
-  for gcc in cbe.gcc_group.ret do
-    out := out ++ (← GenCheckCalls_toCode gcc)
-  if cbe.var_eq.size + cbe.gcc_group.check_nonIR_list.size + cbe.gcc_group.check_IR_list.size + cbe.gcc_group.ifsome_list.size > 0 then
-    out := out ++ "\nthrowError \"fail at checkstep\""
-  if cbe.mat_inp.size > 0 then
-    out:= out ++ "\n| " ++ makeUnderscores_commas cbe.mat_inp.size ++ " => throwError \"fail\""
-  return out
--/
-
-
-def producer_where_defs (relation: IR_info) (inpname: List String) (genpos: Nat): MetaM String := do
+def producer_where_defs (relation: IR_info) (inpname: List String) (genpos: Nat) (monad: String :="IO"): MetaM String := do
   let mut out_str := ""
   let mut i := 0
   for con in relation.constructors do
@@ -424,9 +316,9 @@ def producer_where_defs (relation: IR_info) (inpname: List String) (genpos: Nat)
     let conprops_str := (← con.cond_props.mapM (fun a => Meta.ppExpr a)).map toString
     out_str:= out_str ++ "\n-- Constructor: " ++ toString conprops_str
     out_str:= out_str ++ " → " ++ toString (← Meta.ppExpr con.out_prop) ++ "\n"
-    out_str:= out_str ++ (← prototype_for_producer_by_con relation inpname genpos i) ++ ":= do\n"
+    out_str:= out_str ++ (← prototype_for_producer_by_con relation inpname genpos i monad) ++ ":= do\n"
     let bt ← get_producer_backtrack_elem_from_constructor con inpname genpos
-    let btStr ← backtrack_elem_toString_producer bt
+    let btStr ← backtrack_elem_toString_producer bt monad
     out_str:= out_str ++ btStr ++ "\n"
   return out_str
 

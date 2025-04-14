@@ -12,9 +12,9 @@ open Plausible.IR
 open Random Gen
 
 
-#gen_mutual_rec balanced with_name ["h", "T"] backtrack 10
+#gen_mutual_rec balanced with_name ["h", "T"] backtrack 10 monad "Gen"
 
-#derive_generator balanced with_name ["h", "T"] backtrack 100
+#derive_generator balanced  backtrack 100
 
 #eval gen_balanced_at_1 5 4
 #eval gen_balanced_at_1 5 4
@@ -67,7 +67,7 @@ instance : SampleableExt Tree :=
   SampleableExt.mkSelfContained (gentree 3)
 
 
-#eval Gen.run (SampleableExt.interpSample (List Tree)) 5
+#eval Gen.run (SampleableExt.interpSample Tree) 5
 
 #sample List Tree
 

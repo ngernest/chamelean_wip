@@ -13,7 +13,7 @@ import Lean.Elab.Deriving.DecEq
 open List Nat Array String
 open Lean Elab Command Meta Term
 open Lean.Parser.Term
-open Plausible
+open Plausible Gen
 
 namespace Plausible.IR
 
@@ -59,59 +59,68 @@ def size_pos_backtrack_for_producer (r: IR_info) (genpos: Nat): MetaM (Array Str
       out:= out.push bt
   return out
 
-def uniform_backtrack_codeblock (btarray: Array String) (inps: List String) (backtracknum: Nat) : MetaM String := do
+def uniform_backtrack_codeblock (btarray: Array String) (inps: List String) (backtracknum: Nat)
+      (monad: String :="IO") : MetaM String := do
   let mut body := " for _i in [1:" ++ toString backtracknum ++ "] do\n"
-  body:= body ++ "  let f ← uniform_backtracking #["
+  body:= body ++ "  let f ← uniform_backtracking_" ++ monad ++ " #["
   for bt in btarray do
     body := body ++ bt ++ ", "
-  body:= ⟨body.data.dropLast.dropLast⟩ ++ "]\n  let ret ← IO_to_option (f size "
+  body:= ⟨body.data.dropLast.dropLast⟩ ++ "] "
+  body:= body ++ "\n  let ret ← "
+  body:= if monad = "IO" then body ++ monad ++ "_to_option (f size " else body ++ "(f size "
   for i in inps do
     body:= body ++ i ++ " "
   body:= ⟨body.data.dropLast⟩ ++ ")\n"
   body:= body ++ "  match ret with\n"
   body:= body ++ "  | some ret => return ret\n"
   body:= body ++ "  | _ => continue\n"
-  body:= body ++ " throw (IO.userError \"fail\")"
+  let monad_fail: String := if monad = "IO" then "throw (IO.userError \"fail\")" else "return false"
+  body:= body ++ " " ++ monad_fail
   return body
 
-def weight_backtrack_codeblock (btarray: Array String) (inps: List String) (backtracknum: Nat) (low_weight_size: Nat): MetaM String := do
+def weight_backtrack_codeblock (btarray: Array String) (inps: List String) (backtracknum: Nat) (low_weight_size: Nat)
+    (monad: String :="IO") : MetaM String := do
   let mut body := " for _i in [1:" ++ toString backtracknum ++ "] do\n"
-  body:= body ++ "  let f ← weight_backtracking #["
+  body:= body ++ "  let f ← weight_backtracking_" ++ monad ++ " #["
   for bt in btarray do
     body := body ++ bt ++ ", "
   body:= ⟨body.data.dropLast.dropLast⟩ ++ "] " ++ toString low_weight_size ++ " size"
-  body:= body ++ "\n  let ret ← IO_to_option (f size "
+  body:= body ++ "\n  let ret ← "
+  body:= if monad = "IO" then body ++ monad ++ "_to_option (f size " else body ++ "(f size "
   for i in inps do
     body:= body ++ i ++ " "
   body:= ⟨body.data.dropLast⟩ ++ ")\n"
   body:= body ++ "  match ret with\n"
   body:= body ++ "  | some ret => return ret\n"
   body:= body ++ "  | _ => continue\n"
-  body:= body ++ " throw (IO.userError \"fail\")"
+  let monad_fail: String := if monad = "IO" then "throw (IO.userError \"fail\")" else "return false"
+  body:= body ++ " " ++ monad_fail
   return body
 
-def checker_body (r: IR_info) (inpname: List String) (backtracknum: Nat): MetaM (String) := do
+def checker_body (r: IR_info) (inpname: List String) (backtracknum: Nat)
+    (monad: String :="IO") : MetaM (String) := do
   let mut body := "match size with \n| zero => \n"
   let bt0 ← size_zero_backtrack_for_checker r
-  let btblock ← uniform_backtrack_codeblock bt0 inpname backtracknum
+  let btblock ← uniform_backtrack_codeblock bt0 inpname backtracknum monad
   body := body ++ btblock
   body:= body ++ "\n| succ size => \n"
   let btpos ← size_pos_backtrack_for_checker r
-  let btblock ← weight_backtrack_codeblock btpos inpname backtracknum bt0.size
+  let btblock ← weight_backtrack_codeblock btpos inpname backtracknum bt0.size monad
   body := body ++ btblock
   return body
 
 
-def producer_body (r: IR_info) (inpname: List String) (genpos: Nat) (backtracknum: Nat): MetaM (String) := do
+def producer_body (r: IR_info) (inpname: List String) (genpos: Nat) (backtracknum: Nat)
+    (monad: String :="IO") : MetaM (String) := do
   let mut body := "match size with \n| zero => \n"
   let inps := inpname.take genpos ++ inpname.drop (genpos + 1)
   let bt0 ← size_zero_backtrack_for_producer r genpos
-  let btblock ← uniform_backtrack_codeblock bt0 inps backtracknum
+  let btblock ← uniform_backtrack_codeblock bt0 inps backtracknum monad
   body := body ++ btblock
   body:= body ++ "\n| succ size => \n"
   let btpos ← size_pos_backtrack_for_producer r genpos
   let bts:= bt0.append btpos
-  let btblock ← weight_backtrack_codeblock bts inps backtracknum bt0.size
+  let btblock ← weight_backtrack_codeblock bts inps backtracknum bt0.size monad
   body := body ++ btblock
   return body
 
@@ -129,19 +138,39 @@ def IO_to_option (io : IO α) : IO (Option α) := do
   catch _ =>
     pure none
 
-def uniform_backtracking {α : Type } (a : Array α) : IO α := do
+def uniform_backtracking_IO {α : Type } (a : Array α) : IO α := do
   -- Using monadLift to lift the random number generation from IO to MetaM
   let idx ← monadLift <| IO.rand 0 (a.size - 1)
   let mem ←  option_to_IO (a[idx]?)
   return mem
 
 
-def weight_backtracking {α : Type } (a : Array α) (low_weight_size: Nat) (weight: Nat): IO α := do
+def weight_backtracking_IO {α : Type } (a : Array α) (low_weight_size: Nat) (weight: Nat): IO α := do
   -- Using monadLift to lift the random number generation from IO to MetaM
   let maxnum := low_weight_size + (a.size - low_weight_size)*weight -1
   let randnat ← monadLift <| IO.rand 0 maxnum
   let idx := if randnat < low_weight_size then randnat else (randnat - low_weight_size)/weight + low_weight_size
   let mem ←  option_to_IO (a[idx]?)
+  return mem
+
+def uniform_backtracking_Gen {α : Type } (a : Array α) (h: a.size > 0): Gen α := do
+  let idx ← choose Nat 0 (a.size -1) (by omega)
+  let mem :=  a[idx.val]'(by omega)
+  return mem
+
+
+
+def weight_backtracking_Gen {α : Type } (a : Array α) (low_weight_size: Nat) (weight: Nat)
+      (h1: a.size ≥ low_weight_size  )(h: low_weight_size  > 0): Gen α := do
+  let maxnum := low_weight_size + (a.size - low_weight_size)*weight -1
+  let randnat ← choose Nat 0 maxnum (by omega)
+  let idx := if randnat.val < low_weight_size then randnat.val else (randnat.val - low_weight_size)/weight + low_weight_size
+  have h: idx < a.size :=by
+    simp only [idx]; split ; omega
+    apply Nat.add_lt_of_lt_sub; apply Nat.div_lt_of_lt_mul; apply Nat.sub_lt_left_of_lt_add (by omega)
+    have: low_weight_size + weight * (a.size - low_weight_size) = maxnum + 1 :=by rw[Nat.mul_comm] ;omega
+    omega
+  let mem :=  a[idx]'h
   return mem
 
 

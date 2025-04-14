@@ -57,7 +57,6 @@ def printExpr_of_Name (name : Name) : MetaM Format := do
   let m ← Meta.ppExpr e
   return m
 
-
 def option_to_MetaM {α : Type} (o : Option α) (errorMsg : String := "Option is none") : MetaM α :=
   match o with
   | some a => return a
@@ -109,7 +108,6 @@ partial def decompose_type(e : Expr) : MetaM (Array (Name × Expr) × Expr × Ar
   return (binder,  exp, tyexp)
 
 
-
 def get_recursive_calls (typeName : Name) (e : Expr) : MetaM (Array Expr) := do
   let rec go (e : Expr) (acc : Array Expr) : MetaM (Array Expr) := do
     match e with
@@ -148,10 +146,9 @@ def mk_eqs (ee: Array (Expr × Expr)) : MetaM (Array Expr) := do
     equations := equations.push (← whnf eq)
   return equations
 
-
 def splitLast? (arr : Array Expr) : Option (Array Expr × Expr) :=
   match arr.back? with
-  |  none => none
+  | none => none
   | some a => some (arr.extract 0 (arr.size - 1), a)
 
 def printConstructorsWithArgs (typeName : Name) : MetaM Unit := do
@@ -366,8 +363,18 @@ where makeInputs_aux (s: String) (n : Nat) (z: Nat) : List String := match n wit
 | 0 => []
 | succ n => [s ++ "_" ++ (toString (z - n) ) ++ " "] ++ (makeInputs_aux s n z)
 
+
 def print_m_string (m: MetaM String) : MetaM Unit :=do
   IO.println s!"{← m}"
+
+def parseCommand (input : String) : CommandElabM Unit := do
+  let env ← getEnv
+  match Parser.runParserCategory env `command input with
+  | Except.ok stx =>
+    IO.println s!"Parsed successfully: {stx}"
+    elabCommand stx
+    --runFrontend (processCommand stx) {} {} -- Executes the parsed command
+  | Except.error err => IO.println s!"Parse error: {err}"
 
 
 end Plausible.IR
