@@ -46,6 +46,7 @@ def GenCheckCalls_grouping (gccs: Array GenCheckCall) : MetaM GenCheckCall_group
     | GenCheckCall.mat _ sp =>
       {
         ifsome_list := ifsome_list.push gcc;
+        gen_list := gen_list.push gcc;
         var_eq := var_eq ++ sp.eqs;
       }
     | GenCheckCall.ret _ => ret:= ret.push gcc
@@ -125,13 +126,17 @@ def cbe_match_block (cbe: backtrack_elem) : MetaM String := do
     out:= ⟨out.data.dropLast.dropLast⟩ ++ " =>  "
   return out
 
-def cbe_gen_block (cbe: backtrack_elem) (monad: String :="IO"): MetaM String := do
+def cbe_gen_block (cbe: backtrack_elem) (monad: String :="IO"): MetaM (String × String) := do
   let mut out := ""
+  let mut iden := ""
   for gcc in cbe.gcc_group.gen_list do
-    out := out ++ (← GenCheckCalls_toCode gcc monad) ++ " \n"
+    out := out ++ iden ++ (← GenCheckCalls_toCode gcc monad) ++ " \n"
+    match gcc with
+    | GenCheckCall.mat _ _ => iden := iden ++ " "
+    | _ => continue
   if cbe.gcc_group.gen_list.size > 0 then
     out := ⟨out.data.dropLast.dropLast⟩
-  return out
+  return (out, iden)
 
 def cbe_ifsome_block (cbe: backtrack_elem) (monad: String :="IO"): MetaM (String × String) := do
   let mut out := ""
@@ -182,8 +187,8 @@ def cbe_return_checker (cbe: backtrack_elem) (iden: String) (vars: List String) 
 def backtrack_elem_toString_checker (cbe: backtrack_elem) (monad: String :="IO"): MetaM String := do
   let mut out := ""
   let matchblock ← cbe_match_block cbe
-  let genblock ← cbe_gen_block cbe monad
-  let (ifsomeblock, iden) ← cbe_ifsome_block cbe monad
+  let (genblock, iden) ← cbe_gen_block cbe monad
+  --let (ifsomeblock, iden) ← cbe_ifsome_block cbe monad
   let (checkIRblock, vars) ← cbe_gen_check_IR_block cbe iden monad
   let returnblock ← cbe_return_checker cbe iden vars monad
   out := out ++ matchblock
@@ -191,13 +196,13 @@ def backtrack_elem_toString_checker (cbe: backtrack_elem) (monad: String :="IO")
   if genblock.length > 0 ∧ out.length > 0 then
     out := out ++ "\n"
   out:= out ++ genblock
-  if ifsomeblock.length > 0 ∧ out.length > 0 then
-    out := out ++ "\n"
-  out:= out ++ ifsomeblock
+  --if ifsomeblock.length > 0 ∧ out.length > 0 then
+  --  out := out ++ "\n"
+  --out:= out ++ ifsomeblock
   if checkIRblock.length > 0 ∧ out.length > 0 then
     out := out ++ "\n"
   out:= out ++ checkIRblock
-  if genblock.length + ifsomeblock.length + checkIRblock.length > 0 then
+  if genblock.length + checkIRblock.length > 0 then
     out:= out ++ "\n" ++ returnblock
   else out:= out ++ returnblock
   return out
@@ -290,21 +295,21 @@ def cbe_if_return_producer (cbe: backtrack_elem) (iden: String) (vars: List Stri
 def backtrack_elem_toString_producer (cbe: backtrack_elem) (monad: String :="IO"): MetaM String := do
   let mut out := ""
   let matchblock ← cbe_match_block cbe
-  let genblock ← cbe_gen_block cbe monad
-  let (ifsomeblock, iden) ← cbe_ifsome_block cbe monad
+  let (genblock, iden) ← cbe_gen_block cbe monad
+  --let (ifsomeblock, iden) ← cbe_ifsome_block cbe monad
   let (checkIRblock, vars) ← cbe_gen_check_IR_block cbe iden monad
   let returnblock ← cbe_if_return_producer cbe iden vars monad
   out := out ++ matchblock
-  if genblock.length + ifsomeblock.length + checkIRblock.length + returnblock.length > 0  ∧ out.length > 0 then
+  if genblock.length + checkIRblock.length + returnblock.length > 0  ∧ out.length > 0 then
     out := out ++ "\n"
   out:= out ++ genblock
-  if ifsomeblock.length > 0 ∧ out.length > 0 then
-    out := out ++ "\n"
-  out:= out ++ ifsomeblock
+  --if ifsomeblock.length > 0 ∧ out.length > 0 then
+  --  out := out ++ "\n"
+  --out:= out ++ ifsomeblock
   if checkIRblock.length > 0 ∧ out.length > 0 then
     out := out ++ "\n"
   out:= out ++ checkIRblock
-  if genblock.length + ifsomeblock.length + checkIRblock.length > 0 then
+  if genblock.length + checkIRblock.length > 0 then
     out:= out ++ "\n" ++ returnblock
   else out:= out ++ returnblock
   return out

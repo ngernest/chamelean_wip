@@ -606,7 +606,7 @@ match l  with
 | (state_api_call.get k none, state_result.Failure "no such key", s0)  =>
 let tcond1 ← gen_lookup_kv_at_1 size s
 if let (state_result.Failure "no such key", k_1, 0, v) := tcond1 then
-  return (s == s0) && (k == k_1)
+ return (s == s0) && (k == k_1)
 return false
 | _  => return false
 
@@ -624,7 +624,7 @@ match l  with
 | (state_api_call.get k (some n), state_result.Failure "no such version", s0)  =>
 let tcond1 ← gen_lookup_kv_at_1 size s
 if let (state_result.Failure "no such version", k_1, n_1, v) := tcond1 then
-  return (s == s0) && (k == k_1) && (n == n_1)
+ return (s == s0) && (k == k_1) && (n == n_1)
 return false
 | _  => return false
 
@@ -634,7 +634,7 @@ match l  with
 | (state_api_call.key_exists k, state_result.Ok, s0)  =>
 let tcond1 ← gen_lookup_kv_at_1 size s
 if let (state_result.Ok, k_1, 0, v) := tcond1 then
-  return (s == s0) && (k == k_1)
+ return (s == s0) && (k == k_1)
 return false
 | _  => return false
 
@@ -644,7 +644,7 @@ match l  with
 | (state_api_call.key_exists k, state_result.Result "no such key", s0)  =>
 let tcond1 ← gen_lookup_kv_at_1 size s
 if let (state_result.Failure "no such key", k_1, 0, v) := tcond1 then
-  return (s == s0) && (k == k_1)
+ return (s == s0) && (k == k_1)
 return false
 | _  => return false
 
@@ -662,8 +662,8 @@ match l  with
 | (state_api_call.copy k k2, state_result.Ok, s2)  =>
 let tcond1 ← gen_lookup_kv_at_1 size s
 if let (state_result.Ok, k_1, 0, v) := tcond1 then
-  let check1 ← check_add_kv size k2 v s s2
-  return check1 && (k == k_1)
+ let check1 ← check_add_kv size k2 v s s2
+ return check1 && (k == k_1)
 return false
 | _  => return false
 
@@ -673,7 +673,7 @@ match l  with
 | (state_api_call.copy k k2, state_result.Failure "no such key", s0)  =>
 let tcond1 ← gen_lookup_kv_at_1 size s
 if let (state_result.Failure "no such key", k_1, 0, v) := tcond1 then
-  return (s == s0) && (k == k_1)
+ return (s == s0) && (k == k_1)
 return false
 | _  => return false
 
@@ -682,10 +682,10 @@ partial def check_eval_state_api_call_by_con_10 (size : Nat) (s : List (String �
 match l  with
 | (state_api_call.append k v3, state_result.Ok, s2)  =>
 let tcond1 ← gen_lookup_kv_at_1 size s
-let v2 ← monadLift <| Gen.run (SampleableExt.interpSample String) 100
 if let (state_result.Ok, k_1, 0, v) := tcond1 then
-  let check1 ← check_add_kv size k v3 s s2
-  return check1 && (k == k_1) && (v3 = append_string v v2)
+ let v2 ← monadLift <| Gen.run (SampleableExt.interpSample String) 100
+ let check1 ← check_add_kv size k v3 s s2
+ return check1 && (k == k_1) && (v3 = append_string v v2)
 return false
 | _  => return false
 
@@ -695,7 +695,7 @@ match l  with
 | (state_api_call.append k v2, state_result.Failure "no such key", s0)  =>
 let tcond1 ← gen_lookup_kv_at_1 size s
 if let (state_result.Failure "no such key", k_1, 0, v) := tcond1 then
-  return (s == s0) && (k == k_1)
+ return (s == s0) && (k == k_1)
 return false
 | _  => return false
 
@@ -705,8 +705,8 @@ match l  with
 | (state_api_call.delete k, state_result.Ok, s2)  =>
 let tcond1 ← gen_lookup_kv_at_1 size s
 if let (state_result.Ok, k_1, 0, v) := tcond1 then
-  let check1 ← check_remove_kv size k s s2
-  return check1 && (k == k_1)
+ let check1 ← check_remove_kv size k s s2
+ return check1 && (k == k_1)
 return false
 | _  => return false
 
@@ -716,7 +716,7 @@ match l  with
 | (state_api_call.delete k, state_result.Failure "no such key", s0)  =>
 let tcond1 ← gen_lookup_kv_at_1 size s
 if let (state_result.Failure "no such key", k_1, 0, v) := tcond1 then
-  return (s == s0) && (k == k_1)
+ return (s == s0) && (k == k_1)
 return false
 | _  => return false
 
@@ -758,8 +758,8 @@ match l  with
 | (state_api_call.get k none, state_result.Failure "no such key", s)  =>
 let tcond1 ← gen_lookup_kv_at_1 size s
 if let (state_result.Failure "no such key", k_1, 0, v) := tcond1 then
-  if (k == k_1)
-  then   return s
+ if (k == k_1)
+ then  return s
 throw (IO.userError "fail at checkstep")
 | _  => throw (IO.userError "fail")
 
@@ -780,8 +780,8 @@ match l  with
 | (state_api_call.get k (some n), state_result.Failure "no such version", s)  =>
 let tcond1 ← gen_lookup_kv_at_1 size s
 if let (state_result.Failure "no such version", k_1, n_1, v) := tcond1 then
-  if (k == k_1) && (n == n_1)
-  then   return s
+ if (k == k_1) && (n == n_1)
+ then  return s
 throw (IO.userError "fail at checkstep")
 | _  => throw (IO.userError "fail")
 
@@ -791,8 +791,8 @@ match l  with
 | (state_api_call.key_exists k, state_result.Ok, s)  =>
 let tcond1 ← gen_lookup_kv_at_1 size s
 if let (state_result.Ok, k_1, 0, v) := tcond1 then
-  if (k == k_1)
-  then   return s
+ if (k == k_1)
+ then  return s
 throw (IO.userError "fail at checkstep")
 | _  => throw (IO.userError "fail")
 
@@ -802,8 +802,8 @@ match l  with
 | (state_api_call.key_exists k, state_result.Result "no such key", s)  =>
 let tcond1 ← gen_lookup_kv_at_1 size s
 if let (state_result.Failure "no such key", k_1, 0, v) := tcond1 then
-  if (k == k_1)
-  then   return s
+ if (k == k_1)
+ then  return s
 throw (IO.userError "fail at checkstep")
 | _  => throw (IO.userError "fail")
 
@@ -822,9 +822,9 @@ match l  with
 let s ← monadLift <| Gen.run (SampleableExt.interpSample (List (String × String))) 100
 let tcond1 ← gen_lookup_kv_at_1 size s
 if let (state_result.Ok, k_1, 0, v) := tcond1 then
-  let check1 ← check_add_kv size k2 v s s2
-  if check1 && (k == k_1)
-  then   return s
+ let check1 ← check_add_kv size k2 v s s2
+ if check1 && (k == k_1)
+ then  return s
 throw (IO.userError "fail at checkstep")
 | _  => throw (IO.userError "fail")
 
@@ -834,8 +834,8 @@ match l  with
 | (state_api_call.copy k k2, state_result.Failure "no such key", s)  =>
 let tcond1 ← gen_lookup_kv_at_1 size s
 if let (state_result.Failure "no such key", k_1, 0, v) := tcond1 then
-  if (k == k_1)
-  then   return s
+ if (k == k_1)
+ then  return s
 throw (IO.userError "fail at checkstep")
 | _  => throw (IO.userError "fail")
 
@@ -845,11 +845,11 @@ match l  with
 | (state_api_call.append k v3, state_result.Ok, s2)  =>
 let s ← monadLift <| Gen.run (SampleableExt.interpSample (List (String × String))) 100
 let tcond1 ← gen_lookup_kv_at_1 size s
-let v2 ← monadLift <| Gen.run (SampleableExt.interpSample String) 100
 if let (state_result.Ok, k_1, 0, v) := tcond1 then
-  let check1 ← check_add_kv size k v3 s s2
-  if check1 && (k == k_1) && (v3 = append_string v v2)
-  then   return s
+ let v2 ← monadLift <| Gen.run (SampleableExt.interpSample String) 100
+ let check1 ← check_add_kv size k v3 s s2
+ if check1 && (k == k_1) && (v3 = append_string v v2)
+ then  return s
 throw (IO.userError "fail at checkstep")
 | _  => throw (IO.userError "fail")
 
@@ -859,8 +859,8 @@ match l  with
 | (state_api_call.append k v2, state_result.Failure "no such key", s)  =>
 let tcond1 ← gen_lookup_kv_at_1 size s
 if let (state_result.Failure "no such key", k_1, 0, v) := tcond1 then
-  if (k == k_1)
-  then   return s
+ if (k == k_1)
+ then  return s
 throw (IO.userError "fail at checkstep")
 | _  => throw (IO.userError "fail")
 
@@ -871,9 +871,9 @@ match l  with
 let s ← monadLift <| Gen.run (SampleableExt.interpSample (List (String × String))) 100
 let tcond1 ← gen_lookup_kv_at_1 size s
 if let (state_result.Ok, k_1, 0, v) := tcond1 then
-  let check1 ← check_remove_kv size k s s2
-  if check1 && (k == k_1)
-  then   return s
+ let check1 ← check_remove_kv size k s s2
+ if check1 && (k == k_1)
+ then  return s
 throw (IO.userError "fail at checkstep")
 | _  => throw (IO.userError "fail")
 
@@ -883,8 +883,8 @@ match l  with
 | (state_api_call.delete k, state_result.Failure "no such key", s)  =>
 let tcond1 ← gen_lookup_kv_at_1 size s
 if let (state_result.Failure "no such key", k_1, 0, v) := tcond1 then
-  if (k == k_1)
-  then   return s
+ if (k == k_1)
+ then  return s
 throw (IO.userError "fail at checkstep")
 | _  => throw (IO.userError "fail")
 
@@ -913,42 +913,42 @@ match size with
 partial def gen_eval_state_api_call_at_1_by_con_1 (size : Nat) (s : List (String × String)) : IO (state_api_call × state_result × List (String × String)):= do
 let tcond1 ← gen_lookup_kv_at_1 size s
 if let (state_result.Ok, k, 0, v) := tcond1 then
-  return (state_api_call.get k none, state_result.Result v, s)
+ return (state_api_call.get k none, state_result.Result v, s)
 throw (IO.userError "fail at checkstep")
 
 -- Constructor: #[lookup_kv s (state_result.Failure "no such key", k, 0, v)] → eval_state_api_call s (state_api_call.get k none, state_result.Failure "no such key", s)
 partial def gen_eval_state_api_call_at_1_by_con_2 (size : Nat) (s : List (String × String)) : IO (state_api_call × state_result × List (String × String)):= do
 let tcond1 ← gen_lookup_kv_at_1 size s
 if let (state_result.Failure "no such key", k, 0, v) := tcond1 then
-  return (state_api_call.get k none, state_result.Failure "no such key", s)
+ return (state_api_call.get k none, state_result.Failure "no such key", s)
 throw (IO.userError "fail at checkstep")
 
 -- Constructor: #[lookup_kv s (state_result.Ok, k, n, v)] → eval_state_api_call s (state_api_call.get k (some n), state_result.Result v, s)
 partial def gen_eval_state_api_call_at_1_by_con_3 (size : Nat) (s : List (String × String)) : IO (state_api_call × state_result × List (String × String)):= do
 let tcond1 ← gen_lookup_kv_at_1 size s
 if let (state_result.Ok, k, n, v) := tcond1 then
-  return (state_api_call.get k (some n), state_result.Result v, s)
+ return (state_api_call.get k (some n), state_result.Result v, s)
 throw (IO.userError "fail at checkstep")
 
 -- Constructor: #[lookup_kv s (state_result.Failure "no such version", k, n, v)] → eval_state_api_call s (state_api_call.get k (some n), state_result.Failure "no such version", s)
 partial def gen_eval_state_api_call_at_1_by_con_4 (size : Nat) (s : List (String × String)) : IO (state_api_call × state_result × List (String × String)):= do
 let tcond1 ← gen_lookup_kv_at_1 size s
 if let (state_result.Failure "no such version", k, n, v) := tcond1 then
-  return (state_api_call.get k (some n), state_result.Failure "no such version", s)
+ return (state_api_call.get k (some n), state_result.Failure "no such version", s)
 throw (IO.userError "fail at checkstep")
 
 -- Constructor: #[lookup_kv s (state_result.Ok, k, 0, v)] → eval_state_api_call s (state_api_call.key_exists k, state_result.Ok, s)
 partial def gen_eval_state_api_call_at_1_by_con_5 (size : Nat) (s : List (String × String)) : IO (state_api_call × state_result × List (String × String)):= do
 let tcond1 ← gen_lookup_kv_at_1 size s
 if let (state_result.Ok, k, 0, v) := tcond1 then
-  return (state_api_call.key_exists k, state_result.Ok, s)
+ return (state_api_call.key_exists k, state_result.Ok, s)
 throw (IO.userError "fail at checkstep")
 
 -- Constructor: #[lookup_kv s (state_result.Failure "no such key", k, 0, v)] → eval_state_api_call s (state_api_call.key_exists k, state_result.Result "no such key", s)
 partial def gen_eval_state_api_call_at_1_by_con_6 (size : Nat) (s : List (String × String)) : IO (state_api_call × state_result × List (String × String)):= do
 let tcond1 ← gen_lookup_kv_at_1 size s
 if let (state_result.Failure "no such key", k, 0, v) := tcond1 then
-  return (state_api_call.key_exists k, state_result.Result "no such key", s)
+ return (state_api_call.key_exists k, state_result.Result "no such key", s)
 throw (IO.userError "fail at checkstep")
 
 -- Constructor: #[add_kv k v s s2] → eval_state_api_call s (state_api_call.set k v, state_result.Ok, s2)
@@ -961,52 +961,52 @@ return (state_api_call.set k v, state_result.Ok, s2)
 -- Constructor: #[lookup_kv s (state_result.Ok, k, 0, v), add_kv k2 v s s2] → eval_state_api_call s (state_api_call.copy k k2, state_result.Ok, s2)
 partial def gen_eval_state_api_call_at_1_by_con_8 (size : Nat) (s : List (String × String)) : IO (state_api_call × state_result × List (String × String)):= do
 let tcond1 ← gen_lookup_kv_at_1 size s
-let k2 ← monadLift <| Gen.run (SampleableExt.interpSample String) 100
-let s2 ← gen_add_kv_at_3 size k2 v s
 if let (state_result.Ok, k, 0, v) := tcond1 then
-  return (state_api_call.copy k k2, state_result.Ok, s2)
+ let k2 ← monadLift <| Gen.run (SampleableExt.interpSample String) 100
+ let s2 ← gen_add_kv_at_3 size k2 v s
+ return (state_api_call.copy k k2, state_result.Ok, s2)
 throw (IO.userError "fail at checkstep")
 
 -- Constructor: #[lookup_kv s (state_result.Failure "no such key", k, 0, v)] → eval_state_api_call s (state_api_call.copy k k2, state_result.Failure "no such key", s)
 partial def gen_eval_state_api_call_at_1_by_con_9 (size : Nat) (s : List (String × String)) : IO (state_api_call × state_result × List (String × String)):= do
 let tcond1 ← gen_lookup_kv_at_1 size s
-let k2 ← monadLift <| Gen.run (SampleableExt.interpSample String) 100
 if let (state_result.Failure "no such key", k, 0, v) := tcond1 then
-  return (state_api_call.copy k k2, state_result.Failure "no such key", s)
+ let k2 ← monadLift <| Gen.run (SampleableExt.interpSample String) 100
+ return (state_api_call.copy k k2, state_result.Failure "no such key", s)
 throw (IO.userError "fail at checkstep")
 
 -- Constructor: #[lookup_kv s (state_result.Ok, k, 0, v), v3 = append_string v v2, add_kv k v3 s s2] → eval_state_api_call s (state_api_call.append k v3, state_result.Ok, s2)
 partial def gen_eval_state_api_call_at_1_by_con_10 (size : Nat) (s : List (String × String)) : IO (state_api_call × state_result × List (String × String)):= do
 let tcond1 ← gen_lookup_kv_at_1 size s
-let v3 ← monadLift <| Gen.run (SampleableExt.interpSample String) 100
-let v2 ← monadLift <| Gen.run (SampleableExt.interpSample String) 100
-let s2 ← gen_add_kv_at_3 size k v3 s
 if let (state_result.Ok, k, 0, v) := tcond1 then
-  if (v3 = append_string v v2)
-  then   return (state_api_call.append k v3, state_result.Ok, s2)
+ let v3 ← monadLift <| Gen.run (SampleableExt.interpSample String) 100
+ let v2 ← monadLift <| Gen.run (SampleableExt.interpSample String) 100
+ let s2 ← gen_add_kv_at_3 size k v3 s
+ if (v3 = append_string v v2)
+ then  return (state_api_call.append k v3, state_result.Ok, s2)
 throw (IO.userError "fail at checkstep")
 
 -- Constructor: #[lookup_kv s (state_result.Failure "no such key", k, 0, v)] → eval_state_api_call s (state_api_call.append k v2, state_result.Failure "no such key", s)
 partial def gen_eval_state_api_call_at_1_by_con_11 (size : Nat) (s : List (String × String)) : IO (state_api_call × state_result × List (String × String)):= do
 let tcond1 ← gen_lookup_kv_at_1 size s
-let v2 ← monadLift <| Gen.run (SampleableExt.interpSample String) 100
 if let (state_result.Failure "no such key", k, 0, v) := tcond1 then
-  return (state_api_call.append k v2, state_result.Failure "no such key", s)
+ let v2 ← monadLift <| Gen.run (SampleableExt.interpSample String) 100
+ return (state_api_call.append k v2, state_result.Failure "no such key", s)
 throw (IO.userError "fail at checkstep")
 
 -- Constructor: #[lookup_kv s (state_result.Ok, k, 0, v), remove_kv k s s2] → eval_state_api_call s (state_api_call.delete k, state_result.Ok, s2)
 partial def gen_eval_state_api_call_at_1_by_con_12 (size : Nat) (s : List (String × String)) : IO (state_api_call × state_result × List (String × String)):= do
 let tcond1 ← gen_lookup_kv_at_1 size s
-let s2 ← gen_remove_kv_at_2 size k s
 if let (state_result.Ok, k, 0, v) := tcond1 then
-  return (state_api_call.delete k, state_result.Ok, s2)
+ let s2 ← gen_remove_kv_at_2 size k s
+ return (state_api_call.delete k, state_result.Ok, s2)
 throw (IO.userError "fail at checkstep")
 
 -- Constructor: #[lookup_kv s (state_result.Failure "no such key", k, 0, v)] → eval_state_api_call s (state_api_call.delete k, state_result.Failure "no such key", s)
 partial def gen_eval_state_api_call_at_1_by_con_13 (size : Nat) (s : List (String × String)) : IO (state_api_call × state_result × List (String × String)):= do
 let tcond1 ← gen_lookup_kv_at_1 size s
 if let (state_result.Failure "no such key", k, 0, v) := tcond1 then
-  return (state_api_call.delete k, state_result.Failure "no such key", s)
+ return (state_api_call.delete k, state_result.Failure "no such key", s)
 throw (IO.userError "fail at checkstep")
 
 partial def gen_eval_state_api_call_at_1 (size : Nat) (s : List (String × String)) : IO (state_api_call × state_result × List (String × String)) := do
