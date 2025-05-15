@@ -105,7 +105,8 @@ def checker_body (r: IR_info) (inpname: List String) (backtracknum: Nat)
   body := body ++ btblock
   body:= body ++ "\n| succ size => \n"
   let btpos ← size_pos_backtrack_for_checker r
-  let btblock ← weight_backtrack_codeblock btpos inpname backtracknum bt0.size monad
+  let bts:= bt0.append btpos
+  let btblock ← weight_backtrack_codeblock bts inpname backtracknum bt0.size monad
   body := body ++ btblock
   return body
 

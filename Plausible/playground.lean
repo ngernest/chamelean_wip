@@ -12,7 +12,7 @@ open Plausible.IR
 open Random Gen
 
 
-#gen_mutual_rec balanced with_name ["h", "T"] backtrack 10 monad "Gen"
+#gen_mutual_rec balanced with_name ["h", "T"] backtrack 10 monad "IO"
 
 #derive_generator balanced  backtrack 100
 

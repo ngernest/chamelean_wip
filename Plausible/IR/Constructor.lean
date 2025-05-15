@@ -96,7 +96,8 @@ def gen_IR_at_pos_toCode (id: FVarId) (cond: Expr) (pos: Nat) : MetaM String := 
 
 def gen_nonIR_toCode (id: FVarId) (ty: Expr) (monad: String :="IO") : MetaM String := do
   let mut out:= "let "++ toString (id.name)
-  let typename := afterLastDot (toString (← Meta.ppExpr ty))
+  let mut typename := afterLastDot (toString (← Meta.ppExpr ty))
+  if typename.contains ' ' then typename:= "(" ++ typename ++ ")"
   if monad = "IO" then
     out := out ++ " ← monadLift <| Gen.run (SampleableExt.interpSample " ++ typename ++ ") 100"
   else
@@ -173,7 +174,7 @@ def cbe_return_checker (cbe: backtrack_elem) (iden: String) (vars: List String) 
   if cbe.var_eq.size + cbe.gcc_group.check_nonIR_list.size + cbe.gcc_group.check_IR_list.size > 0 then
     out:= ⟨out.data.dropLast.dropLast.dropLast⟩
   if cbe.gcc_group.ifsome_list.size > 0 then
-      out := out ++ " => return false"
+      out := out ++ "\nreturn false"
   if cbe.mat_inp.size > 0 then
     out:= out ++ "\n| " ++ makeUnderscores_commas cbe.mat_inp.size ++ " => return false"
   return out
@@ -186,7 +187,8 @@ def backtrack_elem_toString_checker (cbe: backtrack_elem) (monad: String :="IO")
   let (checkIRblock, vars) ← cbe_gen_check_IR_block cbe iden monad
   let returnblock ← cbe_return_checker cbe iden vars monad
   out := out ++ matchblock
-  if genblock.length > 0  ∧ out.length > 0 then
+  --if genblock.length + ifsomeblock.length + checkIRblock.length + returnblock.length > 0 ∧ out.length > 0 then
+  if genblock.length > 0 ∧ out.length > 0 then
     out := out ++ "\n"
   out:= out ++ genblock
   if ifsomeblock.length > 0 ∧ out.length > 0 then
@@ -275,7 +277,7 @@ def cbe_if_return_producer (cbe: backtrack_elem) (iden: String) (vars: List Stri
   if cbe.var_eq.size + cbe.gcc_group.check_nonIR_list.size + cbe.gcc_group.check_IR_list.size > 0 then
     out:= ⟨out.data.dropLast.dropLast.dropLast⟩ ++ "\n" ++ iden ++  "then "
   for gcc in cbe.gcc_group.ret do
-    out := out ++ (← GenCheckCalls_toCode gcc monad)
+    out := out ++ iden ++ (← GenCheckCalls_toCode gcc monad)
   if cbe.var_eq.size + cbe.gcc_group.check_nonIR_list.size + cbe.gcc_group.check_IR_list.size + cbe.gcc_group.ifsome_list.size > 0 then
     let monad_fail := if monad = "IO" then "throw (IO.userError \"fail at checkstep\")" else "return none"
     out := out ++ "\n" ++ monad_fail
@@ -293,7 +295,7 @@ def backtrack_elem_toString_producer (cbe: backtrack_elem) (monad: String :="IO"
   let (checkIRblock, vars) ← cbe_gen_check_IR_block cbe iden monad
   let returnblock ← cbe_if_return_producer cbe iden vars monad
   out := out ++ matchblock
-  if genblock.length > 0  ∧ out.length > 0 then
+  if genblock.length + ifsomeblock.length + checkIRblock.length + returnblock.length > 0  ∧ out.length > 0 then
     out := out ++ "\n"
   out:= out ++ genblock
   if ifsomeblock.length > 0 ∧ out.length > 0 then

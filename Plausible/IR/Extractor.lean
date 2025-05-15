@@ -21,23 +21,59 @@ def is_ind_type (typename : Name) : MetaM Bool := do
   | some (ConstantInfo.inductInfo _) => return true
   | some _ => return false
 
-def is_builtin (n: Expr) : Bool := n.constName ∈ [`Nat]
+def is_IR (type : Expr) : MetaM Bool := do
+  --IO.println s!" cur expr : {type}"
+  if ! (← is_ind_type type.constName) then return false
+  let ty ← inferType type
+  let types ← get_types_chain ty
+  let retty := types.toList.getLast!
+  --IO.println s!" types : {retty}"
+  return retty.isProp
 
 
+def is_builtin (n: Expr) : Bool := n.constName ∈ [`Nat, `String, `Bool]
+
+partial def all_args_types (e: Expr) : MetaM (Array Expr) :=do
+  let args := e.getAppArgs
+  if e.isFVar then return #[]
+  if args.size = 0 then
+    try
+      let ty ← inferType e
+      if is_builtin e then return #[e] else return ty.getAppArgs
+    catch _ => return #[e]
+  let mut out : Array Expr := #[]
+  for arg in args do
+    let arg_types ← all_args_types arg
+    out := out.append arg_types
+  return out
+
+/-
 def is_builtin_cond (e: Expr) : MetaM Bool := do
   let fn := e.getAppFn
-  let ty ← inferType fn
-  let types := (← get_types_chain ty).pop
+  let tys ← all_args_types e
+  IO.println s!" expr  : {e}"
+  IO.println s!" types  : {tys}"
+  if fn.constName! == `Eq then
+    let rhs := e.getAppArgs[1]!
+    let rhsfun := rhs.getAppFn
+    let ty ← inferType rhsfun
+    let types := (← get_types_chain ty).pop
+    let p := (types.size > 0) ∧ (∀ t ∈ types, is_builtin t)
+    return p
+  else
+    let ty ← inferType fn
+    let types := (← get_types_chain ty).pop
+    let p := (types.size > 0) ∧ (∀ t ∈ types, is_builtin t)
+    return p
+-/
+
+def is_builtin_cond (e: Expr) : MetaM Bool := do
+  let types ← all_args_types e
   let p := (types.size > 0) ∧ (∀ t ∈ types, is_builtin t)
   return p
 
-def mkFVars (a: Array Name) : Array Expr:= a.map (fun x => mkFVar ⟨x⟩)
 
-def is_inductive_cond (inpexp : Expr) : MetaM Bool := do
-  if ← is_builtin_cond inpexp then return false
-  match inpexp.getAppFn.constName? with
-  | some typeName => is_ind_type typeName
-  | none => return false
+def mkFVars (a: Array Name) : Array Expr:= a.map (fun x => mkFVar ⟨x⟩)
 
 
 def raw_constructor_type:= Array (Name × Expr) × Expr × Array Expr
@@ -59,6 +95,7 @@ structure IRConstructor where
   ctor_expr: Expr
   num_inp_eq: Array (Expr × Expr)
   notnum_inp_eq: Array (Expr × Expr)
+  root: Name
 
 structure IR_info where
   name : Name
@@ -80,6 +117,18 @@ structure IR_info where
 #check Expr.containsFVar
 #check Expr.updateFVar!
 #check Expr.applyFVarSubst
+
+
+def is_pure_inductive_cond (inpexp : Expr) : MetaM Bool := do
+  match inpexp.getAppFn.constName? with
+  | some typeName => is_ind_type typeName
+  | none => return false
+
+
+def is_inductive_cond (inpexp : Expr) (c: IRConstructor): MetaM Bool := do
+  if ! (← is_IR inpexp.getAppFn) then return false
+  if inpexp.getAppFn.constName.getRoot == c.root then return true
+  return false
 
 
 def process_cond_props (cond_prop: Array Expr) (out_prop: Expr) (var_names : Array Name) : MetaM ((Array Expr) × (Array Name) × (Array (Expr × Expr))) := do
@@ -126,11 +175,11 @@ def process_constructor (ctortype: Expr) (inpvar: Array Expr) (inptypes: Array E
     let outprop_args:= out_prop.getAppArgs
     let output ← option_to_MetaM (out_prop.getAppArgs).toList.getLast?
     for cond in cond_prop do
-      if ← is_builtin_cond cond then
-        num_conds := num_conds.push cond
-      else if cond.getAppFn.constName = relation_name then
+      if cond.getAppFn.constName = relation_name then
         recursive_conds := recursive_conds.push cond
-      else if ← is_inductive_cond cond then
+      else if ← is_builtin_cond cond then
+        num_conds := num_conds.push cond
+      else if ← is_pure_inductive_cond cond then
         inductive_conds := inductive_conds.push cond
       else
         nonlinear_conds := nonlinear_conds.push cond
@@ -155,6 +204,7 @@ def process_constructor (ctortype: Expr) (inpvar: Array Expr) (inptypes: Array E
       inp_eq := inp_eq
       num_inp_eq := num_inp_eq
       notnum_inp_eq := notnum_inp_eq
+      root:= relation_name.getRoot
     }
   | none => throwError "Not a match"
 
@@ -187,6 +237,10 @@ def process_constructor_unify_inpname (ctortype: Expr) (inpvar: Array Expr) (inp
   match splitLast? list_prop with
   | some (cond_prop0, out_prop0) =>
     let replist ← get_Fvar_replist out_prop0 inpname
+    for r in replist do
+      let inpfvar:= r.2.fvarId!
+      let inpfvartype:= varid_type.get! r.1
+      varid_type:= varid_type.insert inpfvar inpfvartype
     let out_prop ← replace_FVar_list out_prop0 replist
     let cond_prop ← replace_arrcond_FVar_list cond_prop0 replist
     let (var_names, _):= list_name_type.unzip
@@ -199,11 +253,11 @@ def process_constructor_unify_inpname (ctortype: Expr) (inpvar: Array Expr) (inp
     let outprop_args:= out_prop.getAppArgs
     let output ← option_to_MetaM (out_prop.getAppArgs).toList.getLast?
     for cond in cond_prop do
-      if ← is_builtin_cond cond then
-        num_conds := num_conds.push cond
-      else if cond.getAppFn.constName = relation_name then
+      if cond.getAppFn.constName = relation_name then
         recursive_conds := recursive_conds.push cond
-      else if ← is_inductive_cond cond then
+      else if ← is_builtin_cond cond then
+        num_conds := num_conds.push cond
+      else if ← is_pure_inductive_cond cond then
         inductive_conds := inductive_conds.push cond
       else
         nonlinear_conds := nonlinear_conds.push cond
@@ -228,6 +282,7 @@ def process_constructor_unify_inpname (ctortype: Expr) (inpvar: Array Expr) (inp
       inp_eq := inp_eq
       num_inp_eq := num_inp_eq
       notnum_inp_eq := notnum_inp_eq
+      root:= relation_name.getRoot
     }
   | none => throwError "Not a match"
 

@@ -163,7 +163,7 @@ def get_uninit_set (cond: Expr) (initset : Array FVarId) := in_a_not_in_b (all_F
 def fully_init (cond: Expr) (initset : Array FVarId) := (get_uninit_set cond initset).size == 0
 
 def get_last_uninit (cond: Expr) (initset : Array FVarId): MetaM (Option Nat) := do
-  if  ¬ (← is_inductive_cond cond) then throwError "not a inductive cond to get_last_uninit_arg "
+  if  ¬ (← is_pure_inductive_cond cond) then throwError "not a inductive cond to get_last_uninit_arg "
   let args:= cond.getAppArgs
   let mut i:=0
   let mut pos:=args.size + 1
@@ -173,7 +173,7 @@ def get_last_uninit (cond: Expr) (initset : Array FVarId): MetaM (Option Nat) :=
   if pos = args.size + 1 then return none else return some pos
 
 def get_last_uninit_arg_and_uninitset (cond: Expr) (initset : Array FVarId): MetaM (Nat × Array FVarId × Array FVarId) := do
-  if  ¬ (← is_inductive_cond cond) then throwError "not a inductive cond to get_last_uninit_arg "
+  if  ¬ (← is_pure_inductive_cond cond) then throwError "not a inductive cond to get_last_uninit_arg "
   let args:= cond.getAppArgs
   let mut i:=0
   let mut pos:=args.size + 1
@@ -208,7 +208,8 @@ def GenCheckCalls_for_cond_props  (c: IRConstructor) (initset0: Array FVarId) : 
     let namearr := (get_uninit_set cond initset).map FVarId.name
     IO.println s!" All uninit fvars : {namearr}"-/
     i := i + 1
-    if ← is_inductive_cond cond then
+    if ← is_inductive_cond cond c then
+      --IO.println s!" cond : {cond}"
       if fully_init cond initset then
         outarr := outarr.push (GenCheckCall.check_IR cond)
       else
