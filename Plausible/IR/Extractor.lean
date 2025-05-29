@@ -14,6 +14,7 @@ namespace Plausible.IR
 /- CODE -/
 
 
+/-- Determines if a type (identified by its `Name`) is an `inductive` -/
 def is_ind_type (typename : Name) : MetaM Bool := do
   let env ← getEnv
   match env.find? typename with
@@ -21,17 +22,17 @@ def is_ind_type (typename : Name) : MetaM Bool := do
   | some (ConstantInfo.inductInfo _) => return true
   | some _ => return false
 
+/-- Determines if an `expr` is an `inductive` relation -/
 def is_IR (type : Expr) : MetaM Bool := do
-  --IO.println s!" cur expr : {type}"
   if ! (← is_ind_type type.constName) then return false
   let ty ← inferType type
   let types ← get_types_chain ty
   let retty := types.toList.getLast!
-  --IO.println s!" types : {retty}"
   return retty.isProp
 
-
-def is_builtin (n: Expr) : Bool := n.constName ∈ [`Nat, `String, `Bool]
+/-- Determines if an `expr` is a base type (i.e. `Nat, String, Bool`) -/
+def is_builtin (n: Expr) : Bool :=
+  n.constName ∈ [`Nat, `String, `Bool]
 
 partial def all_args_types (e: Expr) : MetaM (Array Expr) := do
   let args := e.getAppArgs
@@ -76,8 +77,9 @@ def is_builtin_cond (e: Expr) : MetaM Bool := do
 def mkFVars (a: Array Name) : Array Expr:= a.map (fun x => mkFVar ⟨x⟩)
 
 
-def raw_constructor_type:= Array (Name × Expr) × Expr × Array Expr
+def raw_constructor_type := Array (Name × Expr) × Expr × Array Expr
 
+/-- The `IRConstructor` type represents a constructor for an inductive relation -/
 structure IRConstructor where
   var_names: Array Name
   varid_type : Std.HashMap FVarId Expr
@@ -97,8 +99,11 @@ structure IRConstructor where
   notnum_inp_eq: Array (Expr × Expr)
   root: Name
 
+/-- A `structure` that bundles together all the metadata for an inductive relation -/
 structure IR_info where
+  /-- The name of the inductive relation -/
   name : Name
+  /-- The names of the types for the input parameters -/
   inp_type_names : Array Name
   out_type_name : Name
   inp_types : Array Expr
@@ -443,9 +448,10 @@ def print_relation_info (r: MetaM (IR_info)  ) : MetaM Unit := do
   print_constructors relation.constructors
 
 
-
+-- Declare the syntax for the `#get_relation` command (extracts metadata about an inductive relation)
 syntax (name := getRelationInfo) "#get_relation" term : command
 
+-- Declare & register the elaborator for `#get_relation`
 @[command_elab getRelationInfo]
 def elabGetExpr : CommandElab := fun stx => do
   match stx with
