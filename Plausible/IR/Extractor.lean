@@ -33,7 +33,7 @@ def is_IR (type : Expr) : MetaM Bool := do
 
 def is_builtin (n: Expr) : Bool := n.constName ∈ [`Nat, `String, `Bool]
 
-partial def all_args_types (e: Expr) : MetaM (Array Expr) :=do
+partial def all_args_types (e: Expr) : MetaM (Array Expr) := do
   let args := e.getAppArgs
   if e.isFVar then return #[]
   if args.size = 0 then
@@ -157,7 +157,7 @@ def process_cond_props (cond_prop: Array Expr) (out_prop: Expr) (var_names : Arr
 
 
 def process_constructor (ctortype: Expr) (inpvar: Array Expr) (inptypes: Array Expr) (relation_name: Name): MetaM IRConstructor := do
-  let c ←  decompose_type ctortype
+  let c ← decompose_type ctortype
   let (list_name_type, _ , list_prop) := c
   let mut varid_type : Std.HashMap FVarId Expr := Std.HashMap.emptyWithCapacity
   for pair in list_name_type do
@@ -208,7 +208,7 @@ def process_constructor (ctortype: Expr) (inpvar: Array Expr) (inptypes: Array E
     }
   | none => throwError "Not a match"
 
-def get_Fvar_replist (out_prop: Expr) (inpname: List String) : MetaM (List (FVarId × Expr)) :=do
+def get_Fvar_replist (out_prop: Expr) (inpname: List String) : MetaM (List (FVarId × Expr)) := do
   let new_fvarid : List FVarId := inpname.map (fun x => FVarId.mk (Name.mkStr1 x))
   let new_expr := new_fvarid.map (fun x => Expr.fvar x)
   let args_zip := out_prop.getAppArgs.toList.zip new_expr
@@ -216,7 +216,7 @@ def get_Fvar_replist (out_prop: Expr) (inpname: List String) : MetaM (List (FVar
   let ret := filter_args_zip.map (fun x => (x.1.fvarId!, x.2))
   return ret
 
-def replace_FVar_list (cond : Expr) (fvarids: List (FVarId × Expr)) : MetaM Expr :=do
+def replace_FVar_list (cond : Expr) (fvarids: List (FVarId × Expr)) : MetaM Expr := do
   let mut newcond := cond
   for rep in fvarids do
     newcond := newcond.replaceFVarId rep.1 rep.2
@@ -321,7 +321,7 @@ where makeInputs_aux  (n : Nat) (z: Nat) : List String := match n with
 
 #check mkFVarEx
 
-def mkArrayFreshVar (types: Array Expr) : MetaM (Array Expr) :=do
+def mkArrayFreshVar (types: Array Expr) : MetaM (Array Expr) := do
   let mut vars : Array Expr :=#[]
   for i in [:types.size-1] do
     --let type := types[i]!
@@ -425,7 +425,7 @@ def extract_IR_info_with_inpname (inpexp : Expr) (inpname: List String) : MetaM 
 
 
 
-def print_constructors (c: Array IRConstructor) : MetaM Unit :=do
+def print_constructors (c: Array IRConstructor) : MetaM Unit := do
   let mut i := 0
   for l in c do
     IO.println s!"IRConstructor {i}: "
