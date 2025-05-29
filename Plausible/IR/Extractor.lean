@@ -14,17 +14,9 @@ namespace Plausible.IR
 /- CODE -/
 
 
-/-- Determines if a type (identified by its `Name`) is an `inductive` -/
-def is_ind_type (typename : Name) : MetaM Bool := do
-  let env ← getEnv
-  match env.find? typename with
-  | none => throwError "Type '{typename}' not found"
-  | some (ConstantInfo.inductInfo _) => return true
-  | some _ => return false
-
 /-- Determines if an `expr` is an `inductive` relation -/
 def is_IR (type : Expr) : MetaM Bool := do
-  if ! (← is_ind_type type.constName) then return false
+  if ! (← Meta.isInductivePredicate type.constName) then return false
   let ty ← inferType type
   let types ← get_types_chain ty
   let retty := types.toList.getLast!
@@ -126,7 +118,7 @@ structure IR_info where
 
 def is_pure_inductive_cond (inpexp : Expr) : MetaM Bool := do
   match inpexp.getAppFn.constName? with
-  | some typeName => is_ind_type typeName
+  | some typeName => Meta.isInductivePredicate typeName
   | none => return false
 
 
