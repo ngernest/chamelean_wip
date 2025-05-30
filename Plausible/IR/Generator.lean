@@ -35,6 +35,7 @@ def elabGetChecker : CommandElab := fun stx => do
       let e ← elabTerm t none
       let inpname ← termToStringList t2
       let relation ←  extract_IR_info_with_inpname e inpname
+      logInfo s!"input variable names = {relation.inp_var_names}"
       let btnum := TSyntax.getNat t3
       let checker := get_checker relation inpname btnum
       print_m_string checker

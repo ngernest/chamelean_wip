@@ -70,6 +70,7 @@ def mkFVars (a: Array Name) : Array Expr:= a.map (fun x => mkFVar ⟨x⟩)
 
 
 def raw_constructor_type := Array (Name × Expr) × Expr × Array Expr
+  deriving Repr
 
 /-- The `IRConstructor` type represents a constructor for an inductive relation -/
 structure IRConstructor where
@@ -90,6 +91,7 @@ structure IRConstructor where
   num_inp_eq: Array (Expr × Expr)
   notnum_inp_eq: Array (Expr × Expr)
   root: Name
+  deriving Repr
 
 /-- A `structure` that bundles together all the metadata for an inductive relation -/
 structure IR_info where
@@ -108,6 +110,7 @@ structure IR_info where
   constructors : Array IRConstructor
   nocond_constructors : Array IRConstructor
   cond_constructors : Array IRConstructor
+  deriving Repr
 
 #check Expr.replaceFVarId
 #check Expr.fvarsSubset
