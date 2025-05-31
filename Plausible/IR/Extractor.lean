@@ -40,33 +40,13 @@ partial def all_args_types (e: Expr) : MetaM (Array Expr) := do
     out := out.append arg_types
   return out
 
-/-
-def is_builtin_cond (e: Expr) : MetaM Bool := do
-  let fn := e.getAppFn
-  let tys ← all_args_types e
-  IO.println s!" expr  : {e}"
-  IO.println s!" types  : {tys}"
-  if fn.constName! == `Eq then
-    let rhs := e.getAppArgs[1]!
-    let rhsfun := rhs.getAppFn
-    let ty ← inferType rhsfun
-    let types := (← get_types_chain ty).pop
-    let p := (types.size > 0) ∧ (∀ t ∈ types, is_builtin t)
-    return p
-  else
-    let ty ← inferType fn
-    let types := (← get_types_chain ty).pop
-    let p := (types.size > 0) ∧ (∀ t ∈ types, is_builtin t)
-    return p
--/
-
 def is_builtin_cond (e: Expr) : MetaM Bool := do
   let types ← all_args_types e
   let p := (types.size > 0) ∧ (∀ t ∈ types, is_builtin t)
   return p
 
 
-def mkFVars (a: Array Name) : Array Expr:= a.map (fun x => mkFVar ⟨x⟩)
+def mkFVars (a: Array Name) : Array Expr := a.map (fun x => mkFVar ⟨x⟩)
 
 
 def raw_constructor_type := Array (Name × Expr) × Expr × Array Expr

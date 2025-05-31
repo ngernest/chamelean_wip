@@ -55,7 +55,7 @@ def elabGetprotoChecker : CommandElab := fun stx => do
   | `(#get_checker_prototype $t with_name $t2:term) =>
     Command.liftTermElabM do
       let e ← elabTerm t none
-      let relation ←  extract_IR_info e
+      let relation ← extract_IR_info e
       let inpname ← termToStringList t2
       let proto := prototype_for_checker relation inpname
       print_m_string proto
