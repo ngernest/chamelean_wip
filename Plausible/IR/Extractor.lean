@@ -311,7 +311,7 @@ def mkArrayFreshVar (types: Array Expr) : MetaM (Array Expr) := do
     vars := vars.push var
   return vars
 
-def extract_IR_info (inpexp : Expr) : MetaM (IR_info) := do
+def extract_IR_info (inpexp : Expr) : MetaM IR_info := do
   match inpexp.getAppFn.constName? with
   | some typeName => do
     let type ← inferType inpexp

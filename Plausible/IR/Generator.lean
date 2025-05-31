@@ -18,7 +18,7 @@ namespace Plausible.IR
 
 def get_checker (r: IR_info) (inpname: List String) (btnum: Nat)
     (monad: String :="IO") : MetaM String := do
-  let prototype ←  prototype_for_checker r inpname monad
+  let prototype ← prototype_for_checker r inpname monad
   let body ← checker_body r inpname btnum monad
   let where_def ← checker_where_defs r inpname monad
   let checker := where_def ++ "\n" ++ prototype ++ " := do\n" ++ body ++ "\n"
