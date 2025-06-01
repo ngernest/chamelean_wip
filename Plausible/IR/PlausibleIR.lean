@@ -6,3 +6,4 @@ import Plausible.IR.GCCall
 import Plausible.IR.Constructor
 import Plausible.IR.Backtrack
 import Plausible.IR.Generator
+import Plausible.IR.Headers

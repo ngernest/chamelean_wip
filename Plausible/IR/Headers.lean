@@ -16,6 +16,59 @@ def parseInductiveApp (stx : Term) : CommandElabM (Name × Array Term) := do
 def makeCheckerName (inductiveName : Name) : Name :=
   Name.mkStr1 s!"check_{inductiveName}"
 
+/-- Extracts the name of a parameter from a corresponding `Term` -/
+def extractParamName (arg : Term) : Name :=
+  match arg with
+  | `($name:ident) => name.getId
+  | _ =>
+    -- TODO: may want to generate fresh names
+    Name.mkSimple "param"
+
+
+/-- Analyzes the type of the inductive relation and matches each
+    argument with its expected type, returning an array of
+    (parameter name, type expression) pairs -/
+def analyzeInductiveArgs (inductiveName : Name) (args : Array Term) :
+  CommandElabM (Array (Name × TSyntax `term)) := do
+
+  -- Extract the no. of parameters & indices for the inductive
+  let inductInfo ← getConstInfoInduct inductiveName
+  let numParams := inductInfo.numParams
+  let numIndices := inductInfo.numIndices
+  let numArgs := numParams + numIndices
+
+  if args.size != numArgs then
+    throwError s!"Expected {numArgs} arguments but received {args.size} arguments instead"
+
+  -- Extract the type of the inductive relation
+  let inductType := inductInfo.type
+
+  let result ← liftTermElabM do
+    forallTelescope inductType fun xs _ => do
+      let mut paramInfo : Array (Name × TSyntax `term) := #[]
+
+      for i in [:args.size] do
+        let arg := args[i]!
+        let paramFVar := xs[i]!
+        let paramType ← inferType paramFVar
+
+        -- Extract parameter name from the argument syntax
+        let paramName := extractParamName arg
+
+        -- Use Lean's delaborator to express the parameter type
+        -- using concrete surface-level syntax
+        let typeSyntax ← PrettyPrinter.delab paramType
+
+        paramInfo := paramInfo.push (paramName, typeSyntax)
+
+      return paramInfo
+
+  return result
+
+-----------
+-- Command elaborator infrastructure below
+-----------
+
 syntax (name := mk_checker_header) "#mk_checker_header " term : command
 
 /-- Command elaborator that produces the function header for the checker -/
@@ -25,57 +78,47 @@ def elabMkCheckerHeader : CommandElab := fun stx => do
   | `(#mk_checker_header ( $inductiveApp:term )) =>
     logInfo s!"Collected: {inductiveApp}"
 
-    -- Parse the inductive application
+    -- Parse the names of inductive relation + its arguments
     let (inductiveName, args) ← parseInductiveApp inductiveApp
 
     if !(← isInductive inductiveName) then
       throwErrorAt stx "{inductiveName} is not an inductive, expected an inductive relation"
 
-    logInfo s!"inductiveName = {inductiveName}, args = {args}"
+    -- Associate each argument with an appropriate type expression
+    let paramInfo ← analyzeInductiveArgs inductiveName args
 
-    -- Generate the checker function name
+    -- Compute the name for the checker function
     let checkerName := makeCheckerName inductiveName
     let checkerIdent := mkIdent checkerName
 
     -- Extract parameter names and types from the arguments
-    -- We'll create parameters for each argument in the inductive application
     let mut params := #[]
 
-    -- Add the standard size parameters
+    -- Produce size arguments for the checker
     let sizeParam ← `(bracketedBinder| (size : Nat))
     let topSizeParam ← `(bracketedBinder| (top_size : Nat))
     params := params.push sizeParam
     params := params.push topSizeParam
 
     -- Process each argument from the inductive application
-    for i in [:args.size] do
-      let arg := args[i]!
+    for (paramName, paramType) in paramInfo do
+      let paramIdent := mkIdent paramName
+      let param ← `(bracketedBinder| ($paramIdent : $paramType))
+      params := params.push param
 
-      -- TODO: generalize this to handle any any argument types
-      match i with
-      | 0 => -- First argument (Γ : List type)
-        let param ← `(bracketedBinder| (Γ : List type))
-        params := params.push param
-      | 1 => -- Second argument (e : term)
-        let param ← `(bracketedBinder| (e : term))
-        params := params.push param
-      | 2 => -- Third argument (τ : type)
-        let param ← `(bracketedBinder| (t : type))
-        params := params.push param
-      | _ =>
-        -- Handle additional arguments generically
-        let paramName := mkIdent (Name.mkStr1 s!"arg{i}")
-        let param ← `(bracketedBinder| ($paramName : _))
-        params := params.push param
-
-    -- Generate the complete function header
     let funHeader : TSyntax `command ←
-      `(def $checkerIdent $params* : Option Bool := sorry)
+      `(def $checkerIdent $params* : Option Bool := none)
 
-    -- Elaborate the generated command
+    let headerFormat ← liftCoreM (PrettyPrinter.ppCommand funHeader)
+    logInfo m!"Generated function header:\n{headerFormat}"
+
     elabCommand funHeader
 
   | _ => throwUnsupportedSyntax
+
+-----------
+-- Testing
+-----------
 
 /-- Base types in the STLC (either Nat or functions) -/
 inductive type where
