@@ -64,20 +64,6 @@ def elabGetprotoChecker : CommandElab := fun stx => do
 #get_checker_prototype typing with_name ["L", "e", "t"]
 
 
--- New version of #get_checker_prototype
-
-syntax (name := mk_checker_header) "#mk_checker_header " term : command
-
-@[command_elab mk_checker_header]
-def elabMkCheckerHeader : CommandElab := fun stx => do
-  match stx with
-  | `(#mk_checker_header $inductive_name:term) =>
-    logInfo s!"Collected: {inductive_name}"
-  | _ => throwUnsupportedSyntax
-
-#mk_checker_header (typing Γ e τ)
-
-
 def prototype_for_producer(r: IR_info) (inpname: List String) (genpos: Nat) (monad: String :="IO"): MetaM String := do
   let zipinp := [("size", Lean.mkConst `Nat)] ++ List.zip inpname r.inp_types.toList
   let inps := zipinp.take (genpos + 1) ++ zipinp.drop (genpos + 2)
