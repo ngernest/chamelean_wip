@@ -6,24 +6,22 @@ def parseInductiveApp (stx : Term) : CommandElabM (Name × Array Term) := do
   match stx with
   | `($f:ident $args:term*) =>
     let name := f.getId
-    return (name, args)
+    pure (name, args)
   | `($f:ident) =>
     let name := f.getId
-    return (name, #[])
+    pure (name, #[])
   | _ => throwErrorAt stx "Expected inductive type application"
 
 /-- Uses the name of the inductive relation to produce the checker's name -/
 def makeCheckerName (inductiveName : Name) : Name :=
   Name.mkStr1 s!"check_{inductiveName}"
 
-/-- Extracts the name of a parameter from a corresponding `Term` -/
-def extractParamName (arg : Term) : Name :=
+/-- Extracts the name of a parameter from a corresponding `Term`.
+    If this is not possible, a fresh user-facing name is produced. -/
+def extractParamName (arg : Term) : MetaM Name :=
   match arg with
-  | `($name:ident) => name.getId
-  | _ =>
-    -- TODO: may want to generate fresh names
-    Name.mkSimple "param"
-
+  | `($name:ident) => pure name.getId
+  | _ => Core.mkFreshUserName `param
 
 /-- Analyzes the type of the inductive relation and matches each
     argument with its expected type, returning an array of
@@ -43,17 +41,18 @@ def analyzeInductiveArgs (inductiveName : Name) (args : Array Term) :
   -- Extract the type of the inductive relation
   let inductType := inductInfo.type
 
-  let result ← liftTermElabM do
-    forallTelescope inductType fun xs _ => do
+  liftTermElabM $
+    forallTelescope inductType (fun xs _ => do
       let mut paramInfo : Array (Name × TSyntax `term) := #[]
 
       for i in [:args.size] do
+        -- Match each argument with its expected type
         let arg := args[i]!
         let paramFVar := xs[i]!
         let paramType ← inferType paramFVar
 
         -- Extract parameter name from the argument syntax
-        let paramName := extractParamName arg
+        let paramName ← extractParamName arg
 
         -- Use Lean's delaborator to express the parameter type
         -- using concrete surface-level syntax
@@ -61,9 +60,7 @@ def analyzeInductiveArgs (inductiveName : Name) (args : Array Term) :
 
         paramInfo := paramInfo.push (paramName, typeSyntax)
 
-      return paramInfo
-
-  return result
+      pure paramInfo)
 
 -----------
 -- Command elaborator infrastructure below
