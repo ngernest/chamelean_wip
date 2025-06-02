@@ -14,26 +14,19 @@ namespace Plausible.IR
 /- CODE -/
 
 
-def is_ind_type (typename : Name) : MetaM Bool := do
-  let env ← getEnv
-  match env.find? typename with
-  | none => throwError "Type '{typename}' not found"
-  | some (ConstantInfo.inductInfo _) => return true
-  | some _ => return false
-
+/-- Determines if an `expr` is an `inductive` relation -/
 def is_IR (type : Expr) : MetaM Bool := do
-  --IO.println s!" cur expr : {type}"
-  if ! (← is_ind_type type.constName) then return false
+  if ! (← Meta.isInductivePredicate type.constName) then return false
   let ty ← inferType type
   let types ← get_types_chain ty
   let retty := types.toList.getLast!
-  --IO.println s!" types : {retty}"
   return retty.isProp
 
+/-- Determines if an `expr` is a base type (i.e. `Nat, String, Bool`) -/
+def is_builtin (n: Expr) : Bool :=
+  n.constName ∈ [`Nat, `String, `Bool]
 
-def is_builtin (n: Expr) : Bool := n.constName ∈ [`Nat, `String, `Bool]
-
-partial def all_args_types (e: Expr) : MetaM (Array Expr) :=do
+partial def all_args_types (e: Expr) : MetaM (Array Expr) := do
   let args := e.getAppArgs
   if e.isFVar then return #[]
   if args.size = 0 then
@@ -47,37 +40,19 @@ partial def all_args_types (e: Expr) : MetaM (Array Expr) :=do
     out := out.append arg_types
   return out
 
-/-
-def is_builtin_cond (e: Expr) : MetaM Bool := do
-  let fn := e.getAppFn
-  let tys ← all_args_types e
-  IO.println s!" expr  : {e}"
-  IO.println s!" types  : {tys}"
-  if fn.constName! == `Eq then
-    let rhs := e.getAppArgs[1]!
-    let rhsfun := rhs.getAppFn
-    let ty ← inferType rhsfun
-    let types := (← get_types_chain ty).pop
-    let p := (types.size > 0) ∧ (∀ t ∈ types, is_builtin t)
-    return p
-  else
-    let ty ← inferType fn
-    let types := (← get_types_chain ty).pop
-    let p := (types.size > 0) ∧ (∀ t ∈ types, is_builtin t)
-    return p
--/
-
 def is_builtin_cond (e: Expr) : MetaM Bool := do
   let types ← all_args_types e
   let p := (types.size > 0) ∧ (∀ t ∈ types, is_builtin t)
   return p
 
 
-def mkFVars (a: Array Name) : Array Expr:= a.map (fun x => mkFVar ⟨x⟩)
+def mkFVars (a: Array Name) : Array Expr := a.map (fun x => mkFVar ⟨x⟩)
 
 
-def raw_constructor_type:= Array (Name × Expr) × Expr × Array Expr
+def raw_constructor_type := Array (Name × Expr) × Expr × Array Expr
+  deriving Repr
 
+/-- The `IRConstructor` type represents a constructor for an inductive relation -/
 structure IRConstructor where
   var_names: Array Name
   varid_type : Std.HashMap FVarId Expr
@@ -95,11 +70,14 @@ structure IRConstructor where
   ctor_expr: Expr
   num_inp_eq: Array (Expr × Expr)
   notnum_inp_eq: Array (Expr × Expr)
-  name_space: Name
-  dependences: Array Expr
+  root: Name
+  deriving Repr
 
+/-- A `structure` that bundles together all the metadata for an inductive relation -/
 structure IR_info where
+  /-- The name of the inductive relation -/
   name : Name
+  /-- The names of the types for the input parameters -/
   inp_type_names : Array Name
   out_type_name : Name
   inp_types : Array Expr
@@ -112,7 +90,7 @@ structure IR_info where
   constructors : Array IRConstructor
   nocond_constructors : Array IRConstructor
   cond_constructors : Array IRConstructor
-  dependences: Array Expr
+  deriving Repr
 
 #check Expr.replaceFVarId
 #check Expr.fvarsSubset
@@ -123,20 +101,15 @@ structure IR_info where
 
 def is_pure_inductive_cond (inpexp : Expr) : MetaM Bool := do
   match inpexp.getAppFn.constName? with
-  | some typeName => is_ind_type typeName
+  | some typeName => Meta.isInductivePredicate typeName
   | none => return false
 
 
 def is_inductive_cond (inpexp : Expr) (c: IRConstructor): MetaM Bool := do
   if ! (← is_IR inpexp.getAppFn) then return false
-  if inpexp.getAppFn.constName.getRoot == c.name_space then return true
+  if inpexp.getAppFn.constName.getRoot == c.root then return true
   return false
 
-
-def is_dependence (inpexp : Expr) (ns: Name): MetaM Bool := do
-  if ! (← is_IR inpexp) then return false
-  if inpexp.constName.getRoot == ns then return true
-  return false
 
 def process_cond_props (cond_prop: Array Expr) (out_prop: Expr) (var_names : Array Name) : MetaM ((Array Expr) × (Array Name) × (Array (Expr × Expr))) := do
   let fvars := var_names.map FVarId.mk
@@ -164,7 +137,7 @@ def process_cond_props (cond_prop: Array Expr) (out_prop: Expr) (var_names : Arr
 
 
 def process_constructor (ctortype: Expr) (inpvar: Array Expr) (inptypes: Array Expr) (relation_name: Name): MetaM IRConstructor := do
-  let c ←  decompose_type ctortype
+  let c ← decompose_type ctortype
   let (list_name_type, _ , list_prop) := c
   let mut varid_type : Std.HashMap FVarId Expr := Std.HashMap.emptyWithCapacity
   for pair in list_name_type do
@@ -179,12 +152,9 @@ def process_constructor (ctortype: Expr) (inpvar: Array Expr) (inptypes: Array E
     let mut nonlinear_conds := #[]
     let mut inductive_conds := #[]
     let mut recursive_conds := #[]
-    let mut dependences := #[]
     let outprop_args:= out_prop.getAppArgs
     let output ← option_to_MetaM (out_prop.getAppArgs).toList.getLast?
     for cond in cond_prop do
-      if ← is_dependence cond.getAppFn relation_name.getRoot then
-        dependences := dependences.push cond.getAppFn
       if cond.getAppFn.constName = relation_name then
         recursive_conds := recursive_conds.push cond
       else if ← is_builtin_cond cond then
@@ -214,12 +184,11 @@ def process_constructor (ctortype: Expr) (inpvar: Array Expr) (inptypes: Array E
       inp_eq := inp_eq
       num_inp_eq := num_inp_eq
       notnum_inp_eq := notnum_inp_eq
-      name_space:= relation_name.getRoot
-      dependences:= dependences
+      root:= relation_name.getRoot
     }
   | none => throwError "Not a match"
 
-def get_Fvar_replist (out_prop: Expr) (inpname: List String) : MetaM (List (FVarId × Expr)) :=do
+def get_Fvar_replist (out_prop: Expr) (inpname: List String) : MetaM (List (FVarId × Expr)) := do
   let new_fvarid : List FVarId := inpname.map (fun x => FVarId.mk (Name.mkStr1 x))
   let new_expr := new_fvarid.map (fun x => Expr.fvar x)
   let args_zip := out_prop.getAppArgs.toList.zip new_expr
@@ -227,7 +196,7 @@ def get_Fvar_replist (out_prop: Expr) (inpname: List String) : MetaM (List (FVar
   let ret := filter_args_zip.map (fun x => (x.1.fvarId!, x.2))
   return ret
 
-def replace_FVar_list (cond : Expr) (fvarids: List (FVarId × Expr)) : MetaM Expr :=do
+def replace_FVar_list (cond : Expr) (fvarids: List (FVarId × Expr)) : MetaM Expr := do
   let mut newcond := cond
   for rep in fvarids do
     newcond := newcond.replaceFVarId rep.1 rep.2
@@ -261,12 +230,9 @@ def process_constructor_unify_inpname (ctortype: Expr) (inpvar: Array Expr) (inp
     let mut nonlinear_conds := #[]
     let mut inductive_conds := #[]
     let mut recursive_conds := #[]
-    let mut dependences := #[]
     let outprop_args:= out_prop.getAppArgs
     let output ← option_to_MetaM (out_prop.getAppArgs).toList.getLast?
     for cond in cond_prop do
-      if ← is_dependence cond.getAppFn relation_name.getRoot then
-        dependences := dependences.push cond.getAppFn
       if cond.getAppFn.constName = relation_name then
         recursive_conds := recursive_conds.push cond
       else if ← is_builtin_cond cond then
@@ -296,8 +262,7 @@ def process_constructor_unify_inpname (ctortype: Expr) (inpvar: Array Expr) (inp
       inp_eq := inp_eq
       num_inp_eq := num_inp_eq
       notnum_inp_eq := notnum_inp_eq
-      name_space:= relation_name.getRoot
-      dependences:= dependences
+      root:= relation_name.getRoot
     }
   | none => throwError "Not a match"
 
@@ -336,7 +301,7 @@ where makeInputs_aux  (n : Nat) (z: Nat) : List String := match n with
 
 #check mkFVarEx
 
-def mkArrayFreshVar (types: Array Expr) : MetaM (Array Expr) :=do
+def mkArrayFreshVar (types: Array Expr) : MetaM (Array Expr) := do
   let mut vars : Array Expr :=#[]
   for i in [:types.size-1] do
     --let type := types[i]!
@@ -346,7 +311,7 @@ def mkArrayFreshVar (types: Array Expr) : MetaM (Array Expr) :=do
     vars := vars.push var
   return vars
 
-def extract_IR_info (inpexp : Expr) : MetaM (IR_info) := do
+def extract_IR_info (inpexp : Expr) : MetaM IR_info := do
   match inpexp.getAppFn.constName? with
   | some typeName => do
     let type ← inferType inpexp
@@ -454,7 +419,7 @@ def extract_IR_info_with_inpname (inpexp : Expr) (inpname: List String) : MetaM 
 
 
 
-def print_constructors (c: Array IRConstructor) : MetaM Unit :=do
+def print_constructors (c: Array IRConstructor) : MetaM Unit := do
   let mut i := 0
   for l in c do
     IO.println s!"IRConstructor {i}: "

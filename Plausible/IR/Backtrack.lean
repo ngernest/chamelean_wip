@@ -22,9 +22,9 @@ namespace Plausible.IR
 def size_zero_backtrack_for_checker (r: IR_info): MetaM (Array String) := do
   let mut i := 0
   let mut out : Array String := #[]
-  for con in r.constructors do
+  for ctor in r.constructors do
     i := i + 1
-    if con.recursive_conds.size = 0 then
+    if ctor.recursive_conds.size = 0 then
       let bt := "check_" ++ afterLastDot r.name.toString ++"_by_con_" ++ toString i
       out:= out.push bt
   return out
@@ -148,7 +148,7 @@ def uniform_backtracking_IO {α : Type } (a : Array α) : IO α := do
 
 def weight_backtracking_IO {α : Type } (a : Array α) (low_weight_size: Nat) (weight: Nat): IO α := do
   -- Using monadLift to lift the random number generation from IO to MetaM
-  let maxnum := low_weight_size + (a.size - low_weight_size)*weight -1
+  let maxnum := low_weight_size + (a.size - low_weight_size) * weight - 1
   let randnat ← monadLift <| IO.rand 0 maxnum
   let idx := if randnat < low_weight_size then randnat else (randnat - low_weight_size)/weight + low_weight_size
   let mem ←  option_to_IO (a[idx]?)

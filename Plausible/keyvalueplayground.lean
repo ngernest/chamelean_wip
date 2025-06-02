@@ -568,7 +568,11 @@ throw (IO.userError "fail at checkstep")
 partial def gen_remove_kv_at_2 (size : Nat) (s : String) (l1 : List (String × String)) : IO (List (String × String)) := do
 match size with
 | zero =>
+<<<<<<< HEAD
  for _i in [1:100] do
+=======
+ for _i in [1:10] do
+>>>>>>> 2ebbb5a
   let f ← uniform_backtracking_IO #[gen_remove_kv_at_2_by_con_1]
   let ret ← IO_to_option (f size s l1)
   match ret with

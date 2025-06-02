@@ -18,7 +18,7 @@ namespace Plausible.IR
 
 def get_checker (r: IR_info) (inpname: List String) (btnum: Nat)
     (monad: String :="IO") : MetaM String := do
-  let prototype ←  prototype_for_checker r inpname monad
+  let prototype ← prototype_for_checker r inpname monad
   let body ← checker_body r inpname btnum monad
   let where_def ← checker_where_defs r inpname monad
   let checker := where_def ++ "\n" ++ prototype ++ " := do\n" ++ body ++ "\n"
@@ -35,6 +35,7 @@ def elabGetChecker : CommandElab := fun stx => do
       let e ← elabTerm t none
       let inpname ← termToStringList t2
       let relation ←  extract_IR_info_with_inpname e inpname
+      logInfo s!"input variable names = {relation.inp_var_names}"
       let btnum := TSyntax.getNat t3
       let checker := get_checker relation inpname btnum
       print_m_string checker
