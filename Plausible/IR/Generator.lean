@@ -152,6 +152,51 @@ def elabDeriveGenerator : CommandElab := fun stx => do
 
 
 
+def get_mutual_rec_blocks_dependences (IR: Expr) (btnum: Nat) (mond : String:= "IO"): MetaM (Array String) := do
+  let r0 ← extract_IR_info IR
+  let deps := (r0.dependences).push IR
+  let mut mc_blocks : Array String := #[]
+  for dep in deps do
+    let deprel0 ← extract_IR_info dep
+    --let inname := (afterLastDot dep.constName.toString) ++ "_in"
+    let depinpname := makeInputs "in" deprel0.inp_types.size
+    let deprel ←  extract_IR_info_with_inpname dep depinpname
+    let mc_block ←  get_mutual_rec_block deprel depinpname btnum mond
+    mc_blocks := mc_blocks.push mc_block
+  return mc_blocks
+
+
+syntax (name := genmutualrecdeps) "#gen_mutual_rec_deps" term  "backtrack" num "monad" str: command
+
+@[command_elab genmutualrecdeps]
+def elabGetMutualBlockdeps : CommandElab := fun stx => do
+  match stx with
+  | `(#gen_mutual_rec_deps $t backtrack $t3 monad $t4) =>
+    Command.liftTermElabM do
+      let e ← elabTerm t none
+      let mnad := TSyntax.getString t4
+      let btnum := TSyntax.getNat t3
+      let mc_blocks := get_mutual_rec_blocks_dependences e btnum mnad
+      print_m_arr_string mc_blocks
+  | _ => throwError "Invalid syntax"
+
+
+
+syntax (name := derivegeneratordeps) "#derive_generator_with_dependencies" term "backtrack" num: command
+
+@[command_elab derivegeneratordeps]
+def elabDeriveGeneratorDep : CommandElab := fun stx => do
+  match stx with
+  | `(#derive_generator $t backtrack $t3) =>
+      let mc_blocks ← Command.liftTermElabM do
+        let e ←  elabTerm t none
+        let btnum := TSyntax.getNat t3
+        get_mutual_rec_blocks_dependences e btnum
+      parseCommands mc_blocks
+  | _ => throwError "Invalid syntax"
+
+
+
 def get_enumerator (r: IR_info) (inpname: List String) (genpos: Nat) (iternum: Nat): MetaM String := do
   let gen_prototype ←  prototype_for_producer r inpname genpos
   let prototype := "enumerate" ++ ⟨gen_prototype.data.drop 3⟩

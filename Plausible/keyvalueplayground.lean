@@ -227,6 +227,15 @@ end
 
 
 
+def ti : IO (String) :=  monadLift <| Gen.run (SampleableExt.interpSample String) 10
+#eval ti
+
+#eval gen_lookup_kv_at_1_by_con_1 4 []
+#eval gen_lookup_kv_at_1_by_con_2 4 [("cc", "dd")]
+#eval gen_lookup_kv_at_1 4 [("cc", "dd")]
+#eval gen_lookup_kv_at_1 4 [("cc", "dd"), ("ee", "ff")]
+
+
 --------ADD_KV------------
 
 #gen_mutual_rec add_kv with_name ["s1", "s2", "l1", "l2"] backtrack 10 monad "IO"
@@ -377,7 +386,8 @@ match size with
 
 end
 
-
+#eval gen_add_kv_at_3 2 "aa" "bb" [("cc", "dd")]
+#eval gen_add_kv_at_3 2 "aa" "bb" [("cc", "dd"), ("ee", "ff")]
 
 -----------------------REMOVE KV-----------------------------------------------
 
@@ -558,7 +568,7 @@ throw (IO.userError "fail at checkstep")
 partial def gen_remove_kv_at_2 (size : Nat) (s : String) (l1 : List (String × String)) : IO (List (String × String)) := do
 match size with
 | zero =>
- for _i in [1:10] do
+ for _i in [1:100] do
   let f ← uniform_backtracking_IO #[gen_remove_kv_at_2_by_con_1]
   let ret ← IO_to_option (f size s l1)
   match ret with
@@ -566,7 +576,7 @@ match size with
   | _ => continue
  throw (IO.userError "fail")
 | succ size =>
- for _i in [1:10] do
+ for _i in [1:100] do
   let f ← weight_backtracking_IO #[gen_remove_kv_at_2_by_con_1, gen_remove_kv_at_2_by_con_2, gen_remove_kv_at_2_by_con_3] 1 size
   let ret ← IO_to_option (f size s l1)
   match ret with
@@ -576,6 +586,9 @@ match size with
 
 end
 
+#eval gen_remove_kv_at_2 2 "ee" [("cc", "ff")]
+#eval gen_remove_kv_at_2 4 "ee" [("cc", "dd"), ("ee", "ff")]
+#eval gen_remove_kv_at_2 3 "cc" [("cc", "dd"), ("ee", "ff")]
 
 
 
@@ -1029,3 +1042,8 @@ match size with
  throw (IO.userError "fail")
 
 end
+
+
+#eval gen_eval_state_api_call_at_1 5 [("aa" ,"bb"), ("cc", "dd")]
+#eval gen_eval_state_api_call_at_1 3 [("aa" ,"bb"), ("cc", "dd"), ("ee", "ff")]
+#eval gen_eval_state_api_call_at_1 3 [("aa" ,"bb"), ("cc", "dd"), ("ee", "ff")]

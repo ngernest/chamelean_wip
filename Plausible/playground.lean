@@ -71,5 +71,9 @@ instance : SampleableExt Tree :=
 
 #sample List Tree
 
+def ts := SampleableExt.interpSample String
+def ti : IO (String) :=  monadLift <| Gen.run ts 9
+#eval ti
+#eval Gen.run ts 3
 --example (t :  Tree) : TreeSize t = 5 := by
  -- plausible

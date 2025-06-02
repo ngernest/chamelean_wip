@@ -10,11 +10,13 @@ inductive state_api_call where
 | copy (k: String) (k2: String): state_api_call
 | append (k: String) (v: String): state_api_call
 | delete (k: String): state_api_call
+deriving Repr
 
 inductive state_result where
 | Ok
 | Failure (s:String): state_result
 | Result (s:String): state_result
+deriving Repr
 
 inductive api_call where
 | create_bucket

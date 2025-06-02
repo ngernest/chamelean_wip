@@ -361,11 +361,15 @@ def afterLastDot (s : String) : String :=
 def makeInputs (s: String) (n : Nat) := makeInputs_aux s n n
 where makeInputs_aux (s: String) (n : Nat) (z: Nat) : List String := match n with
 | 0 => []
-| succ n => [s ++ "_" ++ (toString (z - n) ) ++ " "] ++ (makeInputs_aux s n z)
+| succ n => [s ++ "_" ++ (toString (z - n) )] ++ (makeInputs_aux s n z)
 
 
 def print_m_string (m: MetaM String) : MetaM Unit :=do
   IO.println s!"{← m}"
+
+def print_m_arr_string (a: MetaM (Array String)) : MetaM Unit :=do
+  for m in ← a do
+    IO.println s!"{m}"
 
 def parseCommand (input : String) : CommandElabM Unit := do
   let env ← getEnv
@@ -375,6 +379,16 @@ def parseCommand (input : String) : CommandElabM Unit := do
     elabCommand stx
     --runFrontend (processCommand stx) {} {} -- Executes the parsed command
   | Except.error err => IO.println s!"Parse error: {err}"
+
+def parseCommands (inputs : Array String) : CommandElabM Unit := do
+  let env ← getEnv
+  for input in inputs do
+    match Parser.runParserCategory env `command input with
+    | Except.ok stx =>
+      IO.println s!"Parsed successfully: {stx}"
+      elabCommand stx
+      --runFrontend (processCommand stx) {} {} -- Executes the parsed command
+    | Except.error err => IO.println s!"Parse error: {err}"
 
 
 end Plausible.IR
