@@ -11,4 +11,6 @@ import Plausible.Functions
 import Plausible.Attr
 import Plausible.Tactic
 
+-- TODO: remove these imports in production code
+-- (these are here so that `lake build` compiles the new metaprogramming code)
 import Plausible.New.Headers

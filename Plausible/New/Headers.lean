@@ -104,7 +104,10 @@ def elabMkCheckerHeader : CommandElab := fun stx => do
       params := params.push param
 
     let funHeader : TSyntax `command ←
-      `(def $checkerIdent $params* : Option Bool := none)
+      `(def $checkerIdent $params* : Option Bool :=
+        match size with
+        | .zero => none
+        | .succ size' => none)
 
     let headerFormat ← liftCoreM (PrettyPrinter.ppCommand funHeader)
     logInfo m!"Generated function header:\n{headerFormat}"
