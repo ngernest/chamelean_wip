@@ -10,3 +10,5 @@ import Plausible.Testable
 import Plausible.Functions
 import Plausible.Attr
 import Plausible.Tactic
+
+import Plausible.New.Headers
