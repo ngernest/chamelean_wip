@@ -14,15 +14,8 @@ namespace Plausible.IR
 /- CODE -/
 
 
-def is_ind_type (typename : Name) : MetaM Bool := do
-  let env ← getEnv
-  match env.find? typename with
-  | none => throwError "Type '{typename}' not found"
-  | some (ConstantInfo.inductInfo _) => return true
-  | some _ => return false
-
 def is_IR (type : Expr) : MetaM Bool := do
-  if ! (← is_ind_type type.constName) then return false
+  if ! (← Meta.isInductivePredicate type.constName) then return false
   let ty ← inferType type
   let types ← get_types_chain ty
   let retty := types.toList.getLast!
@@ -45,26 +38,6 @@ partial def all_args_types (e: Expr) : MetaM (Array Expr) :=do
     out := out.append arg_types
   return out
 
-/-
-def is_builtin_cond (e: Expr) : MetaM Bool := do
-  let fn := e.getAppFn
-  let tys ← all_args_types e
-  IO.println s!" expr  : {e}"
-  IO.println s!" types  : {tys}"
-  if fn.constName! == `Eq then
-    let rhs := e.getAppArgs[1]!
-    let rhsfun := rhs.getAppFn
-    let ty ← inferType rhsfun
-    let types := (← get_types_chain ty).pop
-    let p := (types.size > 0) ∧ (∀ t ∈ types, is_builtin t)
-    return p
-  else
-    let ty ← inferType fn
-    let types := (← get_types_chain ty).pop
-    let p := (types.size > 0) ∧ (∀ t ∈ types, is_builtin t)
-    return p
--/
-
 def is_builtin_cond (e: Expr) : MetaM Bool := do
   let types ← all_args_types e
   let p := (types.size > 0) ∧ (∀ t ∈ types, is_builtin t)
@@ -74,7 +47,7 @@ def is_builtin_cond (e: Expr) : MetaM Bool := do
 def mkFVars (a: Array Name) : Array Expr:= a.map (fun x => mkFVar ⟨x⟩)
 
 
-def raw_constructor_type:= Array (Name × Expr) × Expr × Array Expr
+def raw_constructor_type := Array (Name × Expr) × Expr × Array Expr
 
 structure IRConstructor where
   var_names: Array Name
@@ -112,16 +85,10 @@ structure IR_info where
   cond_constructors : Array IRConstructor
   dependences: Array Expr
 
-#check Expr.replaceFVarId
-#check Expr.fvarsSubset
-#check Expr.containsFVar
-#check Expr.updateFVar!
-#check Expr.applyFVarSubst
-
 
 def is_pure_inductive_cond (inpexp : Expr) : MetaM Bool := do
   match inpexp.getAppFn.constName? with
-  | some typeName => is_ind_type typeName
+  | some typeName => Meta.isInductivePredicate typeName
   | none => return false
 
 
