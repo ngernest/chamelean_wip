@@ -62,9 +62,9 @@ def analyzeInductiveArgs (inductiveName : Name) (args : Array Term) :
 
       pure paramInfo)
 
------------
+-------------------------------------------------------
 -- Command elaborator infrastructure below
------------
+-------------------------------------------------------
 
 syntax (name := mk_checker_header) "#mk_checker_header " term : command
 

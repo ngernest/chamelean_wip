@@ -1,6 +1,10 @@
 # Plausible
 A property testing framework for Lean 4 that integrates into the tactic framework.
 
+## New Metaprogramming Code
+- See [`Headers.lean`](./Plausible/IR/Headers.lean) for a re-implemented version of [`Prototype.lean`](./Plausible/IR/Prototype.lean) that uses `TSyntax` instead of `MetaM String`
+
+
 ## Usage
 If you are using built in types Plausible is usually able to handle them already:
 ```lean
