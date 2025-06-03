@@ -89,8 +89,9 @@ elab "#get_type" t:term : command => do
     let typeStr ← typeArrayToString types
     IO.println typeStr
 
+
 /-- Extract binders (∀ x y, etc) from an expression -/
-partial def extractBinders (e : Expr) : Array (Name × Expr) × Expr := Id.run do
+partial def extractBinders (e : Expr) : Array (Name × Expr) × Expr :=
   let rec go (e : Expr) (acc : Array (Name × Expr)) :=
     match e with
     | Expr.forallE n t b _ =>
@@ -102,7 +103,7 @@ partial def extractBinders (e : Expr) : Array (Name × Expr) × Expr := Id.run d
   go e #[]
 
 --decompose a type ∀ x y, A → B → C into a list of bound variables [x,y] and a list of Expr [A, B, C]
-partial def decompose_type(e : Expr) : MetaM (Array (Name × Expr) × Expr × Array Expr) := do
+partial def decompose_type (e : Expr) : MetaM (Array (Name × Expr) × Expr × Array Expr) := do
   let (binder, exp) := extractBinders e
   let tyexp ← get_types_chain exp
   return (binder,  exp, tyexp)

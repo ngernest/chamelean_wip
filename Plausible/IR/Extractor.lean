@@ -136,7 +136,7 @@ def process_constructor (ctortype: Expr) (inpvar: Array Expr) (inptypes: Array E
     let fid:= FVarId.mk pair.1
     varid_type:= varid_type.insert fid pair.2
   match splitLast? list_prop with
-  | some (cond_prop, out_prop) =>
+  | some (hypotheses, output_prop) =>
     let (var_names, _):= list_name_type.unzip
     let (numvars, _) := (list_name_type.filter (fun (_,b) => is_builtin b)).unzip
     let (notnumvars, _) := (list_name_type.filter (fun (_,b) => ¬ is_builtin b)).unzip
@@ -145,9 +145,9 @@ def process_constructor (ctortype: Expr) (inpvar: Array Expr) (inptypes: Array E
     let mut inductive_conds := #[]
     let mut recursive_conds := #[]
     let mut dependencies := #[]
-    let outprop_args:= out_prop.getAppArgs
-    let output ← option_to_MetaM (out_prop.getAppArgs).toList.getLast?
-    for cond in cond_prop do
+    let outprop_args:= output_prop.getAppArgs
+    let output ← option_to_MetaM (output_prop.getAppArgs).toList.getLast?
+    for cond in hypotheses do
       if ← is_dependence cond.getAppFn relation_name.getRoot then
         dependencies := dependencies.push cond.getAppFn
       if cond.getAppFn.constName = relation_name then
@@ -166,8 +166,8 @@ def process_constructor (ctortype: Expr) (inpvar: Array Expr) (inptypes: Array E
       ctor_expr := ctortype
       var_names := var_names,
       varid_type:= varid_type,
-      cond_props:= cond_prop,
-      out_prop := out_prop,
+      cond_props:= hypotheses,
+      out_prop := output_prop,
       out_args := outprop_args,
       output := output
       num_vars := numvars
