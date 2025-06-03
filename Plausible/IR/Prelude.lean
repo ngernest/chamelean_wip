@@ -76,7 +76,6 @@ partial def get_types_chain (type : Expr) : MetaM (Array Expr) := do
     | e => return acc.push e
   let types ← helper type #[]
   return types
-  --types.mapM (whnf ·)
 
 def typeArrayToString (types : Array Expr) : MetaM String := do
   let typeStrs ← types.mapM (fun t => do pure s!"{← Meta.ppExpr t}")
@@ -88,7 +87,6 @@ elab "#get_type" t:term : command => do
     let types ← get_types_chain e
     let typeStr ← typeArrayToString types
     IO.println typeStr
-
 
 /-- Extract binders (∀ x y, etc) from an expression -/
 partial def extractBinders (e : Expr) : Array (Name × Expr) × Expr :=
@@ -103,10 +101,10 @@ partial def extractBinders (e : Expr) : Array (Name × Expr) × Expr :=
   go e #[]
 
 --decompose a type ∀ x y, A → B → C into a list of bound variables [x,y] and a list of Expr [A, B, C]
-partial def decompose_type (e : Expr) : MetaM (Array (Name × Expr) × Expr × Array Expr) := do
+def decompose_type (e : Expr) : MetaM (Array (Name × Expr) × Expr × Array Expr) := do
   let (binder, exp) := extractBinders e
   let tyexp ← get_types_chain exp
-  return (binder,  exp, tyexp)
+  return (binder, exp, tyexp)
 
 
 def get_recursive_calls (typeName : Name) (e : Expr) : MetaM (Array Expr) := do

@@ -136,7 +136,7 @@ def process_constructor (ctortype: Expr) (inpvar: Array Expr) (inptypes: Array E
     let fid:= FVarId.mk pair.1
     varid_type:= varid_type.insert fid pair.2
   match splitLast? list_prop with
-  | some (hypotheses, output_prop) =>
+  | some (hypotheses, conclusion) =>
     let (var_names, _):= list_name_type.unzip
     let (numvars, _) := (list_name_type.filter (fun (_,b) => is_builtin b)).unzip
     let (notnumvars, _) := (list_name_type.filter (fun (_,b) => ¬ is_builtin b)).unzip
@@ -145,19 +145,19 @@ def process_constructor (ctortype: Expr) (inpvar: Array Expr) (inptypes: Array E
     let mut inductive_conds := #[]
     let mut recursive_conds := #[]
     let mut dependencies := #[]
-    let outprop_args:= output_prop.getAppArgs
-    let output ← option_to_MetaM (output_prop.getAppArgs).toList.getLast?
-    for cond in hypotheses do
-      if ← is_dependence cond.getAppFn relation_name.getRoot then
-        dependencies := dependencies.push cond.getAppFn
-      if cond.getAppFn.constName = relation_name then
-        recursive_conds := recursive_conds.push cond
-      else if ← is_builtin_cond cond then
-        num_conds := num_conds.push cond
-      else if ← is_pure_inductive_cond cond then
-        inductive_conds := inductive_conds.push cond
+    let outprop_args:= conclusion.getAppArgs
+    let output ← option_to_MetaM (conclusion.getAppArgs).toList.getLast?
+    for hyp in hypotheses do
+      if ← is_dependence hyp.getAppFn relation_name.getRoot then
+        dependencies := dependencies.push hyp.getAppFn
+      if hyp.getAppFn.constName = relation_name then
+        recursive_conds := recursive_conds.push hyp
+      else if ← is_builtin_cond hyp then
+        num_conds := num_conds.push hyp
+      else if ← is_pure_inductive_cond hyp then
+        inductive_conds := inductive_conds.push hyp
       else
-        nonlinear_conds := nonlinear_conds.push cond
+        nonlinear_conds := nonlinear_conds.push hyp
     let inp_eq :=  outprop_args.zip inpvar
     let inp_eq_ztype := inp_eq.zip inptypes
     let (num_inp_eq,_) := (inp_eq_ztype.filter (fun (_, t) => is_builtin t)).unzip
@@ -167,7 +167,7 @@ def process_constructor (ctortype: Expr) (inpvar: Array Expr) (inptypes: Array E
       var_names := var_names,
       varid_type:= varid_type,
       cond_props:= hypotheses,
-      out_prop := output_prop,
+      out_prop := conclusion,
       out_args := outprop_args,
       output := output
       num_vars := numvars

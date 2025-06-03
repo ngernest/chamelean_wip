@@ -1,8 +1,9 @@
 import Lean
 import Plausible.New.GenOption
-
+import Plausible.IR.Prelude
 import Plausible.Gen
 
+open Plausible.IR
 open Lean Elab Command Meta Term Parser
 
 /-- Extracts the name of the induction relation and its arguments -/
@@ -75,20 +76,21 @@ def containsRecursiveCall [Monad m] (inductiveName : Name) (expr : Expr) : m Boo
       | _ => return found)
 
 
--- Analyze a constructor to determine if it's recursive
+/-- Determines if a constructor for an inductive relation is *recursive*
+    (i.e. the constructor's type mentions the inductive relation)
+    - Note: this function only considers constructors with arrow types -/
 def isConstructorRecursive (inductiveName : Name) (ctorName : Name) : MetaM Bool := do
   let ctorInfo ← getConstInfo ctorName
   let ctorType := ctorInfo.type
 
-  -- Check if the constructor type contains recursive calls
-  forallTelescopeReducing ctorType fun args _ => do
-    -- Check each argument type for recursive calls
-    for arg in args do
-      let argType ← inferType arg
-      let hasRecCall ← containsRecursiveCall inductiveName argType
-      if hasRecCall then
+  let (_, _, type_exprs) ← decompose_type ctorType
+  match splitLast? type_exprs with
+  | some (hypotheses, _conclusion) =>
+    for hyp in hypotheses do
+      if hyp.getAppFn.constName == inductiveName then
         return true
     return false
+  | none => throwError "constructors with non-arrow types are not-considered to be recursive"
 
 -- Find all non-recursive constructors of an inductive
 def findNonRecursiveConstructors (inductiveName : Name) : MetaM (Array Name) := do
@@ -112,7 +114,7 @@ def mkGeneratorFunction (inductiveName : Name) (targetVar : Name) (targetType : 
   (args : TSyntaxArray `term) : CommandElabM (TSyntax `command) := do
   -- Extract the names of the constructors for the inductive
   let inductInfo ← getConstInfoInduct inductiveName
-  let constructorNames := inductInfo.ctors
+  let _constructorNames := inductInfo.ctors
   let nonRecursiveConstructors ← liftTermElabM $ findNonRecursiveConstructors inductiveName
 
   logInfo s!"non-recursive constructors: {nonRecursiveConstructors.toList}"
