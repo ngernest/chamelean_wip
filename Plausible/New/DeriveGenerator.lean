@@ -105,16 +105,32 @@ def mkGeneratorFunction (inductiveName : Name) (targetVar : Name) (targetType : 
   (args : TSyntaxArray `term) : CommandElabM (TSyntax `command) := do
   -- Extract the names of the constructors for the inductive
   let inductInfo ← getConstInfoInduct inductiveName
-  let constructorNames := inductInfo.ctors
-
-  -- Print the arity of each constructor
-  for ctorName in constructorNames do
-    let ctorInfo ← getConstInfoCtor ctorName
-    IO.println s!"ctor {ctorName} has arity {ctorInfo.numFields}"
+  let _constructorNames := inductInfo.ctors
 
   -- Find the names of all non-recursive constructors
   let nonRecursiveConstructors ← liftTermElabM $ findNonRecursiveConstructors inductiveName
-  logInfo s!"non-recursive constructors: {nonRecursiveConstructors.toList}"
+
+  -- Find all arity-0 constructors
+  let mut arityZeroCtors := #[]
+  for ctorName in nonRecursiveConstructors do
+    let ctorInfo ← getConstInfoCtor ctorName
+    logInfo s!"ctor {ctorName} has arity {ctorInfo.numFields}"
+    if ctorInfo.numFields == 0 then
+      arityZeroCtors := arityZeroCtors.push ctorName
+
+  -- For each arity zero generator `C`, produce an array of expressions of the form `(pure (some C))`,
+  -- where `pure` is from Plausible's `Gen` monad
+
+  -- TODO: generalize this to handle constructors that have non-zero arity
+  -- (need to generate values for their arguments)
+  let mut arityZeroGenerators : Array (TSyntax `term) := #[(← `(pure none))]
+  for ctorName in arityZeroCtors do
+    let ctorIdent := mkIdent ctorName
+    let gen ← `(pure (some $ctorIdent))
+    arityZeroGenerators := arityZeroGenerators.push gen
+
+  -- Flatten the array above into one single expression
+  let sizeZeroGenerators ← `(#[$arityZeroGenerators,*])
 
 
   -- Generate the generator function name
@@ -140,7 +156,7 @@ def mkGeneratorFunction (inductiveName : Name) (targetVar : Name) (targetType : 
   -- once the array of sub-generators has been populated
   `(def $genFunName $params* : Plausible.Gen (Option $targetType) :=
       match size with
-      | .zero => Plausible.Gen.oneOf #[return none]
+      | .zero => Plausible.Gen.oneOf $sizeZeroGenerators
       | .succ size' => Plausible.Gen.oneOf #[return none])
 
 ----------------------------------------------------------------------
