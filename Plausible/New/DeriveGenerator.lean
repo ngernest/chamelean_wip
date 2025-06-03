@@ -1,8 +1,9 @@
 import Lean
+import Plausible.New.GenOption
+
 import Plausible.Gen
 
 open Lean Elab Command Meta Term Parser
-open Plausible.Gen
 
 /-- Extracts the name of the induction relation and its arguments -/
 def parseInductiveApp (body : Term) : CommandElabM (Name × TSyntaxArray `term) := do
@@ -117,45 +118,3 @@ def elabDeriveGenerator : CommandElab := fun stx => do
 -----------
 -- Testing
 -----------
-
-/-- Binary trees containing a `Nat` at each node -/
-inductive Tree where
-  | Leaf : Tree
-  | Node : Nat → Tree → Tree → Tree
-  deriving Repr
-
-/-- `bst lo hi t` describes whether a tree `t` is a BST that contains values strictly within `lo` and `hi` -/
-inductive bst : Nat → Nat → Tree → Prop where
-  | BstLeaf: ∀ lo hi,
-      bst lo hi .Leaf
-  | BstNode: ∀ lo hi x l r,
-      lo < x → x < hi →
-      bst lo x l → bst x hi r →
-      bst lo hi (.Node x l r)
-
-/-- Base types in the STLC (either Nat or functions) -/
-inductive type where
-  | Nat : type
-  | Arr : type → type → type
-  deriving BEq, Repr
-
-/-- Terms in the STLC w/ naturals, where variables are represented using De Bruijn indices -/
-inductive term where
-  | Const : Nat → term
-  | Add : term → term → term
-  | Var : Nat → term
-  | App : term → term → term
-  | Abs : type → term → term
-  deriving BEq, Repr
-
-/- `typing Γ e τ` is the typing judgement `Γ ⊢ e : τ`.
-    For simplicity, we only include `TConst` and `TAdd` for now (the other cases require auxiliary `inductive`s) -/
-inductive typing (Γ : List type) : term → type → Prop where
-  | TConst : ∀ n, typing Γ (.Const n) type.Nat
-  | TAdd: ∀ e1 e2, typing Γ e1 .Nat → typing Γ e2 .Nat → typing Γ (term.Add e1 e2) .Nat
-
--- Example usage:
--- (Note: we require users to explicitly provide a type annotation to the argument to the lambda)
-
--- #derive_generator (fun (t : Tree) => bst lo hi t)
-#derive_generator (fun (e : term) => typing Γ e τ)

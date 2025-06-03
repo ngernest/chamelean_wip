@@ -16,3 +16,4 @@ import Plausible.Tactic
 import Plausible.New.Headers
 import Plausible.New.DeriveGenerator
 import Plausible.New.GenOption
+import Plausible.New.Tests

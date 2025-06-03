@@ -25,7 +25,6 @@ instance : Monad GenOption where
   pure := genOptionPure
   bind := genOptionBind
 
-
 /-- Converts a `GenOption α` into a `GenOption β` using the function `f` -/
 def genOptionMap {α β : Type} (f : α → β) (ga : GenOption α) : GenOption β :=
   ga >>= (pure ∘ f)
@@ -37,6 +36,13 @@ instance : Functor GenOption where
 /-- Alias for a generator that always fails -/
 def fail : Gen (Option α) :=
   return none
+
+/-- Lifts a `Gen α` into a `Gen (Option α)`.
+   (this allow us to use `Gen α` computations in places where `GenOption α` is expected) -/
+def liftGenOption (g : Gen α) : Gen (Option α) := do
+  let a ← g
+  pure (some a)
+
 
 --------------------------------------------------------------------------
 -- Helper functions (adapted from QuickChick sourcecode)

@@ -1,5 +1,5 @@
 import Lean
-import Plausible.New.DeriveGenerator
+import Plausible.New.Tests
 
 open Lean Elab Command Meta Term Parser
 
