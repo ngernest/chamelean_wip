@@ -61,20 +61,6 @@ def analyzeInductiveArgs (inductiveName : Name) (args : Array Term) :
 
       pure paramInfo)
 
--- Check if an expression contains a recursive call to the given inductive
-def containsRecursiveCall [Monad m] (inductiveName : Name) (expr : Expr) : m Bool := do
-  expr.foldlM (init := false) (fun found subexpr => do
-    if found then return true
-    else
-      match subexpr with
-      | .const name _ => return (name == inductiveName)
-      | .app f _ =>
-        -- Check if this is an application of the inductive
-        match f with
-        | .const name _ => return (name == inductiveName || found)
-        | _ => return found
-      | _ => return found)
-
 
 /-- Determines if a constructor for an inductive relation is *recursive*
     (i.e. the constructor's type mentions the inductive relation)
@@ -83,8 +69,9 @@ def isConstructorRecursive (inductiveName : Name) (ctorName : Name) : MetaM Bool
   let ctorInfo ← getConstInfo ctorName
   let ctorType := ctorInfo.type
 
-  let (_, _, type_exprs) ← decompose_type ctorType
-  match splitLast? type_exprs with
+  -- TODO: figure out what the first two components of `decompose_type` are
+  let (_, _, type_exprs_in_arrow_type) ← decompose_type ctorType
+  match splitLast? type_exprs_in_arrow_type with
   | some (hypotheses, _conclusion) =>
     for hyp in hypotheses do
       if hyp.getAppFn.constName == inductiveName then
@@ -92,7 +79,10 @@ def isConstructorRecursive (inductiveName : Name) (ctorName : Name) : MetaM Bool
     return false
   | none => throwError "constructors with non-arrow types are not-considered to be recursive"
 
--- Find all non-recursive constructors of an inductive
+/-- Produces the names of all non-recursive constructors of an inductive relation.
+    A constructor is considered non-recursive if:
+    - It is *not* an arrow type (i.e. it can be used directly to build an inhabitant of the inductive relation)
+    - It is an arrow type but all the arrow type's components are non-recursive -/
 def findNonRecursiveConstructors (inductiveName : Name) : MetaM (Array Name) := do
   let inductInfo ← getConstInfoInduct inductiveName
   let allConstructors := inductInfo.ctors
@@ -122,13 +112,12 @@ def mkGeneratorFunction (inductiveName : Name) (targetVar : Name) (targetType : 
   -- Generate the generator function name
   let genFunName := mkIdent (Name.mkStr1 s!"gen_{inductiveName}")
 
-  -- Build parameter list from the predicate arguments (excluding the target variable)
-  -- Add a size parameter for controlling generation depth
+  -- Create function argument for the generator size
   let mut params := #[]
   let sizeParam ← `(bracketedBinder| (size : Nat))
   params := params.push sizeParam
 
-  -- Add parameters for each argument in the predicate (except the target)
+  -- Add parameters for each argument to the inductive relation (except the target)
   let paramInfo ← analyzeInductiveArgs inductiveName args
   for (paramName, paramType) in paramInfo do
     if paramName != targetVar then
@@ -136,7 +125,7 @@ def mkGeneratorFunction (inductiveName : Name) (targetVar : Name) (targetType : 
       let param ← `(bracketedBinder| ($paramIdent : $paramType))
       params := params.push param
 
-  -- Generate the complete function
+  -- Produce the definition for the generator function
   `(def $genFunName $params* : Plausible.Gen (Option $targetType) :=
       match size with
       | .zero => return none

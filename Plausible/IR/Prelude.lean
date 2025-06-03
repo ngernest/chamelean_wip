@@ -147,7 +147,8 @@ def mk_eqs (ee: Array (Expr × Expr)) : MetaM (Array Expr) := do
 
 /-- Decomposes an array `arr` into a pair `(xs, x)`
    where `xs = arr[0..=n-2]` and `x = arr[n - 1]` (where `n` is the length of `arr`).
-   - If `arr` is empty, this function returns `None`
+   - If `arr` is empty, this function returns `none`
+   - If `arr = #[x]`, this function returns `some (#[], x)`
    - Note: this function is the same as `unsnoc` in the Haskell's `Data.List` library -/
 def splitLast? (arr : Array α) : Option (Array α × α) :=
   match arr.back? with
