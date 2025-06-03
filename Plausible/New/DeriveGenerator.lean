@@ -88,7 +88,10 @@ def mkGeneratorFunction (inductiveName : Name) (targetVar : Name) (targetType : 
       params := params.push param
 
   -- Generate the complete function
-  `(def $genFunName $params* : Plausible.Gen $targetType := sorry)
+  `(def $genFunName $params* : Plausible.Gen (Option $targetType) :=
+      match size with
+      | .zero => return none
+      | .succ size' => return none)
 
 ----------------------------------------------------------------------
 -- Command elaborator for producing the Plausible generator
