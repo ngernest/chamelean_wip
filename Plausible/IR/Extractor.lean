@@ -135,7 +135,7 @@ def process_constructor (ctortype: Expr) (inpvar: Array Expr) (inptypes: Array E
   for pair in list_name_type do
     let fid:= FVarId.mk pair.1
     varid_type:= varid_type.insert fid pair.2
-  match unsnoc? components_of_arrow_type with
+  match splitLast? components_of_arrow_type with
   | some (hypotheses, conclusion) =>
     let (var_names, _):= list_name_type.unzip
     let (numvars, _) := (list_name_type.filter (fun (_,b) => is_builtin b)).unzip
@@ -210,7 +210,7 @@ def process_constructor_unify_inpname (ctortype: Expr) (inpvar: Array Expr) (inp
   for pair in list_name_type do
     let fid:= FVarId.mk pair.1
     varid_type:= varid_type.insert fid pair.2
-  match unsnoc? list_prop with
+  match splitLast? list_prop with
   | some (cond_prop0, out_prop0) =>
     let replist ← get_Fvar_replist out_prop0 inpname
     for r in replist do
