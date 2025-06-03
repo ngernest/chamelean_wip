@@ -153,9 +153,9 @@ def elabDeriveGenerator : CommandElab := fun stx => do
 
 
 
-def get_mutual_rec_blocks_dependences (IR: Expr) (btnum: Nat) (mond : String:= "IO"): MetaM (Array String) := do
+def get_mutual_rec_blocks_dependencies (IR: Expr) (btnum: Nat) (mond : String:= "IO"): MetaM (Array String) := do
   let r0 ← extract_IR_info IR
-  let deps := (r0.dependences).push IR
+  let deps := (r0.dependencies).push IR
   let mut mc_blocks : Array String := #[]
   for dep in deps do
     let deprel0 ← extract_IR_info dep
@@ -177,7 +177,7 @@ def elabGetMutualBlockdeps : CommandElab := fun stx => do
       let e ← elabTerm t none
       let mnad := TSyntax.getString t4
       let btnum := TSyntax.getNat t3
-      let mc_blocks := get_mutual_rec_blocks_dependences e btnum mnad
+      let mc_blocks := get_mutual_rec_blocks_dependencies e btnum mnad
       print_m_arr_string mc_blocks
   | _ => throwError "Invalid syntax"
 
@@ -192,7 +192,7 @@ def elabDeriveGeneratorDep : CommandElab := fun stx => do
       let mc_blocks ← Command.liftTermElabM do
         let e ←  elabTerm t none
         let btnum := TSyntax.getNat t3
-        get_mutual_rec_blocks_dependences e btnum
+        get_mutual_rec_blocks_dependencies e btnum
       parseCommands mc_blocks
   | _ => throwError "Invalid syntax"
 

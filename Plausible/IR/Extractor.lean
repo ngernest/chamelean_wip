@@ -67,7 +67,7 @@ structure IRConstructor where
   num_inp_eq: Array (Expr × Expr)
   notnum_inp_eq: Array (Expr × Expr)
   name_space: Name
-  dependences: Array Expr
+  dependencies: Array Expr
 
 structure IR_info where
   name : Name
@@ -83,7 +83,7 @@ structure IR_info where
   constructors : Array IRConstructor
   nocond_constructors : Array IRConstructor
   cond_constructors : Array IRConstructor
-  dependences: Array Expr
+  dependencies: Array Expr
 
 
 def is_pure_inductive_cond (inpexp : Expr) : MetaM Bool := do
@@ -144,12 +144,12 @@ def process_constructor (ctortype: Expr) (inpvar: Array Expr) (inptypes: Array E
     let mut nonlinear_conds := #[]
     let mut inductive_conds := #[]
     let mut recursive_conds := #[]
-    let mut dependences := #[]
+    let mut dependencies := #[]
     let outprop_args:= out_prop.getAppArgs
     let output ← option_to_MetaM (out_prop.getAppArgs).toList.getLast?
     for cond in cond_prop do
       if ← is_dependence cond.getAppFn relation_name.getRoot then
-        dependences := dependences.push cond.getAppFn
+        dependencies := dependencies.push cond.getAppFn
       if cond.getAppFn.constName = relation_name then
         recursive_conds := recursive_conds.push cond
       else if ← is_builtin_cond cond then
@@ -180,7 +180,7 @@ def process_constructor (ctortype: Expr) (inpvar: Array Expr) (inptypes: Array E
       num_inp_eq := num_inp_eq
       notnum_inp_eq := notnum_inp_eq
       name_space:= relation_name.getRoot
-      dependences:= dependences
+      dependencies:= dependencies
     }
   | none => throwError "Not a match"
 
@@ -226,12 +226,12 @@ def process_constructor_unify_inpname (ctortype: Expr) (inpvar: Array Expr) (inp
     let mut nonlinear_conds := #[]
     let mut inductive_conds := #[]
     let mut recursive_conds := #[]
-    let mut dependences := #[]
+    let mut dependencies := #[]
     let outprop_args:= out_prop.getAppArgs
     let output ← option_to_MetaM (out_prop.getAppArgs).toList.getLast?
     for cond in cond_prop do
       if ← is_dependence cond.getAppFn relation_name.getRoot then
-        dependences := dependences.push cond.getAppFn
+        dependencies := dependencies.push cond.getAppFn
       if cond.getAppFn.constName = relation_name then
         recursive_conds := recursive_conds.push cond
       else if ← is_builtin_cond cond then
@@ -262,7 +262,7 @@ def process_constructor_unify_inpname (ctortype: Expr) (inpvar: Array Expr) (inp
       num_inp_eq := num_inp_eq
       notnum_inp_eq := notnum_inp_eq
       name_space:= relation_name.getRoot
-      dependences:= dependences
+      dependencies:= dependencies
     }
   | none => throwError "Not a match"
 
@@ -338,12 +338,12 @@ def extract_IR_info (inpexp : Expr) : MetaM (IR_info) := do
         constructors:= constructors.push constructor
       let nocond_constructors:= constructors.filter (fun x => (x.cond_props.size = 0))
       let cond_constructors:= constructors.filter (fun x => ¬ (x.cond_props.size = 0))
-      let deps_arr := constructors.map (fun x => x.dependences)
+      let deps_arr := constructors.map (fun x => x.dependencies)
       let dep_rep := deps_arr.flatten
-      let mut dependences := #[]
+      let mut dependencies := #[]
       for dep in dep_rep do
-        if (! dependences.contains dep) && (! dep.constName = typeName) then
-         dependences:=dependences.push dep
+        if (! dependencies.contains dep) && (! dep.constName = typeName) then
+         dependencies:=dependencies.push dep
       return {
         name := typeName
         inp_type_names := names,
@@ -358,7 +358,7 @@ def extract_IR_info (inpexp : Expr) : MetaM (IR_info) := do
         constructors := constructors
         nocond_constructors := nocond_constructors
         cond_constructors:= cond_constructors
-        dependences:= dependences
+        dependencies:= dependencies
       }
     | some _ =>
       throwError "'{typeName}' is not an inductive type"
@@ -391,12 +391,12 @@ def extract_IR_info_with_inpname (inpexp : Expr) (inpname: List String) : MetaM 
         constructors:= constructors.push constructor
       let nocond_constructors:= constructors.filter (fun x => (x.cond_props.size = 0))
       let cond_constructors:= constructors.filter (fun x => ¬ (x.cond_props.size = 0))
-      let deps_arr := constructors.map (fun x => x.dependences)
+      let deps_arr := constructors.map (fun x => x.dependencies)
       let dep_rep := deps_arr.flatten
-      let mut dependences := #[]
+      let mut dependencies := #[]
       for dep in dep_rep do
-        if (! dependences.contains dep) && (! dep.constName = typeName) then
-         dependences:=dependences.push dep
+        if (! dependencies.contains dep) && (! dep.constName = typeName) then
+         dependencies:=dependencies.push dep
       return {
         name := typeName
         inp_type_names := names,
@@ -411,7 +411,7 @@ def extract_IR_info_with_inpname (inpexp : Expr) (inpname: List String) : MetaM 
         constructors := constructors
         nocond_constructors := nocond_constructors
         cond_constructors:= cond_constructors
-        dependences:= dependences
+        dependencies:= dependencies
       }
     | some _ =>
       throwError "'{typeName}' is not an inductive type"
@@ -434,7 +434,7 @@ def print_relation_info (r: MetaM (IR_info)  ) : MetaM Unit := do
   IO.println s!"Generated type: {relation.out_type}"
   IO.println s!"Input vars: {relation.inp_vars}"
   IO.println s!"Out vars: {relation.out_var}"
-  IO.println s!"Dependences: {relation.dependences}"
+  IO.println s!"dependencies: {relation.dependencies}"
   print_constructors relation.constructors
 
 

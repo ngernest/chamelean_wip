@@ -60,6 +60,50 @@ def analyzeInductiveArgs (inductiveName : Name) (args : Array Term) :
 
       pure paramInfo)
 
+-- Check if an expression contains a recursive call to the given inductive
+def containsRecursiveCall [Monad m] (inductiveName : Name) (expr : Expr) : m Bool := do
+  expr.foldlM (init := false) (fun found subexpr => do
+    if found then return true
+    else
+      match subexpr with
+      | .const name _ => return (name == inductiveName)
+      | .app f _ =>
+        -- Check if this is an application of the inductive
+        match f with
+        | .const name _ => return (name == inductiveName || found)
+        | _ => return found
+      | _ => return found)
+
+
+-- Analyze a constructor to determine if it's recursive
+def isConstructorRecursive (inductiveName : Name) (ctorName : Name) : MetaM Bool := do
+  let ctorInfo ← getConstInfo ctorName
+  let ctorType := ctorInfo.type
+
+  -- Check if the constructor type contains recursive calls
+  forallTelescopeReducing ctorType fun args _ => do
+    -- Check each argument type for recursive calls
+    for arg in args do
+      let argType ← inferType arg
+      let hasRecCall ← containsRecursiveCall inductiveName argType
+      if hasRecCall then
+        return true
+    return false
+
+-- Find all non-recursive constructors of an inductive
+def findNonRecursiveConstructors (inductiveName : Name) : MetaM (Array Name) := do
+  let inductInfo ← getConstInfoInduct inductiveName
+  let allConstructors := inductInfo.ctors
+
+  let mut nonRecursive : Array Name := #[]
+
+  for ctorName in allConstructors do
+    let isRec ← isConstructorRecursive inductiveName ctorName
+    if !isRec then
+      nonRecursive := nonRecursive.push ctorName
+
+  return nonRecursive
+
 /-- Produces the actual generator function.
     - `inductiveName` is the name of the inductive relation
     - `targetVar`, `targetType`: the variable name and type of the value to be generated
@@ -69,6 +113,9 @@ def mkGeneratorFunction (inductiveName : Name) (targetVar : Name) (targetType : 
   -- Extract the names of the constructors for the inductive
   let inductInfo ← getConstInfoInduct inductiveName
   let constructorNames := inductInfo.ctors
+  let nonRecursiveConstructors ← liftTermElabM $ findNonRecursiveConstructors inductiveName
+
+  logInfo s!"non-recursive constructors: {nonRecursiveConstructors.toList}"
 
   -- Generate the generator function name
   let genFunName := mkIdent (Name.mkStr1 s!"gen_{inductiveName}")
