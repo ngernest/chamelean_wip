@@ -41,7 +41,7 @@ inductive typing (Γ : List type) : term → type → Prop where
 -- Example usage:
 -- (Note: we require users to explicitly provide a type annotation to the argument to the lambda)
 
--- #derive_generator (fun (t : Tree) => bst lo hi t)
+#derive_generator (fun (t : Tree) => bst lo hi t)
 -- #derive_generator (fun (e : term) => typing Γ e τ)
 
 

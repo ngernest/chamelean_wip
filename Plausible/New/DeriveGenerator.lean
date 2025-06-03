@@ -114,7 +114,3 @@ def elabDeriveGenerator : CommandElab := fun stx => do
     elabCommand genFunction
 
   | _ => throwUnsupportedSyntax
-
------------
--- Testing
------------
