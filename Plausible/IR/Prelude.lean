@@ -145,7 +145,11 @@ def mk_eqs (ee: Array (Expr × Expr)) : MetaM (Array Expr) := do
     equations := equations.push (← whnf eq)
   return equations
 
-def splitLast? (arr : Array Expr) : Option (Array Expr × Expr) :=
+/-- Decomposes an array `arr` into a pair `(xs, x)`
+   where `xs = arr[0..=n-2]` and `x = arr[n - 1]` (where `n` is the length of `arr`).
+   - If `arr` is empty, this function returns `None`
+   - Note: this function is the same as `unsnoc` in the Haskell's `Data.List` library -/
+def unsnoc? (arr : Array α) : Option (Array α × α) :=
   match arr.back? with
   | none => none
   | some a => some (arr.extract 0 (arr.size - 1), a)
@@ -161,7 +165,7 @@ def printConstructorsWithArgs (typeName : Name) : MetaM Unit := do
       let some ctor := env.find? ctorName
         | throwError "Constructor '{ctorName}' not found"
       let (_, _, list_prop) ←  decompose_type ctor.type
-      match splitLast? list_prop with
+      match unsnoc? list_prop with
       | some (cond_prop, out_prop) =>
       IO.println s!"  {ctorName} : {ctor.type}"
       IO.println s!" Cond prop : {cond_prop}"
