@@ -36,7 +36,7 @@ deriving BEq, Repr
     For simplicity, we only include `TConst` and `TAdd` for now (the other cases require auxiliary `inductive`s) -/
 inductive typing: List type → term → type → Prop where
 | TCon : ∀ n, typing L (term.Con n) type.N
-| TAdd: ∀ e1 e2, typing L e1 type.N →  typing L e2 type.N  →  typing L (term.Add e1 e2) type.N
--- | TAbs: ∀ e t1 t2, typing (t1::L) e t2 → typing L (term.Abs t1 e) (type.Arr t1 t2)
--- | TVar: ∀ x t, typing L (term.Var x) t
--- | TApp: ∀ e1 e2 t1 t2, typing L e2 t1 → typing L e1 (type.Arr t1 t2) → typing L (term.App e1 e2) t2
+| TAdd: ∀ e1 e2, typing L e1 type.N → typing L e2 type.N → typing L (term.Add e1 e2) type.N
+| TAbs: ∀ e t1 t2, typing (t1::L) e t2 → typing L (term.Abs t1 e) (type.Arr t1 t2)
+| TVar: ∀ x t, typing L (term.Var x) t
+| TApp: ∀ e1 e2 t1 t2, typing L e2 t1 → typing L e1 (type.Arr t1 t2) → typing L (term.App e1 e2) t2

@@ -69,7 +69,8 @@ def isConstructorRecursive (inductiveName : Name) (ctorName : Name) : MetaM Bool
   let ctorInfo ← getConstInfo ctorName
   let ctorType := ctorInfo.type
 
-  -- TODO: figure out what the first two components of `decompose_type` are
+  -- TODO: figure out what are the first two components of the
+  -- triple returned by `decompose_type`
   let (_, _, type_exprs_in_arrow_type) ← decompose_type ctorType
   match splitLast? type_exprs_in_arrow_type with
   | some (hypotheses, _conclusion) =>
@@ -104,10 +105,17 @@ def mkGeneratorFunction (inductiveName : Name) (targetVar : Name) (targetType : 
   (args : TSyntaxArray `term) : CommandElabM (TSyntax `command) := do
   -- Extract the names of the constructors for the inductive
   let inductInfo ← getConstInfoInduct inductiveName
-  let _constructorNames := inductInfo.ctors
-  let nonRecursiveConstructors ← liftTermElabM $ findNonRecursiveConstructors inductiveName
+  let constructorNames := inductInfo.ctors
 
+  -- Print the arity of each constructor
+  for ctorName in constructorNames do
+    let ctorInfo ← getConstInfoCtor ctorName
+    IO.println s!"ctor {ctorName} has arity {ctorInfo.numFields}"
+
+  -- Find the names of all non-recursive constructors
+  let nonRecursiveConstructors ← liftTermElabM $ findNonRecursiveConstructors inductiveName
   logInfo s!"non-recursive constructors: {nonRecursiveConstructors.toList}"
+
 
   -- Generate the generator function name
   let genFunName := mkIdent (Name.mkStr1 s!"gen_{inductiveName}")
@@ -125,11 +133,15 @@ def mkGeneratorFunction (inductiveName : Name) (targetVar : Name) (targetType : 
       let param ← `(bracketedBinder| ($paramIdent : $paramType))
       params := params.push param
 
+  -- TODO: when `size == 0`, do `return C` for each arity-0 non-recursive constructor
+
   -- Produce the definition for the generator function
+  -- TODO: switch to `backtrack` combinator instead of `Gen.oneOf`
+  -- once the array of sub-generators has been populated
   `(def $genFunName $params* : Plausible.Gen (Option $targetType) :=
       match size with
-      | .zero => return none
-      | .succ size' => return none)
+      | .zero => Plausible.Gen.oneOf #[return none]
+      | .succ size' => Plausible.Gen.oneOf #[return none])
 
 ----------------------------------------------------------------------
 -- Command elaborator for producing the Plausible generator
