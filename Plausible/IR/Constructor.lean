@@ -213,7 +213,7 @@ def checker_where_defs (relation: IR_info) (inpname: List String) (monad: String
   let mut i := 0
   for con in relation.constructors do
     i := i + 1
-    let conprops_str := (← con.hypotheses.mapM (fun a => Meta.ppExpr a)).map toString
+    let conprops_str := (← con.all_hypotheses.mapM (fun a => Meta.ppExpr a)).map toString
     out_str:= out_str ++ "\n-- Constructor: " ++ toString conprops_str
     out_str:= out_str ++ " → " ++ toString (← Meta.ppExpr con.conclusion) ++ "\n"
     out_str:= out_str ++ (← prototype_for_checker_by_con relation inpname i monad) ++ ":= do \n"
@@ -320,7 +320,7 @@ def producer_where_defs (relation: IR_info) (inpname: List String) (genpos: Nat)
   let mut i := 0
   for ctor in relation.constructors do
     i := i + 1
-    let conprops_str := (← ctor.hypotheses.mapM (fun a => Meta.ppExpr a)).map toString
+    let conprops_str := (← ctor.all_hypotheses.mapM (fun a => Meta.ppExpr a)).map toString
     out_str:= out_str ++ "\n-- Constructor: " ++ toString conprops_str
     out_str:= out_str ++ " → " ++ toString (← Meta.ppExpr ctor.conclusion) ++ "\n"
     out_str:= out_str ++ (← prototype_for_producer_by_con relation inpname genpos i monad) ++ ":= do\n"

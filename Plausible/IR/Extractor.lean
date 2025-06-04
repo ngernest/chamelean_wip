@@ -99,7 +99,7 @@ structure IR_info where
   output_vars : Expr
   input_var_names: Array (Option Name)
   output_var_names : Option Name
-  raw_constructors : Array DecomposedConstructorType
+  decomposed_ctor_types : Array DecomposedConstructorType
   constructors : Array IRConstructor
   nocond_constructors : Array IRConstructor
   cond_constructors : Array IRConstructor
@@ -118,7 +118,7 @@ def is_inductive_cond (inpexp : Expr) (c: IRConstructor): MetaM Bool := do
   return false
 
 
-def is_dependence (inpexp : Expr) (ns: Name): MetaM Bool := do
+def isDependency (inpexp : Expr) (ns: Name): MetaM Bool := do
   if ! (← isInductiveRelation inpexp) then return false
   if inpexp.constName.getRoot == ns then return true
   return false
@@ -175,7 +175,7 @@ def process_constructor (ctor_type : Expr) (input_vars: Array Expr) (input_types
     let final_arg_in_conclusion ← option_to_MetaM conclusion_args.toList.getLast?
 
     for hyp in hypotheses do
-      if ← is_dependence hyp.getAppFn inductive_relation_name.getRoot then
+      if ← isDependency hyp.getAppFn inductive_relation_name.getRoot then
         dependencies := dependencies.push hyp.getAppFn
       if hyp.getAppFn.constName == inductive_relation_name then
         recursive_hypotheses := recursive_hypotheses.push hyp
@@ -258,7 +258,7 @@ def process_constructor_unify_inpname (ctortype: Expr) (inpvar: Array Expr) (inp
     let outprop_args:= out_prop.getAppArgs
     let output ← option_to_MetaM (out_prop.getAppArgs).toList.getLast?
     for cond in cond_prop do
-      if ← is_dependence cond.getAppFn relation_name.getRoot then
+      if ← isDependency cond.getAppFn relation_name.getRoot then
         dependencies := dependencies.push cond.getAppFn
       if cond.getAppFn.constName = relation_name then
         recursive_conds := recursive_conds.push cond
@@ -389,7 +389,7 @@ def extract_IR_info (input_expr : Expr) : MetaM IR_info := do
         input_vars := input_vars
         input_var_names := input_vars_names
         output_var_names := output_var_name
-        raw_constructors := decomposed_ctor_types
+        decomposed_ctor_types := decomposed_ctor_types
         constructors := ctors
         nocond_constructors := nocond_constructors
         cond_constructors := cond_constructors
@@ -442,7 +442,7 @@ def extract_IR_info_with_inpname (inpexp : Expr) (inpname: List String) : MetaM 
         input_vars := inp_vars
         input_var_names := inp_var_names
         output_var_names := out_var_name
-        raw_constructors := raw_constructors
+        decomposed_ctor_types := raw_constructors
         constructors := constructors
         nocond_constructors := nocond_constructors
         cond_constructors:= cond_constructors

@@ -143,19 +143,18 @@ def get_producer_initset (c: IRConstructor) (genpos: Nat): MetaM (Array FVarId) 
   if genpos ≥ c.conclusion_args.size
     then throwError "invalid gen position"
   let mut i := 0
-  let mut outconclusion_argsray FVarId := #[]
-  for e in c.out_args do
+  let mut outarr := #[]
+  for e in c.conclusion_args do
     if i != genpos then
       outarr := Array.appendUniqueElements outarr (extractFVars e)
     i:= i + 1
   return outarr
-conclusion_args
+
 def get_producer_outset (c: IRConstructor) (genpos: Nat): MetaM (Array FVarId) := do
-  if h: genpos ≥ c.out_args.size then throwError "invalid gen position"
-  elseconclusion_args
+  if h: genpos ≥ c.conclusion_args.size then throwError "invalid gen position"
+  else
     let initset ← get_producer_initset c genpos
-    let gen_arg := c.out_args[genpos]
-    --let gen_arg := c.out_args.get genpos (by omega)
+    let gen_arg := c.conclusion_args[genpos]
     let outvar := extractFVars gen_arg
     let mut outarr : Array FVarId := #[]
     for i in initset do
@@ -165,9 +164,9 @@ def get_producer_outset (c: IRConstructor) (genpos: Nat): MetaM (Array FVarId) :
 def get_uninit_set (cond: Expr) (initset : Array FVarId) := Array.removeAll (extractFVars cond) initset
 
 def fully_init (cond: Expr) (initset : Array FVarId) := (get_uninit_set cond initset).size == 0
-isInductiveRelationApplication
+
 def get_last_uninit (cond: Expr) (initset : Array FVarId): MetaM (Option Nat) := do
-  if  ¬ (← is_pure_inductive_cond cond) then throwError "not a inductive cond to get_last_uninit_arg "
+  if  ¬ (← isInductiveRelationApplication cond) then throwError "not a inductive cond to get_last_uninit_arg "
   let args:= cond.getAppArgs
   let mut i:=0
   let mut pos:=args.size + 1
@@ -175,9 +174,9 @@ def get_last_uninit (cond: Expr) (initset : Array FVarId): MetaM (Option Nat) :=
     if ¬ fully_init arg initset then pos :=i
     i:= i + 1
   if pos = args.size + 1 then return none else return some pos
-isInductiveRelationApplication
+
 def get_last_uninit_arg_and_uninitset (cond: Expr) (initset : Array FVarId): MetaM (Nat × Array FVarId × Array FVarId) := do
-  if  ¬ (← is_pure_inductive_cond cond) then throwError "not a inductive cond to get_last_uninit_arg "
+  if  ¬ (← isInductiveRelationApplication cond) then throwError "not a inductive cond to get_last_uninit_arg "
   let args:= cond.getAppArgs
   let mut i:=0
   let mut pos:=args.size + 1
@@ -200,11 +199,11 @@ def get_last_uninit_arg_and_uninitset (cond: Expr) (initset : Array FVarId): Met
   return (pos, uninitset, tobeinit)
 
 
-def GenCheckCalls_for_hypotheses  (c: IRConstructor) (initset0: Array FVarId) : MetaM (Array GenCheckCall) := do
+def GenCheckCalls_for_hypotheses (c: IRConstructor) (initset0: Array FVarId) : MetaM (Array GenCheckCall) := do
   let mut outarr : Array GenCheckCall := #[]
   let mut initset := initset0
   let mut i := 0
-  for cond in c.hypotheses do
+  for cond in c.all_hypotheses do
     i := i + 1
     if ← is_inductive_cond cond c then
       if fully_init cond initset then
@@ -212,12 +211,12 @@ def GenCheckCalls_for_hypotheses  (c: IRConstructor) (initset0: Array FVarId) : 
       else
         let (pos, uninitset, tobeinit) ← get_last_uninit_arg_and_uninitset cond initset
         for fid in uninitset do
-          let ty :=  c.varid_type.get! fid
+          let ty :=  c.bound_var_ctx.get! fid
           outarr := outarr.push (GenCheckCall.gen_fvar fid ty)
         let gen_arg := cond.getAppArgs[pos]!
         initset := Array.appendUniqueElements initset uninitset
         if gen_arg.isFVar then
-          let genid := bound_var_ctxarId!
+          let genid := gen_arg.fvarId!
           outarr := outarr.push (GenCheckCall.gen_IR genid cond pos)
         else
           let genname := Name.mkStr1 ("tcond" ++ toString i)
@@ -232,26 +231,26 @@ def GenCheckCalls_for_hypotheses  (c: IRConstructor) (initset0: Array FVarId) : 
       else
         let uninitset := get_uninit_set cond initset
         for fid in uninitset do
-          let ty := c.varid_type.get! fid
+          let ty := c.bound_var_ctx.get! fid
           outarr := outarr.push (GenCheckCall.gen_fvar fid ty)
         initset := Array.appendUniqueElements initset uninitset
         outarr := outarr.push (GenCheckCall.check_nonIR cond)
   return outarr
 
 def GenCheckCalls_for_checker (c: IRConstructor) : MetaM (Array GenCheckCall) := do
-  let mut initset := gebound_var_ctxinitset c
+  let mut initset := get_checker_initset c
   let mut outarr ← GenCheckCalls_for_hypotheses c initset
   return outarr
 
 def GenCheckCalls_for_producer (ctor : IRConstructor) (genpos : Nat) : MetaM (Array GenCheckCall) := do
   let mut initset ← get_producer_initset ctor genpos
   let mut outarr ← GenCheckCalls_for_hypotheses ctor initset
-  for hyp in ctor.hypotheses do
+  for hyp in ctor.all_hypotheses do
     initset := Array.appendUniqueElements initset (extractFVars hyp)
   let gen_arg := ctor.conclusion.getAppArgs[genpos]!
   let uninitset := Array.removeAll (extractFVars gen_arg) initset
   for fid in uninitset do
-    let ty := ctor.varid_type.get! fid
+    let ty := ctor.bound_var_ctx.get! fid
     outarr := outarr.push (GenCheckCall.gen_fvar fid ty)
   outarr := outarr.push (GenCheckCall.ret gen_arg)
   return outarr
@@ -259,7 +258,7 @@ def GenCheckCalls_for_producer (ctor : IRConstructor) (genpos : Nat) : MetaM (Ar
 -- TODO: figure out how each `GenCheckCall` is produced
 def GenCheckCalls_toStr (c: GenCheckCall) : MetaM String := do
   match c with
-  | GenCheckCall.bound_var_ctxond => return  "check_IR_" ++ toString (← Meta.ppExpr cond)
+  | GenCheckCall.check_IR cond => return  "check_IR_" ++ toString (← Meta.ppExpr cond)
   | GenCheckCall.check_nonIR cond => return  "check_nonIR_" ++ toString (← Meta.ppExpr cond)
   | GenCheckCall.gen_IR _ cond pos =>  return  "gen_IR_" ++ toString (← Meta.ppExpr cond) ++ " at "  ++ toString pos
   | GenCheckCall.mat id sp => return "match " ++ id.name.toString ++ toString (← Meta.ppExpr sp.cond)
@@ -295,7 +294,7 @@ def elabCheckerCall : CommandElab := fun stx => do
       let inpexp ← elabTerm t1 none
       let relation ← extract_IR_info inpexp
       for con in relation.constructors do
-        IO.println s!"\n---- Cond prop : {con.hypotheses}"
+        IO.println s!"\n---- Cond prop : {con.all_hypotheses}"
         IO.println s!"---- Out prop : {con.conclusion}"
         let proc_conds ← GenCheckCalls_for_checker con
         for pc in proc_conds do
@@ -318,7 +317,7 @@ def elabGenCall : CommandElab := fun stx => do
       let pos := TSyntax.getNat t2
       let relation ← extract_IR_info inpexp
       for con in relation.constructors do
-        IO.println s!"\n---- Cond prop : {con.hypotheses}"
+        IO.println s!"\n---- Cond prop : {con.all_hypotheses}"
         IO.println s!"---- Out prop : {con.conclusion}"
         let proc_conds ← GenCheckCalls_for_producer con pos
         for pc in proc_conds do
