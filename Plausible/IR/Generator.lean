@@ -34,7 +34,7 @@ def elabGetChecker : CommandElab := fun stx => do
     Command.liftTermElabM do
       let e ← elabTerm t none
       let inpname ← termToStringList t2
-      let relation ←  extract_IR_info_with_inpname e inpname
+      let relation ←  extract_IR_info_with_args e inpname
       logInfo s!"input variable names = {relation.input_var_names}"
       let btnum := TSyntax.getNat t3
       let checker := get_checker relation inpname btnum
@@ -63,7 +63,7 @@ def elabGetProducer : CommandElab := fun stx => do
     Command.liftTermElabM do
       let e ← elabTerm t none
       let inpname ← termToStringList t2
-      let relation ←  extract_IR_info_with_inpname e inpname
+      let relation ←  extract_IR_info_with_args e inpname
       let pos := TSyntax.getNat t3
       let btnum := TSyntax.getNat t4
       let producer := get_producer relation inpname pos btnum
@@ -93,7 +93,7 @@ def elabGetMutualBlock : CommandElab := fun stx => do
     Command.liftTermElabM do
       let e ← elabTerm t none
       let inpname ← termToStringList t2
-      let relation ←  extract_IR_info_with_inpname e inpname
+      let relation ←  extract_IR_info_with_args e inpname
       let btnum := TSyntax.getNat t3
       let mnad := TSyntax.getString t4
       let mc_block := get_mutual_rec_block relation inpname btnum mnad
@@ -124,7 +124,7 @@ def elabWriteMutualBlock : CommandElab := fun stx => do
       let e ← elabTerm t none
       let inpname ← termToStringList t2
       let filename := TSyntax.getString t4
-      let relation ←  extract_IR_info_with_inpname e inpname
+      let relation ←  extract_IR_info_with_args e inpname
       let btnum := TSyntax.getNat t3
       let mc_block ←  get_testfile relation inpname btnum
       let path := System.FilePath.mk "Plausible" / "TestIR" / filename
@@ -146,7 +146,7 @@ def elabDeriveGenerator : CommandElab := fun stx => do
         let e ←  elabTerm t none
         let r0 ← extract_IR_info e
         let inpname := makeInputs "in" r0.input_types.size
-        let relation ←  extract_IR_info_with_inpname e inpname
+        let relation ←  extract_IR_info_with_args e inpname
         let btnum := TSyntax.getNat t3
         get_mutual_rec_block relation inpname btnum
       parseCommand mc_block
@@ -162,7 +162,7 @@ def get_mutual_rec_blocks_dependencies (IR: Expr) (btnum: Nat) (mond : String:= 
     let deprel0 ← extract_IR_info dep
     --let inname := (afterLastDot dep.constName.toString) ++ "_in"
     let depinpname := makeInputs "in" deprel0.input_types.size
-    let deprel ←  extract_IR_info_with_inpname dep depinpname
+    let deprel ←  extract_IR_info_with_args dep depinpname
     let mc_block ←  get_mutual_rec_block deprel depinpname btnum mond
     mc_blocks := mc_blocks.push mc_block
   return mc_blocks

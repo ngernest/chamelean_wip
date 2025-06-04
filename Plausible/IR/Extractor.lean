@@ -339,9 +339,8 @@ def mkArrayFreshVar (types: Array Expr) : MetaM (Array Expr) :=do
     vars := vars.push var
   return vars
 
-/-- Takes in an inductive relation and extracts metadata corresponding to the `inductive`,
-    returning an `IR_info` -/
-def extract_IR_info (input_expr : Expr) : MetaM IR_info := do
+
+def extract_IR_info_with_args (input_expr : Expr) (arg_names : List String) : MetaM IR_info := do
   match input_expr.getAppFn.constName? with
   | some typeName => do
     let type ← inferType input_expr
@@ -369,7 +368,11 @@ def extract_IR_info (input_expr : Expr) : MetaM IR_info := do
          | throwError "IRConstructor '{ctorName}' not found"
         let decomposed_ctor_type ← decomposeType ctor.type
         decomposed_ctor_types := decomposed_ctor_types.push decomposed_ctor_type
-        let constructor ← process_constructor ctor.type input_vars hypotheses_types typeName
+        let constructor ←
+          if List.isEmpty arg_names then
+            process_constructor ctor.type input_vars hypotheses_types typeName
+          else
+            process_constructor_unify_inpname ctor.type input_vars hypotheses_types typeName arg_names
         ctors := ctors.push constructor
       let nocond_constructors := ctors.filter (fun x => x.all_hypotheses.size == 0)
       let cond_constructors := ctors.filter (fun x => x.all_hypotheses.size != 0)
@@ -399,59 +402,10 @@ def extract_IR_info (input_expr : Expr) : MetaM IR_info := do
       throwError "'{typeName}' is not an inductive type"
   | none => throwError "Not a type"
 
-def extract_IR_info_with_inpname (inpexp : Expr) (inpname: List String) : MetaM (IR_info) := do
-  match inpexp.getAppFn.constName? with
-  | some typeName => do
-    let type ← inferType inpexp
-    let types_org ← getComponentsOfArrowType type
-    let types := types_org.pop
-    let outtype ←  option_to_MetaM (types.back?)
-    let names:= (types.map Expr.constName).pop
-    let out_var ←   mkFreshExprMVar outtype (userName:=`out)
-    let inp_vars ← mkArrayFreshVar types
-    let inp_var_names := inp_vars.map Expr.name?
-    let out_var_name := Expr.name? out_var
-    let env ← getEnv
-    match env.find? typeName with
-    | none => throwError "Type '{typeName}' not found"
-    | some (ConstantInfo.inductInfo info) => do
-      let mut raw_constructors : Array DecomposedConstructorType := #[]
-      let mut constructors : Array IRConstructor := #[]
-      for ctorName in info.ctors do
-        let some ctor := env.find? ctorName
-         | throwError "IRConstructor '{ctorName}' not found"
-        let raw_constructor ←  decomposeType ctor.type
-        raw_constructors:= raw_constructors.push raw_constructor
-        let constructor ← process_constructor_unify_inpname ctor.type inp_vars types typeName inpname
-        constructors:= constructors.push constructor
-      let nocond_constructors:= constructors.filter (fun x => (x.all_hypotheses.size = 0))
-      let cond_constructors:= constructors.filter (fun x => ¬ (x.all_hypotheses.size = 0))
-      let deps_arr := constructors.map (fun x => x.dependencies)
-      let dep_rep := deps_arr.flatten
-      let mut dependencies := #[]
-      for dep in dep_rep do
-        if (! dependencies.contains dep) && (! dep.constName = typeName) then
-         dependencies:=dependencies.push dep
-      return {
-        name := typeName
-        input_type_names := names,
-        output_type_name := Expr.constName outtype
-        input_types := types,
-        output_type := outtype
-        output_vars := out_var
-        input_vars := inp_vars
-        input_var_names := inp_var_names
-        output_var_names := out_var_name
-        decomposed_ctor_types := raw_constructors
-        constructors := constructors
-        nocond_constructors := nocond_constructors
-        cond_constructors:= cond_constructors
-        dependencies:= dependencies
-      }
-    | some _ =>
-      throwError "'{typeName}' is not an inductive type"
-  | none => throwError "Not a type"
-
+/-- Takes in an inductive relation and extracts metadata corresponding to the `inductive`,
+    returning an `IR_info` -/
+def extract_IR_info (input_expr : Expr) : MetaM IR_info := do
+  extract_IR_info_with_args input_expr []
 
 
 def print_constructors (c: Array IRConstructor) : MetaM Unit :=do
