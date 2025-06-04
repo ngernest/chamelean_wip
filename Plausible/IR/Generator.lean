@@ -35,7 +35,7 @@ def elabGetChecker : CommandElab := fun stx => do
       let e ← elabTerm t none
       let inpname ← termToStringList t2
       let relation ←  extract_IR_info_with_inpname e inpname
-      logInfo s!"input variable names = {relation.inp_var_names}"
+      logInfo s!"input variable names = {relation.input_var_names}"
       let btnum := TSyntax.getNat t3
       let checker := get_checker relation inpname btnum
       print_m_string checker
@@ -78,7 +78,7 @@ def elabGetProducer : CommandElab := fun stx => do
 def get_mutual_rec_block (r: IR_info) (inpname: List String) (btnum: Nat) (monad: String :="IO"): MetaM String := do
   let checker ←  get_checker r inpname btnum monad
   let mut mc_block := "mutual\n-- CHECKER \n " ++ checker
-  for pos in [0:r.inp_types.size] do
+  for pos in [0:r.input_types.size] do
     let producer ← get_producer r inpname pos btnum monad
     mc_block := mc_block ++ "\n-- GENERATOR FOR ARG" ++ toString pos ++ "\n" ++ producer
   mc_block := mc_block ++ "\nend"
@@ -145,7 +145,7 @@ def elabDeriveGenerator : CommandElab := fun stx => do
       let mc_block ← Command.liftTermElabM do
         let e ←  elabTerm t none
         let r0 ← extract_IR_info e
-        let inpname := makeInputs "in" r0.inp_types.size
+        let inpname := makeInputs "in" r0.input_types.size
         let relation ←  extract_IR_info_with_inpname e inpname
         let btnum := TSyntax.getNat t3
         get_mutual_rec_block relation inpname btnum
@@ -161,7 +161,7 @@ def get_mutual_rec_blocks_dependencies (IR: Expr) (btnum: Nat) (mond : String:= 
   for dep in deps do
     let deprel0 ← extract_IR_info dep
     --let inname := (afterLastDot dep.constName.toString) ++ "_in"
-    let depinpname := makeInputs "in" deprel0.inp_types.size
+    let depinpname := makeInputs "in" deprel0.input_types.size
     let deprel ←  extract_IR_info_with_inpname dep depinpname
     let mc_block ←  get_mutual_rec_block deprel depinpname btnum mond
     mc_blocks := mc_blocks.push mc_block

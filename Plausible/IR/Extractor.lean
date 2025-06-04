@@ -72,14 +72,14 @@ structure IRConstructor where
 
 structure IR_info where
   name : Name
-  inp_type_names : Array Name
-  out_type_name : Name
-  inp_types : Array Expr
-  out_type : Expr
-  inp_vars: Array Expr
-  out_var : Expr
-  inp_var_names: Array (Option Name)
-  out_var_name : Option Name
+  input_type_names : Array Name
+  output_type_name : Name
+  input_types : Array Expr
+  output_type : Expr
+  input_vars: Array Expr
+  output_vars : Expr
+  input_var_names: Array (Option Name)
+  output_var_names : Option Name
   raw_constructors : Array raw_constructor_type
   constructors : Array IRConstructor
   nocond_constructors : Array IRConstructor
@@ -321,12 +321,16 @@ def extract_IR_info (input_expr : Expr) : MetaM IR_info := do
     let tyexprs_in_arrow_type ← get_types_chain type
     -- `hypotheses_types` contains all elements of `tyexprs_in_arrow_type` except the conclusion
     let hypotheses_types := tyexprs_in_arrow_type.pop
-    let outtype ← option_to_MetaM (hypotheses_types.back?)
     let hypotheses_names := (hypotheses_types.map Expr.constName).pop
-    let out_var ← mkFreshExprMVar outtype (userName:=`out)
+
     let input_vars ← mkArrayFreshVar hypotheses_types
     let input_vars_names := input_vars.map Expr.name?
-    let output_var_name := Expr.name? out_var
+
+    -- `output_type` is the last element (type expression) in the array `hypotheses_types`
+    let output_type ← option_to_MetaM (hypotheses_types.back?)
+    let output_var ← mkFreshExprMVar output_type (userName:=`out)
+    let output_var_name := Expr.name? output_var
+
     let env ← getEnv
     match env.find? typeName with
     | none => throwError "Type '{typeName}' not found"
@@ -350,18 +354,18 @@ def extract_IR_info (input_expr : Expr) : MetaM IR_info := do
          dependencies := dependencies.push dep
       return {
         name := typeName
-        inp_type_names := hypotheses_names,
-        out_type_name := Expr.constName outtype
-        inp_types := hypotheses_types,
-        out_type := outtype
-        out_var := out_var
-        inp_vars := input_vars
-        inp_var_names := input_vars_names
-        out_var_name := output_var_name
+        input_type_names := hypotheses_names,
+        output_type_name := Expr.constName output_type
+        input_types := hypotheses_types,
+        output_type := output_type
+        output_vars := output_var
+        input_vars := input_vars
+        input_var_names := input_vars_names
+        output_var_names := output_var_name
         raw_constructors := raw_constructors
         constructors := constructors
         nocond_constructors := nocond_constructors
-        cond_constructors:= cond_constructors
+        cond_constructors := cond_constructors
         dependencies:= dependencies
       }
     | some _ =>
@@ -403,14 +407,14 @@ def extract_IR_info_with_inpname (inpexp : Expr) (inpname: List String) : MetaM 
          dependencies:=dependencies.push dep
       return {
         name := typeName
-        inp_type_names := names,
-        out_type_name := Expr.constName outtype
-        inp_types := types,
-        out_type := outtype
-        out_var := out_var
-        inp_vars := inp_vars
-        inp_var_names := inp_var_names
-        out_var_name := out_var_name
+        input_type_names := names,
+        output_type_name := Expr.constName outtype
+        input_types := types,
+        output_type := outtype
+        output_vars := out_var
+        input_vars := inp_vars
+        input_var_names := inp_var_names
+        output_var_names := out_var_name
         raw_constructors := raw_constructors
         constructors := constructors
         nocond_constructors := nocond_constructors
@@ -434,10 +438,10 @@ def print_constructors (c: Array IRConstructor) : MetaM Unit :=do
 def print_relation_info (r: MetaM (IR_info)  ) : MetaM Unit := do
   let relation ← r
   IO.println s!"Relation name: {relation.name}"
-  IO.println s!"Input types: {relation.inp_types}"
-  IO.println s!"Generated type: {relation.out_type}"
-  IO.println s!"Input vars: {relation.inp_vars}"
-  IO.println s!"Out vars: {relation.out_var}"
+  IO.println s!"Input types: {relation.input_types}"
+  IO.println s!"Generated type: {relation.output_type}"
+  IO.println s!"Input vars: {relation.input_vars}"
+  IO.println s!"Out vars: {relation.output_vars}"
   IO.println s!"dependencies: {relation.dependencies}"
   print_constructors relation.constructors
 

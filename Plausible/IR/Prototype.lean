@@ -19,7 +19,7 @@ def elim_dot_for_type (name: String) : String :=
   ⟨qf.data.tail⟩
 
 def prototype_for_checker (r: IR_info) (inpname: List String) (monad: String :="IO"): MetaM String := do
-  let inps := [("size", Lean.mkConst `Nat)] ++ List.zip inpname r.inp_types.toList
+  let inps := [("size", Lean.mkConst `Nat)] ++ List.zip inpname r.input_types.toList
   let genfuncname: String := "check_" ++ afterLastDot r.name.toString
   let mut prototype := "partial def " ++ genfuncname ++ " "
   for inp in inps do
@@ -33,7 +33,7 @@ def prototype_for_checker (r: IR_info) (inpname: List String) (monad: String :="
   return prototype
 
 def prototype_for_checker_by_con (r: IR_info) (inpname: List String) (con: Nat) (monad: String :="IO"): MetaM String := do
-  let inps := [("size", Lean.mkConst `Nat)] ++ List.zip inpname r.inp_types.toList
+  let inps := [("size", Lean.mkConst `Nat)] ++ List.zip inpname r.input_types.toList
   let genfuncname: String := "check_" ++ afterLastDot r.name.toString ++ "_by_con_" ++ toString con
   let mut prototype := "partial def " ++ genfuncname ++ " "
   for inp in inps do
@@ -65,7 +65,7 @@ def elabGetprotoChecker : CommandElab := fun stx => do
 
 
 def prototype_for_producer(r: IR_info) (inpname: List String) (genpos: Nat) (monad: String :="IO"): MetaM String := do
-  let zipinp := [("size", Lean.mkConst `Nat)] ++ List.zip inpname r.inp_types.toList
+  let zipinp := [("size", Lean.mkConst `Nat)] ++ List.zip inpname r.input_types.toList
   let inps := zipinp.take (genpos + 1) ++ zipinp.drop (genpos + 2)
   let out := zipinp[genpos + 1]!
   let genfuncname: String := "gen_" ++ afterLastDot r.name.toString ++ "_at_" ++ toString genpos
@@ -83,7 +83,7 @@ def prototype_for_producer(r: IR_info) (inpname: List String) (genpos: Nat) (mon
   return prototype
 
 def prototype_for_producer_by_con(r: IR_info) (inpname: List String) (genpos: Nat) (con: Nat) (monad: String :="IO"): MetaM String := do
-  let zipinp := [("size", Lean.mkConst `Nat)] ++ List.zip inpname r.inp_types.toList
+  let zipinp := [("size", Lean.mkConst `Nat)] ++ List.zip inpname r.input_types.toList
   let inps := zipinp.take (genpos + 1) ++ zipinp.drop (genpos + 2)
   let out := zipinp[genpos + 1]!
   let genfuncname: String := "gen_" ++ afterLastDot r.name.toString ++ "_at_" ++ toString genpos ++ "_by_con_" ++ toString con
