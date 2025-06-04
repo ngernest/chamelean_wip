@@ -312,6 +312,8 @@ def mkArrayFreshVar (types: Array Expr) : MetaM (Array Expr) :=do
     vars := vars.push var
   return vars
 
+/-- Takes in an inductive relation and extracts metadata corresponding to the `inductive`,
+    returning an `IR_info` -/
 def extract_IR_info (input_expr : Expr) : MetaM IR_info := do
   match input_expr.getAppFn.constName? with
   | some typeName => do
@@ -319,9 +321,9 @@ def extract_IR_info (input_expr : Expr) : MetaM IR_info := do
     let tyexprs_in_arrow_type ← get_types_chain type
     -- `hypotheses_types` contains all elements of `tyexprs_in_arrow_type` except the conclusion
     let hypotheses_types := tyexprs_in_arrow_type.pop
-    let outtype ←  option_to_MetaM (hypotheses_types.back?)
+    let outtype ← option_to_MetaM (hypotheses_types.back?)
     let hypotheses_names := (hypotheses_types.map Expr.constName).pop
-    let out_var ←  mkFreshExprMVar outtype (userName:=`out)
+    let out_var ← mkFreshExprMVar outtype (userName:=`out)
     let input_vars ← mkArrayFreshVar hypotheses_types
     let input_vars_names := input_vars.map Expr.name?
     let output_var_name := Expr.name? out_var
@@ -334,18 +336,18 @@ def extract_IR_info (input_expr : Expr) : MetaM IR_info := do
       for ctorName in info.ctors do
         let some ctor := env.find? ctorName
          | throwError "IRConstructor '{ctorName}' not found"
-        let raw_constructor ←  decompose_type ctor.type
-        raw_constructors:= raw_constructors.push raw_constructor
+        let raw_constructor ← decompose_type ctor.type
+        raw_constructors := raw_constructors.push raw_constructor
         let constructor ← process_constructor ctor.type input_vars hypotheses_types typeName
-        constructors:= constructors.push constructor
-      let nocond_constructors:= constructors.filter (fun x => (x.hypotheses.size = 0))
-      let cond_constructors:= constructors.filter (fun x => ¬ (x.hypotheses.size = 0))
+        constructors := constructors.push constructor
+      let nocond_constructors := constructors.filter (fun x => x.hypotheses.size == 0)
+      let cond_constructors := constructors.filter (fun x => x.hypotheses.size != 0)
       let deps_arr := constructors.map (fun x => x.dependencies)
       let dep_rep := deps_arr.flatten
       let mut dependencies := #[]
       for dep in dep_rep do
         if (! dependencies.contains dep) && (! dep.constName = typeName) then
-         dependencies:=dependencies.push dep
+         dependencies := dependencies.push dep
       return {
         name := typeName
         inp_type_names := hypotheses_names,

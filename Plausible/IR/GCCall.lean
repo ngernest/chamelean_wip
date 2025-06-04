@@ -200,20 +200,13 @@ def get_last_uninit_arg_and_uninitset (cond: Expr) (initset : Array FVarId): Met
   return (pos, uninitset, tobeinit)
 
 
-def GenCheckCalls_for_cond_props  (c: IRConstructor) (initset0: Array FVarId) : MetaM (Array GenCheckCall) := do
+def GenCheckCalls_for_hypotheses  (c: IRConstructor) (initset0: Array FVarId) : MetaM (Array GenCheckCall) := do
   let mut outarr : Array GenCheckCall := #[]
   let mut initset := initset0
   let mut i := 0
   for cond in c.hypotheses do
-    /-let namearr := initset.map FVarId.name
-    IO.println s!" initset : {namearr}"
-    let namearr := (all_FVars_in cond).map FVarId.name
-    IO.println s!" All fvars : {namearr}"
-    let namearr := (get_uninit_set cond initset).map FVarId.name
-    IO.println s!" All uninit fvars : {namearr}"-/
     i := i + 1
     if ← is_inductive_cond cond c then
-      --IO.println s!" cond : {cond}"
       if fully_init cond initset then
         outarr := outarr.push (GenCheckCall.check_IR cond)
       else
@@ -238,10 +231,8 @@ def GenCheckCalls_for_cond_props  (c: IRConstructor) (initset0: Array FVarId) : 
         outarr := outarr.push (GenCheckCall.check_nonIR cond)
       else
         let uninitset := get_uninit_set cond initset
-        /-let namearr := uninitset.map FVarId.name
-        IO.println s!" All uninit fvars : {namearr}"-/
         for fid in uninitset do
-          let ty :=  c.varid_type.get! fid
+          let ty := c.varid_type.get! fid
           outarr := outarr.push (GenCheckCall.gen_fvar fid ty)
         initset := Array.appendUniqueElements initset uninitset
         outarr := outarr.push (GenCheckCall.check_nonIR cond)
@@ -249,19 +240,18 @@ def GenCheckCalls_for_cond_props  (c: IRConstructor) (initset0: Array FVarId) : 
 
 def GenCheckCalls_for_checker (c: IRConstructor) : MetaM (Array GenCheckCall) := do
   let mut initset := get_checker_initset c
-  let mut outarr ← GenCheckCalls_for_cond_props c initset
-  --outarr := outarr.push (GenCheckCall.check_IR c.out_prop)
+  let mut outarr ← GenCheckCalls_for_hypotheses c initset
   return outarr
 
-def GenCheckCalls_for_producer (ctor : IRConstructor) (genpos: Nat) : MetaM (Array GenCheckCall) := do
+def GenCheckCalls_for_producer (ctor : IRConstructor) (genpos : Nat) : MetaM (Array GenCheckCall) := do
   let mut initset ← get_producer_initset ctor genpos
-  let mut outarr ← GenCheckCalls_for_cond_props ctor initset
-  for cond in ctor.hypotheses do
-    initset := Array.appendUniqueElements initset (extractFVars cond)
+  let mut outarr ← GenCheckCalls_for_hypotheses ctor initset
+  for hyp in ctor.hypotheses do
+    initset := Array.appendUniqueElements initset (extractFVars hyp)
   let gen_arg := ctor.conclusion.getAppArgs[genpos]!
   let uninitset := Array.removeAll (extractFVars gen_arg) initset
   for fid in uninitset do
-    let ty :=  ctor.varid_type.get! fid
+    let ty := ctor.varid_type.get! fid
     outarr := outarr.push (GenCheckCall.gen_fvar fid ty)
   outarr := outarr.push (GenCheckCall.ret gen_arg)
   return outarr
