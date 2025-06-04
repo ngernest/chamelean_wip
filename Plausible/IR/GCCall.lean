@@ -199,42 +199,42 @@ def get_last_uninit_arg_and_uninitset (cond: Expr) (initset : Array FVarId): Met
   return (pos, uninitset, tobeinit)
 
 
-def GenCheckCalls_for_hypotheses (c: IRConstructor) (initset0: Array FVarId) : MetaM (Array GenCheckCall) := do
+def GenCheckCalls_for_hypotheses (ctor : IRConstructor) (initset0: Array FVarId) : MetaM (Array GenCheckCall) := do
   let mut outarr : Array GenCheckCall := #[]
   let mut initset := initset0
   let mut i := 0
-  for cond in c.all_hypotheses do
+  for hyp in ctor.all_hypotheses do
     i := i + 1
-    if ← is_inductive_cond cond c then
-      if fully_init cond initset then
-        outarr := outarr.push (GenCheckCall.check_IR cond)
+    if ← isHypothesisOfInductiveConstructor hyp ctor then
+      if fully_init hyp initset then
+        outarr := outarr.push (GenCheckCall.check_IR hyp)
       else
-        let (pos, uninitset, tobeinit) ← get_last_uninit_arg_and_uninitset cond initset
+        let (pos, uninitset, tobeinit) ← get_last_uninit_arg_and_uninitset hyp initset
         for fid in uninitset do
-          let ty :=  c.bound_var_ctx.get! fid
+          let ty := ctor.bound_var_ctx.get! fid
           outarr := outarr.push (GenCheckCall.gen_fvar fid ty)
-        let gen_arg := cond.getAppArgs[pos]!
+        let gen_arg := hyp.getAppArgs[pos]!
         initset := Array.appendUniqueElements initset uninitset
         if gen_arg.isFVar then
           let genid := gen_arg.fvarId!
-          outarr := outarr.push (GenCheckCall.gen_IR genid cond pos)
+          outarr := outarr.push (GenCheckCall.gen_IR genid hyp pos)
         else
           let genname := Name.mkStr1 ("tcond" ++ toString i)
           let genid := FVarId.mk genname
           let sp ←  separate_fvar_in_cond gen_arg initset i
-          outarr := outarr.push (GenCheckCall.gen_IR genid cond pos)
+          outarr := outarr.push (GenCheckCall.gen_IR genid hyp pos)
           outarr := outarr.push (GenCheckCall.mat genid sp)
         initset := Array.appendUniqueElements initset tobeinit
     else
-      if fully_init cond initset then
-        outarr := outarr.push (GenCheckCall.check_nonIR cond)
+      if fully_init hyp initset then
+        outarr := outarr.push (GenCheckCall.check_nonIR hyp)
       else
-        let uninitset := get_uninit_set cond initset
+        let uninitset := get_uninit_set hyp initset
         for fid in uninitset do
-          let ty := c.bound_var_ctx.get! fid
+          let ty := ctor.bound_var_ctx.get! fid
           outarr := outarr.push (GenCheckCall.gen_fvar fid ty)
         initset := Array.appendUniqueElements initset uninitset
-        outarr := outarr.push (GenCheckCall.check_nonIR cond)
+        outarr := outarr.push (GenCheckCall.check_nonIR hyp)
   return outarr
 
 def GenCheckCalls_for_checker (c: IRConstructor) : MetaM (Array GenCheckCall) := do

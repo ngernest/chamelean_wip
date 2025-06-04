@@ -115,14 +115,22 @@ def isInductiveRelationApplication (e : Expr) : MetaM Bool := do
   | some typeName => Meta.isInductivePredicate typeName
   | none => return false
 
-def is_inductive_cond (inpexp : Expr) (c: IRConstructor): MetaM Bool := do
-  if ! (← isInductiveRelation inpexp.getAppFn) then return false
-  if inpexp.getAppFn.constName.getRoot == c.name_space then return true
+/-- Determines whether an expression `e` is a hypothesis of a constructor `ctor`
+   for an inductive relation -/
+def isHypothesisOfInductiveConstructor (e : Expr) (ctor : IRConstructor) : MetaM Bool := do
+  if !(← isInductiveRelation e.getAppFn) then
+    return false
+  if e.getAppFn.constName.getRoot == ctor.name_space then
+    return true
   return false
 
-def isDependency (inpexp : Expr) (ns: Name): MetaM Bool := do
-  if ! (← isInductiveRelation inpexp) then return false
-  if inpexp.constName.getRoot == ns then return true
+/-- Determines whether an expression `e` is a dependency of an inductive relation
+    (i.e. if `e` is an inductive relation that is defined within the current namespace) -/
+def isDependency (e : Expr) (current_namespace : Name) : MetaM Bool := do
+  if !(← isInductiveRelation e) then
+    return false
+  if e.constName.getRoot == current_namespace then
+    return true
   return false
 
 /-- Takes each argument in `input_args` and produces a corresponding `FVarId`,
@@ -349,7 +357,7 @@ def extract_IR_info_with_args (input_expr : Expr) (arg_names : List String) : Me
 
 /-- Takes in an inductive relation and extracts metadata corresponding to the `inductive`,
     returning an `IR_info` -/
-def extract_IR_info (input_expr : Expr) : MetaM IR_info := do
+def extract_IR_info (input_expr : Expr) : MetaM IR_info :=
   extract_IR_info_with_args input_expr []
 
 
