@@ -68,14 +68,16 @@ def option_to_IO {α : Type} (o : Option α) (errorMsg : String := "Option is no
   | some a => return a
   | none => throw (IO.userError errorMsg)
 
-partial def get_types_chain (type : Expr) : MetaM (Array Expr) := do
+/-- Takes a type expression `tyexpr` representing an arrow type, and returns an array of type-expressions
+    where each element is a component of the arrow type.
+    For example, `get_types_chain (A -> B -> C)` produces `#[A, B, C]`. -/
+partial def get_types_chain (tyexpr : Expr) : MetaM (Array Expr) := do
   let rec helper (e : Expr) (acc : Array Expr) : MetaM (Array Expr) := do
     match e with
     | Expr.forallE _ domain body _ =>
       helper (body.instantiate1 (mkFVar ⟨`x⟩)) (acc.push domain)
     | e => return acc.push e
-  let types ← helper type #[]
-  return types
+  helper tyexpr #[]
 
 def typeArrayToString (types : Array Expr) : MetaM String := do
   let typeStrs ← types.mapM (fun t => do pure s!"{← Meta.ppExpr t}")
@@ -88,8 +90,9 @@ elab "#get_type" t:term : command => do
     let typeStr ← typeArrayToString types
     IO.println typeStr
 
-/-- Extract binders (∀ x y, etc) from an expression -/
-partial def extractBinders (e : Expr) : Array (Name × Expr) × Expr :=
+/-- Takes a universally-quantified expression of the form `∀ (x1 : τ1) … (xn : τn), body`
+    and returns the pair `(#[(x1, τ1), …, (xn, τn)], body)` -/
+partial def extractForAllBinders (e : Expr) : Array (Name × Expr) × Expr :=
   let rec go (e : Expr) (acc : Array (Name × Expr)) :=
     match e with
     | Expr.forallE n t b _ =>
@@ -100,9 +103,13 @@ partial def extractBinders (e : Expr) : Array (Name × Expr) × Expr :=
     | _ => (acc, e)
   go e #[]
 
---decompose a type ∀ x y, A → B → C into a list of bound variables [x,y] and a list of Expr [A, B, C]
+/-- Decomposes a universally-quantified type expression whose body is an arrow type
+    (i.e. `∀ (x1 : τ1) … (xn : τn), A → B → C`), and returns a triple of the form
+    `(#[(x1, τ1), …, (xn, τn)], A → B → C, #[A, B, C])`.
+    - The 2nd component of the triple is the body of the forall-expression
+    - The 3rd component of the triple is an array containing each subterm of the arrow type -/
 def decompose_type (e : Expr) : MetaM (Array (Name × Expr) × Expr × Array Expr) := do
-  let (binder, exp) := extractBinders e
+  let (binder, exp) := extractForAllBinders e
   let tyexp ← get_types_chain exp
   return (binder, exp, tyexp)
 

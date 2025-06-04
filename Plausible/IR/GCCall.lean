@@ -264,6 +264,7 @@ def GenCheckCalls_for_producer (c: IRConstructor) (genpos: Nat) : MetaM (Array G
   outarr := outarr.push (GenCheckCall.ret gen_arg)
   return outarr
 
+-- TODO: figure out how each `GenCheckCall` is produced
 def GenCheckCalls_toStr (c: GenCheckCall) : MetaM String := do
   match c with
   | GenCheckCall.check_IR cond => return  "check_IR_" ++ toString (← Meta.ppExpr cond)
