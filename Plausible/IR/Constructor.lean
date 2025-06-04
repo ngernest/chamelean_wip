@@ -63,7 +63,7 @@ def GenCheckCalls_grouping (gccs: Array GenCheckCall) : MetaM GenCheckCall_group
 
 def get_checker_backtrack_elem_from_constructor (con: IRConstructor) (inpname: List String) : MetaM backtrack_elem := do
   --Get the match expr and inp
-  let out_prop ←  separate_fvar con.out_prop
+  let out_prop ←  separate_fvar con.conclusion
   let args := (out_prop.cond.getAppArgs).toList
   let zipinp := inpname.zip args
   let need_match_zipimp :=  zipinp.filter (fun x => is_inductive_constructor x.2)
@@ -213,9 +213,9 @@ def checker_where_defs (relation: IR_info) (inpname: List String) (monad: String
   let mut i := 0
   for con in relation.constructors do
     i := i + 1
-    let conprops_str := (← con.cond_props.mapM (fun a => Meta.ppExpr a)).map toString
+    let conprops_str := (← con.hypotheses.mapM (fun a => Meta.ppExpr a)).map toString
     out_str:= out_str ++ "\n-- Constructor: " ++ toString conprops_str
-    out_str:= out_str ++ " → " ++ toString (← Meta.ppExpr con.out_prop) ++ "\n"
+    out_str:= out_str ++ " → " ++ toString (← Meta.ppExpr con.conclusion) ++ "\n"
     out_str:= out_str ++ (← prototype_for_checker_by_con relation inpname i monad) ++ ":= do \n"
     let bt ← get_checker_backtrack_elem_from_constructor con inpname
     let btStr ← backtrack_elem_toString_checker bt monad
@@ -245,27 +245,27 @@ def elabgetBackTrack : CommandElab := fun stx => do
 -- BACKTRACK PRODUCER ---
 
 
-def get_producer_backtrack_elem_from_constructor (con: IRConstructor) (inpname: List String) (genpos: Nat)
+def get_producer_backtrack_elem_from_constructor (ctor: IRConstructor) (inpname: List String) (genpos: Nat)
       : MetaM backtrack_elem := do
   let temp := Name.mkStr1 "temp000"
   let tempfvar := Expr.fvar (FVarId.mk temp)
-  let mut out_prop_args :=  con.out_prop.getAppArgs.set! genpos tempfvar
-  let newoutprop := mkAppN con.out_prop.getAppFn out_prop_args
-  let out_prop ←  separate_fvar newoutprop
-  let args := (out_prop.cond.getAppArgs).toList
+  let mut conclusion_args :=  ctor.conclusion.getAppArgs.set! genpos tempfvar
+  let new_conclusion := mkAppN ctor.conclusion.getAppFn conclusion_args
+  let conclusion ← separate_fvar new_conclusion
+  let args := (conclusion.cond.getAppArgs).toList
   let zipinp := inpname.zip args
-  let zipinp := zipinp.take (genpos) ++ zipinp.drop (genpos+1)
+  let zipinp := zipinp.take genpos ++ zipinp.drop (genpos + 1)
   let need_match_zipimp :=  zipinp.filter (fun x => is_inductive_constructor x.2)
   let (mat_inp, mat_expr) := need_match_zipimp.unzip
   --Get GenCheckCall
-  let gccs ← GenCheckCalls_for_producer con genpos
+  let gccs ← GenCheckCalls_for_producer ctor genpos
   let gcc_group ← GenCheckCalls_grouping gccs
   return {
     inp := (inpname.take (genpos) ++ inpname.drop (genpos+1)).toArray
     mat_inp:= mat_inp.toArray
     mat_expr := mat_expr.toArray
     gcc_group := gcc_group
-    var_eq := out_prop.eqs ++ gcc_group.var_eq
+    var_eq := conclusion.eqs ++ gcc_group.var_eq
   }
 
 
@@ -318,13 +318,13 @@ def backtrack_elem_toString_producer (cbe: backtrack_elem) (monad: String :="IO"
 def producer_where_defs (relation: IR_info) (inpname: List String) (genpos: Nat) (monad: String :="IO"): MetaM String := do
   let mut out_str := ""
   let mut i := 0
-  for con in relation.constructors do
+  for ctor in relation.constructors do
     i := i + 1
-    let conprops_str := (← con.cond_props.mapM (fun a => Meta.ppExpr a)).map toString
+    let conprops_str := (← ctor.hypotheses.mapM (fun a => Meta.ppExpr a)).map toString
     out_str:= out_str ++ "\n-- Constructor: " ++ toString conprops_str
-    out_str:= out_str ++ " → " ++ toString (← Meta.ppExpr con.out_prop) ++ "\n"
+    out_str:= out_str ++ " → " ++ toString (← Meta.ppExpr ctor.conclusion) ++ "\n"
     out_str:= out_str ++ (← prototype_for_producer_by_con relation inpname genpos i monad) ++ ":= do\n"
-    let bt ← get_producer_backtrack_elem_from_constructor con inpname genpos
+    let bt ← get_producer_backtrack_elem_from_constructor ctor inpname genpos
     let btStr ← backtrack_elem_toString_producer bt monad
     out_str:= out_str ++ btStr ++ "\n"
   return out_str
@@ -337,11 +337,11 @@ def elabgetBackTrackProducer : CommandElab := fun stx => do
   match stx with
   | `(#get_backtrack_producer $t1:term with_name $t2:term for_arg $t3) =>
     Command.liftTermElabM do
-      let inpexp ← elabTerm t1 none
+      let input_expr ← elabTerm t1 none
       let inpname ← termToStringList t2
       let pos := TSyntax.getNat t3
-      let relation ← extract_IR_info inpexp
-      let where_defs ← producer_where_defs relation inpname pos
+      let inductiveInfo ← extract_IR_info input_expr
+      let where_defs ← producer_where_defs inductiveInfo inpname pos
       IO.println where_defs
   | _ => throwError "Invalid syntax"
 

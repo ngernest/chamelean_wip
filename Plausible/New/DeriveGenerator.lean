@@ -69,8 +69,6 @@ def isConstructorRecursive (inductiveName : Name) (ctorName : Name) : MetaM Bool
   let ctorInfo ← getConstInfo ctorName
   let ctorType := ctorInfo.type
 
-  -- TODO: figure out what are the first two components of the
-  -- triple returned by `decompose_type`
   let (_, _, type_exprs_in_arrow_type) ← decompose_type ctorType
   match splitLast? type_exprs_in_arrow_type with
   | some (hypotheses, _conclusion) =>
@@ -109,6 +107,7 @@ def mkGeneratorFunction (inductiveName : Name) (targetVar : Name) (targetType : 
 
   -- Find the names of all non-recursive constructors
   let nonRecursiveConstructors ← liftTermElabM $ findNonRecursiveConstructors inductiveName
+  logInfo s!"nonRecursiveConstructors = {nonRecursiveConstructors}"
 
   -- Find all arity-0 constructors
   let mut arityZeroCtors := #[]
@@ -118,7 +117,7 @@ def mkGeneratorFunction (inductiveName : Name) (targetVar : Name) (targetType : 
     if ctorInfo.numFields == 0 then
       arityZeroCtors := arityZeroCtors.push ctorName
 
-  -- For each arity zero generator `C`, produce an array of expressions of the form `(pure (some C))`,
+  -- For each arity zero generator `C`, produce an array of expressions of the form `pure (some C)`,
   -- where `pure` is from Plausible's `Gen` monad
 
   -- TODO: generalize this to handle constructors that have non-zero arity

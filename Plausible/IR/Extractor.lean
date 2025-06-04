@@ -52,9 +52,10 @@ def raw_constructor_type := Array (Name × Expr) × Expr × Array Expr
 structure IRConstructor where
   var_names: Array Name
   varid_type : Std.HashMap FVarId Expr
-  cond_props: Array Expr
-  out_prop: Expr
+  hypotheses: Array Expr
+  conclusion: Expr
   output : Expr
+  -- TODO: What is out_args???
   out_args : Array Expr
   num_vars: Array Name
   num_conds: Array Expr
@@ -166,8 +167,8 @@ def process_constructor (ctortype: Expr) (inpvar: Array Expr) (inptypes: Array E
       ctor_expr := ctortype
       var_names := var_names,
       varid_type:= varid_type,
-      cond_props:= hypotheses,
-      out_prop := conclusion,
+      hypotheses:= hypotheses,
+      conclusion := conclusion,
       out_args := outprop_args,
       output := output
       num_vars := numvars
@@ -248,8 +249,8 @@ def process_constructor_unify_inpname (ctortype: Expr) (inpvar: Array Expr) (inp
       ctor_expr := ctortype
       var_names := var_names,
       varid_type:= varid_type,
-      cond_props:= cond_prop,
-      out_prop := out_prop,
+      hypotheses:= cond_prop,
+      conclusion := out_prop,
       out_args := outprop_args,
       output := output
       num_vars := numvars
@@ -276,8 +277,8 @@ def arrayppExpr (a: Array Expr) : MetaM (Array Format) := do
 
 def process_constructor_print (pc: IRConstructor) : MetaM Unit := do
   IO.println s!" Vars : {pc.var_names}"
-  IO.println s!" Cond prop : {pc.cond_props}"
-  let op ←  Meta.ppExpr pc.out_prop
+  IO.println s!" Cond prop : {pc.hypotheses}"
+  let op ←  Meta.ppExpr pc.conclusion
   IO.println s!" Out prop:  {op}"
   let oa := arrayppExpr (pc.out_args)
   IO.println s!" Out args:  {← oa}"
@@ -311,18 +312,19 @@ def mkArrayFreshVar (types: Array Expr) : MetaM (Array Expr) :=do
     vars := vars.push var
   return vars
 
-def extract_IR_info (inpexp : Expr) : MetaM (IR_info) := do
-  match inpexp.getAppFn.constName? with
+def extract_IR_info (input_expr : Expr) : MetaM IR_info := do
+  match input_expr.getAppFn.constName? with
   | some typeName => do
-    let type ← inferType inpexp
-    let types_org ← get_types_chain type
-    let types := types_org.pop
-    let outtype ←  option_to_MetaM (types.back?)
-    let names:= (types.map Expr.constName).pop
-    let out_var ←   mkFreshExprMVar outtype (userName:=`out)
-    let inp_vars ← mkArrayFreshVar types
-    let inp_var_names := inp_vars.map Expr.name?
-    let out_var_name := Expr.name? out_var
+    let type ← inferType input_expr
+    let tyexprs_in_arrow_type ← get_types_chain type
+    -- `hypotheses_types` contains all elements of `tyexprs_in_arrow_type` except the conclusion
+    let hypotheses_types := tyexprs_in_arrow_type.pop
+    let outtype ←  option_to_MetaM (hypotheses_types.back?)
+    let hypotheses_names := (hypotheses_types.map Expr.constName).pop
+    let out_var ←  mkFreshExprMVar outtype (userName:=`out)
+    let input_vars ← mkArrayFreshVar hypotheses_types
+    let input_vars_names := input_vars.map Expr.name?
+    let output_var_name := Expr.name? out_var
     let env ← getEnv
     match env.find? typeName with
     | none => throwError "Type '{typeName}' not found"
@@ -334,10 +336,10 @@ def extract_IR_info (inpexp : Expr) : MetaM (IR_info) := do
          | throwError "IRConstructor '{ctorName}' not found"
         let raw_constructor ←  decompose_type ctor.type
         raw_constructors:= raw_constructors.push raw_constructor
-        let constructor ← process_constructor ctor.type inp_vars types typeName
+        let constructor ← process_constructor ctor.type input_vars hypotheses_types typeName
         constructors:= constructors.push constructor
-      let nocond_constructors:= constructors.filter (fun x => (x.cond_props.size = 0))
-      let cond_constructors:= constructors.filter (fun x => ¬ (x.cond_props.size = 0))
+      let nocond_constructors:= constructors.filter (fun x => (x.hypotheses.size = 0))
+      let cond_constructors:= constructors.filter (fun x => ¬ (x.hypotheses.size = 0))
       let deps_arr := constructors.map (fun x => x.dependencies)
       let dep_rep := deps_arr.flatten
       let mut dependencies := #[]
@@ -346,14 +348,14 @@ def extract_IR_info (inpexp : Expr) : MetaM (IR_info) := do
          dependencies:=dependencies.push dep
       return {
         name := typeName
-        inp_type_names := names,
+        inp_type_names := hypotheses_names,
         out_type_name := Expr.constName outtype
-        inp_types := types,
+        inp_types := hypotheses_types,
         out_type := outtype
         out_var := out_var
-        inp_vars := inp_vars
-        inp_var_names := inp_var_names
-        out_var_name := out_var_name
+        inp_vars := input_vars
+        inp_var_names := input_vars_names
+        out_var_name := output_var_name
         raw_constructors := raw_constructors
         constructors := constructors
         nocond_constructors := nocond_constructors
@@ -389,8 +391,8 @@ def extract_IR_info_with_inpname (inpexp : Expr) (inpname: List String) : MetaM 
         raw_constructors:= raw_constructors.push raw_constructor
         let constructor ← process_constructor_unify_inpname ctor.type inp_vars types typeName inpname
         constructors:= constructors.push constructor
-      let nocond_constructors:= constructors.filter (fun x => (x.cond_props.size = 0))
-      let cond_constructors:= constructors.filter (fun x => ¬ (x.cond_props.size = 0))
+      let nocond_constructors:= constructors.filter (fun x => (x.hypotheses.size = 0))
+      let cond_constructors:= constructors.filter (fun x => ¬ (x.hypotheses.size = 0))
       let deps_arr := constructors.map (fun x => x.dependencies)
       let dep_rep := deps_arr.flatten
       let mut dependencies := #[]

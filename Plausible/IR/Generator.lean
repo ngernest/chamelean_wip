@@ -210,7 +210,7 @@ def get_enumerator (r: IR_info) (inpname: List String) (genpos: Nat) (iternum: N
   body := body ++ "\nreturn out"
   return prototype ++ "\n" ++ body
 
---#derive_generator balanced with_name ["h", "T"] backtrack 100
+-- #derive_generator balanced with_name ["h", "T"] backtrack 100
 
 --#eval gen_balanced_at_1 2 1
 

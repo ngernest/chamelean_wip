@@ -50,10 +50,10 @@ def count_fvars_in (e: Expr) (id: FVarId) : Nat :=
   | _ => 0
 
 /-- Extracts all the free variables in an expression, returning an array of `FVarID`s -/
-def all_FVars_in (e: Expr) : Array FVarId :=
+def extractFVars (e: Expr) : Array FVarId :=
   match e with
   | Expr.fvar fid => #[fid]
-  | Expr.app f a => Array.appendUniqueElements (all_FVars_in f) (all_FVars_in a)
+  | Expr.app f a => Array.appendUniqueElements (extractFVars f) (extractFVars a)
   | _ => #[]
 
 def subst_first_fVar (e: Expr) (old : FVarId) (new : FVarId) : MetaM Expr := do
@@ -76,11 +76,11 @@ structure split_inductive_cond where
   fvarids : Array FVarId
   eqs: Array (FVarId × FVarId)
 
-/- for any Fvar t appear more than 1 time in the expr, keep the first one as t
+/-- for any Fvar t appear more than 1 time in the expr, keep the first one as t,
     replace the second one with t1, the third one with t2 ....
     record the equations t = t1, t = t2 .... -/
 def separate_fvar (cond: Expr): MetaM split_inductive_cond := do
-  let fvars := all_FVars_in cond
+  let fvars := extractFVars cond
   let mut eq_arr: Array (FVarId × FVarId) := #[]
   let mut fvarids := fvars
   let temp := Name.mkStr1 "temp000"
@@ -106,7 +106,7 @@ def separate_fvar (cond: Expr): MetaM split_inductive_cond := do
   }
 
 def separate_fvar_in_cond (cond: Expr) (initset: Array FVarId) (cond_pos: Nat): MetaM split_inductive_cond := do
-  let fvars := all_FVars_in cond
+  let fvars := extractFVars cond
   let fvars_init := Array.intersect fvars initset
   let mut newcond := cond
   let mut eqs : Array (FVarId × FVarId) := #[]
@@ -137,14 +137,16 @@ inductive GenCheckCall where
   | gen_fvar (id: FVarId) (type: Expr) : GenCheckCall
   | ret (e: Expr): GenCheckCall
 
-def get_checker_initset (c: IRConstructor) : Array FVarId := all_FVars_in c.out_prop
+def get_checker_initset (c: IRConstructor) : Array FVarId := extractFVars c.conclusion
 
 def get_producer_initset (c: IRConstructor) (genpos: Nat): MetaM (Array FVarId) := do
-  if genpos ≥ c.out_args.size then throwError "invalid gen position"
+  if genpos ≥ c.out_args.size
+    then throwError "invalid gen position"
   let mut i := 0
   let mut outarr : Array FVarId := #[]
   for e in c.out_args do
-    if ¬ i = genpos then outarr := Array.appendUniqueElements outarr (all_FVars_in e)
+    if i != genpos then
+      outarr := Array.appendUniqueElements outarr (extractFVars e)
     i:= i + 1
   return outarr
 
@@ -154,13 +156,13 @@ def get_producer_outset (c: IRConstructor) (genpos: Nat): MetaM (Array FVarId) :
     let initset ← get_producer_initset c genpos
     let gen_arg := c.out_args[genpos]
     --let gen_arg := c.out_args.get genpos (by omega)
-    let outvar := all_FVars_in gen_arg
+    let outvar := extractFVars gen_arg
     let mut outarr : Array FVarId := #[]
     for i in initset do
       if ¬ Array.elem i outvar then outarr:=outarr.push i
     return outarr
 
-def get_uninit_set (cond: Expr) (initset : Array FVarId) := Array.removeAll (all_FVars_in cond) initset
+def get_uninit_set (cond: Expr) (initset : Array FVarId) := Array.removeAll (extractFVars cond) initset
 
 def fully_init (cond: Expr) (initset : Array FVarId) := (get_uninit_set cond initset).size == 0
 
@@ -186,7 +188,7 @@ def get_last_uninit_arg_and_uninitset (cond: Expr) (initset : Array FVarId): Met
       {
         pos :=i;
         uninit_arg := arg;
-        tobeinit := all_FVars_in arg
+        tobeinit := extractFVars arg
       }
     i:= i + 1
   if pos = args.size + 1 then return (args.size + 1, #[], #[])
@@ -202,7 +204,7 @@ def GenCheckCalls_for_cond_props  (c: IRConstructor) (initset0: Array FVarId) : 
   let mut outarr : Array GenCheckCall := #[]
   let mut initset := initset0
   let mut i := 0
-  for cond in c.cond_props do
+  for cond in c.hypotheses do
     /-let namearr := initset.map FVarId.name
     IO.println s!" initset : {namearr}"
     let namearr := (all_FVars_in cond).map FVarId.name
@@ -251,15 +253,15 @@ def GenCheckCalls_for_checker (c: IRConstructor) : MetaM (Array GenCheckCall) :=
   --outarr := outarr.push (GenCheckCall.check_IR c.out_prop)
   return outarr
 
-def GenCheckCalls_for_producer (c: IRConstructor) (genpos: Nat) : MetaM (Array GenCheckCall) := do
-  let mut initset ←  get_producer_initset c genpos
-  let mut outarr ← GenCheckCalls_for_cond_props c initset
-  for cond in c.cond_props do
-    initset := Array.appendUniqueElements initset (all_FVars_in cond)
-  let gen_arg := c.out_prop.getAppArgs[genpos]!
-  let uninitset := Array.removeAll (all_FVars_in gen_arg) initset
+def GenCheckCalls_for_producer (ctor : IRConstructor) (genpos: Nat) : MetaM (Array GenCheckCall) := do
+  let mut initset ← get_producer_initset ctor genpos
+  let mut outarr ← GenCheckCalls_for_cond_props ctor initset
+  for cond in ctor.hypotheses do
+    initset := Array.appendUniqueElements initset (extractFVars cond)
+  let gen_arg := ctor.conclusion.getAppArgs[genpos]!
+  let uninitset := Array.removeAll (extractFVars gen_arg) initset
   for fid in uninitset do
-    let ty :=  c.varid_type.get! fid
+    let ty :=  ctor.varid_type.get! fid
     outarr := outarr.push (GenCheckCall.gen_fvar fid ty)
   outarr := outarr.push (GenCheckCall.ret gen_arg)
   return outarr
@@ -303,8 +305,8 @@ def elabCheckerCall : CommandElab := fun stx => do
       let inpexp ← elabTerm t1 none
       let relation ← extract_IR_info inpexp
       for con in relation.constructors do
-        IO.println s!"\n---- Cond prop : {con.cond_props}"
-        IO.println s!"---- Out prop : {con.out_prop}"
+        IO.println s!"\n---- Cond prop : {con.hypotheses}"
+        IO.println s!"---- Out prop : {con.conclusion}"
         let proc_conds ← GenCheckCalls_for_checker con
         for pc in proc_conds do
           IO.println (← GenCheckCalls_toRawCode pc)
@@ -326,8 +328,8 @@ def elabGenCall : CommandElab := fun stx => do
       let pos := TSyntax.getNat t2
       let relation ← extract_IR_info inpexp
       for con in relation.constructors do
-        IO.println s!"\n---- Cond prop : {con.cond_props}"
-        IO.println s!"---- Out prop : {con.out_prop}"
+        IO.println s!"\n---- Cond prop : {con.hypotheses}"
+        IO.println s!"---- Out prop : {con.conclusion}"
         let proc_conds ← GenCheckCalls_for_producer con pos
         for pc in proc_conds do
           IO.println (← GenCheckCalls_toRawCode pc)
