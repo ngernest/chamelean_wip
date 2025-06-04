@@ -24,7 +24,7 @@ def size_zero_backtrack_for_checker (r: IR_info): MetaM (Array String) := do
   let mut out : Array String := #[]
   for ctor in r.constructors do
     i := i + 1
-    if ctor.recursive_conds.size = 0 then
+    if ctor.recursive_hypotheses.size = 0 then
       let bt := "check_" ++ afterLastDot r.name.toString ++"_by_con_" ++ toString i
       out:= out.push bt
   return out
@@ -34,7 +34,7 @@ def size_pos_backtrack_for_checker (r: IR_info): MetaM (Array String) := do
   let mut out : Array String := #[]
   for con in r.constructors do
     i := i + 1
-    if con.recursive_conds.size > 0 then
+    if con.recursive_hypotheses.size > 0 then
       let bt := "check_" ++ afterLastDot r.name.toString ++"_by_con_" ++ toString i
       out:= out.push bt
   return out
@@ -44,7 +44,7 @@ def size_zero_backtrack_for_producer (r: IR_info) (genpos: Nat): MetaM (Array St
   let mut out : Array String := #[]
   for con in r.constructors do
     i := i + 1
-    if con.recursive_conds.size = 0 then
+    if con.recursive_hypotheses.size = 0 then
       let bt := "gen_" ++ afterLastDot r.name.toString ++ "_at_" ++ toString genpos  ++"_by_con_" ++ toString i
       out:= out.push bt
   return out
@@ -54,7 +54,7 @@ def size_pos_backtrack_for_producer (r: IR_info) (genpos: Nat): MetaM (Array Str
   let mut out : Array String := #[]
   for con in r.constructors do
     i := i + 1
-    if con.recursive_conds.size > 0 then
+    if con.recursive_hypotheses.size > 0 then
       let bt := "gen_" ++ afterLastDot r.name.toString ++ "_at_" ++ toString genpos ++"_by_con_" ++ toString i
       out:= out.push bt
   return out

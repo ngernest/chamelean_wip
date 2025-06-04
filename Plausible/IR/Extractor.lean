@@ -64,18 +64,24 @@ def mkFVars (a : Array Name) : Array Expr := a.map (fun x => mkFVar ⟨x⟩)
 abbrev DecomposedConstructorType := Array (Name × Expr) × Expr × Array Expr
 
 structure IRConstructor where
+  -- Bound variables and their types
   bound_vars: Array Name
   bound_var_ctx : Std.HashMap FVarId Expr
-  hypotheses : Array Expr
+  bound_vars_with_base_types : Array Name
+  bound_vars_with_non_base_types : Array Name
+
+  -- Metadata about each of the constructor's hypotheses
+  all_hypotheses : Array Expr
+  recursive_hypotheses: Array Expr
+  hypotheses_with_only_base_type_args : Array Expr
+  hypotheses_that_are_inductive_applications: Array Expr
+  nonlinear_hypotheses: Array Expr
+
+  -- Metadata about the constructor's conclusion
   conclusion : Expr
   final_arg_in_conclusion : Expr
   conclusion_args : Array Expr
-  bound_vars_with_base_types : Array Name
-  hypotheses_with_only_base_type_args : Array Expr
-  bound_vars_with_non_base_types : Array Name
-  recursive_conds: Array Expr
-  hypotheses_that_are_inductive_applications: Array Expr
-  nonlinear_conds: Array Expr
+
   inp_eq: Array (Expr × Expr)
   ctor_expr: Expr
   num_inp_eq: Array (Expr × Expr)
@@ -160,9 +166,9 @@ def process_constructor (ctor_type : Expr) (input_vars: Array Expr) (input_types
     let (bound_vars_with_non_base_types, _) := (bound_vars_and_types.filter (fun (_, ty) => !isBaseType ty)).unzip
 
     let mut hypotheses_with_only_base_type_args := #[]
-    let mut nonlinear_conds := #[]
+    let mut nonlinear_hypotheses := #[]
     let mut hypotheses_that_are_inductive_applications := #[]
-    let mut recursive_conds := #[]
+    let mut recursive_hypotheses := #[]
     let mut dependencies := #[]
 
     let conclusion_args := conclusion.getAppArgs
@@ -171,14 +177,14 @@ def process_constructor (ctor_type : Expr) (input_vars: Array Expr) (input_types
     for hyp in hypotheses do
       if ← is_dependence hyp.getAppFn inductive_relation_name.getRoot then
         dependencies := dependencies.push hyp.getAppFn
-      if hyp.getAppFn.constName = inductive_relation_name then
-        recursive_conds := recursive_conds.push hyp
+      if hyp.getAppFn.constName == inductive_relation_name then
+        recursive_hypotheses := recursive_hypotheses.push hyp
       else if ← allArgsHaveBaseTypes hyp then
         hypotheses_with_only_base_type_args := hypotheses_with_only_base_type_args.push hyp
       else if ← isInductiveRelationApplication hyp then
         hypotheses_that_are_inductive_applications := hypotheses_that_are_inductive_applications.push hyp
       else
-        nonlinear_conds := nonlinear_conds.push hyp
+        nonlinear_hypotheses := nonlinear_hypotheses.push hyp
 
     let inp_eq :=  conclusion_args.zip input_vars
     let inp_eq_ztype := inp_eq.zip input_types
@@ -188,16 +194,16 @@ def process_constructor (ctor_type : Expr) (input_vars: Array Expr) (input_types
       ctor_expr := ctor_type
       bound_vars := bound_vars,
       bound_var_ctx := bound_var_ctx,
-      hypotheses := hypotheses,
+      all_hypotheses := hypotheses,
       conclusion := conclusion,
       conclusion_args := conclusion_args,
       final_arg_in_conclusion := final_arg_in_conclusion
       bound_vars_with_base_types := bound_vars_with_base_types
       hypotheses_with_only_base_type_args := hypotheses_with_only_base_type_args
       bound_vars_with_non_base_types := bound_vars_with_non_base_types
-      nonlinear_conds := nonlinear_conds
+      nonlinear_hypotheses := nonlinear_hypotheses
       hypotheses_that_are_inductive_applications := hypotheses_that_are_inductive_applications
-      recursive_conds := recursive_conds
+      recursive_hypotheses := recursive_hypotheses
       inp_eq := inp_eq
       num_inp_eq := num_inp_eq
       notnum_inp_eq := notnum_inp_eq
@@ -270,16 +276,16 @@ def process_constructor_unify_inpname (ctortype: Expr) (inpvar: Array Expr) (inp
       ctor_expr := ctortype
       bound_vars := var_names,
       bound_var_ctx:= varid_type,
-      hypotheses:= cond_prop,
+      all_hypotheses:= cond_prop,
       conclusion := out_prop,
       conclusion_args := outprop_args,
       final_arg_in_conclusion := output
       bound_vars_with_base_types := numvars
       hypotheses_with_only_base_type_args := num_conds
       bound_vars_with_non_base_types := notnumvars
-      nonlinear_conds := nonlinear_conds
+      nonlinear_hypotheses := nonlinear_conds
       hypotheses_that_are_inductive_applications := inductive_conds
-      recursive_conds := recursive_conds
+      recursive_hypotheses := recursive_conds
       inp_eq := inp_eq
       num_inp_eq := num_inp_eq
       notnum_inp_eq := notnum_inp_eq
@@ -298,7 +304,7 @@ def arrayppExpr (a: Array Expr) : MetaM (Array Format) := do
 
 def process_constructor_print (pc: IRConstructor) : MetaM Unit := do
   IO.println s!" Vars : {pc.bound_vars}"
-  IO.println s!" Cond prop : {pc.hypotheses}"
+  IO.println s!" Cond prop : {pc.all_hypotheses}"
   let op ←  Meta.ppExpr pc.conclusion
   IO.println s!" Out prop:  {op}"
   let oa := arrayppExpr (pc.conclusion_args)
@@ -306,9 +312,9 @@ def process_constructor_print (pc: IRConstructor) : MetaM Unit := do
   IO.println s!" num_vars : {pc.bound_vars_with_base_types}"
   IO.println s!" num_conds:  {pc.hypotheses_with_only_base_type_args}"
   IO.println s!" notnum_vars : {pc.bound_vars_with_non_base_types}"
-  IO.println s!" nonlinear_conds:  {pc.nonlinear_conds}"
+  IO.println s!" nonlinear_conds:  {pc.nonlinear_hypotheses}"
   IO.println s!" inductive_conds:  {pc.hypotheses_that_are_inductive_applications}"
-  IO.println s!" recursive_conds:  {pc.recursive_conds}"
+  IO.println s!" recursive_conds:  {pc.recursive_hypotheses}"
   IO.println s!" inp eqs:  {pc.inp_eq}"
   --IO.println s!" var_eqs:  {pc.var_eq}"
 
@@ -365,8 +371,8 @@ def extract_IR_info (input_expr : Expr) : MetaM IR_info := do
         decomposed_ctor_types := decomposed_ctor_types.push decomposed_ctor_type
         let constructor ← process_constructor ctor.type input_vars hypotheses_types typeName
         ctors := ctors.push constructor
-      let nocond_constructors := ctors.filter (fun x => x.hypotheses.size == 0)
-      let cond_constructors := ctors.filter (fun x => x.hypotheses.size != 0)
+      let nocond_constructors := ctors.filter (fun x => x.all_hypotheses.size == 0)
+      let cond_constructors := ctors.filter (fun x => x.all_hypotheses.size != 0)
       let deps_arr := ctors.map (fun x => x.dependencies)
       let dep_rep := deps_arr.flatten
       let mut dependencies := #[]
@@ -418,8 +424,8 @@ def extract_IR_info_with_inpname (inpexp : Expr) (inpname: List String) : MetaM 
         raw_constructors:= raw_constructors.push raw_constructor
         let constructor ← process_constructor_unify_inpname ctor.type inp_vars types typeName inpname
         constructors:= constructors.push constructor
-      let nocond_constructors:= constructors.filter (fun x => (x.hypotheses.size = 0))
-      let cond_constructors:= constructors.filter (fun x => ¬ (x.hypotheses.size = 0))
+      let nocond_constructors:= constructors.filter (fun x => (x.all_hypotheses.size = 0))
+      let cond_constructors:= constructors.filter (fun x => ¬ (x.all_hypotheses.size = 0))
       let deps_arr := constructors.map (fun x => x.dependencies)
       let dep_rep := deps_arr.flatten
       let mut dependencies := #[]
