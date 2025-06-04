@@ -95,6 +95,7 @@ def findNonRecursiveConstructors (inductiveName : Name) : MetaM (Array Name) := 
 
   return nonRecursive
 
+
 /-- Produces the actual generator function.
     - `inductiveName` is the name of the inductive relation
     - `targetVar`, `targetType`: the variable name and type of the value to be generated
@@ -157,6 +158,8 @@ def mkGeneratorFunction (inductiveName : Name) (targetVar : Name) (targetType : 
       match size with
       | .zero => Plausible.Gen.oneOf $sizeZeroGenerators
       | .succ size' => Plausible.Gen.oneOf #[return none])
+
+
 
 ----------------------------------------------------------------------
 -- Command elaborator for producing the Plausible generator

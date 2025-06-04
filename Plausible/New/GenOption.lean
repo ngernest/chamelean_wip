@@ -1,4 +1,7 @@
+import Plausible.IR.Example
+
 import Plausible.Gen
+import Plausible.Sampleable
 open Plausible
 
 ------------------------
@@ -8,6 +11,9 @@ open Plausible
 /-- Type alias for Generators that produce a value wrapped in a `Option`
     (i.e. generators that may fail, i.e. because they ran out of fuel or because they failed to produce an inhabitant of `α`) -/
 abbrev GenOption (α : Type) := Gen (Option α)
+
+class ArbitraryOption (α : Type) where
+  arbitrary : Gen (Option α)
 
 /-- Pure: wrap a value in Some and lift to Gen -/
 def genOptionPure {α : Type} (a : α) : Gen (Option α) :=
@@ -39,9 +45,9 @@ def fail : Gen (Option α) :=
 
 /-- Lifts a `Gen α` into a `Gen (Option α)`.
    (this allow us to use `Gen α` computations in places where `GenOption α` is expected) -/
-def liftGenOption (g : Gen α) : Gen (Option α) := do
-  let a ← g
-  pure (some a)
+def liftGenOption {α : Type} (g : Gen α) : Gen (Option α) :=
+  g >>= (fun x => pure (some x))
+
 
 
 --------------------------------------------------------------------------
