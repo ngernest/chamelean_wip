@@ -55,8 +55,13 @@ def allArgsHaveBaseTypes (e : Expr) : MetaM Bool := do
 
 def mkFVars (a : Array Name) : Array Expr := a.map (fun x => mkFVar ⟨x⟩)
 
-
-def raw_constructor_type := Array (Name × Expr) × Expr × Array Expr
+/-- `ConstructorType` describes a universally-quantified type expression whose body is an arrow type,
+     i.e. types of the form `∀ (x1 : τ1) … (xn : τn), Q1 → … → Qn → P`.
+    - `ConstructorType` is a triple containing three components:
+    `(#[(x1, τ1), …, (xn, τn)], Q1 → … → Qn → P, #[Q1, …, Qn, P])`.
+    - Note: The 2nd component is the body of the forall-expression
+    - Note: The 3rd component is an array containing each subterm of the arrow type -/
+abbrev DecomposedConstructorType := Array (Name × Expr) × Expr × Array Expr
 
 structure IRConstructor where
   bound_vars: Array Name
@@ -69,7 +74,7 @@ structure IRConstructor where
   hypotheses_with_only_base_type_args : Array Expr
   bound_vars_with_non_base_types : Array Name
   recursive_conds: Array Expr
-  inductive_conds: Array Expr
+  hypotheses_that_are_inductive_applications: Array Expr
   nonlinear_conds: Array Expr
   inp_eq: Array (Expr × Expr)
   ctor_expr: Expr
@@ -88,18 +93,18 @@ structure IR_info where
   output_vars : Expr
   input_var_names: Array (Option Name)
   output_var_names : Option Name
-  raw_constructors : Array raw_constructor_type
+  raw_constructors : Array DecomposedConstructorType
   constructors : Array IRConstructor
   nocond_constructors : Array IRConstructor
   cond_constructors : Array IRConstructor
   dependencies: Array Expr
 
-
-def is_pure_inductive_cond (inpexp : Expr) : MetaM Bool := do
-  match inpexp.getAppFn.constName? with
+/-- Determines if an expression `e` is an application of the form `R e1 ... en`,
+    where `R` is an inductive relation  -/
+def isInductiveRelationApplication (e : Expr) : MetaM Bool := do
+  match e.getAppFn.constName? with
   | some typeName => Meta.isInductivePredicate typeName
   | none => return false
-
 
 def is_inductive_cond (inpexp : Expr) (c: IRConstructor): MetaM Bool := do
   if ! (← isInductiveRelation inpexp.getAppFn) then return false
@@ -156,7 +161,7 @@ def process_constructor (ctor_type : Expr) (input_vars: Array Expr) (input_types
 
     let mut hypotheses_with_only_base_type_args := #[]
     let mut nonlinear_conds := #[]
-    let mut inductive_conds := #[]
+    let mut hypotheses_that_are_inductive_applications := #[]
     let mut recursive_conds := #[]
     let mut dependencies := #[]
 
@@ -170,8 +175,8 @@ def process_constructor (ctor_type : Expr) (input_vars: Array Expr) (input_types
         recursive_conds := recursive_conds.push hyp
       else if ← allArgsHaveBaseTypes hyp then
         hypotheses_with_only_base_type_args := hypotheses_with_only_base_type_args.push hyp
-      else if ← is_pure_inductive_cond hyp then
-        inductive_conds := inductive_conds.push hyp
+      else if ← isInductiveRelationApplication hyp then
+        hypotheses_that_are_inductive_applications := hypotheses_that_are_inductive_applications.push hyp
       else
         nonlinear_conds := nonlinear_conds.push hyp
 
@@ -191,7 +196,7 @@ def process_constructor (ctor_type : Expr) (input_vars: Array Expr) (input_types
       hypotheses_with_only_base_type_args := hypotheses_with_only_base_type_args
       bound_vars_with_non_base_types := bound_vars_with_non_base_types
       nonlinear_conds := nonlinear_conds
-      inductive_conds := inductive_conds
+      hypotheses_that_are_inductive_applications := hypotheses_that_are_inductive_applications
       recursive_conds := recursive_conds
       inp_eq := inp_eq
       num_inp_eq := num_inp_eq
@@ -253,7 +258,7 @@ def process_constructor_unify_inpname (ctortype: Expr) (inpvar: Array Expr) (inp
         recursive_conds := recursive_conds.push cond
       else if ← allArgsHaveBaseTypes cond then
         num_conds := num_conds.push cond
-      else if ← is_pure_inductive_cond cond then
+      else if ← isInductiveRelationApplication cond then
         inductive_conds := inductive_conds.push cond
       else
         nonlinear_conds := nonlinear_conds.push cond
@@ -273,7 +278,7 @@ def process_constructor_unify_inpname (ctortype: Expr) (inpvar: Array Expr) (inp
       hypotheses_with_only_base_type_args := num_conds
       bound_vars_with_non_base_types := notnumvars
       nonlinear_conds := nonlinear_conds
-      inductive_conds := inductive_conds
+      hypotheses_that_are_inductive_applications := inductive_conds
       recursive_conds := recursive_conds
       inp_eq := inp_eq
       num_inp_eq := num_inp_eq
@@ -302,7 +307,7 @@ def process_constructor_print (pc: IRConstructor) : MetaM Unit := do
   IO.println s!" num_conds:  {pc.hypotheses_with_only_base_type_args}"
   IO.println s!" notnum_vars : {pc.bound_vars_with_non_base_types}"
   IO.println s!" nonlinear_conds:  {pc.nonlinear_conds}"
-  IO.println s!" inductive_conds:  {pc.inductive_conds}"
+  IO.println s!" inductive_conds:  {pc.hypotheses_that_are_inductive_applications}"
   IO.println s!" recursive_conds:  {pc.recursive_conds}"
   IO.println s!" inp eqs:  {pc.inp_eq}"
   --IO.println s!" var_eqs:  {pc.var_eq}"
@@ -351,18 +356,18 @@ def extract_IR_info (input_expr : Expr) : MetaM IR_info := do
     match env.find? typeName with
     | none => throwError "Type '{typeName}' not found"
     | some (ConstantInfo.inductInfo info) => do
-      let mut raw_constructors : Array raw_constructor_type := #[]
-      let mut constructors : Array IRConstructor := #[]
+      let mut decomposed_ctor_types : Array DecomposedConstructorType := #[]
+      let mut ctors : Array IRConstructor := #[]
       for ctorName in info.ctors do
         let some ctor := env.find? ctorName
          | throwError "IRConstructor '{ctorName}' not found"
-        let raw_constructor ← decomposeType ctor.type
-        raw_constructors := raw_constructors.push raw_constructor
+        let decomposed_ctor_type ← decomposeType ctor.type
+        decomposed_ctor_types := decomposed_ctor_types.push decomposed_ctor_type
         let constructor ← process_constructor ctor.type input_vars hypotheses_types typeName
-        constructors := constructors.push constructor
-      let nocond_constructors := constructors.filter (fun x => x.hypotheses.size == 0)
-      let cond_constructors := constructors.filter (fun x => x.hypotheses.size != 0)
-      let deps_arr := constructors.map (fun x => x.dependencies)
+        ctors := ctors.push constructor
+      let nocond_constructors := ctors.filter (fun x => x.hypotheses.size == 0)
+      let cond_constructors := ctors.filter (fun x => x.hypotheses.size != 0)
+      let deps_arr := ctors.map (fun x => x.dependencies)
       let dep_rep := deps_arr.flatten
       let mut dependencies := #[]
       for dep in dep_rep do
@@ -378,8 +383,8 @@ def extract_IR_info (input_expr : Expr) : MetaM IR_info := do
         input_vars := input_vars
         input_var_names := input_vars_names
         output_var_names := output_var_name
-        raw_constructors := raw_constructors
-        constructors := constructors
+        raw_constructors := decomposed_ctor_types
+        constructors := ctors
         nocond_constructors := nocond_constructors
         cond_constructors := cond_constructors
         dependencies:= dependencies
@@ -404,7 +409,7 @@ def extract_IR_info_with_inpname (inpexp : Expr) (inpname: List String) : MetaM 
     match env.find? typeName with
     | none => throwError "Type '{typeName}' not found"
     | some (ConstantInfo.inductInfo info) => do
-      let mut raw_constructors : Array raw_constructor_type := #[]
+      let mut raw_constructors : Array DecomposedConstructorType := #[]
       let mut constructors : Array IRConstructor := #[]
       for ctorName in info.ctors do
         let some ctor := env.find? ctorName

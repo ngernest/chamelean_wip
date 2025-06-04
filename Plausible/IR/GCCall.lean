@@ -165,7 +165,7 @@ def get_producer_outset (c: IRConstructor) (genpos: Nat): MetaM (Array FVarId) :
 def get_uninit_set (cond: Expr) (initset : Array FVarId) := Array.removeAll (extractFVars cond) initset
 
 def fully_init (cond: Expr) (initset : Array FVarId) := (get_uninit_set cond initset).size == 0
-
+isInductiveRelationApplication
 def get_last_uninit (cond: Expr) (initset : Array FVarId): MetaM (Option Nat) := do
   if  ¬ (← is_pure_inductive_cond cond) then throwError "not a inductive cond to get_last_uninit_arg "
   let args:= cond.getAppArgs
@@ -175,7 +175,7 @@ def get_last_uninit (cond: Expr) (initset : Array FVarId): MetaM (Option Nat) :=
     if ¬ fully_init arg initset then pos :=i
     i:= i + 1
   if pos = args.size + 1 then return none else return some pos
-
+isInductiveRelationApplication
 def get_last_uninit_arg_and_uninitset (cond: Expr) (initset : Array FVarId): MetaM (Nat × Array FVarId × Array FVarId) := do
   if  ¬ (← is_pure_inductive_cond cond) then throwError "not a inductive cond to get_last_uninit_arg "
   let args:= cond.getAppArgs
