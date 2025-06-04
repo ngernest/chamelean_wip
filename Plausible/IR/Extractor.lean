@@ -120,35 +120,10 @@ def is_inductive_cond (inpexp : Expr) (c: IRConstructor): MetaM Bool := do
   if inpexp.getAppFn.constName.getRoot == c.name_space then return true
   return false
 
-
 def isDependency (inpexp : Expr) (ns: Name): MetaM Bool := do
   if ! (← isInductiveRelation inpexp) then return false
   if inpexp.constName.getRoot == ns then return true
   return false
-
-def process_cond_props (cond_prop: Array Expr) (out_prop: Expr) (var_names : Array Name) : MetaM ((Array Expr) × (Array Name) × (Array (Expr × Expr))) := do
-  let fvars := var_names.map FVarId.mk
-  let mut appeared_fvarid: Array FVarId := #[]
-  let mut eq_arr: Array (Expr × Expr) := #[]
-  let mut new_arr_expr: Array Expr := #[]
-  let mut new_var_names := var_names
-  let mut i := 0
-  for cond in cond_prop do
-    let mut newcond:= cond
-    for fv in fvars do
-      if cond.containsFVar fv then
-        if ¬ appeared_fvarid.contains fv then
-          appeared_fvarid := appeared_fvarid.push fv
-        else
-          if ¬ out_prop.containsFVar fv then
-            let newname := Name.mkStr1 (fv.name.toString ++ toString i)
-            let newfvarid := FVarId.mk newname
-            appeared_fvarid := appeared_fvarid.push newfvarid
-            eq_arr:= eq_arr.push (mkFVar fv, mkFVar newfvarid)
-            newcond:= newcond.replaceFVarId fv (mkFVar newfvarid)
-            new_var_names := new_var_names.push newname
-    new_arr_expr:= new_arr_expr.push newcond
-  return (new_arr_expr, new_var_names, eq_arr)
 
 /-- Takes each argument in `input_args` and produces a corresponding `FVarId`,
     replacing the `i`-th argument in `conclusion` (if it is an application)
