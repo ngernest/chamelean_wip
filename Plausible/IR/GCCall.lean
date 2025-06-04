@@ -14,25 +14,31 @@ namespace Plausible.IR
 
 -- Process condition ---
 
-
+/-- Removes all elements of `xs` that are present in `ys`
+    (variant of `List.removeAll` for arrays) -/
 def arrayRemoveAll [BEq α] (xs : Array α) (ys : Array α) : Array α :=
   (List.removeAll xs.toList ys.toList).toArray
 
+/-- Computes the intersection of two lists -/
 def List.intersect [BEq α] (xs : List α) (ys: List α) : List α :=
   match xs with
   | [] => []
   | h::t => if List.elem h ys then h::List.intersect t ys else List.intersect t ys
 
+/-- Computes the intersection of two arrays -/
 def Array.intersect [BEq α] (xs : Array α) (ys : Array α) : Array α :=
   (List.intersect xs.toList ys.toList).toArray
 
-def list_append_non_repeat [BEq α] (xs ys : List α) : List α :=
+/-- Takes `xs` and appends all elements in `ys` that aren't in `xs` to `xs` -/
+def List.appendUniqueElements [BEq α] (xs : List α) (ys : List α) : List α :=
   match ys with
   | [] => xs
-  | h::t => if !(List.elem h xs) then list_append_non_repeat (xs ++ [h]) t
-            else  list_append_non_repeat xs t
+  | h::t => if !(List.elem h xs) then List.appendUniqueElements (List.concat xs h) t
+            else List.appendUniqueElements xs t
 
-def append_non_repeat (a b : Array FVarId) := (list_append_non_repeat a.toList b.toList).toArray
+/-- Takes `xs` and appends all elements in `ys` that aren't in `xs` to `xs` -/
+def Array.appendUniqueElements [BEq α] (xs : Array α) (ys : Array α) : Array α :=
+  (List.appendUniqueElements xs.toList ys.toList).toArray
 
 def count_fvars_in (e: Expr) (id: FVarId) : Nat :=
   match e with
@@ -47,7 +53,7 @@ def count_fvars_in (e: Expr) (id: FVarId) : Nat :=
 def all_FVars_in (e: Expr) : Array FVarId :=
   match e with
   | Expr.fvar fid => #[fid]
-  | Expr.app f a => append_non_repeat (all_FVars_in f) (all_FVars_in a)
+  | Expr.app f a => Array.appendUniqueElements (all_FVars_in f) (all_FVars_in a)
   | _ => #[]
 
 def subst_first_fVar (e: Expr) (old : FVarId) (new : FVarId) : MetaM Expr := do
@@ -138,7 +144,7 @@ def get_producer_initset (c: IRConstructor) (genpos: Nat): MetaM (Array FVarId) 
   let mut i := 0
   let mut outarr : Array FVarId := #[]
   for e in c.out_args do
-    if ¬ i = genpos then outarr := append_non_repeat outarr (all_FVars_in e)
+    if ¬ i = genpos then outarr := Array.appendUniqueElementss outarr (all_FVars_in e)
     i:= i + 1
   return outarr
 
@@ -187,7 +193,7 @@ def get_last_uninit_arg_and_uninitset (cond: Expr) (initset : Array FVarId): Met
   let mut uninitset : Array FVarId := #[]
   i := 0
   for e in args do
-    if ¬ i = pos then uninitset := append_non_repeat uninitset (get_uninit_set e initset)
+    if ¬ i = pos then uninitset := Array.appendUniqueElementss uninitset (get_uninit_set e initset)
   uninitset := arrayRemoveAll uninitset tobeinit
   return (pos, uninitset, tobeinit)
 
@@ -214,7 +220,7 @@ def GenCheckCalls_for_cond_props  (c: IRConstructor) (initset0: Array FVarId) : 
           let ty :=  c.varid_type.get! fid
           outarr := outarr.push (GenCheckCall.gen_fvar fid ty)
         let gen_arg := cond.getAppArgs[pos]!
-        initset := append_non_repeat initset uninitset
+        initset := Array.appendUniqueElementss initset uninitset
         if gen_arg.isFVar then
           let genid := gen_arg.fvarId!
           outarr := outarr.push (GenCheckCall.gen_IR genid cond pos)
@@ -224,7 +230,7 @@ def GenCheckCalls_for_cond_props  (c: IRConstructor) (initset0: Array FVarId) : 
           let sp ←  separate_fvar_in_cond gen_arg initset i
           outarr := outarr.push (GenCheckCall.gen_IR genid cond pos)
           outarr := outarr.push (GenCheckCall.mat genid sp)
-        initset := append_non_repeat initset tobeinit
+        initset := Array.appendUniqueElementss initset tobeinit
     else
       if fully_init cond initset then
         outarr := outarr.push (GenCheckCall.check_nonIR cond)
@@ -235,7 +241,7 @@ def GenCheckCalls_for_cond_props  (c: IRConstructor) (initset0: Array FVarId) : 
         for fid in uninitset do
           let ty :=  c.varid_type.get! fid
           outarr := outarr.push (GenCheckCall.gen_fvar fid ty)
-        initset := append_non_repeat initset uninitset
+        initset := Array.appendUniqueElementss initset uninitset
         outarr := outarr.push (GenCheckCall.check_nonIR cond)
   return outarr
 
@@ -249,7 +255,7 @@ def GenCheckCalls_for_producer (c: IRConstructor) (genpos: Nat) : MetaM (Array G
   let mut initset ←  get_producer_initset c genpos
   let mut outarr ← GenCheckCalls_for_cond_props c initset
   for cond in c.cond_props do
-    initset := append_non_repeat initset (all_FVars_in cond)
+    initset := Array.appendUniqueElementss initset (all_FVars_in cond)
   let gen_arg := c.out_prop.getAppArgs[genpos]!
   let uninitset := arrayRemoveAll (all_FVars_in gen_arg) initset
   for fid in uninitset do
