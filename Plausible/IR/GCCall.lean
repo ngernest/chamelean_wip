@@ -14,28 +14,23 @@ namespace Plausible.IR
 
 -- Process condition ---
 
-def contains_in_list (f:FVarId) (a: List FVarId):= match a with
-| [] => false
-| h::t => h == f || contains_in_list f t
 
-def contains_in (f:FVarId) (a: Array FVarId):= contains_in_list f a.toList
+def arrayRemoveAll [BEq α] (xs : Array α) (ys : Array α) : Array α :=
+  (List.removeAll xs.toList ys.toList).toArray
 
-def in_a_not_in_b_list (a b: List FVarId) := match a with
-| [] => []
-| h::t => if contains_in_list h b then in_a_not_in_b_list t b else h::in_a_not_in_b_list t b
+def List.intersect [BEq α] (xs : List α) (ys: List α) : List α :=
+  match xs with
+  | [] => []
+  | h::t => if List.elem h ys then h::List.intersect t ys else List.intersect t ys
 
-def in_a_not_in_b (a b: Array FVarId) := (in_a_not_in_b_list a.toList b.toList).toArray
+def Array.intersect [BEq α] (xs : Array α) (ys : Array α) : Array α :=
+  (List.intersect xs.toList ys.toList).toArray
 
-def in_a_and_b_list (a b: List FVarId) := match a with
-| [] => []
-| h::t => if contains_in_list h b then h::in_a_and_b_list t b else in_a_and_b_list t b
-
-def in_a_and_b (a b: Array FVarId) := (in_a_and_b_list a.toList b.toList).toArray
-
-def list_append_non_repeat (a b : List FVarId) := match b with
-| [] => a
-| h::t => if contains_in_list h a == false then list_append_non_repeat (a ++ [h]) t
-          else  list_append_non_repeat a t
+def list_append_non_repeat [BEq α] (xs ys : List α) : List α :=
+  match ys with
+  | [] => xs
+  | h::t => if !(List.elem h xs) then list_append_non_repeat (xs ++ [h]) t
+            else  list_append_non_repeat xs t
 
 def append_non_repeat (a b : Array FVarId) := (list_append_non_repeat a.toList b.toList).toArray
 
@@ -48,6 +43,7 @@ def count_fvars_in (e: Expr) (id: FVarId) : Nat :=
     c1 + c2
   | _ => 0
 
+/-- Extracts all the free variables in an expression, returning an array of `FVarID`s -/
 def all_FVars_in (e: Expr) : Array FVarId :=
   match e with
   | Expr.fvar fid => #[fid]
@@ -105,7 +101,7 @@ def separate_fvar (cond: Expr): MetaM split_inductive_cond := do
 
 def separate_fvar_in_cond (cond: Expr) (initset: Array FVarId) (cond_pos: Nat): MetaM split_inductive_cond := do
   let fvars := all_FVars_in cond
-  let fvars_init := in_a_and_b fvars initset
+  let fvars_init := Array.intersect fvars initset
   let mut newcond := cond
   let mut eqs : Array (FVarId × FVarId) := #[]
   for f in fvars_init do
@@ -155,10 +151,10 @@ def get_producer_outset (c: IRConstructor) (genpos: Nat): MetaM (Array FVarId) :
     let outvar := all_FVars_in gen_arg
     let mut outarr : Array FVarId := #[]
     for i in initset do
-      if ¬ contains_in i outvar then outarr:=outarr.push i
+      if ¬ Array.elem i outvar then outarr:=outarr.push i
     return outarr
 
-def get_uninit_set (cond: Expr) (initset : Array FVarId) := in_a_not_in_b (all_FVars_in cond) initset
+def get_uninit_set (cond: Expr) (initset : Array FVarId) := arrayRemoveAll (all_FVars_in cond) initset
 
 def fully_init (cond: Expr) (initset : Array FVarId) := (get_uninit_set cond initset).size == 0
 
@@ -192,7 +188,7 @@ def get_last_uninit_arg_and_uninitset (cond: Expr) (initset : Array FVarId): Met
   i := 0
   for e in args do
     if ¬ i = pos then uninitset := append_non_repeat uninitset (get_uninit_set e initset)
-  uninitset := in_a_not_in_b uninitset tobeinit
+  uninitset := arrayRemoveAll uninitset tobeinit
   return (pos, uninitset, tobeinit)
 
 
@@ -255,7 +251,7 @@ def GenCheckCalls_for_producer (c: IRConstructor) (genpos: Nat) : MetaM (Array G
   for cond in c.cond_props do
     initset := append_non_repeat initset (all_FVars_in cond)
   let gen_arg := c.out_prop.getAppArgs[genpos]!
-  let uninitset := in_a_not_in_b (all_FVars_in gen_arg) initset
+  let uninitset := arrayRemoveAll (all_FVars_in gen_arg) initset
   for fid in uninitset do
     let ty :=  c.varid_type.get! fid
     outarr := outarr.push (GenCheckCall.gen_fvar fid ty)
