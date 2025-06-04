@@ -16,7 +16,7 @@ namespace Plausible.IR
 
 /-- Removes all elements of `xs` that are present in `ys`
     (variant of `List.removeAll` for arrays) -/
-def arrayRemoveAll [BEq α] (xs : Array α) (ys : Array α) : Array α :=
+def Array.removeAll [BEq α] (xs : Array α) (ys : Array α) : Array α :=
   (List.removeAll xs.toList ys.toList).toArray
 
 /-- Computes the intersection of two lists -/
@@ -160,7 +160,7 @@ def get_producer_outset (c: IRConstructor) (genpos: Nat): MetaM (Array FVarId) :
       if ¬ Array.elem i outvar then outarr:=outarr.push i
     return outarr
 
-def get_uninit_set (cond: Expr) (initset : Array FVarId) := arrayRemoveAll (all_FVars_in cond) initset
+def get_uninit_set (cond: Expr) (initset : Array FVarId) := Array.removeAll (all_FVars_in cond) initset
 
 def fully_init (cond: Expr) (initset : Array FVarId) := (get_uninit_set cond initset).size == 0
 
@@ -194,7 +194,7 @@ def get_last_uninit_arg_and_uninitset (cond: Expr) (initset : Array FVarId): Met
   i := 0
   for e in args do
     if ¬ i = pos then uninitset := Array.appendUniqueElements uninitset (get_uninit_set e initset)
-  uninitset := arrayRemoveAll uninitset tobeinit
+  uninitset := Array.removeAll uninitset tobeinit
   return (pos, uninitset, tobeinit)
 
 
@@ -257,7 +257,7 @@ def GenCheckCalls_for_producer (c: IRConstructor) (genpos: Nat) : MetaM (Array G
   for cond in c.cond_props do
     initset := Array.appendUniqueElements initset (all_FVars_in cond)
   let gen_arg := c.out_prop.getAppArgs[genpos]!
-  let uninitset := arrayRemoveAll (all_FVars_in gen_arg) initset
+  let uninitset := Array.removeAll (all_FVars_in gen_arg) initset
   for fid in uninitset do
     let ty :=  c.varid_type.get! fid
     outarr := outarr.push (GenCheckCall.gen_fvar fid ty)
