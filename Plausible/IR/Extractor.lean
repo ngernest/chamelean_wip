@@ -8,6 +8,9 @@ open List Nat Array String
 open Lean Elab Command Meta Term
 open Lean.Parser.Term
 
+-- We bring in the `Std` namespace so that we can refer to `HashMap` functions easily
+open Std
+
 
 namespace Plausible.IR
 
@@ -66,7 +69,7 @@ abbrev DecomposedConstructorType := Array (Name × Expr) × Expr × Array Expr
 structure IRConstructor where
   -- Bound variables and their types
   bound_vars: Array Name
-  bound_var_ctx : Std.HashMap FVarId Expr
+  bound_var_ctx : HashMap FVarId Expr
   bound_vars_with_base_types : Array Name
   bound_vars_with_non_base_types : Array Name
 
@@ -147,43 +150,55 @@ def process_cond_props (cond_prop: Array Expr) (out_prop: Expr) (var_names : Arr
     new_arr_expr:= new_arr_expr.push newcond
   return (new_arr_expr, new_var_names, eq_arr)
 
-def get_Fvar_replist (conclusion : Expr) (input_args : List String) : MetaM (List (FVarId × Expr)) := do
-  let new_fvarid : List FVarId := input_args.map (fun x => FVarId.mk (Name.mkStr1 x))
-  let new_expr := new_fvarid.map Expr.fvar
-  let args_zip := conclusion.getAppArgs.toList.zip new_expr
-  let filter_args_zip := args_zip.filter (fun x => x.1.isFVar)
-  let ret := filter_args_zip.map (fun x => (x.1.fvarId!, x.2))
-  return ret
+/-- Takes each argument in `input_args` and produces a corresponding `FVarId`,
+    replacing the `i`-th argument in `conclusion` (if it is an application)
+    with the `FVarId` corresponding to the `i`-th `input_arg` -/
+def extract_fvars (conclusion : Expr) (input_args : List String) : MetaM (List (FVarId × Expr)) := do
+  let fvar_ids := input_args.map (FVarId.mk ∘ Name.mkStr1)
+  let new_input_args := fvar_ids.map Expr.fvar
+  let conclusion_args_and_new_inputs := List.zip (conclusion.getAppArgs.toList) new_input_args
+  pure $ List.filterMap (fun (conclusion_arg, new_expr) =>
+    if conclusion_arg.isFVar then some (conclusion_arg.fvarId!, new_expr)
+    else none) conclusion_args_and_new_inputs
 
-def replace_FVar_list (cond : Expr) (fvarids: List (FVarId × Expr)) : MetaM Expr :=do
-  let mut newcond := cond
-  for rep in fvarids do
-    newcond := newcond.replaceFVarId rep.1 rep.2
+/-- Replaces all occurrences of `FVarId`s in `e` using the association list `fvar_ids`, which
+    maps each `FVarId` to an `expr` -/
+def replace_fvars_in_expr (e : Expr) (fvar_ids : List (FVarId × Expr)) : MetaM Expr := do
+  let mut newcond := e
+  for (fvar_id, expr) in fvar_ids do
+    newcond := newcond.replaceFVarId fvar_id expr
   return newcond
 
-def replace_arrcond_FVar_list (arrcond : Array Expr) (fvarids: List (FVarId × Expr)) : MetaM (Array Expr) :=
-  arrcond.mapM (fun x => replace_FVar_list x fvarids)
+/-- For each `e` in `exprs_arr`, this function replaces all occurrences of `FVarId`s in `e`
+    using the association list `fvar_ids`, which maps each `FVarId` to an `expr` -/
+def replace_fvars_in_exprs (exprs_arr : Array Expr) (fvar_ids: List (FVarId × Expr)) : MetaM (Array Expr) :=
+  Array.mapM (fun x => replace_fvars_in_expr x fvar_ids) exprs_arr
 
-def unify_args_with_conclusion (hypotheses : Array Expr) (conclusion : Expr) (arg_names : List String) (bound_var_ctx : Std.HashMap FVarId Expr) := do
+/-- Unifies each argument in `arg_names` with each variable in the `conclusion`, returning
+    the updated `hypotheses`, `conclusion` and `bound_var_ctx` -/
+def unify_args_with_conclusion (hypotheses : Array Expr) (conclusion : Expr) (arg_names : List String)
+  (bound_var_ctx : HashMap FVarId Expr) := do
   let mut new_ctx := bound_var_ctx
-  let replist ← get_Fvar_replist conclusion arg_names
-  for r in replist do
-    let inpfvar := r.2.fvarId!
-    let inpfvartype := bound_var_ctx[r.1]!
-    new_ctx := bound_var_ctx.insert inpfvar inpfvartype
-  let conclusion ← replace_FVar_list conclusion replist
-  let hypotheses ← replace_arrcond_FVar_list hypotheses replist
+  let fvar_ids ← extract_fvars conclusion arg_names
+  for (fvar_id, expr) in fvar_ids do
+    let fvar := expr.fvarId!
+    let fvar_type := bound_var_ctx[fvar_id]!
+    new_ctx := new_ctx.insert fvar fvar_type
+  let conclusion ← replace_fvars_in_expr conclusion fvar_ids
+  let hypotheses ← replace_fvars_in_exprs hypotheses fvar_ids
   return (hypotheses, conclusion, new_ctx)
 
 
 /-- Takes in the constructor's type, the input variables & their types and the name of the inductive relation,
-    and builds an `IRConstructor` containing metadata for the constructor -/
-def process_constructor_unify_args (ctor_type: Expr) (input_vars : Array Expr) (input_types: Array Expr)
+    and builds an `IRConstructor` containing metadata for the constructor.
+    During this process, the names of input arguments (`arg_names`) are unified with variables in the
+    conclusion of the constructor. -/
+def process_constructor_unify_args (ctor_type: Expr) (input_vars : Array Expr) (input_types : Array Expr)
   (inductive_relation_name: Name) (arg_names : List String) : MetaM IRConstructor := do
   let (bound_vars_and_types, _ , components_of_arrow_type) ← decomposeType ctor_type
 
   -- `bound_var_ctx` maps free variables (identified by their `FVarId`) to their types
-  let mut bound_var_ctx : Std.HashMap FVarId Expr := Std.HashMap.emptyWithCapacity
+  let mut bound_var_ctx := HashMap.emptyWithCapacity
   for (bound_var, ty) in bound_vars_and_types do
     let fid := FVarId.mk bound_var
     bound_var_ctx := bound_var_ctx.insert fid ty
@@ -271,7 +286,6 @@ def process_constructor_print (pc: IRConstructor) : MetaM Unit := do
   IO.println s!" inductive_conds:  {pc.hypotheses_that_are_inductive_applications}"
   IO.println s!" recursive_conds:  {pc.recursive_hypotheses}"
   IO.println s!" inp eqs:  {pc.inp_eq}"
-  --IO.println s!" var_eqs:  {pc.var_eq}"
 
 
 
@@ -294,7 +308,8 @@ def mkArrayFreshVar (types: Array Expr) : MetaM (Array Expr) :=do
     vars := vars.push var
   return vars
 
-
+/-- Takes in an inductive relation with arguments specified by `arg_names`,
+    and extracts metadata corresponding to the `inductive`, returning an `IR_info` -/
 def extract_IR_info_with_args (input_expr : Expr) (arg_names : List String) : MetaM IR_info := do
   match input_expr.getAppFn.constName? with
   | some typeName => do
