@@ -21,16 +21,20 @@ def is_IR (type : Expr) : MetaM Bool := do
   let retty := types.toList.getLast!
   return retty.isProp
 
+/-- Determines whether a type expression corresponds to the name of a base type (`Nat, String, Bool`) -/
+def isBaseType (tyexpr : Expr) : Bool :=
+  tyexpr.constName ∈ [`Nat, `String, `Bool]
 
-def is_builtin (n: Expr) : Bool := n.constName ∈ [`Nat, `String, `Bool]
-
-partial def all_args_types (e: Expr) : MetaM (Array Expr) :=do
+partial def all_args_types (e: Expr) : MetaM (Array Expr) := do
   let args := e.getAppArgs
   if e.isFVar then return #[]
   if args.size = 0 then
     try
       let ty ← inferType e
-      if is_builtin e then return #[e] else return ty.getAppArgs
+      if isBaseType e then
+        return #[e]
+      else
+        return ty.getAppArgs
     catch _ => return #[e]
   let mut out : Array Expr := #[]
   for arg in args do
@@ -40,8 +44,7 @@ partial def all_args_types (e: Expr) : MetaM (Array Expr) :=do
 
 def is_builtin_cond (e: Expr) : MetaM Bool := do
   let types ← all_args_types e
-  let p := (types.size > 0) ∧ (∀ t ∈ types, is_builtin t)
-  return p
+  pure $ (types.size > 0) ∧ (∀ t ∈ types, isBaseType t)
 
 
 def mkFVars (a: Array Name) : Array Expr:= a.map (fun x => mkFVar ⟨x⟩)
@@ -57,9 +60,9 @@ structure IRConstructor where
   output : Expr
   -- TODO: What is out_args???
   out_args : Array Expr
-  num_vars: Array Name
+  bound_vars_with_base_types: Array Name
   num_conds: Array Expr
-  notnum_vars: Array Name
+  bound_vars_with_non_base_types: Array Name
   recursive_conds: Array Expr
   inductive_conds: Array Expr
   nonlinear_conds: Array Expr
@@ -128,30 +131,32 @@ def process_cond_props (cond_prop: Array Expr) (out_prop: Expr) (var_names : Arr
     new_arr_expr:= new_arr_expr.push newcond
   return (new_arr_expr, new_var_names, eq_arr)
 
-
-def process_constructor (ctortype: Expr) (inpvar: Array Expr) (inptypes: Array Expr) (relation_name: Name): MetaM IRConstructor := do
-  let c ←  decompose_type ctortype
-  let (list_name_type, _ , components_of_arrow_type) := c
+/-- Takes in the constructor's type, the input variables & their types and the name of the inductive relation,
+    and builds an `IRConstructor` containing metadata for the constructor -/
+def process_constructor (ctortype: Expr) (input_vars: Array Expr) (input_types: Array Expr)
+  (inductive_relation_name : Name): MetaM IRConstructor := do
+  let (bound_vars_and_types, _ , components_of_arrow_type) ← decompose_type ctortype
   let mut varid_type : Std.HashMap FVarId Expr := Std.HashMap.emptyWithCapacity
-  for pair in list_name_type do
-    let fid:= FVarId.mk pair.1
-    varid_type:= varid_type.insert fid pair.2
+  for pair in bound_vars_and_types do
+    let fid := FVarId.mk pair.1
+    varid_type := varid_type.insert fid pair.2
   match splitLast? components_of_arrow_type with
   | some (hypotheses, conclusion) =>
-    let (var_names, _):= list_name_type.unzip
-    let (numvars, _) := (list_name_type.filter (fun (_,b) => is_builtin b)).unzip
-    let (notnumvars, _) := (list_name_type.filter (fun (_,b) => ¬ is_builtin b)).unzip
+    let (bound_vars, _):= bound_vars_and_types.unzip
+    let (bound_vars_with_base_types, _) := (bound_vars_and_types.filter (fun (_, ty) => isBaseType ty)).unzip
+    let (bound_vars_with_non_base_types, _) := (bound_vars_and_types.filter (fun (_, ty) => !isBaseType ty)).unzip
     let mut num_conds := #[]
     let mut nonlinear_conds := #[]
     let mut inductive_conds := #[]
     let mut recursive_conds := #[]
     let mut dependencies := #[]
-    let outprop_args:= conclusion.getAppArgs
-    let output ← option_to_MetaM (conclusion.getAppArgs).toList.getLast?
+    let conclusion_args := conclusion.getAppArgs
+    -- TODO: `output` is the final argument in the conclusion?
+    let output ← option_to_MetaM conclusion_args.toList.getLast?
     for hyp in hypotheses do
-      if ← is_dependence hyp.getAppFn relation_name.getRoot then
+      if ← is_dependence hyp.getAppFn inductive_relation_name.getRoot then
         dependencies := dependencies.push hyp.getAppFn
-      if hyp.getAppFn.constName = relation_name then
+      if hyp.getAppFn.constName = inductive_relation_name then
         recursive_conds := recursive_conds.push hyp
       else if ← is_builtin_cond hyp then
         num_conds := num_conds.push hyp
@@ -159,29 +164,29 @@ def process_constructor (ctortype: Expr) (inpvar: Array Expr) (inptypes: Array E
         inductive_conds := inductive_conds.push hyp
       else
         nonlinear_conds := nonlinear_conds.push hyp
-    let inp_eq :=  outprop_args.zip inpvar
-    let inp_eq_ztype := inp_eq.zip inptypes
-    let (num_inp_eq,_) := (inp_eq_ztype.filter (fun (_, t) => is_builtin t)).unzip
-    let (notnum_inp_eq,_) := (inp_eq_ztype.filter (fun (_, t) => ¬ is_builtin t)).unzip
+    let inp_eq :=  conclusion_args.zip input_vars
+    let inp_eq_ztype := inp_eq.zip input_types
+    let (num_inp_eq,_) := (inp_eq_ztype.filter (fun (_, t) => isBaseType t)).unzip
+    let (notnum_inp_eq,_) := (inp_eq_ztype.filter (fun (_, t) => ¬ isBaseType t)).unzip
     return {
       ctor_expr := ctortype
-      var_names := var_names,
+      var_names := bound_vars,
       varid_type:= varid_type,
       hypotheses:= hypotheses,
       conclusion := conclusion,
-      out_args := outprop_args,
+      out_args := conclusion_args,
       output := output
-      num_vars := numvars
+      bound_vars_with_base_types := bound_vars_with_base_types
       num_conds := num_conds
-      notnum_vars := notnumvars
+      bound_vars_with_non_base_types := bound_vars_with_non_base_types
       nonlinear_conds := nonlinear_conds
       inductive_conds := inductive_conds
       recursive_conds := recursive_conds
       inp_eq := inp_eq
       num_inp_eq := num_inp_eq
       notnum_inp_eq := notnum_inp_eq
-      name_space:= relation_name.getRoot
-      dependencies:= dependencies
+      name_space := inductive_relation_name.getRoot
+      dependencies := dependencies
     }
   | none => throwError "Not a match"
 
@@ -221,8 +226,8 @@ def process_constructor_unify_inpname (ctortype: Expr) (inpvar: Array Expr) (inp
     let out_prop ← replace_FVar_list out_prop0 replist
     let cond_prop ← replace_arrcond_FVar_list cond_prop0 replist
     let (var_names, _):= list_name_type.unzip
-    let (numvars, _) := (list_name_type.filter (fun (_,b) => is_builtin b)).unzip
-    let (notnumvars, _) := (list_name_type.filter (fun (_,b) => ¬ is_builtin b)).unzip
+    let (numvars, _) := (list_name_type.filter (fun (_,b) => isBaseType b)).unzip
+    let (notnumvars, _) := (list_name_type.filter (fun (_,b) => ¬ isBaseType b)).unzip
     let mut num_conds := #[]
     let mut nonlinear_conds := #[]
     let mut inductive_conds := #[]
@@ -243,8 +248,8 @@ def process_constructor_unify_inpname (ctortype: Expr) (inpvar: Array Expr) (inp
         nonlinear_conds := nonlinear_conds.push cond
     let inp_eq :=  outprop_args.zip inpvar
     let inp_eq_ztype := inp_eq.zip inptypes
-    let (num_inp_eq,_) := (inp_eq_ztype.filter (fun (_, t) => is_builtin t)).unzip
-    let (notnum_inp_eq,_) := (inp_eq_ztype.filter (fun (_, t) => ¬ is_builtin t)).unzip
+    let (num_inp_eq,_) := (inp_eq_ztype.filter (fun (_, t) => isBaseType t)).unzip
+    let (notnum_inp_eq,_) := (inp_eq_ztype.filter (fun (_, t) => ¬ isBaseType t)).unzip
     return {
       ctor_expr := ctortype
       var_names := var_names,
@@ -253,9 +258,9 @@ def process_constructor_unify_inpname (ctortype: Expr) (inpvar: Array Expr) (inp
       conclusion := out_prop,
       out_args := outprop_args,
       output := output
-      num_vars := numvars
+      bound_vars_with_base_types := numvars
       num_conds := num_conds
-      notnum_vars := notnumvars
+      bound_vars_with_non_base_types := notnumvars
       nonlinear_conds := nonlinear_conds
       inductive_conds := inductive_conds
       recursive_conds := recursive_conds
@@ -282,9 +287,9 @@ def process_constructor_print (pc: IRConstructor) : MetaM Unit := do
   IO.println s!" Out prop:  {op}"
   let oa := arrayppExpr (pc.out_args)
   IO.println s!" Out args:  {← oa}"
-  IO.println s!" num_vars : {pc.num_vars}"
+  IO.println s!" num_vars : {pc.bound_vars_with_base_types}"
   IO.println s!" num_conds:  {pc.num_conds}"
-  IO.println s!" notnum_vars : {pc.notnum_vars}"
+  IO.println s!" notnum_vars : {pc.bound_vars_with_non_base_types}"
   IO.println s!" nonlinear_conds:  {pc.nonlinear_conds}"
   IO.println s!" inductive_conds:  {pc.inductive_conds}"
   IO.println s!" recursive_conds:  {pc.recursive_conds}"
