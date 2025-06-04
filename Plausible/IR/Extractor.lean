@@ -27,8 +27,9 @@ def isBaseType (tyexpr : Expr) : Bool :=
 
 partial def all_args_types (e: Expr) : MetaM (Array Expr) := do
   let args := e.getAppArgs
-  if e.isFVar then return #[]
-  if args.size = 0 then
+  if e.isFVar then
+    return #[]
+  if args.size == 0 then
     try
       let ty ← inferType e
       if isBaseType e then
@@ -42,6 +43,7 @@ partial def all_args_types (e: Expr) : MetaM (Array Expr) := do
     out := out.append arg_types
   return out
 
+/-- Determines whether a hypothesis `e` contains -/
 def is_builtin_cond (e: Expr) : MetaM Bool := do
   let types ← all_args_types e
   pure $ (types.size > 0) ∧ (∀ t ∈ types, isBaseType t)
@@ -133,9 +135,9 @@ def process_cond_props (cond_prop: Array Expr) (out_prop: Expr) (var_names : Arr
 
 /-- Takes in the constructor's type, the input variables & their types and the name of the inductive relation,
     and builds an `IRConstructor` containing metadata for the constructor -/
-def process_constructor (ctortype: Expr) (input_vars: Array Expr) (input_types: Array Expr)
+def process_constructor (ctor_type : Expr) (input_vars: Array Expr) (input_types: Array Expr)
   (inductive_relation_name : Name): MetaM IRConstructor := do
-  let (bound_vars_and_types, _ , components_of_arrow_type) ← decompose_type ctortype
+  let (bound_vars_and_types, _ , components_of_arrow_type) ← decompose_type ctor_type
   let mut varid_type : Std.HashMap FVarId Expr := Std.HashMap.emptyWithCapacity
   for pair in bound_vars_and_types do
     let fid := FVarId.mk pair.1
@@ -169,10 +171,10 @@ def process_constructor (ctortype: Expr) (input_vars: Array Expr) (input_types: 
     let (num_inp_eq,_) := (inp_eq_ztype.filter (fun (_, t) => isBaseType t)).unzip
     let (notnum_inp_eq,_) := (inp_eq_ztype.filter (fun (_, t) => ¬ isBaseType t)).unzip
     return {
-      ctor_expr := ctortype
+      ctor_expr := ctor_type
       var_names := bound_vars,
-      varid_type:= varid_type,
-      hypotheses:= hypotheses,
+      varid_type := varid_type,
+      hypotheses := hypotheses,
       conclusion := conclusion,
       out_args := conclusion_args,
       output := output
