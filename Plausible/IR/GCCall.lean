@@ -144,7 +144,7 @@ def get_producer_initset (c: IRConstructor) (genpos: Nat): MetaM (Array FVarId) 
   let mut i := 0
   let mut outarr : Array FVarId := #[]
   for e in c.out_args do
-    if ¬ i = genpos then outarr := Array.appendUniqueElementss outarr (all_FVars_in e)
+    if ¬ i = genpos then outarr := Array.appendUniqueElements outarr (all_FVars_in e)
     i:= i + 1
   return outarr
 
@@ -193,7 +193,7 @@ def get_last_uninit_arg_and_uninitset (cond: Expr) (initset : Array FVarId): Met
   let mut uninitset : Array FVarId := #[]
   i := 0
   for e in args do
-    if ¬ i = pos then uninitset := Array.appendUniqueElementss uninitset (get_uninit_set e initset)
+    if ¬ i = pos then uninitset := Array.appendUniqueElements uninitset (get_uninit_set e initset)
   uninitset := arrayRemoveAll uninitset tobeinit
   return (pos, uninitset, tobeinit)
 
@@ -220,7 +220,7 @@ def GenCheckCalls_for_cond_props  (c: IRConstructor) (initset0: Array FVarId) : 
           let ty :=  c.varid_type.get! fid
           outarr := outarr.push (GenCheckCall.gen_fvar fid ty)
         let gen_arg := cond.getAppArgs[pos]!
-        initset := Array.appendUniqueElementss initset uninitset
+        initset := Array.appendUniqueElements initset uninitset
         if gen_arg.isFVar then
           let genid := gen_arg.fvarId!
           outarr := outarr.push (GenCheckCall.gen_IR genid cond pos)
@@ -230,7 +230,7 @@ def GenCheckCalls_for_cond_props  (c: IRConstructor) (initset0: Array FVarId) : 
           let sp ←  separate_fvar_in_cond gen_arg initset i
           outarr := outarr.push (GenCheckCall.gen_IR genid cond pos)
           outarr := outarr.push (GenCheckCall.mat genid sp)
-        initset := Array.appendUniqueElementss initset tobeinit
+        initset := Array.appendUniqueElements initset tobeinit
     else
       if fully_init cond initset then
         outarr := outarr.push (GenCheckCall.check_nonIR cond)
@@ -241,7 +241,7 @@ def GenCheckCalls_for_cond_props  (c: IRConstructor) (initset0: Array FVarId) : 
         for fid in uninitset do
           let ty :=  c.varid_type.get! fid
           outarr := outarr.push (GenCheckCall.gen_fvar fid ty)
-        initset := Array.appendUniqueElementss initset uninitset
+        initset := Array.appendUniqueElements initset uninitset
         outarr := outarr.push (GenCheckCall.check_nonIR cond)
   return outarr
 
@@ -255,7 +255,7 @@ def GenCheckCalls_for_producer (c: IRConstructor) (genpos: Nat) : MetaM (Array G
   let mut initset ←  get_producer_initset c genpos
   let mut outarr ← GenCheckCalls_for_cond_props c initset
   for cond in c.cond_props do
-    initset := Array.appendUniqueElementss initset (all_FVars_in cond)
+    initset := Array.appendUniqueElements initset (all_FVars_in cond)
   let gen_arg := c.out_prop.getAppArgs[genpos]!
   let uninitset := arrayRemoveAll (all_FVars_in gen_arg) initset
   for fid in uninitset do
