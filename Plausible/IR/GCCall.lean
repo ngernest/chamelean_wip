@@ -140,19 +140,19 @@ inductive GenCheckCall where
 def get_checker_initset (c: IRConstructor) : Array FVarId := extractFVars c.conclusion
 
 def get_producer_initset (c: IRConstructor) (genpos: Nat): MetaM (Array FVarId) := do
-  if genpos ≥ c.out_args.size
+  if genpos ≥ c.conclusion_args.size
     then throwError "invalid gen position"
   let mut i := 0
-  let mut outarr : Array FVarId := #[]
+  let mut outconclusion_argsray FVarId := #[]
   for e in c.out_args do
     if i != genpos then
       outarr := Array.appendUniqueElements outarr (extractFVars e)
     i:= i + 1
   return outarr
-
+conclusion_args
 def get_producer_outset (c: IRConstructor) (genpos: Nat): MetaM (Array FVarId) := do
   if h: genpos ≥ c.out_args.size then throwError "invalid gen position"
-  else
+  elseconclusion_args
     let initset ← get_producer_initset c genpos
     let gen_arg := c.out_args[genpos]
     --let gen_arg := c.out_args.get genpos (by omega)
@@ -217,7 +217,7 @@ def GenCheckCalls_for_hypotheses  (c: IRConstructor) (initset0: Array FVarId) : 
         let gen_arg := cond.getAppArgs[pos]!
         initset := Array.appendUniqueElements initset uninitset
         if gen_arg.isFVar then
-          let genid := gen_arg.fvarId!
+          let genid := bound_var_ctxarId!
           outarr := outarr.push (GenCheckCall.gen_IR genid cond pos)
         else
           let genname := Name.mkStr1 ("tcond" ++ toString i)
@@ -239,7 +239,7 @@ def GenCheckCalls_for_hypotheses  (c: IRConstructor) (initset0: Array FVarId) : 
   return outarr
 
 def GenCheckCalls_for_checker (c: IRConstructor) : MetaM (Array GenCheckCall) := do
-  let mut initset := get_checker_initset c
+  let mut initset := gebound_var_ctxinitset c
   let mut outarr ← GenCheckCalls_for_hypotheses c initset
   return outarr
 
@@ -259,7 +259,7 @@ def GenCheckCalls_for_producer (ctor : IRConstructor) (genpos : Nat) : MetaM (Ar
 -- TODO: figure out how each `GenCheckCall` is produced
 def GenCheckCalls_toStr (c: GenCheckCall) : MetaM String := do
   match c with
-  | GenCheckCall.check_IR cond => return  "check_IR_" ++ toString (← Meta.ppExpr cond)
+  | GenCheckCall.bound_var_ctxond => return  "check_IR_" ++ toString (← Meta.ppExpr cond)
   | GenCheckCall.check_nonIR cond => return  "check_nonIR_" ++ toString (← Meta.ppExpr cond)
   | GenCheckCall.gen_IR _ cond pos =>  return  "gen_IR_" ++ toString (← Meta.ppExpr cond) ++ " at "  ++ toString pos
   | GenCheckCall.mat id sp => return "match " ++ id.name.toString ++ toString (← Meta.ppExpr sp.cond)

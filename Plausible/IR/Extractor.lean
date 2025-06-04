@@ -13,19 +13,22 @@ namespace Plausible.IR
 
 /- CODE -/
 
-
-def is_IR (type : Expr) : MetaM Bool := do
-  if ! (← Meta.isInductivePredicate type.constName) then return false
-  let ty ← inferType type
-  let types ← get_types_chain ty
-  let retty := types.toList.getLast!
-  return retty.isProp
+/-- Determines whether a type expression is an inductive relation -/
+def isInductiveRelation (tyexpr : Expr) : MetaM Bool := do
+  if ! (← Meta.isInductivePredicate tyexpr.constName) then
+    return false
+  let ty ← inferType tyexpr
+  let arrow_type_components ← getComponentsOfArrowType ty
+  -- Return type must be `Prop` in order for `tyexpr` to be an inductive relation
+  let return_type := arrow_type_components.toList.getLast!
+  return return_type.isProp
 
 /-- Determines whether a type expression corresponds to the name of a base type (`Nat, String, Bool`) -/
 def isBaseType (tyexpr : Expr) : Bool :=
   tyexpr.constName ∈ [`Nat, `String, `Bool]
 
-partial def all_args_types (e: Expr) : MetaM (Array Expr) := do
+/-- Extracts the types of all the arguments to an expression -/
+partial def all_args_types (e : Expr) : MetaM (Array Expr) := do
   let args := e.getAppArgs
   if e.isFVar then
     return #[]
@@ -43,28 +46,28 @@ partial def all_args_types (e: Expr) : MetaM (Array Expr) := do
     out := out.append arg_types
   return out
 
-/-- Determines whether a hypothesis `e` contains -/
-def is_builtin_cond (e: Expr) : MetaM Bool := do
+/-- Determines whether all the arguments to an expression have base types as their type
+     -/
+def allArgsHaveBaseTypes (e : Expr) : MetaM Bool := do
   let types ← all_args_types e
   pure $ (types.size > 0) ∧ (∀ t ∈ types, isBaseType t)
 
 
-def mkFVars (a: Array Name) : Array Expr:= a.map (fun x => mkFVar ⟨x⟩)
+def mkFVars (a : Array Name) : Array Expr := a.map (fun x => mkFVar ⟨x⟩)
 
 
 def raw_constructor_type := Array (Name × Expr) × Expr × Array Expr
 
 structure IRConstructor where
-  var_names: Array Name
-  varid_type : Std.HashMap FVarId Expr
-  hypotheses: Array Expr
-  conclusion: Expr
-  output : Expr
-  -- TODO: What is out_args???
-  out_args : Array Expr
-  bound_vars_with_base_types: Array Name
-  num_conds: Array Expr
-  bound_vars_with_non_base_types: Array Name
+  bound_vars: Array Name
+  bound_var_ctx : Std.HashMap FVarId Expr
+  hypotheses : Array Expr
+  conclusion : Expr
+  final_arg_in_conclusion : Expr
+  conclusion_args : Array Expr
+  bound_vars_with_base_types : Array Name
+  hypotheses_with_only_base_type_args : Array Expr
+  bound_vars_with_non_base_types : Array Name
   recursive_conds: Array Expr
   inductive_conds: Array Expr
   nonlinear_conds: Array Expr
@@ -99,13 +102,13 @@ def is_pure_inductive_cond (inpexp : Expr) : MetaM Bool := do
 
 
 def is_inductive_cond (inpexp : Expr) (c: IRConstructor): MetaM Bool := do
-  if ! (← is_IR inpexp.getAppFn) then return false
+  if ! (← isInductiveRelation inpexp.getAppFn) then return false
   if inpexp.getAppFn.constName.getRoot == c.name_space then return true
   return false
 
 
 def is_dependence (inpexp : Expr) (ns: Name): MetaM Bool := do
-  if ! (← is_IR inpexp) then return false
+  if ! (← isInductiveRelation inpexp) then return false
   if inpexp.constName.getRoot == ns then return true
   return false
 
@@ -137,49 +140,55 @@ def process_cond_props (cond_prop: Array Expr) (out_prop: Expr) (var_names : Arr
     and builds an `IRConstructor` containing metadata for the constructor -/
 def process_constructor (ctor_type : Expr) (input_vars: Array Expr) (input_types: Array Expr)
   (inductive_relation_name : Name): MetaM IRConstructor := do
-  let (bound_vars_and_types, _ , components_of_arrow_type) ← decompose_type ctor_type
-  let mut varid_type : Std.HashMap FVarId Expr := Std.HashMap.emptyWithCapacity
-  for pair in bound_vars_and_types do
-    let fid := FVarId.mk pair.1
-    varid_type := varid_type.insert fid pair.2
+  let (bound_vars_and_types, _ , components_of_arrow_type) ← decomposeType ctor_type
+
+  -- `bound_var_ctx` maps free variables (identified by their `FVarId`) to their types
+  let mut bound_var_ctx : Std.HashMap FVarId Expr := Std.HashMap.emptyWithCapacity
+  for (bound_var, ty) in bound_vars_and_types do
+    let fid := FVarId.mk bound_var
+    bound_var_ctx := bound_var_ctx.insert fid ty
+
   match splitLast? components_of_arrow_type with
   | some (hypotheses, conclusion) =>
-    let (bound_vars, _):= bound_vars_and_types.unzip
+    let (bound_vars, _) := bound_vars_and_types.unzip
     let (bound_vars_with_base_types, _) := (bound_vars_and_types.filter (fun (_, ty) => isBaseType ty)).unzip
     let (bound_vars_with_non_base_types, _) := (bound_vars_and_types.filter (fun (_, ty) => !isBaseType ty)).unzip
-    let mut num_conds := #[]
+
+    let mut hypotheses_with_only_base_type_args := #[]
     let mut nonlinear_conds := #[]
     let mut inductive_conds := #[]
     let mut recursive_conds := #[]
     let mut dependencies := #[]
+
     let conclusion_args := conclusion.getAppArgs
-    -- TODO: `output` is the final argument in the conclusion?
-    let output ← option_to_MetaM conclusion_args.toList.getLast?
+    let final_arg_in_conclusion ← option_to_MetaM conclusion_args.toList.getLast?
+
     for hyp in hypotheses do
       if ← is_dependence hyp.getAppFn inductive_relation_name.getRoot then
         dependencies := dependencies.push hyp.getAppFn
       if hyp.getAppFn.constName = inductive_relation_name then
         recursive_conds := recursive_conds.push hyp
-      else if ← is_builtin_cond hyp then
-        num_conds := num_conds.push hyp
+      else if ← allArgsHaveBaseTypes hyp then
+        hypotheses_with_only_base_type_args := hypotheses_with_only_base_type_args.push hyp
       else if ← is_pure_inductive_cond hyp then
         inductive_conds := inductive_conds.push hyp
       else
         nonlinear_conds := nonlinear_conds.push hyp
+
     let inp_eq :=  conclusion_args.zip input_vars
     let inp_eq_ztype := inp_eq.zip input_types
     let (num_inp_eq,_) := (inp_eq_ztype.filter (fun (_, t) => isBaseType t)).unzip
     let (notnum_inp_eq,_) := (inp_eq_ztype.filter (fun (_, t) => ¬ isBaseType t)).unzip
     return {
       ctor_expr := ctor_type
-      var_names := bound_vars,
-      varid_type := varid_type,
+      bound_vars := bound_vars,
+      bound_var_ctx := bound_var_ctx,
       hypotheses := hypotheses,
       conclusion := conclusion,
-      out_args := conclusion_args,
-      output := output
+      conclusion_args := conclusion_args,
+      final_arg_in_conclusion := final_arg_in_conclusion
       bound_vars_with_base_types := bound_vars_with_base_types
-      num_conds := num_conds
+      hypotheses_with_only_base_type_args := hypotheses_with_only_base_type_args
       bound_vars_with_non_base_types := bound_vars_with_non_base_types
       nonlinear_conds := nonlinear_conds
       inductive_conds := inductive_conds
@@ -212,7 +221,7 @@ def replace_arrcond_FVar_list (arrcond : Array Expr) (fvarids: List (FVarId × E
 
 def process_constructor_unify_inpname (ctortype: Expr) (inpvar: Array Expr) (inptypes: Array Expr) (relation_name: Name)
                                       (inpname: List String): MetaM IRConstructor := do
-  let c ←  decompose_type ctortype
+  let c ←  decomposeType ctortype
   let (list_name_type, _ , list_prop) := c
   let mut varid_type : Std.HashMap FVarId Expr := Std.HashMap.emptyWithCapacity
   for pair in list_name_type do
@@ -242,7 +251,7 @@ def process_constructor_unify_inpname (ctortype: Expr) (inpvar: Array Expr) (inp
         dependencies := dependencies.push cond.getAppFn
       if cond.getAppFn.constName = relation_name then
         recursive_conds := recursive_conds.push cond
-      else if ← is_builtin_cond cond then
+      else if ← allArgsHaveBaseTypes cond then
         num_conds := num_conds.push cond
       else if ← is_pure_inductive_cond cond then
         inductive_conds := inductive_conds.push cond
@@ -254,14 +263,14 @@ def process_constructor_unify_inpname (ctortype: Expr) (inpvar: Array Expr) (inp
     let (notnum_inp_eq,_) := (inp_eq_ztype.filter (fun (_, t) => ¬ isBaseType t)).unzip
     return {
       ctor_expr := ctortype
-      var_names := var_names,
-      varid_type:= varid_type,
+      bound_vars := var_names,
+      bound_var_ctx:= varid_type,
       hypotheses:= cond_prop,
       conclusion := out_prop,
-      out_args := outprop_args,
-      output := output
+      conclusion_args := outprop_args,
+      final_arg_in_conclusion := output
       bound_vars_with_base_types := numvars
-      num_conds := num_conds
+      hypotheses_with_only_base_type_args := num_conds
       bound_vars_with_non_base_types := notnumvars
       nonlinear_conds := nonlinear_conds
       inductive_conds := inductive_conds
@@ -283,14 +292,14 @@ def arrayppExpr (a: Array Expr) : MetaM (Array Format) := do
   return s
 
 def process_constructor_print (pc: IRConstructor) : MetaM Unit := do
-  IO.println s!" Vars : {pc.var_names}"
+  IO.println s!" Vars : {pc.bound_vars}"
   IO.println s!" Cond prop : {pc.hypotheses}"
   let op ←  Meta.ppExpr pc.conclusion
   IO.println s!" Out prop:  {op}"
-  let oa := arrayppExpr (pc.out_args)
+  let oa := arrayppExpr (pc.conclusion_args)
   IO.println s!" Out args:  {← oa}"
   IO.println s!" num_vars : {pc.bound_vars_with_base_types}"
-  IO.println s!" num_conds:  {pc.num_conds}"
+  IO.println s!" num_conds:  {pc.hypotheses_with_only_base_type_args}"
   IO.println s!" notnum_vars : {pc.bound_vars_with_non_base_types}"
   IO.println s!" nonlinear_conds:  {pc.nonlinear_conds}"
   IO.println s!" inductive_conds:  {pc.inductive_conds}"
@@ -325,7 +334,7 @@ def extract_IR_info (input_expr : Expr) : MetaM IR_info := do
   match input_expr.getAppFn.constName? with
   | some typeName => do
     let type ← inferType input_expr
-    let tyexprs_in_arrow_type ← get_types_chain type
+    let tyexprs_in_arrow_type ← getComponentsOfArrowType type
     -- `hypotheses_types` contains all elements of `tyexprs_in_arrow_type` except the conclusion
     let hypotheses_types := tyexprs_in_arrow_type.pop
     let hypotheses_names := (hypotheses_types.map Expr.constName).pop
@@ -347,7 +356,7 @@ def extract_IR_info (input_expr : Expr) : MetaM IR_info := do
       for ctorName in info.ctors do
         let some ctor := env.find? ctorName
          | throwError "IRConstructor '{ctorName}' not found"
-        let raw_constructor ← decompose_type ctor.type
+        let raw_constructor ← decomposeType ctor.type
         raw_constructors := raw_constructors.push raw_constructor
         let constructor ← process_constructor ctor.type input_vars hypotheses_types typeName
         constructors := constructors.push constructor
@@ -383,7 +392,7 @@ def extract_IR_info_with_inpname (inpexp : Expr) (inpname: List String) : MetaM 
   match inpexp.getAppFn.constName? with
   | some typeName => do
     let type ← inferType inpexp
-    let types_org ← get_types_chain type
+    let types_org ← getComponentsOfArrowType type
     let types := types_org.pop
     let outtype ←  option_to_MetaM (types.back?)
     let names:= (types.map Expr.constName).pop
@@ -400,7 +409,7 @@ def extract_IR_info_with_inpname (inpexp : Expr) (inpname: List String) : MetaM 
       for ctorName in info.ctors do
         let some ctor := env.find? ctorName
          | throwError "IRConstructor '{ctorName}' not found"
-        let raw_constructor ←  decompose_type ctor.type
+        let raw_constructor ←  decomposeType ctor.type
         raw_constructors:= raw_constructors.push raw_constructor
         let constructor ← process_constructor_unify_inpname ctor.type inp_vars types typeName inpname
         constructors:= constructors.push constructor

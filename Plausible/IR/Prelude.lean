@@ -70,8 +70,8 @@ def option_to_IO {α : Type} (o : Option α) (errorMsg : String := "Option is no
 
 /-- Takes a type expression `tyexpr` representing an arrow type, and returns an array of type-expressions
     where each element is a component of the arrow type.
-    For example, `get_types_chain (A -> B -> C)` produces `#[A, B, C]`. -/
-partial def get_types_chain (tyexpr : Expr) : MetaM (Array Expr) := do
+    For example, `getComponentsOfArrowType (A -> B -> C)` produces `#[A, B, C]`. -/
+partial def getComponentsOfArrowType (tyexpr : Expr) : MetaM (Array Expr) := do
   let rec helper (e : Expr) (acc : Array Expr) : MetaM (Array Expr) := do
     match e with
     | Expr.forallE _ domain body _ =>
@@ -86,7 +86,7 @@ def typeArrayToString (types : Array Expr) : MetaM String := do
 elab "#get_type" t:term : command => do
   Command.liftTermElabM do
     let e ← Term.elabTerm t none
-    let types ← get_types_chain e
+    let types ← getComponentsOfArrowType e
     let typeStr ← typeArrayToString types
     IO.println typeStr
 
@@ -108,9 +108,9 @@ partial def extractForAllBinders (e : Expr) : Array (Name × Expr) × Expr :=
     `(#[(x1, τ1), …, (xn, τn)], A → B → C, #[A, B, C])`.
     - The 2nd component of the triple is the body of the forall-expression
     - The 3rd component of the triple is an array containing each subterm of the arrow type -/
-def decompose_type (e : Expr) : MetaM (Array (Name × Expr) × Expr × Array Expr) := do
+def decomposeType (e : Expr) : MetaM (Array (Name × Expr) × Expr × Array Expr) := do
   let (binder, exp) := extractForAllBinders e
-  let tyexp ← get_types_chain exp
+  let tyexp ← getComponentsOfArrowType exp
   return (binder, exp, tyexp)
 
 
@@ -172,7 +172,7 @@ def printConstructorsWithArgs (typeName : Name) : MetaM Unit := do
     for ctorName in info.ctors do
       let some ctor := env.find? ctorName
         | throwError "Constructor '{ctorName}' not found"
-      let (_, _, list_prop) ←  decompose_type ctor.type
+      let (_, _, list_prop) ←  decomposeType ctor.type
       match splitLast? list_prop with
       | some (cond_prop, out_prop) =>
       IO.println s!"  {ctorName} : {ctor.type}"
