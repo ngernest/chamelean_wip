@@ -2,9 +2,12 @@ import Lean
 import Plausible.New.GenOption
 import Plausible.IR.Prelude
 import Plausible.Gen
+import Plausible.New.OptionTGen
 
 open Plausible.IR
 open Lean Elab Command Meta Term Parser
+
+
 
 /-- Extracts the name of the induction relation and its arguments -/
 def parseInductiveApp (body : Term) : CommandElabM (Name × TSyntaxArray `term) := do
@@ -95,7 +98,6 @@ def findNonRecursiveConstructors (inductiveName : Name) : MetaM (Array Name) := 
 
   return nonRecursive
 
-
 /-- Produces the actual generator function.
     - `inductiveName` is the name of the inductive relation
     - `targetVar`, `targetType`: the variable name and type of the value to be generated
@@ -123,43 +125,49 @@ def mkGeneratorFunction (inductiveName : Name) (targetVar : Name) (targetType : 
 
   -- TODO: generalize this to handle constructors that have non-zero arity
   -- (need to generate values for their arguments)
-  let mut arityZeroGenerators : Array (TSyntax `term) := #[(← `(pure none))]
+  let mut arityZeroGenerators : Array (TSyntax `term) := #[(← `((1, OptionT.fail)))]
   for ctorName in arityZeroCtors do
     let ctorIdent := mkIdent ctorName
-    let gen ← `(pure (some $ctorIdent))
+    let gen ← `(pure $ctorIdent)
     arityZeroGenerators := arityZeroGenerators.push gen
 
   -- Flatten the array above into one single expression
-  let sizeZeroGenerators ← `(#[$arityZeroGenerators,*])
-
+  let generatorList ← `([(1, OptionT.fail)])
+  let backtrackFn := mkIdent $ Name.mkStr2 "OptionTGen" "backtrack"
 
   -- Generate the generator function name
   let genFunName := mkIdent (Name.mkStr1 s!"gen_{inductiveName}")
 
   -- Create function argument for the generator size
-  let mut params := #[]
-  let sizeParam ← `(bracketedBinder| (size : Nat))
-  params := params.push sizeParam
+  let sizeParam ← `(Term.letIdBinder| (size : Nat))
 
   -- Add parameters for each argument to the inductive relation (except the target)
   let paramInfo ← analyzeInductiveArgs inductiveName args
+  let mut topLevelParams := #[]
+  let mut innerParams := #[]
+  let mut paramIdents := #[]
   for (paramName, paramType) in paramInfo do
     if paramName != targetVar then
       let paramIdent := mkIdent paramName
-      let param ← `(bracketedBinder| ($paramIdent : $paramType))
-      params := params.push param
+      paramIdents := paramIdents.push paramIdent
+
+      let topLevelParam ← `(bracketedBinder| ($paramIdent : $paramType))
+      topLevelParams := topLevelParams.push topLevelParam
+
+      let innerParam ← `(Term.letIdBinder| ($paramIdent : $paramType))
+      innerParams := innerParams.push innerParam
+
 
   -- TODO: when `size == 0`, do `return C` for each arity-0 non-recursive constructor
 
   -- Produce the definition for the generator function
-  -- TODO: switch to `backtrack` combinator instead of `Gen.oneOf`
-  -- once the array of sub-generators has been populated
-  `(def $genFunName $params* : OptionT Plausible.Gen $targetType :=
-      match size with
-      | .zero => Plausible.Gen.oneOf $sizeZeroGenerators
-      | .succ size' => Plausible.Gen.oneOf #[return none])
-
-
+  -- TODO: generate a fresh name for size for the lambda at the end
+  `(def $genFunName $topLevelParams* : Nat → OptionT Plausible.Gen $targetType :=
+      let rec aux_arb $sizeParam $innerParams* : OptionT Plausible.Gen $targetType :=
+        match size with
+        | .zero => $backtrackFn $generatorList
+        | .succ size' => $backtrackFn $generatorList
+      fun size => aux_arb size $paramIdents*)
 
 ----------------------------------------------------------------------
 -- Command elaborator for producing the Plausible generator
