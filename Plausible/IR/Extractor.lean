@@ -158,18 +158,22 @@ def replace_fvars_in_exprs (exprs_arr : Array Expr) (fvar_ids: List (FVarId × E
   Array.mapM (fun x => replace_fvars_in_expr x fvar_ids) exprs_arr
 
 /-- Unifies each argument in `arg_names` with each variable in the `conclusion`, returning
-    the updated `hypotheses`, `conclusion` and `bound_var_ctx` -/
+    the updated `hypotheses`, `conclusion` and `bound_var_ctx`. If `arg_names` is empty,
+    this function just returns `hypotheses`, `conclusion` & `bound_var_ctx` as is. -/
 def unify_args_with_conclusion (hypotheses : Array Expr) (conclusion : Expr) (arg_names : List String)
   (bound_var_ctx : HashMap FVarId Expr) := do
-  let mut new_ctx := bound_var_ctx
-  let fvar_ids ← extract_fvars conclusion arg_names
-  for (fvar_id, expr) in fvar_ids do
-    let fvar := expr.fvarId!
-    let fvar_type := bound_var_ctx[fvar_id]!
-    new_ctx := new_ctx.insert fvar fvar_type
-  let conclusion ← replace_fvars_in_expr conclusion fvar_ids
-  let hypotheses ← replace_fvars_in_exprs hypotheses fvar_ids
-  return (hypotheses, conclusion, new_ctx)
+  if List.isEmpty arg_names then
+    return (hypotheses, conclusion, bound_var_ctx)
+  else
+    let mut new_ctx := bound_var_ctx
+    let fvar_ids ← extract_fvars conclusion arg_names
+    for (fvar_id, expr) in fvar_ids do
+      let fvar := expr.fvarId!
+      let fvar_type := bound_var_ctx[fvar_id]!
+      new_ctx := new_ctx.insert fvar fvar_type
+    let conclusion ← replace_fvars_in_expr conclusion fvar_ids
+    let hypotheses ← replace_fvars_in_exprs hypotheses fvar_ids
+    return (hypotheses, conclusion, new_ctx)
 
 
 /-- Takes in the constructor's type, the input variables & their types and the name of the inductive relation,
@@ -188,11 +192,14 @@ def process_constructor_unify_args (ctor_type: Expr) (input_vars : Array Expr) (
 
   match splitLast? components_of_arrow_type with
   | some (hypotheses, conclusion) =>
-    let (hypotheses, conclusion, new_ctx) ← unify_args_with_conclusion hypotheses conclusion arg_names bound_var_ctx
+    let (hypotheses, conclusion, new_ctx) ←
+      unify_args_with_conclusion hypotheses conclusion arg_names bound_var_ctx
 
     let (bound_vars, _) := bound_vars_and_types.unzip
-    let (bound_vars_with_base_types, _) := (bound_vars_and_types.filter (fun (_,b) => isBaseType b)).unzip
-    let (bound_vars_with_non_base_types, _) := (bound_vars_and_types.filter (fun (_,b) => ¬ isBaseType b)).unzip
+    let (bound_vars_with_base_types, _) :=
+      (bound_vars_and_types.filter (fun (_,b) => isBaseType b)).unzip
+    let (bound_vars_with_non_base_types, _) :=
+      (bound_vars_and_types.filter (fun (_,b) => ¬ isBaseType b)).unzip
 
     let mut hypotheses_with_only_base_type_args := #[]
     let mut nonlinear_hypotheses := #[]
