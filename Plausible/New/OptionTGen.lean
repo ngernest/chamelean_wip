@@ -11,7 +11,7 @@ open Plausible
 
 /-- `pickDrop xs n` returns a weight & its generator `(k, gen)` such that `n < k`,
     and also returns the tail of the list after `(k, gen)` -/
-def pickDrop (xs : List (Nat × OptionT Gen α)) (n : Nat) :=
+def pickDrop (xs : List (Nat × OptionT Gen α)) (n : Nat) : Nat × OptionT Gen α × List (Nat × OptionT Gen α) :=
   match xs with
   | [] => (0, OptionT.fail, [])
   | (k, x) :: xs =>
@@ -40,18 +40,23 @@ def backtrackFuel (fuel : Nat) (total : Nat) (gs : List (Nat × OptionT Gen α))
 def backtrack (gs : List (Nat × OptionT Gen α)) : OptionT Gen α :=
   backtrackFuel (gs.length) (sumFst gs) gs
 
+def thunkGen (f : Unit → OptionT Gen α) : OptionT Gen α :=
+  f ()
 
-/-- A handwritten generator for BSTs à la "Generating Good Generators for Inductive Relations"
-   - We use the `OptionT` monad to add the possibility of failure to the `Gen` monad -/
+/-- A handwritten generator for BSTs (modelled after the automatically derived generator produced by QuickChick).
+    Note that:
+   - We use the `OptionT` monad to add the possibility of failure to the `Gen` monad
+   - All the generators supplied to the `backtrack` combinator are thunked, to avoid unnecessary
+     computation (since Lean is strict) -/
 def genBST (in1 : Nat) (in2 : Nat) : Nat → OptionT Gen Tree :=
   let rec aux_arb (size : Nat) (in1 : Nat) (in2 : Nat) : OptionT Gen Tree :=
     match size with
     | .zero => pure .Leaf
     | .succ size' =>
       backtrack [
-        (1, pure .Leaf),
-        (1, do
-          let x ← Gen.choose Nat 0 in2 (by omega)
+        (1, thunkGen $ fun () => pure .Leaf),
+        (1, thunkGen $ fun () => do
+          let x ← SampleableExt.interpSample Nat
           if x > in1 then
             let l ← aux_arb size' in1 x
             let r ← aux_arb size' x in2
@@ -64,3 +69,44 @@ def genBST (in1 : Nat) (in2 : Nat) : Nat → OptionT Gen Tree :=
 -- then invoke `Gen.run` to display the generated value in the IO monad
 def tempSize := 5
 #eval (Gen.run (OptionT.run (genBST 1 10 tempSize)) tempSize)
+
+/-- A handwritten generator for balanced trees
+    (modelled after the automatically derived generator produced by QuickChick) -/
+def genBalancedTree (n : Nat) : Nat → OptionT Gen Tree :=
+  let rec aux_arb (size : Nat) (n : Nat) : OptionT Gen Tree :=
+    match size with
+    | .zero =>
+      backtrack [
+        (1, thunkGen $ fun _ =>
+            match n with
+            | .zero => pure .Leaf
+            | .succ _ => OptionT.fail),
+        (1, thunkGen $ fun _ =>
+            match n with
+            | 1 => pure .Leaf
+            | _ => OptionT.fail),
+        (1, thunkGen $ fun _ => OptionT.fail)
+      ]
+    | .succ size' =>
+      -- TODO: figure out how QuickChick assigns the right weights to the different sub-generators
+      backtrack [
+        (1, thunkGen $ fun _ =>
+            match n with
+            | .zero => pure .Leaf
+            | _ => OptionT.fail),
+        (1, thunkGen $ fun _ =>
+            match n with
+            | 1 => pure .Leaf
+            | _ => OptionT.fail),
+        (.succ size', thunkGen $ fun _ =>
+          match n with
+          | .zero => OptionT.fail
+          | .succ n => do
+            let l ← aux_arb size' n
+            let r ← aux_arb size' n
+            let x ← SampleableExt.interpSample Nat
+            pure (.Node x l r))
+      ]
+  fun size => aux_arb size n
+
+#eval (Gen.run (OptionT.run (genBalancedTree 2 tempSize)) tempSize)

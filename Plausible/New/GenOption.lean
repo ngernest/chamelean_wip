@@ -39,10 +39,6 @@ def genOptionMap {α β : Type} (f : α → β) (ga : GenOption α) : GenOption 
 instance : Functor GenOption where
   map := genOptionMap
 
-/-- Alias for a generator that always fails -/
-def fail : Gen (Option α) :=
-  return none
-
 /-- Lifts a `Gen α` into a `Gen (Option α)`.
    (this allow us to use `Gen α` computations in places where `GenOption α` is expected) -/
 def liftGenOption {α : Type} (g : Gen α) : Gen (Option α) :=

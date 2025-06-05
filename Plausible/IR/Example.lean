@@ -13,10 +13,14 @@ inductive Tree where
 | Node : Nat → Tree → Tree → Tree
 deriving Repr
 
-/-- `balanced n t` describes whether the tree `t` of height `n` is balanced -/
+/-- `balanced n t` describes whether the tree `t` of height `n` is *balanced*, i.e.
+    every path through the tree has length either `n` or `n-1`. -/
 inductive balanced : Nat → Tree → Prop where
-| B0 : balanced 0 Tree.Leaf
-| BS : ∀ n x l r, balanced n l → balanced n r → balanced (succ n) (Tree.Node x l r)
+| B0 : balanced 0 .Leaf
+| B1 : balanced 1 .Leaf
+| BS : ∀ n x l r,
+  balanced n l → balanced n r →
+  balanced (succ n) (.Node x l r)
 
 /-- `bst lo hi t` describes whether a tree `t` is a BST that contains values strictly within `lo` and `hi` -/
 inductive bst : Nat → Nat → Tree → Prop where
