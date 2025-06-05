@@ -49,8 +49,7 @@ partial def all_args_types (e : Expr) : MetaM (Array Expr) := do
     out := out.append arg_types
   return out
 
-/-- Determines whether all the arguments to an expression have base types as their type
-     -/
+/-- Determines whether all the arguments to an expression have base types as their type -/
 def allArgsHaveBaseTypes (e : Expr) : MetaM Bool := do
   let types ← all_args_types e
   pure $ (types.size > 0) ∧ (∀ t ∈ types, isBaseType t)
@@ -58,15 +57,16 @@ def allArgsHaveBaseTypes (e : Expr) : MetaM Bool := do
 
 def mkFVars (a : Array Name) : Array Expr := a.map (fun x => mkFVar ⟨x⟩)
 
-/-- `ConstructorType` describes a universally-quantified type expression whose body is an arrow type,
+/-- The type `DecomposedConstructorType` describes a universally-quantified type expression whose body is an arrow type,
      i.e. types of the form `∀ (x1 : τ1) … (xn : τn), Q1 → … → Qn → P`.
-    - `ConstructorType` is a triple containing three components:
+    - `DecomposedConstructorType` is a triple containing three components:
     `(#[(x1, τ1), …, (xn, τn)], Q1 → … → Qn → P, #[Q1, …, Qn, P])`.
     - Note: The 2nd component is the body of the forall-expression
     - Note: The 3rd component is an array containing each subterm of the arrow type -/
 abbrev DecomposedConstructorType := Array (Name × Expr) × Expr × Array Expr
 
-/-- Record -/
+/-- The datatype `InductiveConstructor` bundles together metadata
+    for a constructor of an inductive relation -/
 structure InductiveConstructor where
   -- Bound variables and their types
   bound_vars: Array Name
@@ -93,7 +93,7 @@ structure InductiveConstructor where
   name_space: Name
   dependencies: Array Expr
 
-/-- `InductiveInfo` is a datatype that bundles together metadata for an inductive relation -/
+/-- The datatype `InductiveInfo` bundles together metadata for an inductive relation -/
 structure InductiveInfo where
   /-- The name of the inductive relation -/
   inductive_name : Name
@@ -131,7 +131,8 @@ structure InductiveInfo where
   /-- Name corresponding to the value being generated -/
   output_var_name : Option Name
 
-
+  /-- The decomposed types for each constructor of the induction relation.
+      See docs for `DecomposedConstructorType` for further details. -/
   decomposed_ctor_types : Array DecomposedConstructorType
   constructors : Array InductiveConstructor
   constructors_with_arity_zero : Array InductiveConstructor

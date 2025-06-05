@@ -247,6 +247,8 @@ def GenCheckCalls_for_producer (ctor : InductiveConstructor) (genpos : Nat) : Me
   let mut outarr ← GenCheckCalls_for_hypotheses ctor initset
   for hyp in ctor.all_hypotheses do
     initset := Array.appendUniqueElements initset (extractFVars hyp)
+  -- TODO: figure out how to extract the conclusion of the constructor so that we can produce
+  -- the corresponding generator
   let gen_arg := ctor.conclusion.getAppArgs[genpos]!
   let uninitset := Array.removeAll (extractFVars gen_arg) initset
   for fid in uninitset do

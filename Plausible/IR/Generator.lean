@@ -45,11 +45,11 @@ def elabGetChecker : CommandElab := fun stx => do
 #gen_checker balanced with_name ["h", "T"] backtrack 100
 #gen_checker bst with_name ["lo", "hi", "T"] backtrack 100
 
-def get_producer (r: InductiveInfo) (arg_names : List String) (genpos: Nat) (btnum: Nat)
+def get_producer (inductiveInfo : InductiveInfo) (arg_names : List String) (genpos: Nat) (btnum: Nat)
     (monad: String :="IO") : MetaM String := do
-  let prototype ← prototype_for_producer r arg_names genpos monad
-  let body ← producer_body r arg_names genpos btnum monad
-  let where_def ← producer_where_defs r arg_names genpos monad
+  let prototype ← prototype_for_producer inductiveInfo arg_names genpos monad
+  let body ← producer_body inductiveInfo arg_names genpos btnum monad
+  let where_def ← producer_where_defs inductiveInfo arg_names genpos monad
   let producer := where_def ++ "\n" ++ prototype ++ " := do\n" ++ body ++ "\n"
   return producer
 
@@ -63,10 +63,10 @@ def elabGetProducer : CommandElab := fun stx => do
     Command.liftTermElabM do
       let e ← elabTerm t none
       let inpname ← termToStringList t2
-      let relation ←  getInductiveInfoWithArgs e inpname
+      let inductiveInfo ← getInductiveInfoWithArgs e inpname
       let pos := TSyntax.getNat t3
       let btnum := TSyntax.getNat t4
-      let producer := get_producer relation inpname pos btnum
+      let producer := get_producer inductiveInfo inpname pos btnum
       print_m_string producer
   | _ => throwError "Invalid syntax"
 
