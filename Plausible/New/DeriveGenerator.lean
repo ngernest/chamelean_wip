@@ -154,7 +154,7 @@ def mkGeneratorFunction (inductiveName : Name) (targetVar : Name) (targetType : 
   -- Produce the definition for the generator function
   -- TODO: switch to `backtrack` combinator instead of `Gen.oneOf`
   -- once the array of sub-generators has been populated
-  `(def $genFunName $params* : Plausible.Gen (Option $targetType) :=
+  `(def $genFunName $params* : OptionT Plausible.Gen $targetType :=
       match size with
       | .zero => Plausible.Gen.oneOf $sizeZeroGenerators
       | .succ size' => Plausible.Gen.oneOf #[return none])
