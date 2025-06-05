@@ -70,8 +70,8 @@ def genBST (lo : Nat) (hi : Nat) : Nat → OptionT Gen Tree :=
       ]
     | .succ size' =>
       backtrack [
-        (1, thunkGen $ fun () => pure .Leaf),
-        (.succ size', thunkGen $ fun () => do
+        (1, thunkGen $ fun _ => pure .Leaf),
+        (.succ size', thunkGen $ fun _ => do
           let x ← SampleableExt.interpSample Nat
           if x > lo then
             let l ← aux_arb size' lo x
@@ -80,11 +80,6 @@ def genBST (lo : Nat) (hi : Nat) : Nat → OptionT Gen Tree :=
           else OptionT.fail)
       ]
   fun size => aux_arb size lo hi
-
--- To sample from the generator, we have to do `OptionT.run` to extract the underlying generator,
--- then invoke `Gen.run` to display the generated value in the IO monad
-def tempSize := 5
-#eval runSizedGen (genBST 1 10) tempSize
 
 /-- A handwritten generator for balanced trees of height `n`
     (modelled after the automatically derived generator produced by QuickChick) -/
@@ -125,6 +120,11 @@ def genBalancedTree (n : Nat) : Nat → OptionT Gen Tree :=
       ]
   fun size => aux_arb size n
 
-#eval runSizedGen (genBalancedTree 2) tempSize
+-- Example usage:
+-- To sample from the generator, we have to do `OptionT.run` to extract the underlying generator,
+-- then invoke `Gen.run` to display the generated value in the IO monad
+-- def tempSize := 5
+-- #eval runSizedGen (genBST 1 10) tempSize
+-- #eval runSizedGen (genBalancedTree 2) tempSize
 
 end OptionTGen

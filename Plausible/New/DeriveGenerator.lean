@@ -131,9 +131,11 @@ def mkGeneratorFunction (inductiveName : Name) (targetVar : Name) (targetType : 
     let gen ← `(pure $ctorIdent)
     arityZeroGenerators := arityZeroGenerators.push gen
 
-  -- Flatten the array above into one single expression
-  let generatorList ← `([(1, OptionT.fail)])
+  -- Create an ident for each function in the auxiliary `OptionTGen` library
+  let thunkGenFn := mkIdent $ Name.mkStr2 "OptionTGen" "thunkGen"
   let backtrackFn := mkIdent $ Name.mkStr2 "OptionTGen" "backtrack"
+
+  let generatorList ← `([(1, $thunkGenFn (fun _ => OptionT.fail))])
 
   -- Generate the generator function name
   let genFunName := mkIdent (Name.mkStr1 s!"gen_{inductiveName}")
@@ -160,14 +162,18 @@ def mkGeneratorFunction (inductiveName : Name) (targetVar : Name) (targetType : 
 
   -- TODO: when `size == 0`, do `return C` for each arity-0 non-recursive constructor
 
+  -- Produce a fresh name for the `size` argument for the lambda
+  -- at the end of the generator function
+  let freshSizeIdent ← liftTermElabM (Lean.mkIdent <$> mkFreshUserName `size)
+  let freshSizeArgBinder ← `(Term.funBinder| $freshSizeIdent)
+
   -- Produce the definition for the generator function
-  -- TODO: generate a fresh name for size for the lambda at the end
   `(def $genFunName $topLevelParams* : Nat → OptionT Plausible.Gen $targetType :=
       let rec aux_arb $sizeParam $innerParams* : OptionT Plausible.Gen $targetType :=
         match size with
         | .zero => $backtrackFn $generatorList
         | .succ size' => $backtrackFn $generatorList
-      fun size => aux_arb size $paramIdents*)
+      fun $freshSizeArgBinder => aux_arb $freshSizeIdent $paramIdents*)
 
 ----------------------------------------------------------------------
 -- Command elaborator for producing the Plausible generator
