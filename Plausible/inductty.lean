@@ -127,7 +127,7 @@ def generatorCode_for_IT_constructor (con: IT_constructor) (order: Nat) : MetaM 
 
 def ind_backtrack_list_for_IT (r: IT_info): MetaM (Array String) := do
   let mut i := 0
-  let name := r.name.toString
+  let name := r.inductive_name.toString
   let mut out : Array String := #[]
   for con in r.constructors do
     i := i + 1
@@ -138,7 +138,7 @@ def ind_backtrack_list_for_IT (r: IT_info): MetaM (Array String) := do
 
 def nonind_backtrack_list_for_IT (r: IT_info): MetaM (Array String) := do
   let mut i := 0
-  let name := r.name.toString
+  let name := r.inductive_name.toString
   let mut out : Array String := #[]
   for con in r.constructors do
     i := i + 1

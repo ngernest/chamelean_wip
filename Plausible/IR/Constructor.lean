@@ -61,7 +61,7 @@ def GenCheckCalls_grouping (gccs: Array GenCheckCall) : MetaM GenCheckCall_group
     var_eq := var_eq
   }
 
-def get_checker_backtrack_elem_from_constructor (con: IRConstructor) (inpname: List String) : MetaM backtrack_elem := do
+def get_checker_backtrack_elem_from_constructor (con: InductiveConstructor) (inpname: List String) : MetaM backtrack_elem := do
   --Get the match expr and inp
   let out_prop ←  separate_fvar con.conclusion
   let args := (out_prop.cond.getAppArgs).toList
@@ -208,7 +208,7 @@ def backtrack_elem_toString_checker (cbe: backtrack_elem) (monad: String :="IO")
   return out
 
 
-def checker_where_defs (relation: IR_info) (inpname: List String) (monad: String :="IO") : MetaM String := do
+def checker_where_defs (relation: InductiveInfo) (inpname: List String) (monad: String :="IO") : MetaM String := do
   let mut out_str := ""
   let mut i := 0
   for con in relation.constructors do
@@ -231,7 +231,7 @@ def elabgetBackTrack : CommandElab := fun stx => do
     Command.liftTermElabM do
       let inpexp ← elabTerm t1 none
       let inpname ← termToStringList t2
-      let relation ← extract_IR_info inpexp
+      let relation ← getInductiveInfo inpexp
       let where_defs ← checker_where_defs relation inpname
       IO.println where_defs
   | _ => throwError "Invalid syntax"
@@ -245,7 +245,7 @@ def elabgetBackTrack : CommandElab := fun stx => do
 -- BACKTRACK PRODUCER ---
 
 
-def get_producer_backtrack_elem_from_constructor (ctor: IRConstructor) (inpname: List String) (genpos: Nat)
+def get_producer_backtrack_elem_from_constructor (ctor: InductiveConstructor) (inpname: List String) (genpos: Nat)
       : MetaM backtrack_elem := do
   let temp := Name.mkStr1 "temp000"
   let tempfvar := Expr.fvar (FVarId.mk temp)
@@ -315,7 +315,7 @@ def backtrack_elem_toString_producer (cbe: backtrack_elem) (monad: String :="IO"
   return out
 
 
-def producer_where_defs (relation: IR_info) (inpname: List String) (genpos: Nat) (monad: String :="IO"): MetaM String := do
+def producer_where_defs (relation: InductiveInfo) (inpname: List String) (genpos: Nat) (monad: String :="IO"): MetaM String := do
   let mut out_str := ""
   let mut i := 0
   for ctor in relation.constructors do
@@ -340,7 +340,7 @@ def elabgetBackTrackProducer : CommandElab := fun stx => do
       let input_expr ← elabTerm t1 none
       let inpname ← termToStringList t2
       let pos := TSyntax.getNat t3
-      let inductiveInfo ← extract_IR_info input_expr
+      let inductiveInfo ← getInductiveInfo input_expr
       let where_defs ← producer_where_defs inductiveInfo inpname pos
       IO.println where_defs
   | _ => throwError "Invalid syntax"

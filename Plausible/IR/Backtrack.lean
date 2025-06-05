@@ -19,43 +19,43 @@ namespace Plausible.IR
 
 -- Generate backtrack list --
 
-def size_zero_backtrack_for_checker (r: IR_info): MetaM (Array String) := do
+def size_zero_backtrack_for_checker (r: InductiveInfo): MetaM (Array String) := do
   let mut i := 0
   let mut out : Array String := #[]
   for ctor in r.constructors do
     i := i + 1
     if ctor.recursive_hypotheses.size = 0 then
-      let bt := "check_" ++ afterLastDot r.name.toString ++"_by_con_" ++ toString i
+      let bt := "check_" ++ afterLastDot r.inductive_name.toString ++"_by_con_" ++ toString i
       out:= out.push bt
   return out
 
-def size_pos_backtrack_for_checker (r: IR_info): MetaM (Array String) := do
+def size_pos_backtrack_for_checker (r: InductiveInfo): MetaM (Array String) := do
   let mut i := 0
   let mut out : Array String := #[]
   for con in r.constructors do
     i := i + 1
     if con.recursive_hypotheses.size > 0 then
-      let bt := "check_" ++ afterLastDot r.name.toString ++"_by_con_" ++ toString i
+      let bt := "check_" ++ afterLastDot r.inductive_name.toString ++"_by_con_" ++ toString i
       out:= out.push bt
   return out
 
-def size_zero_backtrack_for_producer (r: IR_info) (genpos: Nat): MetaM (Array String) := do
+def size_zero_backtrack_for_producer (r: InductiveInfo) (genpos: Nat): MetaM (Array String) := do
   let mut i := 0
   let mut out : Array String := #[]
   for con in r.constructors do
     i := i + 1
     if con.recursive_hypotheses.size = 0 then
-      let bt := "gen_" ++ afterLastDot r.name.toString ++ "_at_" ++ toString genpos  ++"_by_con_" ++ toString i
+      let bt := "gen_" ++ afterLastDot r.inductive_name.toString ++ "_at_" ++ toString genpos  ++"_by_con_" ++ toString i
       out:= out.push bt
   return out
 
-def size_pos_backtrack_for_producer (r: IR_info) (genpos: Nat): MetaM (Array String) := do
+def size_pos_backtrack_for_producer (r: InductiveInfo) (genpos: Nat): MetaM (Array String) := do
   let mut i := 0
   let mut out : Array String := #[]
   for con in r.constructors do
     i := i + 1
     if con.recursive_hypotheses.size > 0 then
-      let bt := "gen_" ++ afterLastDot r.name.toString ++ "_at_" ++ toString genpos ++"_by_con_" ++ toString i
+      let bt := "gen_" ++ afterLastDot r.inductive_name.toString ++ "_at_" ++ toString genpos ++"_by_con_" ++ toString i
       out:= out.push bt
   return out
 
@@ -97,7 +97,7 @@ def weight_backtrack_codeblock (btarray: Array String) (inps: List String) (back
   body:= body ++ " " ++ monad_fail
   return body
 
-def checker_body (r: IR_info) (inpname: List String) (backtracknum: Nat)
+def checker_body (r: InductiveInfo) (inpname: List String) (backtracknum: Nat)
     (monad: String :="IO") : MetaM (String) := do
   let mut body := "match size with \n| zero => \n"
   let bt0 ← size_zero_backtrack_for_checker r
@@ -111,7 +111,7 @@ def checker_body (r: IR_info) (inpname: List String) (backtracknum: Nat)
   return body
 
 
-def producer_body (r: IR_info) (inpname: List String) (genpos: Nat) (backtracknum: Nat)
+def producer_body (r: InductiveInfo) (inpname: List String) (genpos: Nat) (backtracknum: Nat)
     (monad: String :="IO") : MetaM (String) := do
   let mut body := "match size with \n| zero => \n"
   let inps := inpname.take genpos ++ inpname.drop (genpos + 1)

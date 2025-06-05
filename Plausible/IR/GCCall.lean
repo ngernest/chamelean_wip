@@ -137,9 +137,9 @@ inductive GenCheckCall where
   | gen_fvar (id: FVarId) (type: Expr) : GenCheckCall
   | ret (e: Expr): GenCheckCall
 
-def get_checker_initset (c: IRConstructor) : Array FVarId := extractFVars c.conclusion
+def get_checker_initset (c: InductiveConstructor) : Array FVarId := extractFVars c.conclusion
 
-def get_producer_initset (c: IRConstructor) (genpos: Nat): MetaM (Array FVarId) := do
+def get_producer_initset (c: InductiveConstructor) (genpos: Nat): MetaM (Array FVarId) := do
   if genpos ≥ c.conclusion_args.size
     then throwError "invalid gen position"
   let mut i := 0
@@ -150,7 +150,7 @@ def get_producer_initset (c: IRConstructor) (genpos: Nat): MetaM (Array FVarId) 
     i:= i + 1
   return outarr
 
-def get_producer_outset (c: IRConstructor) (genpos: Nat): MetaM (Array FVarId) := do
+def get_producer_outset (c: InductiveConstructor) (genpos: Nat): MetaM (Array FVarId) := do
   if h: genpos ≥ c.conclusion_args.size then throwError "invalid gen position"
   else
     let initset ← get_producer_initset c genpos
@@ -199,7 +199,7 @@ def get_last_uninit_arg_and_uninitset (cond: Expr) (initset : Array FVarId): Met
   return (pos, uninitset, tobeinit)
 
 
-def GenCheckCalls_for_hypotheses (ctor : IRConstructor) (initset0: Array FVarId) : MetaM (Array GenCheckCall) := do
+def GenCheckCalls_for_hypotheses (ctor : InductiveConstructor) (initset0: Array FVarId) : MetaM (Array GenCheckCall) := do
   let mut outarr : Array GenCheckCall := #[]
   let mut initset := initset0
   let mut i := 0
@@ -237,12 +237,12 @@ def GenCheckCalls_for_hypotheses (ctor : IRConstructor) (initset0: Array FVarId)
         outarr := outarr.push (GenCheckCall.check_nonIR hyp)
   return outarr
 
-def GenCheckCalls_for_checker (c: IRConstructor) : MetaM (Array GenCheckCall) := do
+def GenCheckCalls_for_checker (c: InductiveConstructor) : MetaM (Array GenCheckCall) := do
   let mut initset := get_checker_initset c
   let mut outarr ← GenCheckCalls_for_hypotheses c initset
   return outarr
 
-def GenCheckCalls_for_producer (ctor : IRConstructor) (genpos : Nat) : MetaM (Array GenCheckCall) := do
+def GenCheckCalls_for_producer (ctor : InductiveConstructor) (genpos : Nat) : MetaM (Array GenCheckCall) := do
   let mut initset ← get_producer_initset ctor genpos
   let mut outarr ← GenCheckCalls_for_hypotheses ctor initset
   for hyp in ctor.all_hypotheses do
@@ -292,7 +292,7 @@ def elabCheckerCall : CommandElab := fun stx => do
   | `(#get_checker_call $t1:term) =>
     Command.liftTermElabM do
       let inpexp ← elabTerm t1 none
-      let relation ← extract_IR_info inpexp
+      let relation ← getInductiveInfo inpexp
       for con in relation.constructors do
         IO.println s!"\n---- Cond prop : {con.all_hypotheses}"
         IO.println s!"---- Out prop : {con.conclusion}"
@@ -315,7 +315,7 @@ def elabGenCall : CommandElab := fun stx => do
     Command.liftTermElabM do
       let inpexp ← elabTerm t1 none
       let pos := TSyntax.getNat t2
-      let relation ← extract_IR_info inpexp
+      let relation ← getInductiveInfo inpexp
       for con in relation.constructors do
         IO.println s!"\n---- Cond prop : {con.all_hypotheses}"
         IO.println s!"---- Out prop : {con.conclusion}"

@@ -18,9 +18,9 @@ def elim_dot_for_type (name: String) : String :=
   let qf := q.foldl (fun x y => x ++ " " ++ y) ""
   ⟨qf.data.tail⟩
 
-def prototype_for_checker (r: IR_info) (inpname: List String) (monad: String :="IO"): MetaM String := do
+def prototype_for_checker (r: InductiveInfo) (inpname: List String) (monad: String :="IO"): MetaM String := do
   let inps := [("size", Lean.mkConst `Nat)] ++ List.zip inpname r.input_types.toList
-  let genfuncname: String := "check_" ++ afterLastDot r.name.toString
+  let genfuncname: String := "check_" ++ afterLastDot r.inductive_name.toString
   let mut prototype := "partial def " ++ genfuncname ++ " "
   for inp in inps do
     let name := inp.1
@@ -32,9 +32,9 @@ def prototype_for_checker (r: IR_info) (inpname: List String) (monad: String :="
   prototype := prototype ++ ": " ++ ret_type
   return prototype
 
-def prototype_for_checker_by_con (r: IR_info) (inpname: List String) (con: Nat) (monad: String :="IO"): MetaM String := do
+def prototype_for_checker_by_con (r: InductiveInfo) (inpname: List String) (con: Nat) (monad: String :="IO"): MetaM String := do
   let inps := [("size", Lean.mkConst `Nat)] ++ List.zip inpname r.input_types.toList
-  let genfuncname: String := "check_" ++ afterLastDot r.name.toString ++ "_by_con_" ++ toString con
+  let genfuncname: String := "check_" ++ afterLastDot r.inductive_name.toString ++ "_by_con_" ++ toString con
   let mut prototype := "partial def " ++ genfuncname ++ " "
   for inp in inps do
     let name := inp.1
@@ -55,7 +55,7 @@ def elabGetprotoChecker : CommandElab := fun stx => do
   | `(#get_checker_prototype $t with_name $t2:term) =>
     Command.liftTermElabM do
       let e ← elabTerm t none
-      let relation ← extract_IR_info e
+      let relation ← getInductiveInfo e
       let inpname ← termToStringList t2
       let proto := prototype_for_checker relation inpname
       print_m_string proto
@@ -64,11 +64,11 @@ def elabGetprotoChecker : CommandElab := fun stx => do
 #get_checker_prototype typing with_name ["L", "e", "t"]
 
 
-def prototype_for_producer(r: IR_info) (inpname: List String) (genpos: Nat) (monad: String :="IO"): MetaM String := do
+def prototype_for_producer(r: InductiveInfo) (inpname: List String) (genpos: Nat) (monad: String :="IO"): MetaM String := do
   let zipinp := [("size", Lean.mkConst `Nat)] ++ List.zip inpname r.input_types.toList
   let inps := zipinp.take (genpos + 1) ++ zipinp.drop (genpos + 2)
   let out := zipinp[genpos + 1]!
-  let genfuncname: String := "gen_" ++ afterLastDot r.name.toString ++ "_at_" ++ toString genpos
+  let genfuncname: String := "gen_" ++ afterLastDot r.inductive_name.toString ++ "_at_" ++ toString genpos
   let mut prototype := "partial def " ++ genfuncname ++ " "
   for inp in inps do
     let name := inp.1
@@ -82,11 +82,11 @@ def prototype_for_producer(r: IR_info) (inpname: List String) (genpos: Nat) (mon
   prototype := prototype ++ ": " ++ rettype
   return prototype
 
-def prototype_for_producer_by_con(r: IR_info) (inpname: List String) (genpos: Nat) (con: Nat) (monad: String :="IO"): MetaM String := do
+def prototype_for_producer_by_con(r: InductiveInfo) (inpname: List String) (genpos: Nat) (con: Nat) (monad: String :="IO"): MetaM String := do
   let zipinp := [("size", Lean.mkConst `Nat)] ++ List.zip inpname r.input_types.toList
   let inps := zipinp.take (genpos + 1) ++ zipinp.drop (genpos + 2)
   let out := zipinp[genpos + 1]!
-  let genfuncname: String := "gen_" ++ afterLastDot r.name.toString ++ "_at_" ++ toString genpos ++ "_by_con_" ++ toString con
+  let genfuncname: String := "gen_" ++ afterLastDot r.inductive_name.toString ++ "_at_" ++ toString genpos ++ "_by_con_" ++ toString con
   let mut prototype := "partial def " ++ genfuncname ++ " "
   for inp in inps do
     let name := inp.1
@@ -109,7 +109,7 @@ def elabGetprotoProducer : CommandElab := fun stx => do
   | `(#get_producer_prototype $t with_name $t2:term for_arg $t3) =>
     Command.liftTermElabM do
       let e ← elabTerm t none
-      let relation ←  extract_IR_info e
+      let relation ←  getInductiveInfo e
       let inpname ← termToStringList t2
       let pos := TSyntax.getNat t3
       let proto := prototype_for_producer relation inpname pos
