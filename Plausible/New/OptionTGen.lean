@@ -40,30 +40,39 @@ def backtrackFuel (fuel : Nat) (total : Nat) (gs : List (Nat × OptionT Gen α))
 def backtrack (gs : List (Nat × OptionT Gen α)) : OptionT Gen α :=
   backtrackFuel (gs.length) (sumFst gs) gs
 
+/-- Delays the evaluation of a generator by taking in a function `f : Unit → OptionT Gen α` -/
 def thunkGen (f : Unit → OptionT Gen α) : OptionT Gen α :=
   f ()
+
+--------------------------------------------------------------------------
+-- Some example `OptionT Gen α` generators
+--------------------------------------------------------------------------
 
 /-- A handwritten generator for BSTs (modelled after the automatically derived generator produced by QuickChick).
     Note that:
    - We use the `OptionT` monad to add the possibility of failure to the `Gen` monad
    - All the generators supplied to the `backtrack` combinator are thunked, to avoid unnecessary
      computation (since Lean is strict) -/
-def genBST (in1 : Nat) (in2 : Nat) : Nat → OptionT Gen Tree :=
-  let rec aux_arb (size : Nat) (in1 : Nat) (in2 : Nat) : OptionT Gen Tree :=
+def genBST (lo : Nat) (hi : Nat) : Nat → OptionT Gen Tree :=
+  let rec aux_arb (size : Nat) (lo : Nat) (hi : Nat) : OptionT Gen Tree :=
     match size with
-    | .zero => pure .Leaf
+    | .zero =>
+      backtrack [
+        (1, pure .Leaf),
+        (1, OptionT.fail)
+      ]
     | .succ size' =>
       backtrack [
         (1, thunkGen $ fun () => pure .Leaf),
-        (1, thunkGen $ fun () => do
+        (.succ size', thunkGen $ fun () => do
           let x ← SampleableExt.interpSample Nat
-          if x > in1 then
-            let l ← aux_arb size' in1 x
-            let r ← aux_arb size' x in2
+          if x > lo then
+            let l ← aux_arb size' lo x
+            let r ← aux_arb size' x hi
             pure (.Node x l r)
           else OptionT.fail)
       ]
-  fun size => aux_arb size in1 in2
+  fun size => aux_arb size lo hi
 
 -- To sample from the generator, we have to do `OptionT.run` to extract the underlying generator,
 -- then invoke `Gen.run` to display the generated value in the IO monad
