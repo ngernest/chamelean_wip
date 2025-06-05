@@ -4,6 +4,8 @@ import Plausible.Gen
 import Plausible.Sampleable
 open Plausible
 
+namespace OptionTGen
+
 --------------------------------------------------------------------------
 -- Helper functions (adapted from QuickChick sourcecode)
 -- https://github.com/QuickChick/QuickChick/blob/master/src/Generators.v
@@ -44,6 +46,11 @@ def backtrack (gs : List (Nat × OptionT Gen α)) : OptionT Gen α :=
 def thunkGen (f : Unit → OptionT Gen α) : OptionT Gen α :=
   f ()
 
+/-- Samples from an `OptionT Gen` generator that is parameterized by its `size`,
+    returning the generated `Option α`  in the `IO` monad -/
+def runSizedGen {α} (sizedGen : Nat → OptionT Gen α) (size : Nat) : IO (Option α) :=
+  Gen.run (OptionT.run $ sizedGen size) size
+
 --------------------------------------------------------------------------
 -- Some example `OptionT Gen α` generators
 --------------------------------------------------------------------------
@@ -77,9 +84,9 @@ def genBST (lo : Nat) (hi : Nat) : Nat → OptionT Gen Tree :=
 -- To sample from the generator, we have to do `OptionT.run` to extract the underlying generator,
 -- then invoke `Gen.run` to display the generated value in the IO monad
 def tempSize := 5
-#eval (Gen.run (OptionT.run (genBST 1 10 tempSize)) tempSize)
+#eval runSizedGen (genBST 1 10) tempSize
 
-/-- A handwritten generator for balanced trees
+/-- A handwritten generator for balanced trees of height `n`
     (modelled after the automatically derived generator produced by QuickChick) -/
 def genBalancedTree (n : Nat) : Nat → OptionT Gen Tree :=
   let rec aux_arb (size : Nat) (n : Nat) : OptionT Gen Tree :=
@@ -118,4 +125,6 @@ def genBalancedTree (n : Nat) : Nat → OptionT Gen Tree :=
       ]
   fun size => aux_arb size n
 
-#eval (Gen.run (OptionT.run (genBalancedTree 2 tempSize)) tempSize)
+#eval runSizedGen (genBalancedTree 2) tempSize
+
+end OptionTGen
