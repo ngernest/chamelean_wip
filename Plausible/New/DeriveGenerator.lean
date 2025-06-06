@@ -81,7 +81,7 @@ def isConstructorRecursive (inductiveName : Name) (ctorName : Name) : MetaM Bool
     return false
   | none => throwError "constructors with non-arrow types are not-considered to be recursive"
 
-def foo (ctorName : Name) : MetaM α := do
+def debug_foo (ctorName : Name) : MetaM Unit := do
   let ctorInfo ← getConstInfo ctorName
   let ctorType := ctorInfo.type
 
@@ -95,9 +95,9 @@ def foo (ctorName : Name) : MetaM α := do
 
   let (_, _, type_exprs_in_arrow_type) ← decomposeType ctorType
   match splitLast? type_exprs_in_arrow_type with
-  | some (hypotheses, conclusion) =>
-    sorry
-  | none => sorry
+  | some (_hypotheses, conclusion) =>
+    logInfo s!"conclusion = {conclusion}"
+  | none => return ()
 
 /-- Produces the names of all non-recursive constructors of an inductive relation.
     A constructor is considered non-recursive if:
@@ -126,9 +126,20 @@ def mkGeneratorFunction (inductiveName : Name) (targetVar : Name) (targetType : 
   let inductInfo ← getConstInfoInduct inductiveName
   let _constructorNames := inductInfo.ctors
 
+  -- Find the index of the argument in the inductive application for the value we wish to generate
+  -- (i.e. find `i` s.t. `args[i] == targetVar`)
+  let targetIdxOpt := Array.findIdx? (fun arg => arg.getId == targetVar) (TSyntaxArray.raw args)
+  if let .none := targetIdxOpt then
+    throwError "cannot find index of value to be generated"
+  let targetIdx := Option.get! targetIdxOpt
+  logInfo s!"varIdx = {targetIdx}"
+
   -- Find the names of all non-recursive constructors
   let nonRecursiveConstructors ← liftTermElabM $ findNonRecursiveConstructors inductiveName
   logInfo s!"nonRecursiveConstructors = {nonRecursiveConstructors}"
+
+  for ctor in nonRecursiveConstructors do
+    liftTermElabM $ debug_foo ctor
 
   -- Find all arity-0 constructors
   let mut arityZeroCtors := #[]
