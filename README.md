@@ -3,6 +3,7 @@ A property testing framework for Lean 4 that integrates into the tactic framewor
 
 ## New Metaprogramming Code
 - See the [`New`](./Plausible/New/) subdirectory for new code that uses `TSyntax` instead of `MetaM String` 
+- See [`Tests.lean`](./Plausible/New/Tests.lean) for example usage on how to use the new `#deriving` commands for deriving generators
 - See [`OptionTGen.lean`](./Plausible/New/OptionTGen.lean) for new generator combinators that work over the `OptionT Gen` monad transformer (representing generators that may fail)
 
 ## Usage
