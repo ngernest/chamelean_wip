@@ -8,13 +8,13 @@ open Plausible.IR
 open Lean Elab Command Meta Term Parser
 
 
--- Create an ident for each function in the auxiliary `OptionTGen` library
+-- Create idents for commonly-called functions & commonly-referenced types
+
 def thunkGenFn : Ident :=
   mkIdent $ Name.mkStr2 "OptionTGen" "thunkGen"
 def backtrackFn : Ident :=
   mkIdent $ Name.mkStr2 "OptionTGen" "backtrack"
 def failFn : Ident := mkIdent $ Name.mkStr2 "OptionT" "fail"
-
 def natIdent : Ident := mkIdent ``Nat
 def optionTIdent : Ident := mkIdent ``OptionT
 def genIdent : Ident := mkIdent ``Plausible.Gen
@@ -256,7 +256,7 @@ def elabDeriveGenerator : CommandElab := fun stx => do
     -- Display the code for the derived generator to the user
     -- & prompt the user to accept it in the VS Code side panel
     liftTermElabM $ Tactic.TryThis.addSuggestion stx
-      (Format.pretty genFormat) (header := "Derived generator: ")
+      (Format.pretty genFormat) (header := "Try this generator: ")
 
     logInfo m!"Derived generator:\n{genFormat}"
 
