@@ -216,7 +216,11 @@ def elabDeriveGenerator : CommandElab := fun stx => do
 
     -- Pretty-print the derived generator
     let genFormat ← liftCoreM (PrettyPrinter.ppCommand genFunction)
-    logInfo m!"Generated generator function:\n{genFormat}"
+
+    -- Display the code for the derived generator to the user
+    -- & prompt the user to accept it in the VS Code side panel
+    liftTermElabM $ Tactic.TryThis.addSuggestion stx
+      (Format.pretty genFormat) (header := "Derived generator: ")
 
     elabCommand genFunction
 
