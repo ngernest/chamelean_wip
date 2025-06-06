@@ -13,6 +13,7 @@ def thunkGenFn : Ident :=
   mkIdent $ Name.mkStr2 "OptionTGen" "thunkGen"
 def backtrackFn : Ident :=
   mkIdent $ Name.mkStr2 "OptionTGen" "backtrack"
+def failFn : Ident := mkIdent $ Name.mkStr2 "OptionT" "fail"
 
 def natIdent : Ident := mkIdent ``Nat
 def optionTIdent : Ident := mkIdent ``OptionT
@@ -108,7 +109,8 @@ def getGeneratorForTarget (ctorName : Name) (targetIdx : Nat) : MetaM (TSyntax `
     -- then delaborate it to a `Term`
     let argToGenExpr := conclusion.getAppArgs[targetIdx]!
     let argToGenTerm ← PrettyPrinter.delab argToGenExpr
-    `((1, $thunkGenFn (fun _ => pure $argToGenTerm)))
+    let pureIdent := mkIdent (Name.mkStr1 "pure")
+    `((1, $thunkGenFn (fun _ => $pureIdent $argToGenTerm)))
   | none => throwError s!"Constructor {ctorName} has type {ctorType} which can't be decomposed"
 
 /-- Produces the names of all non-recursive constructors of an inductive relation.
@@ -157,7 +159,7 @@ def mkGeneratorFunction (inductiveName : Name) (targetVar : Name) (targetType : 
     generators := generators.push gen
   -- Add generator that always fails
   -- TODO: only add this failure generator to the case when `size == 0`
-  generators := generators.push (← `((1, $thunkGenFn (fun _ => OptionT.fail))))
+  generators := generators.push (← `((1, $thunkGenFn (fun _ => $failFn))))
 
   -- Convert the list of generator terms into a Lean list
   -- containing all the generators
@@ -171,7 +173,8 @@ def mkGeneratorFunction (inductiveName : Name) (targetVar : Name) (targetType : 
   let sizeParam ← `(Term.letIdBinder| ($sizeIdent : $natIdent))
 
   let mut caseExprs := #[]
-  let zeroCase ← `(Term.matchAltExpr| | zero => $backtrackFn $generatorList)
+  let zero := Syntax.mkNumLit "0"
+  let zeroCase ← `(Term.matchAltExpr| | $zero => $backtrackFn $generatorList)
   let succCase ← `(Term.matchAltExpr| | .succ size' => $backtrackFn $generatorList)
   caseExprs := caseExprs.push zeroCase
   caseExprs := caseExprs.push succCase
@@ -200,8 +203,9 @@ def mkGeneratorFunction (inductiveName : Name) (targetVar : Name) (targetType : 
 
   -- Produce a fresh name for the `size` argument for the lambda
   -- at the end of the generator function
-  let freshSizeIdent ← liftTermElabM (Lean.mkIdent <$> mkFreshUserName `size)
-  let freshSizeArgBinder ← `(Term.funBinder| $freshSizeIdent)
+  -- let freshSizeName ← mkFreshUserName `size
+  let freshSizeIdent := mkIdent (Name.mkStr1 "size")
+  -- let freshSizeArgBinder ← `(Term.funBinder| $freshSizeIdent)
 
   let auxArb := Name.mkStr1 "aux_arb"
   let auxArbIdent := mkIdent auxArb
@@ -211,11 +215,12 @@ def mkGeneratorFunction (inductiveName : Name) (targetVar : Name) (targetType : 
   `(def $genFunName $topLevelParams* : $natIdent → $generatorType :=
       let rec $auxArbIdent:ident $innerParams* : $generatorType :=
         $matchExpr
-      fun $freshSizeArgBinder => $auxArbIdent $freshSizeIdent $paramIdents*)
+      fun $freshSizeIdent => $auxArbIdent $freshSizeIdent $paramIdents*)
 
 ----------------------------------------------------------------------
 -- Command elaborator for producing the Plausible generator
 -----------------------------------------------------------------------
+
 
 syntax (name := derive_generator) "#derive_generator" "(" "fun" "(" ident ":" term ")" "=>" term ")" : command
 
@@ -232,14 +237,13 @@ def elabDeriveGenerator : CommandElab := fun stx => do
 
     -- Pretty-print the derived generator
     let genFormat ← liftCoreM (PrettyPrinter.ppCommand genFunction)
-    let prettyGen := Format.pretty genFormat
 
     -- Display the code for the derived generator to the user
     -- & prompt the user to accept it in the VS Code side panel
     liftTermElabM $ Tactic.TryThis.addSuggestion stx
-      prettyGen (header := "Derived generator: ")
+      (Format.pretty genFormat) (header := "Derived generator: ")
 
-    logInfo s!"Derived generator:\n{prettyGen}"
+    logInfo m!"Derived generator:\n{genFormat}"
 
     elabCommand genFunction
 
