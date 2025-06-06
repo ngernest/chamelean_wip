@@ -19,6 +19,15 @@ def natIdent : Ident := mkIdent ``Nat
 def optionTIdent : Ident := mkIdent ``OptionT
 def genIdent : Ident := mkIdent ``Plausible.Gen
 
+/-- Produces a fresh user-facing & *accessible* identifier with respect to the local context
+    - Note: prefer using this function over `Core.mkFreshUserName`, which is meant
+      to create fresh names that are *inaccessible* to the user (i.e. `mkFreshUserName` will
+      add daggers (`†`) to the name to make them inaccessible).
+    - This function ensures that the identifier is fresh
+      by adding suffixes containing underscores/numbers when necessary (in lieu of adding daggers). -/
+def mkFreshAccessibleIdent (localCtx : LocalContext) (name : Name) : Ident :=
+  mkIdent $ LocalContext.getUnusedName localCtx name
+
 /-- Extracts the name of the induction relation and its arguments -/
 def parseInductiveApp (body : Term) : CommandElabM (Name × TSyntaxArray `term) := do
   match body with
@@ -136,6 +145,11 @@ def findNonRecursiveConstructors (inductiveName : Name) : MetaM (Array Name) := 
     - `args`: the other arguments to the inductive relation -/
 def mkGeneratorFunction (inductiveName : Name) (targetVar : Name) (targetType : TSyntax `term)
   (args : TSyntaxArray `term) : CommandElabM (TSyntax `command) := do
+
+  -- Fetch the ambient local context, which we need to generate user-facing fresh names
+  -- that are accessible to the user
+  let localCtx ← liftTermElabM $ getLCtx
+
   -- Extract the names of the constructors for the inductive
   let inductInfo ← getConstInfoInduct inductiveName
   let _constructorNames := inductInfo.ctors
@@ -157,32 +171,38 @@ def mkGeneratorFunction (inductiveName : Name) (targetVar : Name) (targetType : 
   for ctor in nonRecursiveConstructors do
     let gen ← liftTermElabM $ getGeneratorForTarget ctor targetIdx
     generators := generators.push gen
+
   -- Add generator that always fails
   -- TODO: only add this failure generator to the case when `size == 0`
   generators := generators.push (← `((1, $thunkGenFn (fun _ => $failFn))))
 
-  -- Convert the list of generator terms into a Lean list
-  -- containing all the generators
+  -- Convert the list of generator terms into a Lean list containing all the generators
   let generatorList ← `([$generators,*])
 
   -- Generate the generator function name
   let genFunName := mkIdent (Name.mkStr1 s!"gen_{inductiveName}")
 
+  -- Create the cases for the pattern-match on the size argument
+  let mut caseExprs := #[]
+  let zeroCase ← `(Term.matchAltExpr| | $(mkIdent ``Nat.zero) => $backtrackFn $generatorList)
+  caseExprs := caseExprs.push zeroCase
+
+  let smallerSize := mkFreshAccessibleIdent localCtx `size'
+  let succCase ← `(Term.matchAltExpr| | $(mkIdent ``Nat.succ) $smallerSize => $backtrackFn $generatorList)
+  caseExprs := caseExprs.push succCase
+
   -- Create function argument for the generator size
   let sizeIdent := mkIdent `size
   let sizeParam ← `(Term.letIdBinder| ($sizeIdent : $natIdent))
-
-  let mut caseExprs := #[]
-  let zero := Syntax.mkNumLit "0"
-  let zeroCase ← `(Term.matchAltExpr| | $zero => $backtrackFn $generatorList)
-  let succCase ← `(Term.matchAltExpr| | .succ size' => $backtrackFn $generatorList)
-  caseExprs := caseExprs.push zeroCase
-  caseExprs := caseExprs.push succCase
   let matchExpr ← `(match $sizeIdent:ident with $caseExprs:matchAlt*)
 
   -- Add parameters for each argument to the inductive relation (except the target)
   let paramInfo ← analyzeInductiveArgs inductiveName args
+
+  -- Top-level params are arguments to the top-level derived generator
   let mut topLevelParams := #[]
+
+  -- Inner params are for the inner `aux_arb` function
   let mut innerParams := #[]
   innerParams := innerParams.push sizeParam
 
@@ -198,17 +218,12 @@ def mkGeneratorFunction (inductiveName : Name) (targetVar : Name) (targetType : 
       let innerParam ← `(Term.letIdBinder| ($paramIdent : $paramType))
       innerParams := innerParams.push innerParam
 
-
   -- TODO: when `size == 0`, do `return C` for each arity-0 non-recursive constructor
 
   -- Produce a fresh name for the `size` argument for the lambda
   -- at the end of the generator function
-  -- let freshSizeName ← mkFreshUserName `size
-  let freshSizeIdent := mkIdent (Name.mkStr1 "size")
-  -- let freshSizeArgBinder ← `(Term.funBinder| $freshSizeIdent)
-
-  let auxArb := Name.mkStr1 "aux_arb"
-  let auxArbIdent := mkIdent auxArb
+  let freshSizeIdent := mkFreshAccessibleIdent localCtx `size
+  let auxArbIdent := mkFreshAccessibleIdent localCtx `aux_arb
   let generatorType ← `($optionTIdent $genIdent $targetType)
 
   -- Produce the definition for the generator function
