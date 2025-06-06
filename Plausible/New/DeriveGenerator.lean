@@ -8,6 +8,11 @@ open Plausible.IR
 open Lean Elab Command Meta Term Parser
 
 
+-- Create an ident for each function in the auxiliary `OptionTGen` library
+def thunkGenFn : Ident :=
+  mkIdent $ Name.mkStr2 "OptionTGen" "thunkGen"
+def backtrackFn : Ident :=
+  mkIdent $ Name.mkStr2 "OptionTGen" "backtrack"
 
 /-- Extracts the name of the induction relation and its arguments -/
 def parseInductiveApp (body : Term) : CommandElabM (Name × TSyntaxArray `term) := do
@@ -81,23 +86,26 @@ def isConstructorRecursive (inductiveName : Name) (ctorName : Name) : MetaM Bool
     return false
   | none => throwError "constructors with non-arrow types are not-considered to be recursive"
 
-def debug_foo (ctorName : Name) : MetaM Unit := do
+/-- Produces a generator for a constructor identified by its name (`ctorName`),
+    where `targetIdx` is the index of the constructor argument whose value we wish to generate -/
+def getGeneratorForTarget (ctorName : Name) (targetIdx : Nat) : MetaM (TSyntax `term) := do
   let ctorInfo ← getConstInfo ctorName
   let ctorType := ctorInfo.type
-
-  -- TODO: (assume that there are no hypotheses for now)
-  -- TODO: when we examine the conclusion, we
-  -- need a way to distinguish between the variables that need to be generated
-  -- and the other variables that are free??
-
-  -- (or maybe in the case of `balanced`, we just need to figure out what type
-  -- we need to generate)
 
   let (_, _, type_exprs_in_arrow_type) ← decomposeType ctorType
   match splitLast? type_exprs_in_arrow_type with
   | some (_hypotheses, conclusion) =>
-    logInfo s!"conclusion = {conclusion}"
-  | none => return ()
+    -- TOOD: handle the hypotheses for the constructor
+
+    -- TODO: handle other arguments in the conclusion (we need to generate them as well)
+    -- (see how free variables are generated in `GenCheckCalls_for_producer`)
+
+    -- Find the argument (an `Expr`) corresponding to the value we wish to generate,
+    -- then delaborate it to a `Term`
+    let argToGenExpr := conclusion.getAppArgs[targetIdx]!
+    let argToGenTerm ← PrettyPrinter.delab argToGenExpr
+    `((1, $thunkGenFn (fun _ => pure $argToGenTerm)))
+  | none => throwError s!"Constructor {ctorName} has type {ctorType} which can't be decomposed"
 
 /-- Produces the names of all non-recursive constructors of an inductive relation.
     A constructor is considered non-recursive if:
@@ -138,33 +146,18 @@ def mkGeneratorFunction (inductiveName : Name) (targetVar : Name) (targetType : 
   let nonRecursiveConstructors ← liftTermElabM $ findNonRecursiveConstructors inductiveName
   logInfo s!"nonRecursiveConstructors = {nonRecursiveConstructors}"
 
+  -- Populate a list of sub-generators
+  let mut generators := #[]
   for ctor in nonRecursiveConstructors do
-    liftTermElabM $ debug_foo ctor
+    let gen ← liftTermElabM $ getGeneratorForTarget ctor targetIdx
+    generators := generators.push gen
+  -- Add generator that always fails
+  -- TODO: only add this failure generator to the case when `size == 0`
+  generators := generators.push (← `((1, $thunkGenFn (fun _ => OptionT.fail))))
 
-  -- Find all arity-0 constructors
-  let mut arityZeroCtors := #[]
-  for ctorName in nonRecursiveConstructors do
-    let ctorInfo ← getConstInfoCtor ctorName
-    logInfo s!"ctor {ctorName} has arity {ctorInfo.numFields}"
-    if ctorInfo.numFields == 0 then
-      arityZeroCtors := arityZeroCtors.push ctorName
-
-  -- For each arity zero generator `C`, produce an array of expressions of the form `pure (some C)`,
-  -- where `pure` is from Plausible's `Gen` monad
-
-  -- TODO: generalize this to handle constructors that have non-zero arity
-  -- (need to generate values for their arguments)
-  let mut arityZeroGenerators : Array (TSyntax `term) := #[(← `((1, OptionT.fail)))]
-  for ctorName in arityZeroCtors do
-    let ctorIdent := mkIdent ctorName
-    let gen ← `(pure $ctorIdent)
-    arityZeroGenerators := arityZeroGenerators.push gen
-
-  -- Create an ident for each function in the auxiliary `OptionTGen` library
-  let thunkGenFn := mkIdent $ Name.mkStr2 "OptionTGen" "thunkGen"
-  let backtrackFn := mkIdent $ Name.mkStr2 "OptionTGen" "backtrack"
-
-  let generatorList ← `([(1, $thunkGenFn (fun _ => OptionT.fail))])
+  -- Convert the list of generator terms into a Lean list
+  -- containing all the generators
+  let generatorList ← `([$generators,*])
 
   -- Generate the generator function name
   let genFunName := mkIdent (Name.mkStr1 s!"gen_{inductiveName}")
