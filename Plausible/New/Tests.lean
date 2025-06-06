@@ -12,7 +12,7 @@ open OptionTGen
 #derive_generator (fun (t : Tree) => balanced n t)
 
 
-#check gen_balanced
+-- #check gen_balanced
 -- #eval runSizedGen (gen_balanced 2) 10
 
 -- #derive_generator (fun (t : Tree) => bst lo hi t)

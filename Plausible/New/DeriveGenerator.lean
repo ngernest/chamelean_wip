@@ -14,6 +14,10 @@ def thunkGenFn : Ident :=
 def backtrackFn : Ident :=
   mkIdent $ Name.mkStr2 "OptionTGen" "backtrack"
 
+def natIdent : Ident := mkIdent ``Nat
+def optionTIdent : Ident := mkIdent ``OptionT
+def genIdent : Ident := mkIdent ``Plausible.Gen
+
 /-- Extracts the name of the induction relation and its arguments -/
 def parseInductiveApp (body : Term) : CommandElabM (Name × TSyntaxArray `term) := do
   match body with
@@ -163,12 +167,22 @@ def mkGeneratorFunction (inductiveName : Name) (targetVar : Name) (targetType : 
   let genFunName := mkIdent (Name.mkStr1 s!"gen_{inductiveName}")
 
   -- Create function argument for the generator size
-  let sizeParam ← `(Term.letIdBinder| (size : Nat))
+  let sizeIdent := mkIdent `size
+  let sizeParam ← `(Term.letIdBinder| ($sizeIdent : $natIdent))
+
+  let mut caseExprs := #[]
+  let zeroCase ← `(Term.matchAltExpr| | zero => $backtrackFn $generatorList)
+  let succCase ← `(Term.matchAltExpr| | .succ size' => $backtrackFn $generatorList)
+  caseExprs := caseExprs.push zeroCase
+  caseExprs := caseExprs.push succCase
+  let matchExpr ← `(match $sizeIdent:ident with $caseExprs:matchAlt*)
 
   -- Add parameters for each argument to the inductive relation (except the target)
   let paramInfo ← analyzeInductiveArgs inductiveName args
   let mut topLevelParams := #[]
   let mut innerParams := #[]
+  innerParams := innerParams.push sizeParam
+
   let mut paramIdents := #[]
   for (paramName, paramType) in paramInfo do
     if paramName != targetVar then
@@ -189,13 +203,15 @@ def mkGeneratorFunction (inductiveName : Name) (targetVar : Name) (targetType : 
   let freshSizeIdent ← liftTermElabM (Lean.mkIdent <$> mkFreshUserName `size)
   let freshSizeArgBinder ← `(Term.funBinder| $freshSizeIdent)
 
+  let auxArb := Name.mkStr1 "aux_arb"
+  let auxArbIdent := mkIdent auxArb
+  let generatorType ← `($optionTIdent $genIdent $targetType)
+
   -- Produce the definition for the generator function
-  `(def $genFunName $topLevelParams* : Nat → OptionT Plausible.Gen $targetType :=
-      let rec aux_arb $sizeParam $innerParams* : OptionT Plausible.Gen $targetType :=
-        match size with
-        | .zero => $backtrackFn $generatorList
-        | .succ size' => $backtrackFn $generatorList
-      fun $freshSizeArgBinder => aux_arb $freshSizeIdent $paramIdents*)
+  `(def $genFunName $topLevelParams* : $natIdent → $generatorType :=
+      let rec $auxArbIdent:ident $innerParams* : $generatorType :=
+        $matchExpr
+      fun $freshSizeArgBinder => $auxArbIdent $freshSizeIdent $paramIdents*)
 
 ----------------------------------------------------------------------
 -- Command elaborator for producing the Plausible generator
@@ -216,11 +232,14 @@ def elabDeriveGenerator : CommandElab := fun stx => do
 
     -- Pretty-print the derived generator
     let genFormat ← liftCoreM (PrettyPrinter.ppCommand genFunction)
+    let prettyGen := Format.pretty genFormat
 
     -- Display the code for the derived generator to the user
     -- & prompt the user to accept it in the VS Code side panel
     liftTermElabM $ Tactic.TryThis.addSuggestion stx
-      (Format.pretty genFormat) (header := "Derived generator: ")
+      prettyGen (header := "Derived generator: ")
+
+    logInfo s!"Derived generator:\n{prettyGen}"
 
     elabCommand genFunction
 
