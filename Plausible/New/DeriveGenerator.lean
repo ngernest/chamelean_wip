@@ -160,7 +160,6 @@ def mkGeneratorFunction (inductiveName : Name) (targetVar : Name) (targetType : 
   if let .none := targetIdxOpt then
     throwError "cannot find index of value to be generated"
   let targetIdx := Option.get! targetIdxOpt
-  logInfo s!"varIdx = {targetIdx}"
 
   -- Find the names of all non-recursive constructors
   let nonRecursiveConstructors ← liftTermElabM $ findNonRecursiveConstructors inductiveName

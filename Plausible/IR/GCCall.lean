@@ -5,10 +5,12 @@ import Plausible.IR.Extractor
 import Plausible.IR.Prelude
 import Lean.Elab.Deriving.DecEq
 import Lean.Meta.Tactic.Simp.Main
+
 open Lean.Elab.Deriving.DecEq
 open List Nat Array String
 open Lean Elab Command Meta Term
 open Lean.Parser.Term
+open Std
 
 namespace Plausible.IR
 
@@ -49,12 +51,25 @@ def count_fvars_in (e: Expr) (id: FVarId) : Nat :=
     c1 + c2
   | _ => 0
 
-/-- Extracts all the free variables in an expression, returning an array of `FVarID`s -/
-def extractFVars (e: Expr) : Array FVarId :=
+/-- Computes the set of all free variables in an expression, returning a `HashSet` of `FVarId`s
+    - This is a non-monadic version of `Lean.CollectFVars`, defined in
+    https://github.com/leanprover/lean4/blob/6741444a63eec253a7eae7a83f1beb3de015023d/src/Lean/Util/CollectFVars.lean#L28 -/
+def getFVarsSet (e : Expr) : HashSet FVarId :=
+  open HashSet in
   match e with
-  | Expr.fvar fid => #[fid]
-  | Expr.app f a => Array.appendUniqueElements (extractFVars f) (extractFVars a)
-  | _ => #[]
+  | .proj _ _ e => getFVarsSet e
+  | .forallE _ ty body _ => union (getFVarsSet ty) (getFVarsSet body)
+  | .lam _ ty body _ => union (getFVarsSet ty) (getFVarsSet body)
+  | .letE _ ty val body _ =>
+    union (getFVarsSet ty) (union (getFVarsSet val) (getFVarsSet body))
+  | .app f a => union (getFVarsSet f) (getFVarsSet a)
+  | .mdata _ e => getFVarsSet e
+  | .fvar fvar_id => HashSet.ofArray #[fvar_id]
+  | _ => ∅
+
+/-- Extracts the free variables in an expression, returning an array of `FVarID`s -/
+def extractFVars (e : Expr) : Array FVarId :=
+  HashSet.toArray $ getFVarsSet e
 
 def subst_first_fVar (e: Expr) (old : FVarId) (new : FVarId) : MetaM Expr := do
   if ¬ e.containsFVar old then return e
@@ -137,14 +152,15 @@ inductive GenCheckCall where
   | gen_fvar (id: FVarId) (type: Expr) : GenCheckCall
   | ret (e: Expr): GenCheckCall
 
-def get_checker_initset (c: InductiveConstructor) : Array FVarId := extractFVars c.conclusion
+def get_checker_initset (ctor : InductiveConstructor) : Array FVarId :=
+  extractFVars ctor.conclusion
 
-def get_producer_initset (c: InductiveConstructor) (genpos: Nat) : MetaM (Array FVarId) := do
-  if genpos ≥ c.conclusion_args.size
+def get_producer_initset (ctor : InductiveConstructor) (genpos : Nat) : MetaM (Array FVarId) := do
+  if genpos ≥ ctor.conclusion_args.size
     then throwError "invalid gen position"
   let mut i := 0
   let mut outarr := #[]
-  for e in c.conclusion_args do
+  for e in ctor.conclusion_args do
     if i != genpos then
       outarr := Array.appendUniqueElements outarr (extractFVars e)
     i:= i + 1
@@ -161,7 +177,8 @@ def get_producer_outset (c: InductiveConstructor) (genpos: Nat): MetaM (Array FV
       if ¬ Array.elem i outvar then outarr:=outarr.push i
     return outarr
 
-def get_uninit_set (cond: Expr) (initset : Array FVarId) := Array.removeAll (extractFVars cond) initset
+def get_uninit_set (cond: Expr) (initset : Array FVarId) :=
+  Array.removeAll (extractFVars cond) initset
 
 def fully_init (cond: Expr) (initset : Array FVarId) := (get_uninit_set cond initset).size == 0
 
