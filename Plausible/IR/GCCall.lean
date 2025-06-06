@@ -139,7 +139,7 @@ inductive GenCheckCall where
 
 def get_checker_initset (c: InductiveConstructor) : Array FVarId := extractFVars c.conclusion
 
-def get_producer_initset (c: InductiveConstructor) (genpos: Nat): MetaM (Array FVarId) := do
+def get_producer_initset (c: InductiveConstructor) (genpos: Nat) : MetaM (Array FVarId) := do
   if genpos ≥ c.conclusion_args.size
     then throwError "invalid gen position"
   let mut i := 0
@@ -318,12 +318,12 @@ def elabGenCall : CommandElab := fun stx => do
       let inpexp ← elabTerm t1 none
       let pos := TSyntax.getNat t2
       let relation ← getInductiveInfo inpexp
-      for con in relation.constructors do
-        IO.println s!"\n---- Cond prop : {con.all_hypotheses}"
-        IO.println s!"---- Out prop : {con.conclusion}"
-        let proc_conds ← GenCheckCalls_for_producer con pos
-        for pc in proc_conds do
-          IO.println (← GenCheckCalls_toRawCode pc)
+      for ctor in relation.constructors do
+        IO.println s!"\n---- Hypotheses : {ctor.all_hypotheses}"
+        IO.println s!"---- Conclusion : {ctor.conclusion}"
+        let producer_genCheckCalls ← GenCheckCalls_for_producer ctor pos
+        for genCheckCall in producer_genCheckCalls do
+          IO.println (← GenCheckCalls_toRawCode genCheckCall)
   | _ => throwError "Invalid syntax"
 
 

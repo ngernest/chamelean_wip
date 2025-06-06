@@ -81,6 +81,24 @@ def isConstructorRecursive (inductiveName : Name) (ctorName : Name) : MetaM Bool
     return false
   | none => throwError "constructors with non-arrow types are not-considered to be recursive"
 
+def foo (ctorName : Name) : MetaM α := do
+  let ctorInfo ← getConstInfo ctorName
+  let ctorType := ctorInfo.type
+
+  -- TODO: (assume that there are no hypotheses for now)
+  -- TODO: when we examine the conclusion, we
+  -- need a way to distinguish between the variables that need to be generated
+  -- and the other variables that are free??
+
+  -- (or maybe in the case of `balanced`, we just need to figure out what type
+  -- we need to generate)
+
+  let (_, _, type_exprs_in_arrow_type) ← decomposeType ctorType
+  match splitLast? type_exprs_in_arrow_type with
+  | some (hypotheses, conclusion) =>
+    sorry
+  | none => sorry
+
 /-- Produces the names of all non-recursive constructors of an inductive relation.
     A constructor is considered non-recursive if:
     - It is *not* an arrow type (i.e. it can be used directly to build an inhabitant of the inductive relation)

@@ -3,6 +3,7 @@ A property testing framework for Lean 4 that integrates into the tactic framewor
 
 ## New Metaprogramming Code
 - See the [`New`](./Plausible/New/) subdirectory for new code that uses `TSyntax` instead of `MetaM String` 
+- See [`OptionTGen.lean`](./Plausible/New/OptionTGen.lean) for new generator combinators that work over the `OptionT Gen` monad transformer (representing generators that may fail)
 
 ## Usage
 If you are using built in types Plausible is usually able to handle them already:
