@@ -15,8 +15,13 @@ import Plausible.Tactic
 -- (these are here so that `lake build` compiles the new metaprogramming code)
 -- import Plausible.IR.PlausibleIR
 
-import Plausible.New.DeriveChecker
-import Plausible.New.DeriveGenerator
-import Plausible.New.GenOption
-import Plausible.New.Tests
-import Plausible.New.OptionTGen
+import Plausible.NKI.Basic
+import Plausible.NKI.Operators
+import Plausible.NKI.Typecheck
+import Plausible.NKI.Types
+
+-- import Plausible.New.DeriveChecker
+-- import Plausible.New.DeriveGenerator
+-- import Plausible.New.GenOption
+-- import Plausible.New.Tests
+-- import Plausible.New.OptionTGen
