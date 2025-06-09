@@ -5,6 +5,7 @@ Authors: Paul Mure
 -/
 import Plausible.NKI.Basic
 import Plausible.NKI.Types
+import Plausible.IR.PlausibleIR
 
 namespace Plausible.NKI
 
@@ -32,6 +33,7 @@ inductive ShapeIsType : List Nat → ShapeConstr nnat → List (SNat nnat) → P
       sc idx = .some (.const hd)
       → ShapeIsType tl sc tl'
       → ShapeIsType (hd :: tl) sc (.param idx :: tl')
+
 
 inductive ShapeCompat : ShapeConstr nnat → List (SNat nnat) → List (SNat nnat) → Prop
   | nil {sc} : ShapeCompat sc [] []
