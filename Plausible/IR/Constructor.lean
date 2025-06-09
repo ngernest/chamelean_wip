@@ -22,14 +22,14 @@ structure GenCheckCall_group where
   check_IR_list: Array GenCheckCall
   check_nonIR_list: Array GenCheckCall
   ret : Array GenCheckCall
-  var_eq : Array (FVarId × FVarId)
+  variableEqualities : Array (FVarId × FVarId)
 
 structure BacktrackElem where
   inputs : Array String
   inputsToBeMatched : Array String
   exprsToBeMatched : Array Expr
   gcc_group : GenCheckCall_group
-  var_eq : Array (FVarId × FVarId)
+  variableEqualities : Array (FVarId × FVarId)
 
 
 def GenCheckCalls_grouping (gccs: Array GenCheckCall) : MetaM GenCheckCall_group := do
@@ -42,7 +42,7 @@ def GenCheckCalls_grouping (gccs: Array GenCheckCall) : MetaM GenCheckCall_group
   for gcc in gccs do
     match gcc with
     | GenCheckCall.gen_fvar _ _
-    | GenCheckCall.gen_IR _ _ _ => gen_list:= gen_list.push gcc
+    | GenCheckCall.gen_IR _ _ _ => gen_list := gen_list.push gcc
     | GenCheckCall.mat _ sp =>
       {
         ifsome_list := ifsome_list.push gcc;
@@ -58,25 +58,25 @@ def GenCheckCalls_grouping (gccs: Array GenCheckCall) : MetaM GenCheckCall_group
     check_nonIR_list := check_nonIR_list
     ifsome_list := ifsome_list
     ret:= ret
-    var_eq := var_eq
+    variableEqualities := var_eq
   }
 
-def get_checker_backtrack_elem_from_constructor (con: InductiveConstructor) (inpname: List String) : MetaM BacktrackElem := do
+def get_checker_backtrack_elem_from_constructor (ctor : InductiveConstructor) (inputNames : List String) : MetaM BacktrackElem := do
   --Get the match expr and inp
-  let out_prop ←  separate_fvar con.conclusion
-  let args := (out_prop.cond.getAppArgs).toList
-  let zipinp := inpname.zip args
-  let need_match_zipimp :=  zipinp.filter (fun x => is_inductive_constructor x.2)
-  let (mat_inp, mat_expr) := need_match_zipimp.unzip
+  let conclusion ← separate_fvar ctor.conclusion
+  let args := (conclusion.cond.getAppArgs).toList
+  let inputNamesAndArgs := inputNames.zip args
+  let inputPairsThatNeedMatching := inputNamesAndArgs.filter (fun (_, arg) => !arg.isFVar)
+  let (inputsToBeMatched, exprsToBeMatched) := inputPairsThatNeedMatching.unzip
   --Get GenCheckCall
-  let gccs ← GenCheckCalls_for_checker con
+  let gccs ← GenCheckCalls_for_checker ctor
   let gcc_group ← GenCheckCalls_grouping gccs
   return {
-    inputs := inpname.toArray
-    inputsToBeMatched:= mat_inp.toArray
-    exprsToBeMatched := mat_expr.toArray
+    inputs := inputNames.toArray
+    inputsToBeMatched := inputsToBeMatched.toArray
+    exprsToBeMatched := exprsToBeMatched.toArray
     gcc_group := gcc_group
-    var_eq := out_prop.eqs ++ gcc_group.var_eq
+    variableEqualities := conclusion.eqs ++ gcc_group.variableEqualities
   }
 
 def add_size_param (cond: Expr) : MetaM String := do
@@ -166,17 +166,17 @@ def cbe_gen_check_IR_block (cbe: BacktrackElem) (iden: String) (monad: String :=
 
 def cbe_return_checker (cbe: BacktrackElem) (iden: String) (vars: List String) (monad: String :="IO"): MetaM String := do
   let mut out := ""
-  if cbe.var_eq.size + cbe.gcc_group.check_nonIR_list.size + cbe.gcc_group.check_IR_list.size > 0 then
+  if cbe.variableEqualities.size + cbe.gcc_group.check_nonIR_list.size + cbe.gcc_group.check_IR_list.size > 0 then
     out := out ++ iden ++ "return "
   else
     out := out ++ "return true"
   for v in vars do
     out := out ++ "check" ++ v ++ " && "
-  for i in cbe.var_eq do
+  for i in cbe.variableEqualities do
     out := out ++  "(" ++ toString (i.1.name) ++ " == " ++ toString (i.2.name) ++ ") && "
   for gcc in cbe.gcc_group.check_nonIR_list do
     out := out ++ (← GenCheckCalls_toCode gcc monad) ++ " && "
-  if cbe.var_eq.size + cbe.gcc_group.check_nonIR_list.size + cbe.gcc_group.check_IR_list.size > 0 then
+  if cbe.variableEqualities.size + cbe.gcc_group.check_nonIR_list.size + cbe.gcc_group.check_IR_list.size > 0 then
     out:= ⟨out.data.dropLast.dropLast.dropLast⟩
   if cbe.gcc_group.ifsome_list.size > 0 then
       out := out ++ "\nreturn false"
@@ -264,29 +264,29 @@ def get_producer_backtrack_elem_from_constructor (ctor: InductiveConstructor) (i
   let gccs ← GenCheckCalls_for_producer ctor genpos
   let gcc_group ← GenCheckCalls_grouping gccs
   return {
-    inputs := (inputNames.take (genpos) ++ inputNames.drop (genpos+1)).toArray
+    inputs := (List.eraseIdx inputNames genpos).toArray
     inputsToBeMatched := inputsToBeMatched.toArray
     exprsToBeMatched := exprsToBeMatched.toArray
     gcc_group := gcc_group
-    var_eq := conclusion.eqs ++ gcc_group.var_eq
+    variableEqualities := conclusion.eqs ++ gcc_group.variableEqualities
   }
 
 
 def cbe_if_return_producer (cbe: BacktrackElem) (iden: String) (vars: List String) (monad: String :="IO"): MetaM String := do
   let mut out:= ""
-  if cbe.var_eq.size + cbe.gcc_group.check_nonIR_list.size + cbe.gcc_group.check_IR_list.size > 0 then
+  if cbe.variableEqualities.size + cbe.gcc_group.check_nonIR_list.size + cbe.gcc_group.check_IR_list.size > 0 then
     out := out ++ iden ++ "if "
   for j in vars do
     out := out ++ "check" ++ j ++ " && "
-  for i in cbe.var_eq do
+  for i in cbe.variableEqualities do
     out := out ++  "(" ++ toString (i.1.name) ++ " == " ++ toString (i.2.name) ++ ") && "
   for gcc in cbe.gcc_group.check_nonIR_list do
     out := out ++ (← GenCheckCalls_toCode gcc monad) ++ " && "
-  if cbe.var_eq.size + cbe.gcc_group.check_nonIR_list.size + cbe.gcc_group.check_IR_list.size > 0 then
+  if cbe.variableEqualities.size + cbe.gcc_group.check_nonIR_list.size + cbe.gcc_group.check_IR_list.size > 0 then
     out:= ⟨out.data.dropLast.dropLast.dropLast⟩ ++ "\n" ++ iden ++  "then "
   for gcc in cbe.gcc_group.ret do
     out := out ++ iden ++ (← GenCheckCalls_toCode gcc monad)
-  if cbe.var_eq.size + cbe.gcc_group.check_nonIR_list.size + cbe.gcc_group.check_IR_list.size + cbe.gcc_group.ifsome_list.size > 0 then
+  if cbe.variableEqualities.size + cbe.gcc_group.check_nonIR_list.size + cbe.gcc_group.check_IR_list.size + cbe.gcc_group.ifsome_list.size > 0 then
     let monad_fail := if monad = "IO" then "throw (IO.userError \"fail at checkstep\")" else "return none"
     out := out ++ "\n" ++ monad_fail
   if cbe.inputsToBeMatched.size > 0 then
