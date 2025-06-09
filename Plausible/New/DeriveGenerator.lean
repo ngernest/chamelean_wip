@@ -1,11 +1,13 @@
 import Lean
+import Std
 import Plausible.New.GenOption
 import Plausible.IR.Prelude
+import Plausible.IR.GCCall
 import Plausible.Gen
 import Plausible.New.OptionTGen
 
 open Plausible.IR
-open Lean Elab Command Meta Term Parser
+open Lean Elab Command Meta Term Parser Std
 
 
 -- Create idents for commonly-called functions & commonly-referenced types
@@ -14,6 +16,10 @@ def thunkGenFn : Ident :=
   mkIdent $ Name.mkStr2 "OptionTGen" "thunkGen"
 def backtrackFn : Ident :=
   mkIdent $ Name.mkStr2 "OptionTGen" "backtrack"
+def interpSampleFn : Ident :=
+  mkIdent $ Name.mkStr3 "Plausible" "SampleableExt" "interpSample"
+
+
 def failFn : Ident := mkIdent $ Name.mkStr2 "OptionT" "fail"
 def natIdent : Ident := mkIdent ``Nat
 def optionTIdent : Ident := mkIdent ``OptionT
@@ -100,9 +106,15 @@ def isConstructorRecursive (inductiveName : Name) (ctorName : Name) : MetaM Bool
     return false
   | none => throwError "constructors with non-arrow types are not-considered to be recursive"
 
+-- def doElemToSeq {m: Type → Type} [Monad m] [MonadRef m] [MonadQuotation m]
+--     t : m (TSyntax `doSeqItem) := do
+--   `(doSeqItem| $t)
+
 /-- Produces a generator for a constructor identified by its name (`ctorName`),
     where `targetIdx` is the index of the constructor argument whose value we wish to generate -/
 def getGeneratorForTarget (ctorName : Name) (targetIdx : Nat) : MetaM (TSyntax `term) := do
+  let lctx ← getLCtx
+
   let ctorInfo ← getConstInfo ctorName
   let ctorType := ctorInfo.type
 
@@ -116,10 +128,31 @@ def getGeneratorForTarget (ctorName : Name) (targetIdx : Nat) : MetaM (TSyntax `
 
     -- Find the argument (an `Expr`) corresponding to the value we wish to generate,
     -- then delaborate it to a `Term`
-    let argToGenExpr := conclusion.getAppArgs[targetIdx]!
-    let argToGenTerm ← PrettyPrinter.delab argToGenExpr
+    let conclusionArgs := conclusion.getAppArgs
+    let mut conclusionArgsFVars := #[]
+    for arg in conclusionArgs do
+      let argFVars ← extractFVarsMetaM arg
+      conclusionArgsFVars := Array.appendUniqueElements conclusionArgsFVars argFVars
+
+    let targetArg := conclusionArgs[targetIdx]!
+    let targetArgFVars ← extractFVarsMetaM targetArg
+
+    conclusionArgsFVars := Array.removeAll conclusionArgsFVars targetArgFVars
+
+    let argToGenTerm ← PrettyPrinter.delab targetArg
     let pureIdent := mkIdent (Name.mkStr1 "pure")
-    `((1, $thunkGenFn (fun _ => $pureIdent $argToGenTerm)))
+
+    let x := mkFreshAccessibleIdent lctx `x
+    let monadicBind ← `(doSeq|
+      let $x:term ← $interpSampleFn:term $natIdent
+      return $x)
+
+    let generatorBody ← `(fun _ => do $monadicBind)
+
+    `((1, $thunkGenFn ($generatorBody)))
+
+
+
   | none => throwError s!"Constructor {ctorName} has type {ctorType} which can't be decomposed"
 
 /-- Produces the names of all non-recursive constructors of an inductive relation.
