@@ -71,6 +71,13 @@ def getFVarsSet (e : Expr) : HashSet FVarId :=
 def extractFVars (e : Expr) : Array FVarId :=
   HashSet.toArray $ getFVarsSet e
 
+/-- A monadic version of `extractFVars` (which collects the array of `FVarId`s
+    in the `MetaM` monad ) -/
+def extractFVarsMetaM (e : Expr) : MetaM (Array FVarId) := do
+  let (_, fvars_state) ← e.collectFVars.run {}
+  return fvars_state.fvarIds
+
+
 def subst_first_fVar (e: Expr) (old : FVarId) (new : FVarId) : MetaM Expr := do
   if ¬ e.containsFVar old then return e
   else
@@ -155,21 +162,24 @@ inductive GenCheckCall where
 def get_checker_initset (ctor : InductiveConstructor) : Array FVarId :=
   extractFVars ctor.conclusion
 
-def get_producer_initset (ctor : InductiveConstructor) (genpos : Nat) : MetaM (Array FVarId) := do
+/-- Takes a constructor for an inductive relation,
+    and collects the free variables in each of the arguments for the constructor's conclusion
+    (except for the argument which we wish to generate, indicated by its index `genpos`) -/
+def getFVarsInConclusionArgs (ctor : InductiveConstructor) (genpos : Nat) : MetaM (Array FVarId) := do
   if genpos ≥ ctor.conclusion_args.size
     then throwError "invalid gen position"
   let mut i := 0
   let mut outarr := #[]
-  for e in ctor.conclusion_args do
+  for argExpr in ctor.conclusion_args do
     if i != genpos then
-      outarr := Array.appendUniqueElements outarr (extractFVars e)
-    i:= i + 1
+      outarr := Array.appendUniqueElements outarr (extractFVars argExpr)
+    i := i + 1
   return outarr
 
 def get_producer_outset (c: InductiveConstructor) (genpos: Nat): MetaM (Array FVarId) := do
   if h: genpos ≥ c.conclusion_args.size then throwError "invalid gen position"
   else
-    let initset ← get_producer_initset c genpos
+    let initset ← getFVarsInConclusionArgs c genpos
     let gen_arg := c.conclusion_args[genpos]
     let outvar := extractFVars gen_arg
     let mut outarr : Array FVarId := #[]
@@ -177,10 +187,11 @@ def get_producer_outset (c: InductiveConstructor) (genpos: Nat): MetaM (Array FV
       if ¬ Array.elem i outvar then outarr:=outarr.push i
     return outarr
 
-def get_uninit_set (cond: Expr) (initset : Array FVarId) :=
-  Array.removeAll (extractFVars cond) initset
+def get_uninit_set (hyp : Expr) (initset : Array FVarId) : Array FVarId :=
+  Array.removeAll (extractFVars hyp) initset
 
-def fully_init (cond: Expr) (initset : Array FVarId) := (get_uninit_set cond initset).size == 0
+def fully_init (cond : Expr) (initset : Array FVarId) : Bool :=
+  (get_uninit_set cond initset).size == 0
 
 def get_last_uninit (cond: Expr) (initset : Array FVarId): MetaM (Option Nat) := do
   if  ¬ (← isInductiveRelationApplication cond) then throwError "not a inductive cond to get_last_uninit_arg "
@@ -260,7 +271,7 @@ def GenCheckCalls_for_checker (c: InductiveConstructor) : MetaM (Array GenCheckC
   return outarr
 
 def GenCheckCalls_for_producer (ctor : InductiveConstructor) (genpos : Nat) : MetaM (Array GenCheckCall) := do
-  let mut initset ← get_producer_initset ctor genpos
+  let mut initset ← getFVarsInConclusionArgs ctor genpos
   let mut outarr ← GenCheckCalls_for_hypotheses ctor initset
   for hyp in ctor.all_hypotheses do
     initset := Array.appendUniqueElements initset (extractFVars hyp)
