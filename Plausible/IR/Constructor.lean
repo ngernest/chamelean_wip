@@ -47,7 +47,7 @@ def GenCheckCalls_grouping (gccs: Array GenCheckCall) : MetaM GenCheckCall_group
       {
         ifsome_list := ifsome_list.push gcc;
         gen_list := gen_list.push gcc;
-        var_eq := var_eq ++ sp.eqs;
+        var_eq := var_eq ++ sp.variableEqualities;
       }
     | GenCheckCall.ret _ => ret:= ret.push gcc
     | GenCheckCall.check_IR _ => check_IR_list:= check_IR_list.push gcc
@@ -63,8 +63,8 @@ def GenCheckCalls_grouping (gccs: Array GenCheckCall) : MetaM GenCheckCall_group
 
 def get_checker_backtrack_elem_from_constructor (ctor : InductiveConstructor) (inputNames : List String) : MetaM BacktrackElem := do
   --Get the match expr and inp
-  let conclusion ← separate_fvar ctor.conclusion
-  let args := (conclusion.cond.getAppArgs).toList
+  let conclusion ← separateFreeVarsInHypothesis ctor.conclusion
+  let args := (conclusion.newHypothesis.getAppArgs).toList
   let inputNamesAndArgs := inputNames.zip args
   let inputPairsThatNeedMatching := inputNamesAndArgs.filter (fun (_, arg) => !arg.isFVar)
   let (inputsToBeMatched, exprsToBeMatched) := inputPairsThatNeedMatching.unzip
@@ -76,7 +76,7 @@ def get_checker_backtrack_elem_from_constructor (ctor : InductiveConstructor) (i
     inputsToBeMatched := inputsToBeMatched.toArray
     exprsToBeMatched := exprsToBeMatched.toArray
     gcc_group := gcc_group
-    variableEqualities := conclusion.eqs ++ gcc_group.variableEqualities
+    variableEqualities := conclusion.variableEqualities ++ gcc_group.variableEqualities
   }
 
 def add_size_param (cond: Expr) : MetaM String := do
@@ -110,7 +110,7 @@ def GenCheckCalls_toCode (c: GenCheckCall) (monad: String :="IO"): MetaM (String
   | GenCheckCall.check_IR cond => return  "← check_" ++ (← add_size_param cond)
   | GenCheckCall.check_nonIR cond => return  "(" ++ toString (← Meta.ppExpr cond) ++ ")"
   | GenCheckCall.gen_IR id cond pos => gen_IR_at_pos_toCode id cond pos
-  | GenCheckCall.mat id sp => return  "if let " ++ toString (← Meta.ppExpr sp.cond) ++ " := " ++ toString (id.name) ++ " then "
+  | GenCheckCall.mat id sp => return  "if let " ++ toString (← Meta.ppExpr sp.newHypothesis) ++ " := " ++ toString (id.name) ++ " then "
   | GenCheckCall.gen_fvar id ty =>  gen_nonIR_toCode id ty monad
   | GenCheckCall.ret e => return "return " ++ (if monad = "IO" then "" else "some ") ++ toString (← Meta.ppExpr e)
 
@@ -251,8 +251,8 @@ def get_producer_backtrack_elem_from_constructor (ctor: InductiveConstructor) (i
   let tempfvar := Expr.fvar (FVarId.mk temp)
   let conclusion_args :=  ctor.conclusion.getAppArgs.set! genpos tempfvar
   let new_conclusion := mkAppN ctor.conclusion.getAppFn conclusion_args
-  let conclusion ← separate_fvar new_conclusion
-  let args := (conclusion.cond.getAppArgs).toList
+  let conclusion ← separateFreeVarsInHypothesis new_conclusion
+  let args := (conclusion.newHypothesis.getAppArgs).toList
   let inputNamesAndArgs := inputNames.zip args
   -- Take all elements of `inputNamesAndArgs`, but omit the element at the `genpos`-th index
   let inputNamesAndArgs := List.eraseIdx inputNamesAndArgs genpos
@@ -268,7 +268,7 @@ def get_producer_backtrack_elem_from_constructor (ctor: InductiveConstructor) (i
     inputsToBeMatched := inputsToBeMatched.toArray
     exprsToBeMatched := exprsToBeMatched.toArray
     gcc_group := gcc_group
-    variableEqualities := conclusion.eqs ++ gcc_group.variableEqualities
+    variableEqualities := conclusion.variableEqualities ++ gcc_group.variableEqualities
   }
 
 

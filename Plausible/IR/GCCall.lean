@@ -42,12 +42,14 @@ def List.appendUniqueElements [BEq α] (xs : List α) (ys : List α) : List α :
 def Array.appendUniqueElements [BEq α] (xs : Array α) (ys : Array α) : Array α :=
   (List.appendUniqueElements xs.toList ys.toList).toArray
 
-def count_fvars_in (e: Expr) (id: FVarId) : Nat :=
+/-- `numMatchingFVars e id` returns the no. of `FVarId`s in
+     an expression `e` that are equal to `id` -/
+def numMatchingFVars (e : Expr) (id : FVarId) : Nat :=
   match e with
   | Expr.fvar fid => if id == fid then 1 else 0
   | Expr.app f a =>
-    let c1 := count_fvars_in f id
-    let c2 := count_fvars_in a id
+    let c1 := numMatchingFVars f id
+    let c2 := numMatchingFVars a id
     c1 + c2
   | _ => 0
 
@@ -93,41 +95,45 @@ def subst_first_fVar (e: Expr) (old : FVarId) (new : FVarId) : MetaM Expr := do
         return Expr.app f anew
     | _ => return e
 
-structure split_inductive_cond where
-  cond : Expr
-  fvarids : Array FVarId
-  eqs: Array (FVarId × FVarId)
+/-- `DecomposedInductiveHypothesis` represents a hypothesis where the free variables
+     in `fVarId`s have equalities on them as stipulated by the `variableEqualities` field,
+     (which maps old `FVarId`s to new `FVarId`s), and `newHypothesis` is the resultant
+     hypothesis after all the `FVarId`s have been rewritten according to `variableEqualities` -/
+structure DecomposedInductiveHypothesis where
+  newHypothesis : Expr
+  fVarIds : Array FVarId
+  variableEqualities : Array (FVarId × FVarId)
 
 /-- for any Fvar t appear more than 1 time in the expr, keep the first one as t,
     replace the second one with t1, the third one with t2 ....
     record the equations t = t1, t = t2 .... -/
-def separate_fvar (cond: Expr): MetaM split_inductive_cond := do
-  let fvars := extractFVars cond
-  let mut eq_arr: Array (FVarId × FVarId) := #[]
+def separateFreeVarsInHypothesis (hyp : Expr) : MetaM DecomposedInductiveHypothesis := do
+  let fvars := extractFVars hyp
+  let mut equations : Array (FVarId × FVarId) := #[]
   let mut fvarids := fvars
   let temp := Name.mkStr1 "temp000"
   let tempfvarid := FVarId.mk temp
-  let mut new_out := cond
+  let mut newHyp := hyp
   for fv in fvars do
     let mut i := 0
-    let mut currentfv := fv
-    while (count_fvars_in new_out currentfv > 1) do
-      let newname := Name.mkStr1 (fv.name.toString  ++ toString i)
-      let newfvarid := FVarId.mk newname
-      new_out ← subst_first_fVar new_out currentfv tempfvarid
-      new_out := new_out.replaceFVarId currentfv (mkFVar newfvarid)
-      new_out := new_out.replaceFVarId tempfvarid (mkFVar currentfv)
+    let mut currentFV := fv
+    while (numMatchingFVars newHyp currentFV > 1) do
+      let newName := Name.mkNum fv.name i
+      let newFVarId := FVarId.mk newName
+      newHyp ← subst_first_fVar newHyp currentFV tempfvarid
+      newHyp := newHyp.replaceFVarId currentFV (mkFVar newFVarId)
+      newHyp := newHyp.replaceFVarId tempfvarid (mkFVar currentFV)
       i:= i + 1
-      currentfv := newfvarid
-      eq_arr:= eq_arr.push (fv, newfvarid)
-      fvarids := fvarids.push newfvarid
+      currentFV := newFVarId
+      equations := equations.push (fv, newFVarId)
+      fvarids := fvarids.push newFVarId
   return {
-    cond:= new_out
-    fvarids:= fvarids
-    eqs:= eq_arr
+    newHypothesis := newHyp
+    fVarIds:= fvarids
+    variableEqualities:= equations
   }
 
-def separate_fvar_in_cond (cond: Expr) (initset: Array FVarId) (cond_pos: Nat): MetaM split_inductive_cond := do
+def separate_fvar_in_cond (cond: Expr) (initset: Array FVarId) (cond_pos: Nat): MetaM DecomposedInductiveHypothesis := do
   let fvars := extractFVars cond
   let fvars_init := Array.intersect fvars initset
   let mut newcond := cond
@@ -137,11 +143,11 @@ def separate_fvar_in_cond (cond: Expr) (initset: Array FVarId) (cond_pos: Nat): 
     let newfvarid := FVarId.mk newname
     newcond := newcond.replaceFVarId f (mkFVar newfvarid)
     eqs := eqs.push (f,newfvarid)
-  let sep ← separate_fvar newcond
+  let sep ← separateFreeVarsInHypothesis newcond
   let newsep := {
-    cond:= sep.cond
-    fvarids:= fvars_init ++ sep.fvarids
-    eqs := eqs ++ sep.eqs
+    newHypothesis:= sep.newHypothesis
+    fVarIds:= fvars_init ++ sep.fVarIds
+    variableEqualities := eqs ++ sep.variableEqualities
   }
   return newsep
 
@@ -156,7 +162,7 @@ inductive GenCheckCall where
   | check_IR (cond: Expr) : GenCheckCall
   | check_nonIR (cond: Expr) : GenCheckCall
   | gen_IR (id: FVarId) (cond: Expr) (pos: Nat): GenCheckCall
-  | mat (id: FVarId) (sp : split_inductive_cond) : GenCheckCall
+  | mat (id: FVarId) (sp : DecomposedInductiveHypothesis) : GenCheckCall
   | gen_fvar (id: FVarId) (type: Expr) : GenCheckCall
   | ret (e: Expr): GenCheckCall
 
@@ -292,7 +298,7 @@ def GenCheckCalls_toStr (c: GenCheckCall) : MetaM String := do
   | GenCheckCall.check_IR cond => return  "check_IR_" ++ toString (← Meta.ppExpr cond)
   | GenCheckCall.check_nonIR cond => return  "check_nonIR_" ++ toString (← Meta.ppExpr cond)
   | GenCheckCall.gen_IR _ cond pos =>  return  "gen_IR_" ++ toString (← Meta.ppExpr cond) ++ " at "  ++ toString pos
-  | GenCheckCall.mat id sp => return "match " ++ id.name.toString ++ toString (← Meta.ppExpr sp.cond)
+  | GenCheckCall.mat id sp => return "match " ++ id.name.toString ++ toString (← Meta.ppExpr sp.newHypothesis)
   | GenCheckCall.gen_fvar id ty=>  return  "gen_fvar " ++ toString (id.name) ++ ": " ++ toString (← Meta.ppExpr ty)
   | GenCheckCall.ret e =>  return  "ret " ++ toString (← Meta.ppExpr e)
 
@@ -309,7 +315,7 @@ def GenCheckCalls_toRawCode (c: GenCheckCall) : MetaM String := do
   | GenCheckCall.check_IR cond => return  "check_IR (" ++ toString (← Meta.ppExpr cond) ++ ")"
   | GenCheckCall.check_nonIR cond => return  "check (" ++ toString (← Meta.ppExpr cond) ++ ")"
   | GenCheckCall.gen_IR id cond pos => gen_IR_at_pos id cond pos
-  | GenCheckCall.mat id sp => return  "if let " ++ toString (← Meta.ppExpr sp.cond) ++ ":= " ++ toString (id.name) ++ " then "
+  | GenCheckCall.mat id sp => return  "if let " ++ toString (← Meta.ppExpr sp.newHypothesis) ++ ":= " ++ toString (id.name) ++ " then "
   | GenCheckCall.gen_fvar id ty =>  return  "let " ++ toString (id.name) ++ ":= gen_rand " ++ toString (← Meta.ppExpr ty)
   | GenCheckCall.ret e => return "return " ++ toString (← Meta.ppExpr e)
 
