@@ -8,3 +8,8 @@ name = "Test"
 
 [[lean_lib]]
 name = "Plausible"
+
+[[require]]
+name = "aesop"
+git = "https://github.com/leanprover-community/aesop"
+rev = "v4.19.0"
