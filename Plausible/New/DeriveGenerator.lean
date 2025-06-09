@@ -118,9 +118,18 @@ def getGeneratorForTarget (ctorName : Name) (targetIdx : Nat) : MetaM (TSyntax `
   let ctorInfo ← getConstInfo ctorName
   let ctorType := ctorInfo.type
 
-  let (_, _, type_exprs_in_arrow_type) ← decomposeType ctorType
+  let (bound_vars_and_types, _, type_exprs_in_arrow_type) ← decomposeType ctorType
+
+  -- `bound_var_ctx` maps free variables (identified by their `FVarId`) to their types
+  let mut bound_var_ctx := HashMap.emptyWithCapacity
+  for (bound_var, ty) in bound_vars_and_types do
+    let fid := FVarId.mk bound_var
+    bound_var_ctx := bound_var_ctx.insert fid ty
+
   match splitLast? type_exprs_in_arrow_type with
   | some (_hypotheses, conclusion) =>
+    logInfo s!"conclusion = {conclusion}"
+
     -- TOOD: handle the hypotheses for the constructor
 
     -- TODO: handle other arguments in the conclusion (we need to generate them as well)
@@ -139,15 +148,28 @@ def getGeneratorForTarget (ctorName : Name) (targetIdx : Nat) : MetaM (TSyntax `
 
     conclusionArgsFVars := Array.removeAll conclusionArgsFVars targetArgFVars
 
-    let argToGenTerm ← PrettyPrinter.delab targetArg
-    let pureIdent := mkIdent (Name.mkStr1 "pure")
+    let _argToGenTerm ← PrettyPrinter.delab targetArg
+    let _pureIdent := mkIdent (Name.mkStr1 "pure")
 
-    let x := mkFreshAccessibleIdent lctx `x
-    let monadicBind ← `(doSeq|
-      let $x:term ← $interpSampleFn:term $natIdent
-      return $x)
+    -- Note: generatorCalls is empty for some reason
+    let mut generatorCalls := #[]
+    for fvar in conclusionArgsFVars do
+      let ty := bound_var_ctx.get! fvar
+      let tyTerm ← PrettyPrinter.delab ty
+      -- Note: this line complains for the BST example because `lo` is a free variable
+      -- that doesn't appear in the `localContext`
+      let fvarName ← Lean.mkIdent <$> FVarId.getUserName fvar
+      let expr ← `(doSeq| let $fvarName:term ← $interpSampleFn:term $tyTerm)
+      generatorCalls := generatorCalls.push expr
 
-    let generatorBody ← `(fun _ => do $monadicBind)
+    logInfo s!"generatorCalls = {generatorCalls}"
+
+    let generatorCallsArray := TSyntaxArray.mk generatorCalls
+    let doBlockBody ← `(doSeq| $generatorCallsArray* )
+
+    -- TODO: maybe just try to port the `GenCheckCall` stuff?? may be simpler
+
+    let generatorBody ← `(fun _ => do $doBlockBody)
 
     `((1, $thunkGenFn ($generatorBody)))
 

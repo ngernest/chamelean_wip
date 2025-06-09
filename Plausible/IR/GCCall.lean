@@ -148,6 +148,7 @@ def separate_fvar_in_cond (cond: Expr) (initset: Array FVarId) (cond_pos: Nat): 
 
 
 --TO BE IMPLEMENT-- separate function call with constructor
+
 def is_inductive_constructor (e: Expr) : Bool := ¬ e.isFVar
 
 
@@ -349,6 +350,7 @@ def elabGenCall : CommandElab := fun stx => do
       for ctor in relation.constructors do
         IO.println s!"\n---- Hypotheses : {ctor.all_hypotheses}"
         IO.println s!"---- Conclusion : {ctor.conclusion}"
+        IO.println s!"---- Conclusion Args : {ctor.conclusion_args}"
         let producer_genCheckCalls ← GenCheckCalls_for_producer ctor pos
         for genCheckCall in producer_genCheckCalls do
           IO.println (← GenCheckCalls_toRawCode genCheckCall)

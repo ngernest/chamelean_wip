@@ -245,25 +245,28 @@ def elabgetBackTrack : CommandElab := fun stx => do
 -- BACKTRACK PRODUCER ---
 
 
-def get_producer_backtrack_elem_from_constructor (ctor: InductiveConstructor) (inpname: List String) (genpos: Nat)
+def get_producer_backtrack_elem_from_constructor (ctor: InductiveConstructor) (inputNames : List String) (genpos: Nat)
       : MetaM backtrack_elem := do
   let temp := Name.mkStr1 "temp000"
   let tempfvar := Expr.fvar (FVarId.mk temp)
-  let mut conclusion_args :=  ctor.conclusion.getAppArgs.set! genpos tempfvar
+  let conclusion_args :=  ctor.conclusion.getAppArgs.set! genpos tempfvar
   let new_conclusion := mkAppN ctor.conclusion.getAppFn conclusion_args
   let conclusion ← separate_fvar new_conclusion
   let args := (conclusion.cond.getAppArgs).toList
-  let zipinp := inpname.zip args
-  let zipinp := zipinp.take genpos ++ zipinp.drop (genpos + 1)
-  let need_match_zipimp :=  zipinp.filter (fun x => is_inductive_constructor x.2)
-  let (mat_inp, mat_expr) := need_match_zipimp.unzip
+  let inputNamesAndArgs := inputNames.zip args
+  -- Take all elements of `inputNamesAndArgs`, but omit the element at the `genpos`-th index
+  let inputNamesAndArgs := inputNamesAndArgs.take genpos ++ inputNamesAndArgs.drop (genpos + 1)
+  -- Find all pairs where the argument is not a free variable
+  -- (these are the arguments that need matching)
+  let inputPairsThatNeedMatching := inputNamesAndArgs.filter (fun (_, arg) => !arg.isFVar)
+  let (inputsToMatch, exprsToMatch) := inputPairsThatNeedMatching.unzip
   --Get GenCheckCall
   let gccs ← GenCheckCalls_for_producer ctor genpos
   let gcc_group ← GenCheckCalls_grouping gccs
   return {
-    inp := (inpname.take (genpos) ++ inpname.drop (genpos+1)).toArray
-    mat_inp:= mat_inp.toArray
-    mat_expr := mat_expr.toArray
+    inp := (inputNames.take (genpos) ++ inputNames.drop (genpos+1)).toArray
+    mat_inp:= inputsToMatch.toArray
+    mat_expr := exprsToMatch.toArray
     gcc_group := gcc_group
     var_eq := conclusion.eqs ++ gcc_group.var_eq
   }
