@@ -148,28 +148,29 @@ def getGeneratorForTarget (ctorName : Name) (targetIdx : Nat) : MetaM (TSyntax `
 
     conclusionArgsFVars := Array.removeAll conclusionArgsFVars targetArgFVars
 
-    let _argToGenTerm ← PrettyPrinter.delab targetArg
-    let _pureIdent := mkIdent (Name.mkStr1 "pure")
+    -- -- Note: generatorCalls is empty for some reason
+    -- let mut generatorCalls := #[]
+    -- for fvar in conclusionArgsFVars do
+    --   let ty := bound_var_ctx.get! fvar
+    --   let tyTerm ← PrettyPrinter.delab ty
+    --   -- Note: this line complains for the BST example because `lo` is a free variable
+    --   -- that doesn't appear in the `localContext`
+    --   let fvarName ← Lean.mkIdent <$> FVarId.getUserName fvar
+    --   let expr ← `(doSeq| let $fvarName:term ← $interpSampleFn:term $tyTerm)
+    --   generatorCalls := generatorCalls.push expr
 
-    -- Note: generatorCalls is empty for some reason
-    let mut generatorCalls := #[]
-    for fvar in conclusionArgsFVars do
-      let ty := bound_var_ctx.get! fvar
-      let tyTerm ← PrettyPrinter.delab ty
-      -- Note: this line complains for the BST example because `lo` is a free variable
-      -- that doesn't appear in the `localContext`
-      let fvarName ← Lean.mkIdent <$> FVarId.getUserName fvar
-      let expr ← `(doSeq| let $fvarName:term ← $interpSampleFn:term $tyTerm)
-      generatorCalls := generatorCalls.push expr
+    -- logInfo s!"generatorCalls = {generatorCalls}"
 
-    logInfo s!"generatorCalls = {generatorCalls}"
+    -- let generatorCallsArray := TSyntaxArray.mk generatorCalls
+    -- let doBlockBody ← `(doSeq| $generatorCallsArray* )
 
-    let generatorCallsArray := TSyntaxArray.mk generatorCalls
-    let doBlockBody ← `(doSeq| $generatorCallsArray* )
+    -- -- TODO: maybe just try to port the `GenCheckCall` stuff?? may be simpler
 
-    -- TODO: maybe just try to port the `GenCheckCall` stuff?? may be simpler
+    -- let generatorBody ← `(fun _ => do $doBlockBody)
 
-    let generatorBody ← `(fun _ => do $doBlockBody)
+    let argToGenTerm ← PrettyPrinter.delab targetArg
+    let pureIdent := mkIdent (Name.mkStr1 "pure")
+    let generatorBody ← `(fun _ => $pureIdent $argToGenTerm)
 
     `((1, $thunkGenFn ($generatorBody)))
 

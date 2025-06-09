@@ -17,7 +17,7 @@ Constraints for SNat variables.
 `some (.const n)` means the given variable must be equal to constant `n`.
 `some (.param idx)` means the given variable must be equal to another parameter `idx`.
 -/
-inductive ShapeConstrVal (nnat : Nat)
+inductive ShapeConstrVal (nnat : Nat) : Prop where
   | const : Nat → ShapeConstrVal nnat
   | param : Fin nnat → ShapeConstrVal nnat
 
