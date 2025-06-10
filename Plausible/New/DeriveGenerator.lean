@@ -43,6 +43,17 @@ def parseInductiveApp (body : Term) : CommandElabM (Name × TSyntaxArray `term) 
     return (indRel.getId, #[])
   | _ => throwErrorAt body "Expected inductive type application"
 
+/-- Extracts the name of the induction relation and its arguments
+    (variant of `parseInductiveApp` that returns the name of the
+    inductive relation as a `TSyntax `term` instead of a `Name`) -/
+def deconstructInductiveApplication (body : Term) : CommandElabM (TSyntax `term × TSyntaxArray `term) := do
+  match body with
+  | `($indRel:ident $args:term*) =>
+    return (indRel, args)
+  | `($indRel:ident) =>
+    return (indRel, #[])
+  | _ => throwError "Expected inductive type application"
+
 /-- Extracts the name of a parameter from a corresponding `Term`.
     If this is not possible, a fresh user-facing name is produced. -/
 def extractParamName (arg : Term) : MetaM Name :=
@@ -105,10 +116,6 @@ def isConstructorRecursive (inductiveName : Name) (ctorName : Name) : MetaM Bool
         return true
     return false
   | none => throwError "constructors with non-arrow types are not-considered to be recursive"
-
--- def doElemToSeq {m: Type → Type} [Monad m] [MonadRef m] [MonadQuotation m]
---     t : m (TSyntax `doSeqItem) := do
---   `(doSeqItem| $t)
 
 /-- Produces a generator for a constructor identified by its name (`ctorName`),
     where `targetIdx` is the index of the constructor argument whose value we wish to generate -/
@@ -287,23 +294,23 @@ def mkGeneratorFunction (inductiveName : Name) (targetVar : Name) (targetType : 
         $matchExpr
       fun $freshSizeIdent => $auxArbIdent $freshSizeIdent $paramIdents*)
 
+
 ----------------------------------------------------------------------
 -- Command elaborator for producing the Plausible generator
 -----------------------------------------------------------------------
-
 
 syntax (name := derive_generator) "#derive_generator" "(" "fun" "(" ident ":" term ")" "=>" term ")" : command
 
 @[command_elab derive_generator]
 def elabDeriveGenerator : CommandElab := fun stx => do
   match stx with
-  | `(#derive_generator ( fun ( $var:ident : $targetType:term ) => $body:term )) => do
+  | `(#derive_generator ( fun ( $var:ident : $typeSyntax:term ) => $body:term )) => do
     -- Parse the body of the lambda for an application of the inductive relation
     let (inductiveName, args) ← parseInductiveApp body
     let targetVar := var.getId
 
     -- `genFunction` is the syntax for the derived generator function
-    let genFunction ← mkGeneratorFunction inductiveName targetVar targetType args
+    let genFunction ← mkGeneratorFunction inductiveName targetVar typeSyntax args
 
     -- Pretty-print the derived generator
     let genFormat ← liftCoreM (PrettyPrinter.ppCommand genFunction)
@@ -316,5 +323,23 @@ def elabDeriveGenerator : CommandElab := fun stx => do
     logInfo m!"Derived generator:\n{genFormat}"
 
     elabCommand genFunction
+
+  | _ => throwUnsupportedSyntax
+
+@[command_elab derive_generator]
+def elabDeriveGeneratorNew : CommandElab := fun stx => do
+  match stx with
+  | `(#derive_generator ( fun ( $var:ident : $typeSyntax:term ) => $body:term )) => do
+
+    -- Parse the body of the lambda for an application of the inductive relation
+    let (inductiveStx, _args) ← deconstructInductiveApplication body
+
+    -- Elaborate the name of the inductive relation and the type
+    -- of the value to be generated
+    let _inductiveExpr ← liftTermElabM $ elabTerm inductiveStx none
+    let _ty ← liftTermElabM $ elabType typeSyntax
+
+    logInfo m!"hello world!"
+
 
   | _ => throwUnsupportedSyntax

@@ -9,18 +9,7 @@ open OptionTGen
 -- Example usage:
 -- (Note: we require users to explicitly provide a type annotation to the argument to the lambda)
 -- Click on the VS Code sidebar to insert the code of the derived generator into the Lean file
-def gen_balanced (n : Nat) : Nat → OptionT Plausible.Gen Tree :=
-  let rec aux_arb (size : Nat) (n : Nat) : OptionT Plausible.Gen Tree :=
-    match size with
-    | Nat.zero =>
-      OptionTGen.backtrack
-        [(1, OptionTGen.thunkGen (fun _ => pure Tree.Leaf)), (1, OptionTGen.thunkGen (fun _ => pure Tree.Leaf)),
-          (1, OptionTGen.thunkGen (fun _ => OptionT.fail))]
-    | Nat.succ size' =>
-      OptionTGen.backtrack
-        [(1, OptionTGen.thunkGen (fun _ => pure Tree.Leaf)), (1, OptionTGen.thunkGen (fun _ => pure Tree.Leaf)),
-          (1, OptionTGen.thunkGen (fun _ => OptionT.fail))]
-  fun size => aux_arb size n
+#derive_generator (fun (t : Tree) => balanced n t)
 
 -- One can inspect the type of the derived generator like so:
 -- #check gen_balanced
