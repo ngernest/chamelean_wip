@@ -171,22 +171,6 @@ def cbe_gen_block (cbe: BacktrackElem) (monad: String :="IO"): MetaM (String × 
     out := ⟨out.data.dropLast.dropLast⟩
   return (out, iden)
 
-/-- Produces the `if let ...` expressions for a sub-generator based on the info in a `BacktrackElem`
-   - Note: we can get rid of this function
-   - Note: all the if-let statements are grouped together with the `gen`s -/
-def cbe_ifsome_block (cbe: BacktrackElem) (monad: String :="IO"): MetaM (String × String) := do
-  let mut out := ""
-  let iden := if cbe.gcc_group.ifsome_list.size > 0 then "  " else ""
-  let mut is_ident:= false
-  for gcc in cbe.gcc_group.ifsome_list do
-    if is_ident then
-      out := out  ++ iden ++ (← GenCheckCalls_toCode gcc monad) ++ " \n"
-    else
-      out := out  ++ (← GenCheckCalls_toCode gcc monad) ++ " \n"
-      is_ident:= true
-  if cbe.gcc_group.ifsome_list.size > 0 then
-    out := ⟨out.data.dropLast.dropLast⟩
-  return (out, iden)
 
 /-- Produces the assignments of the results of the checker to auxiliary free variables
     ```
@@ -229,17 +213,12 @@ def backtrack_elem_toString_checker (cbe: BacktrackElem) (monad: String :="IO"):
   let mut out := ""
   let matchblock ← cbe_match_block cbe
   let (genblock, iden) ← cbe_gen_block cbe monad
-  --let (ifsomeblock, iden) ← cbe_ifsome_block cbe monad
   let (checkIRblock, vars) ← cbe_gen_check_IR_block cbe iden monad
   let returnblock ← cbe_return_checker cbe iden vars monad
   out := out ++ matchblock
-  --if genblock.length + ifsomeblock.length + checkIRblock.length + returnblock.length > 0 ∧ out.length > 0 then
   if genblock.length > 0 ∧ out.length > 0 then
     out := out ++ "\n"
   out:= out ++ genblock
-  --if ifsomeblock.length > 0 ∧ out.length > 0 then
-  --  out := out ++ "\n"
-  --out:= out ++ ifsomeblock
   if checkIRblock.length > 0 ∧ out.length > 0 then
     out := out ++ "\n"
   out:= out ++ checkIRblock
@@ -338,21 +317,16 @@ def cbe_if_return_producer (cbe: BacktrackElem) (iden: String) (vars: List Strin
     out:= out ++ "\n| " ++ makeUnderscores_commas cbe.inputsToBeMatched.size ++ " => " ++ monad_fail
   return out
 
--- Note: the commented out code can be removed (note that we're no longer using `cbe_ifsome_block`)
 def backtrack_elem_toString_producer (cbe: BacktrackElem) (monad: String :="IO"): MetaM String := do
   let mut out := ""
   let matchblock ← cbe_match_block cbe
   let (genblock, iden) ← cbe_gen_block cbe monad
-  --let (ifsomeblock, iden) ← cbe_ifsome_block cbe monad
   let (checkIRblock, vars) ← cbe_gen_check_IR_block cbe iden monad
   let returnblock ← cbe_if_return_producer cbe iden vars monad
   out := out ++ matchblock
   if genblock.length + checkIRblock.length + returnblock.length > 0  ∧ out.length > 0 then
     out := out ++ "\n"
   out:= out ++ genblock
-  --if ifsomeblock.length > 0 ∧ out.length > 0 then
-  --  out := out ++ "\n"
-  --out:= out ++ ifsomeblock
   if checkIRblock.length > 0 ∧ out.length > 0 then
     out := out ++ "\n"
   out:= out ++ checkIRblock
