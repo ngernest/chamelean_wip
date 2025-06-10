@@ -330,7 +330,6 @@ def GenCheckCalls_toStr (c: GenCheckCall) : MetaM String := do
   | GenCheckCall.genFVar id ty=>  return  "gen_fvar " ++ toString (id.name) ++ ": " ++ toString (← Meta.ppExpr ty)
   | GenCheckCall.ret e =>  return  "ret " ++ toString (← Meta.ppExpr e)
 
-/-- Invoke the -/
 def gen_IR_at_pos (id: FVarId) (cond: Expr) (pos: Nat) : MetaM String := do
   let tt := Lean.mkFVar ⟨Name.mkStr1 "tt"⟩
   let new_args := cond.getAppArgs.set! pos tt

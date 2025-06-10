@@ -38,26 +38,30 @@ def GenCheckCalls_grouping (gccs: Array GenCheckCall) : MetaM GenCheckCall_group
   let mut check_nonIR_list : Array GenCheckCall := #[]
   let mut ifsome_list : Array GenCheckCall := #[]
   let mut ret : Array GenCheckCall := #[]
-  let mut var_eq : Array (FVarId × FVarId) := #[]
+  let mut variableEqualities : Array (FVarId × FVarId) := #[]
   for gcc in gccs do
     match gcc with
-    | GenCheckCall.genFVar _ _ | GenCheckCall.gen_IR _ _ _ => gen_list := gen_list.push gcc
-    | GenCheckCall.matchFVar _ sp =>
-      {
+    | GenCheckCall.genFVar _ _
+    | GenCheckCall.gen_IR _ _ _ =>
+        gen_list := gen_list.push gcc
+    | GenCheckCall.matchFVar _ hyp => {
         ifsome_list := ifsome_list.push gcc;
         gen_list := gen_list.push gcc;
-        var_eq := var_eq ++ sp.variableEqualities;
+        variableEqualities := variableEqualities ++ hyp.variableEqualities;
       }
-    | GenCheckCall.ret _ => ret:= ret.push gcc
-    | GenCheckCall.check_IR _ => check_IR_list:= check_IR_list.push gcc
-    | _ => check_nonIR_list:= check_nonIR_list.push gcc
+    | GenCheckCall.ret _ =>
+        ret := ret.push gcc
+    | GenCheckCall.check_IR _ =>
+        check_IR_list := check_IR_list.push gcc
+    | _ =>
+        check_nonIR_list := check_nonIR_list.push gcc
   return {
     gen_list := gen_list
     check_IR_list := check_IR_list
     check_nonIR_list := check_nonIR_list
     ifsome_list := ifsome_list
-    ret:= ret
-    variableEqualities := var_eq
+    ret := ret
+    variableEqualities := variableEqualities
   }
 
 def get_checker_backtrack_elem_from_constructor (ctor : InductiveConstructor) (inputNames : List String) : MetaM BacktrackElem := do
