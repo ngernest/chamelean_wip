@@ -48,7 +48,7 @@ structure BacktrackElem where
       (used when rewriting free variabels in patterns) -/
   variableEqualities : Array (FVarId × FVarId)
 
-
+/-- Converts an array of `GenCheckCall`s into a `GenCheckCall_group` -/
 def GenCheckCalls_grouping (gccs: Array GenCheckCall) : MetaM GenCheckCall_group := do
   let mut gen_list : Array GenCheckCall := #[]
   let mut check_IR_list : Array GenCheckCall := #[]
@@ -213,6 +213,8 @@ def backtrackElem_return_checker (backtrackElem : BacktrackElem) (indentation : 
     out:= out ++ "\n| " ++ makeUnderscores_commas backtrackElem.inputsToBeMatched.size ++ " => return false"
   return out
 
+/-- Assembles all the components of a sub-checker (a `BacktrackElem`) together, returning a string
+    containing the Lean code for the sub-checker -/
 def backtrack_elem_toString_checker (backtrackElem: BacktrackElem) (monad: String :="IO") : MetaM String := do
   let mut out := ""
   let matchblock ← backtrackElem_match_block backtrackElem
@@ -272,9 +274,8 @@ def elabgetBackTrack : CommandElab := fun stx => do
     and returns a corresponding `BacktrackElem` for a generator -/
 def get_producer_backtrack_elem_from_constructor (ctor: InductiveConstructor) (inputNames : List String) (genpos: Nat)
       : MetaM BacktrackElem := do
-  let temp := Name.mkStr1 "temp000"
-  let tempfvar := Expr.fvar (FVarId.mk temp)
-  let conclusion_args :=  ctor.conclusion.getAppArgs.set! genpos tempfvar
+  let tempFVar := Expr.fvar (FVarId.mk (Name.mkStr1 "temp000"))
+  let conclusion_args := ctor.conclusion.getAppArgs.set! genpos tempFVar
   let new_conclusion := mkAppN ctor.conclusion.getAppFn conclusion_args
   let conclusion ← separateFVars new_conclusion
   let args := (conclusion.newHypothesis.getAppArgs).toList
@@ -322,6 +323,8 @@ def backtrackElem_if_return_producer (backtrackElem : BacktrackElem) (indentatio
     out:= out ++ "\n| " ++ makeUnderscores_commas backtrackElem.inputsToBeMatched.size ++ " => " ++ monad_fail
   return out
 
+/-- Assembles all the components of a sub-generator (a `BacktrackElem`) together, returning a string
+    containing the Lean code for the sub-generator -/
 def backtrack_elem_toString_producer (backtrackElem : BacktrackElem) (monad: String :="IO"): MetaM String := do
   let mut out := ""
   let matchblock ← backtrackElem_match_block backtrackElem
@@ -329,7 +332,7 @@ def backtrack_elem_toString_producer (backtrackElem : BacktrackElem) (monad: Str
   let (checkIRblock, vars) ← backtrackElem_gen_check_IR_block backtrackElem iden monad
   let returnblock ← backtrackElem_if_return_producer backtrackElem iden vars monad
   out := out ++ matchblock
-  if genblock.length + checkIRblock.length + returnblock.length > 0  ∧ out.length > 0 then
+  if genblock.length + checkIRblock.length + returnblock.length > 0 ∧ out.length > 0 then
     out := out ++ "\n"
   out:= out ++ genblock
   if checkIRblock.length > 0 ∧ out.length > 0 then
