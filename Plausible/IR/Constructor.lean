@@ -27,7 +27,6 @@ structure GenCheckCall_group where
   ret_list : Array GenCheckCall
   variableEqualities : Array (FVarId × FVarId)
 
--- Should be called `BacktrackElemInfo`
 -- Contains metadata needed to derive a "backtrack element"
 -- (a sub-generator that is invoked from the main generator function)
 structure BacktrackElem where
@@ -44,6 +43,9 @@ structure BacktrackElem where
   /-- `gcc_group` is used to create the RHS of the first case
       in the pattern match -/
   gcc_group : GenCheckCall_group
+
+  /-- A list of equalities that must hold between free variables
+      (used when rewriting free variabels in patterns) -/
   variableEqualities : Array (FVarId × FVarId)
 
 
@@ -79,6 +81,8 @@ def GenCheckCalls_grouping (gccs: Array GenCheckCall) : MetaM GenCheckCall_group
     variableEqualities := variableEqualities
   }
 
+/-- Takes a constructor for an inductive relation, a list of argument names, the index of the argument we wish to generate (`genpos`),
+    and returns a corresponding `BacktrackElem` for a checker -/
 def get_checker_backtrack_elem_from_constructor (ctor : InductiveConstructor)
   (inputNames : List String) : MetaM BacktrackElem := do
   --Get the match expr and inp
@@ -209,7 +213,7 @@ def backtrackElem_return_checker (backtrackElem : BacktrackElem) (indentation : 
     out:= out ++ "\n| " ++ makeUnderscores_commas backtrackElem.inputsToBeMatched.size ++ " => return false"
   return out
 
-def backtrack_elem_toString_checker (backtrackElem: BacktrackElem) (monad: String :="IO"): MetaM String := do
+def backtrack_elem_toString_checker (backtrackElem: BacktrackElem) (monad: String :="IO") : MetaM String := do
   let mut out := ""
   let matchblock ← backtrackElem_match_block backtrackElem
   let (genblock, iden) ← backtrackElem_gen_block backtrackElem monad
@@ -264,7 +268,8 @@ def elabgetBackTrack : CommandElab := fun stx => do
 
 -- BACKTRACK PRODUCER ---
 
-
+/-- Takes a constructor for an inductive relation, a list of argument names, the index of the argument we wish to generate (`genpos`),
+    and returns a corresponding `BacktrackElem` for a generator -/
 def get_producer_backtrack_elem_from_constructor (ctor: InductiveConstructor) (inputNames : List String) (genpos: Nat)
       : MetaM BacktrackElem := do
   let temp := Name.mkStr1 "temp000"
