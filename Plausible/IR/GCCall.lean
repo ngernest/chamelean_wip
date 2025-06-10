@@ -203,7 +203,10 @@ def getUninitializedFVars (e : Expr) (fvars : Array FVarId) : Array FVarId :=
 def allFVarsInExprInitialized (e : Expr) (fvars : Array FVarId) : Bool :=
   (getUninitializedFVars e fvars).size == 0
 
-def get_last_uninit (hypothesis : Expr) (fvars : Array FVarId) : MetaM (Option Nat) := do
+/-- Retrieves the index of the last argument in the `hypothesis`
+    that contains an uninitialized free variable from the collection `fvars`
+    - Note: this function is currently unused -/
+def getLastUninitializedArgIdx (hypothesis : Expr) (fvars : Array FVarId) : MetaM (Option Nat) := do
   if !(← isInductiveRelationApplication hypothesis) then
     throwError "not a inductive cond to get_last_uninit_arg "
   let args := hypothesis.getAppArgs
@@ -218,32 +221,35 @@ def get_last_uninit (hypothesis : Expr) (fvars : Array FVarId) : MetaM (Option N
   else
     return some pos
 
-def get_last_uninit_arg_and_uninitset
+/-- Returns a triple consisting of:
+    1. The index of the last argument in the `hypothesis` that contains an uninitialized free variable from the collection `fvars`
+    2. A collection of all uninitialized free variables in the `hypothesis`
+    3. The collection of free variables in the argument that have yet to be intiialize -/
+def getLastUninitializedArgAndFVars
   (hypothesis : Expr) (fvars : Array FVarId) : MetaM (Nat × Array FVarId × Array FVarId) := do
   if !(← isInductiveRelationApplication hypothesis) then
     throwError "not a inductive cond to get_last_uninit_arg "
   let args := hypothesis.getAppArgs
   let mut i := 0
-  let mut pos := args.size + 1
-  let mut uninit_arg := args[0]!
-  let mut tobeinit := #[]
+  let mut uninitializedArgIdx := args.size + 1
+  let mut uninitializedArg := args[0]!
+  let mut fVarsToBeInitialized := #[]
   for arg in args do
-    if ¬ allFVarsInExprInitialized arg fvars then
-      {
-        pos := i;
-        uninit_arg := arg;
-        tobeinit := extractFVars arg
-      }
-    i:= i + 1
-  if pos = args.size + 1 then
+    if !allFVarsInExprInitialized arg fvars then {
+      uninitializedArgIdx := i;
+      uninitializedArg := arg;
+      fVarsToBeInitialized := extractFVars arg
+    }
+    i := i + 1
+  if uninitializedArgIdx == args.size + 1 then
     return (args.size + 1, #[], #[])
-  let mut uninitset := #[]
+  let mut uninitializedFVars := #[]
   i := 0
   for arg in args do
-    if i != pos then
-      uninitset := Array.appendUniqueElements uninitset (getUninitializedFVars arg fvars)
-  uninitset := Array.removeAll uninitset tobeinit
-  return (pos, uninitset, tobeinit)
+    if i != uninitializedArgIdx then
+      uninitializedFVars := Array.appendUniqueElements uninitializedFVars (getUninitializedFVars arg fvars)
+  uninitializedFVars := Array.removeAll uninitializedFVars fVarsToBeInitialized
+  return (uninitializedArgIdx, uninitializedFVars, fVarsToBeInitialized)
 
 
 def GenCheckCalls_for_hypotheses (ctor : InductiveConstructor) (fvars : Array FVarId) : MetaM (Array GenCheckCall) := do
@@ -256,7 +262,7 @@ def GenCheckCalls_for_hypotheses (ctor : InductiveConstructor) (fvars : Array FV
       if allFVarsInExprInitialized hyp initializedFVars then
         result := result.push (GenCheckCall.check_IR hyp)
       else
-        let (pos, uninitset, tobeinit) ← get_last_uninit_arg_and_uninitset hyp initializedFVars
+        let (pos, uninitset, tobeinit) ← getLastUninitializedArgAndFVars hyp initializedFVars
         for fid in uninitset do
           let ty := ctor.bound_var_ctx.get! fid
           result := result.push (GenCheckCall.gen_fvar fid ty)
