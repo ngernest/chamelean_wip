@@ -350,6 +350,26 @@ def producer_where_defs (relation: InductiveInfo) (inpname: List String) (genpos
     out_str:= out_str ++ btStr ++ "\n"
   return out_str
 
+/-- Takes an `Expr` representing an inductive relation and a list of names (arguments to the inductive relation),
+    and returns a collection of `BacktrackElem`s for a generator -/
+def get_producer_backtrack_elems (inductiveRelation : Expr) (argNames: List String) (genpos: Nat) : MetaM (Array BacktrackElem) := do
+  let inductiveInfo ← getInductiveInfoWithArgs inductiveRelation argNames
+  let mut output := #[]
+  for ctor in inductiveInfo.constructors do
+    let backtrackElem ← get_producer_backtrack_elem_from_constructor ctor argNames genpos
+    output := output.push backtrackElem
+  return output
+
+/-- Takes an `Expr` representing an inductive relation and a list of names (arguments to the inductive relation),
+    and returns a collection of `BacktrackElem`s for a cecker -/
+def get_checker_backtrack_elems (inductiveRelation: Expr) (argNames : List String) : MetaM (Array BacktrackElem) := do
+  let inductiveInfo ← getInductiveInfoWithArgs inductiveRelation argNames
+  let mut output := #[]
+  for ctor in inductiveInfo.constructors do
+    let backtrackElem ← get_checker_backtrack_elem_from_constructor ctor argNames
+    output := output.push backtrackElem
+  return output
+
 
 syntax (name := getBackTrackProducer) "#get_backtrack_producer" term "with_name" term "for_arg" num: command
 
