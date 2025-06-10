@@ -387,5 +387,15 @@ def parseCommands (inputs : Array String) : CommandElabM Unit := do
       --runFrontend (processCommand stx) {} {} -- Executes the parsed command
     | Except.error err => IO.println s!"Parse error: {err}"
 
+/-- Converts an array of syntactic terms to an array of exprs that are all
+    `Expr`s created using the `Expr.fvar` constructor -/
+def termsToFVarExprs (terms : Array (TSyntax `term)) : Array Expr :=
+  Array.map (fun term =>
+    let name :=
+      match term with
+      | `($id:ident) => id.getId.toString
+      | _ => toString term
+    Expr.fvar (FVarId.mk (Name.mkStr1 name))) terms
+
 
 end Plausible.IR

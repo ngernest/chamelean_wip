@@ -335,8 +335,6 @@ def elabDeriveGeneratorNew : CommandElab := fun stx => do
     -- Parse the body of the lambda for an application of the inductive relation
     let (inductiveStx, args) ← deconstructInductiveApplication body
 
-    let args' ← liftTermElabM $ Array.mapM (fun arg => elabTerm arg none) args
-
     -- Elaborate the name of the inductive relation and the type
     -- of the value to be generated
     let inductiveExpr ← liftTermElabM $ elabTerm inductiveStx none

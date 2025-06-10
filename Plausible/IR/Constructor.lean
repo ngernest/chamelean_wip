@@ -84,10 +84,10 @@ def GenCheckCalls_grouping (gccs: Array GenCheckCall) : MetaM GenCheckCall_group
 /-- Takes a constructor for an inductive relation, a list of argument names, the index of the argument we wish to generate (`genpos`),
     and returns a corresponding `BacktrackElem` for a checker -/
 def get_checker_backtrack_elem_from_constructor (ctor : InductiveConstructor)
-  (inputNames : Array (TSyntax `term)) : MetaM BacktrackElem := do
+  (inputNames : Array String) : MetaM BacktrackElem := do
   --Get the match expr and inp
   let conclusion ← separateFVars ctor.conclusion
-  let args := (conclusion.newHypothesis.getAppArgs).toList
+  let args := (conclusion.newHypothesis.getAppArgs)
   let inputNamesAndArgs := inputNames.zip args
   let inputPairsThatNeedMatching := inputNamesAndArgs.filter (fun (_, arg) => !arg.isFVar)
   let (inputsToBeMatched, exprsToBeMatched) := inputPairsThatNeedMatching.unzip
@@ -95,9 +95,9 @@ def get_checker_backtrack_elem_from_constructor (ctor : InductiveConstructor)
   let gccs ← GenCheckCalls_for_checker ctor
   let gcc_group ← GenCheckCalls_grouping gccs
   return {
-    inputs := inputNames.toArray
-    inputsToBeMatched := inputsToBeMatched.toArray
-    exprsToBeMatched := exprsToBeMatched.toArray
+    inputs := inputNames
+    inputsToBeMatched := inputsToBeMatched
+    exprsToBeMatched := exprsToBeMatched
     gcc_group := gcc_group
     variableEqualities := conclusion.variableEqualities ++ gcc_group.variableEqualities
   }
@@ -243,7 +243,7 @@ def checker_where_defs (relation: InductiveInfo) (inpname: List String) (monad: 
     out_str:= out_str ++ "\n-- Constructor: " ++ toString conprops_str
     out_str:= out_str ++ " → " ++ toString (← Meta.ppExpr con.conclusion) ++ "\n"
     out_str:= out_str ++ (← prototype_for_checker_by_con relation inpname i monad) ++ ":= do \n"
-    let bt ← get_checker_backtrack_elem_from_constructor con inpname
+    let bt ← get_checker_backtrack_elem_from_constructor con inpname.toArray
     let btStr ← backtrack_elem_toString_checker bt monad
     out_str:= out_str ++ btStr ++ "\n"
   return out_str
@@ -272,16 +272,17 @@ def elabgetBackTrack : CommandElab := fun stx => do
 
 /-- Takes a constructor for an inductive relation, a list of argument names, the index of the argument we wish to generate (`genpos`),
     and returns a corresponding `BacktrackElem` for a generator -/
-def get_producer_backtrack_elem_from_constructor (ctor: InductiveConstructor) (inputNames : List String) (genpos: Nat)
+def get_producer_backtrack_elem_from_constructor (ctor: InductiveConstructor) (inputNames : Array String) (genpos: Nat)
       : MetaM BacktrackElem := do
+  let inputNamesList := inputNames.toList
   let tempFVar := Expr.fvar (FVarId.mk (Name.mkStr1 "temp000"))
   let conclusion_args := ctor.conclusion.getAppArgs.set! genpos tempFVar
   let new_conclusion := mkAppN ctor.conclusion.getAppFn conclusion_args
   let conclusion ← separateFVars new_conclusion
-  let args := (conclusion.newHypothesis.getAppArgs).toList
-  let inputNamesAndArgs := inputNames.zip args
+  let args := conclusion.newHypothesis.getAppArgs.toList
+  let zippedInputsAndArgs := List.zip inputNamesList args
   -- Take all elements of `inputNamesAndArgs`, but omit the element at the `genpos`-th index
-  let inputNamesAndArgs := List.eraseIdx inputNamesAndArgs genpos
+  let inputNamesAndArgs := List.eraseIdx zippedInputsAndArgs genpos
   -- Find all pairs where the argument is not a free variable
   -- (these are the arguments that need matching)
   let inputPairsThatNeedMatching := inputNamesAndArgs.filter (fun (_, arg) => !arg.isFVar)
@@ -290,7 +291,7 @@ def get_producer_backtrack_elem_from_constructor (ctor: InductiveConstructor) (i
   let gccs ← GenCheckCalls_for_producer ctor genpos
   let gcc_group ← GenCheckCalls_grouping gccs
   return {
-    inputs := (List.eraseIdx inputNames genpos).toArray
+    inputs := (List.eraseIdx inputNamesList genpos).toArray
     inputsToBeMatched := inputsToBeMatched.toArray
     exprsToBeMatched := exprsToBeMatched.toArray
     gcc_group := gcc_group
@@ -353,14 +354,14 @@ def producer_where_defs (relation: InductiveInfo) (inpname: List String) (genpos
     out_str:= out_str ++ "\n-- Constructor: " ++ toString conprops_str
     out_str:= out_str ++ " → " ++ toString (← Meta.ppExpr ctor.conclusion) ++ "\n"
     out_str:= out_str ++ (← prototype_for_producer_by_con relation inpname genpos i monad) ++ ":= do\n"
-    let bt ← get_producer_backtrack_elem_from_constructor ctor inpname genpos
+    let bt ← get_producer_backtrack_elem_from_constructor ctor inpname.toArray genpos
     let btStr ← backtrack_elem_toString_producer bt monad
     out_str:= out_str ++ btStr ++ "\n"
   return out_str
 
 /-- Takes an `Expr` representing an inductive relation and a list of names (arguments to the inductive relation),
     and returns a collection of `BacktrackElem`s for a generator -/
-def get_producer_backtrack_elems (inductiveRelation : Expr) (argNames : Array (TSyntax `term)) (genpos: Nat) : MetaM (Array BacktrackElem) := do
+def get_producer_backtrack_elems (inductiveRelation : Expr) (argNames : Array String) (genpos: Nat) : MetaM (Array BacktrackElem) := do
   let inductiveInfo ← getInductiveInfoWithArgs inductiveRelation argNames
   let mut output := #[]
   for ctor in inductiveInfo.constructors do
@@ -370,7 +371,7 @@ def get_producer_backtrack_elems (inductiveRelation : Expr) (argNames : Array (T
 
 /-- Takes an `Expr` representing an inductive relation and a list of names (arguments to the inductive relation),
     and returns a collection of `BacktrackElem`s for a cecker -/
-def get_checker_backtrack_elems (inductiveRelation : Expr) (argNames : Array (TSyntax `term)) : MetaM (Array BacktrackElem) := do
+def get_checker_backtrack_elems (inductiveRelation : Expr) (argNames : Array String) : MetaM (Array BacktrackElem) := do
   let inductiveInfo ← getInductiveInfoWithArgs inductiveRelation argNames
   let mut output := #[]
   for ctor in inductiveInfo.constructors do

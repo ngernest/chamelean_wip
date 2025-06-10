@@ -171,21 +171,20 @@ def isDependency (e : Expr) (current_namespace : Name) : MetaM Bool := do
     return true
   return false
 
-
 /-- Takes each argument in `input_args` and produces a corresponding `FVarId`,
     replacing the `i`-th argument in `conclusion` (if it is an application)
     with the `FVarId` corresponding to the `i`-th `input_arg` -/
-def extract_fvars (conclusion : Expr) (input_args : Array (TSyntax `term)) : MetaM (List (FVarId × Expr)) := do
-  let fvar_ids := Array.map (FVarId.mk ∘ Name.mkStr1) input_args
-  let new_input_args := fvar_ids.map Expr.fvar
-  let conclusion_args_and_new_inputs := List.zip (conclusion.getAppArgs.toList) new_input_args
-  pure $ List.filterMap (fun (conclusion_arg, new_expr) =>
-    if conclusion_arg.isFVar then some (conclusion_arg.fvarId!, new_expr)
+def replaceFVarsInConclusion (conclusion : Expr) (inputArgs : Array String) : MetaM (Array (FVarId × Expr)) := do
+  let new_input_args := Array.map (Expr.fvar ∘ FVarId.mk ∘ Name.mkStr1) inputArgs
+  let conclusion_args_and_new_inputs := Array.zip (conclusion.getAppArgs) new_input_args
+  pure $ Array.filterMap (fun (conclusion_arg, new_expr) =>
+    if conclusion_arg.isFVar then
+      some (conclusion_arg.fvarId!, new_expr)
     else none) conclusion_args_and_new_inputs
 
 /-- Replaces all occurrences of `FVarId`s in `e` using the association list `fvar_ids`, which
     maps each `FVarId` to an `expr` -/
-def replace_fvars_in_expr (e : Expr) (fvar_ids : List (FVarId × Expr)) : MetaM Expr := do
+def replace_fvars_in_expr (e : Expr) (fvar_ids : Array (FVarId × Expr)) : MetaM Expr := do
   let mut newcond := e
   for (fvar_id, expr) in fvar_ids do
     newcond := newcond.replaceFVarId fvar_id expr
@@ -193,19 +192,19 @@ def replace_fvars_in_expr (e : Expr) (fvar_ids : List (FVarId × Expr)) : MetaM 
 
 /-- For each `e` in `exprs_arr`, this function replaces all occurrences of `FVarId`s in `e`
     using the association list `fvar_ids`, which maps each `FVarId` to an `expr` -/
-def replace_fvars_in_exprs (exprs_arr : Array Expr) (fvar_ids: List (FVarId × Expr)) : MetaM (Array Expr) :=
+def replace_fvars_in_exprs (exprs_arr : Array Expr) (fvar_ids: Array (FVarId × Expr)) : MetaM (Array Expr) :=
   Array.mapM (fun x => replace_fvars_in_expr x fvar_ids) exprs_arr
 
 /-- Unifies each argument in `arg_names` with each variable in the `conclusion`, returning
     the updated `hypotheses`, `conclusion` and `bound_var_ctx`. If `arg_names` is empty,
     this function just returns `hypotheses`, `conclusion` & `bound_var_ctx` as is. -/
-def unify_args_with_conclusion (hypotheses : Array Expr) (conclusion : Expr) (arg_names : Array (TSyntax `term))
+def unify_args_with_conclusion (hypotheses : Array Expr) (conclusion : Expr) (arg_names : Array String)
   (bound_var_ctx : HashMap FVarId Expr) : MetaM (Array Expr × Expr × HashMap FVarId Expr) := do
   if Array.isEmpty arg_names then
     return (hypotheses, conclusion, bound_var_ctx)
   else
     let mut new_ctx := bound_var_ctx
-    let fvar_ids ← extract_fvars conclusion arg_names
+    let fvar_ids ← replaceFVarsInConclusion conclusion arg_names
     for (fvar_id, expr) in fvar_ids do
       let fvar := expr.fvarId!
       let fvar_type := bound_var_ctx[fvar_id]!
@@ -220,7 +219,7 @@ def unify_args_with_conclusion (hypotheses : Array Expr) (conclusion : Expr) (ar
     During this process, the names of input arguments (`arg_names`) are unified with variables in the
     conclusion of the constructor. -/
 def process_constructor_unify_args (ctor_type: Expr) (input_vars : Array Expr) (input_types : Array Expr)
-  (inductive_relation_name: Name) (arg_names : Array (TSyntax `term)) : MetaM InductiveConstructor := do
+  (inductive_relation_name: Name) (arg_names : Array String) : MetaM InductiveConstructor := do
   let (bound_vars_and_types, _ , components_of_arrow_type) ← decomposeType ctor_type
 
   -- `bound_var_ctx` maps free variables (identified by their `FVarId`) to their types
@@ -292,7 +291,7 @@ def process_constructor_unify_args (ctor_type: Expr) (input_vars : Array Expr) (
     and builds an `IRConstructor` containing metadata for the constructor -/
 def process_constructor (ctor_type : Expr) (input_vars: Array Expr) (input_types : Array Expr)
   (inductive_relation_name : Name) : MetaM InductiveConstructor :=
-  process_constructor_unify_args ctor_type input_vars input_types inductive_relation_name []
+  process_constructor_unify_args ctor_type input_vars input_types inductive_relation_name #[]
 
 
 def arrayppExpr (a: Array Expr) : MetaM (Array Format) := do
@@ -338,7 +337,7 @@ def mkArrayFreshVar (input_types : Array Expr) : MetaM (Array Expr) := do
 /-- Takes in an expression of the form `R e1 ... en`, where `R` is an inductive relation
     with arguments specified by `argNames`, and extracts metadata corresponding to the `inductive`,
     returning an `InductiveInfo` -/
-def getInductiveInfoWithArgs (inputExpr : Expr) (argNames : Array (TSyntax `term)) : MetaM InductiveInfo := do
+def getInductiveInfoWithArgs (inputExpr : Expr) (argNames : Array String) : MetaM InductiveInfo := do
   match inputExpr.getAppFn.constName? with
   | some inductive_name => do
     let type ← inferType inputExpr
@@ -403,7 +402,7 @@ def getInductiveInfoWithArgs (inputExpr : Expr) (argNames : Array (TSyntax `term
 /-- Takes in an inductive relation and extracts metadata corresponding to the `inductive`,
     returning an `IR_info` -/
 def getInductiveInfo (input_expr : Expr) : MetaM InductiveInfo :=
-  getInductiveInfoWithArgs input_expr []
+  getInductiveInfoWithArgs input_expr #[]
 
 
 def print_constructors (ctors : Array InductiveConstructor) : MetaM Unit := do
