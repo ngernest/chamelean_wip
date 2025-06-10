@@ -397,5 +397,11 @@ def termsToFVarExprs (terms : Array (TSyntax `term)) : Array Expr :=
       | _ => toString term
     Expr.fvar (FVarId.mk (Name.mkStr1 name))) terms
 
+/-- Converts an array of syntactic terms to an array of strings -/
+def termsToStrings (terms : Array (TSyntax `term)) : Array String :=
+  Array.map (fun term =>
+      match term with
+      | `($id:ident) => id.getId.toString
+      | _ => toString term) terms
 
 end Plausible.IR

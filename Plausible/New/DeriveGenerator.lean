@@ -2,6 +2,7 @@ import Lean
 import Std
 import Plausible.New.GenOption
 import Plausible.IR.Prelude
+import Plausible.IR.Constructor
 import Plausible.IR.GCCall
 import Plausible.Gen
 import Plausible.New.OptionTGen
@@ -121,7 +122,7 @@ def isConstructorRecursive (inductiveName : Name) (ctorName : Name) : MetaM Bool
 /-- Produces a generator for a constructor identified by its name (`ctorName`),
     where `targetIdx` is the index of the constructor argument whose value we wish to generate -/
 def getGeneratorForTarget (ctorName : Name) (targetIdx : Nat) : MetaM (TSyntax `term) := do
-  let lctx ← getLCtx
+  let _lctx ← getLCtx
 
   let ctorInfo ← getConstInfo ctorName
   let ctorType := ctorInfo.type
@@ -146,15 +147,15 @@ def getGeneratorForTarget (ctorName : Name) (targetIdx : Nat) : MetaM (TSyntax `
     -- Find the argument (an `Expr`) corresponding to the value we wish to generate,
     -- then delaborate it to a `Term`
     let conclusionArgs := conclusion.getAppArgs
-    let mut conclusionArgsFVars := #[]
+    let mut _conclusionArgsFVars := #[]
     for arg in conclusionArgs do
       let argFVars ← extractFVarsMetaM arg
-      conclusionArgsFVars := Array.appendUniqueElements conclusionArgsFVars argFVars
+      _conclusionArgsFVars := Array.appendUniqueElements _conclusionArgsFVars argFVars
 
     let targetArg := conclusionArgs[targetIdx]!
     let targetArgFVars ← extractFVarsMetaM targetArg
 
-    conclusionArgsFVars := Array.removeAll conclusionArgsFVars targetArgFVars
+    _conclusionArgsFVars := Array.removeAll _conclusionArgsFVars targetArgFVars
 
     -- -- Note: generatorCalls is empty for some reason
     -- let mut generatorCalls := #[]
@@ -182,8 +183,6 @@ def getGeneratorForTarget (ctorName : Name) (targetIdx : Nat) : MetaM (TSyntax `
 
     `((1, $thunkGenFn ($generatorBody)))
 
-
-
   | none => throwError s!"Constructor {ctorName} has type {ctorType} which can't be decomposed"
 
 /-- Produces the names of all non-recursive constructors of an inductive relation.
@@ -203,11 +202,17 @@ def findNonRecursiveConstructors (inductiveName : Name) : MetaM (Array Name) := 
 
   return nonRecursive
 
+/-- Finds the index of the argument in the inductive application for the value we wish to generate
+    (i.e. finds `i` s.t. `args[i] == targetVar`) -/
+def findTargetVarIndex (targetVar : Name) (args : TSyntaxArray `term) : Option Nat :=
+  Array.findIdx? (fun arg => arg.getId == targetVar) (TSyntaxArray.raw args)
+
+
 /-- Produces the actual generator function.
     - `inductiveName` is the name of the inductive relation
     - `targetVar`, `targetType`: the variable name and type of the value to be generated
     - `args`: the other arguments to the inductive relation -/
-def mkGeneratorFunction (inductiveName : Name) (targetVar : Name) (targetType : TSyntax `term)
+def mkGeneratorFunction (inductiveName : Name) (targetVar : Name) (targetTypeSyntax : TSyntax `term)
   (args : TSyntaxArray `term) : CommandElabM (TSyntax `command) := do
 
   -- Fetch the ambient local context, which we need to generate user-facing fresh names
@@ -220,7 +225,7 @@ def mkGeneratorFunction (inductiveName : Name) (targetVar : Name) (targetType : 
 
   -- Find the index of the argument in the inductive application for the value we wish to generate
   -- (i.e. find `i` s.t. `args[i] == targetVar`)
-  let targetIdxOpt := Array.findIdx? (fun arg => arg.getId == targetVar) (TSyntaxArray.raw args)
+  let targetIdxOpt := findTargetVarIndex targetVar args
   if let .none := targetIdxOpt then
     throwError "cannot find index of value to be generated"
   let targetIdx := Option.get! targetIdxOpt
@@ -287,13 +292,15 @@ def mkGeneratorFunction (inductiveName : Name) (targetVar : Name) (targetType : 
   -- at the end of the generator function
   let freshSizeIdent := mkFreshAccessibleIdent localCtx `size
   let auxArbIdent := mkFreshAccessibleIdent localCtx `aux_arb
-  let generatorType ← `($optionTIdent $genIdent $targetType)
+  let generatorType ← `($optionTIdent $genIdent $targetTypeSyntax)
 
   -- Produce the definition for the generator function
   `(def $genFunName $topLevelParams* : $natIdent → $generatorType :=
       let rec $auxArbIdent:ident $innerParams* : $generatorType :=
         $matchExpr
       fun $freshSizeIdent => $auxArbIdent $freshSizeIdent $paramIdents*)
+
+
 
 
 ----------------------------------------------------------------------
@@ -334,15 +341,25 @@ def elabDeriveGeneratorNew : CommandElab := fun stx => do
 
     -- Parse the body of the lambda for an application of the inductive relation
     let (inductiveStx, args) ← deconstructInductiveApplication body
+    let targetVar := var.getId
 
     -- Elaborate the name of the inductive relation and the type
     -- of the value to be generated
     let inductiveExpr ← liftTermElabM $ elabTerm inductiveStx none
-    let ty ← liftTermElabM $ elabType typeSyntax
+    let _targetType ← liftTermElabM $ elabType typeSyntax
 
-    -- TODO: figure out how to call `get_producer_backtrack_elems` and figure out whta to do
-    -- with the array of `BacktrackElem`s that are returned
-    -- let backtrackElems ← get_producer_backtrack_elems inductiveExpr
+    -- Find the index of the argument in the inductive application for the value we wish to generate
+    -- (i.e. find `i` s.t. `args[i] == targetVar`)
+    let targetIdxOpt := findTargetVarIndex targetVar args
+    if let .none := targetIdxOpt then
+      throwError "cannot find index of value to be generated"
+    let targetIdx := Option.get! targetIdxOpt
+
+    -- Call helper function that produces Thanh's `BacktrackElem` data structure
+    let argNameStrings := termsToStrings args
+    let _backtrackElems ← liftTermElabM $
+      get_producer_backtrack_elems inductiveExpr argNameStrings targetIdx
+
 
     logInfo m!"hello world!"
 
