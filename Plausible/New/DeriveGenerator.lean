@@ -45,8 +45,9 @@ def parseInductiveApp (body : Term) : CommandElabM (Name × TSyntaxArray `term) 
 
 /-- Extracts the name of the induction relation and its arguments
     (variant of `parseInductiveApp` that returns the name of the
-    inductive relation as a `TSyntax `term` instead of a `Name`) -/
-def deconstructInductiveApplication (body : Term) : CommandElabM (TSyntax `term × TSyntaxArray `term) := do
+    inductive relation as a `TSyntax term` instead of a `Name`,
+    and the arguments to the `inductive` as an `Array` of `TSyntax term`s ) -/
+def deconstructInductiveApplication (body : Term) : CommandElabM (TSyntax `term × Array (TSyntax `term)) := do
   match body with
   | `($indRel:ident $args:term*) =>
     return (indRel, args)
@@ -332,12 +333,18 @@ def elabDeriveGeneratorNew : CommandElab := fun stx => do
   | `(#derive_generator ( fun ( $var:ident : $typeSyntax:term ) => $body:term )) => do
 
     -- Parse the body of the lambda for an application of the inductive relation
-    let (inductiveStx, _args) ← deconstructInductiveApplication body
+    let (inductiveStx, args) ← deconstructInductiveApplication body
+
+    let args' ← liftTermElabM $ Array.mapM (fun arg => elabTerm arg none) args
 
     -- Elaborate the name of the inductive relation and the type
     -- of the value to be generated
-    let _inductiveExpr ← liftTermElabM $ elabTerm inductiveStx none
-    let _ty ← liftTermElabM $ elabType typeSyntax
+    let inductiveExpr ← liftTermElabM $ elabTerm inductiveStx none
+    let ty ← liftTermElabM $ elabType typeSyntax
+
+    -- TODO: figure out how to call `get_producer_backtrack_elems` and figure out whta to do
+    -- with the array of `BacktrackElem`s that are returned
+    -- let backtrackElems ← get_producer_backtrack_elems inductiveExpr
 
     logInfo m!"hello world!"
 

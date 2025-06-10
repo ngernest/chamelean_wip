@@ -141,7 +141,7 @@ def IO_to_option (io : IO α) : IO (Option α) := do
 
 def uniform_backtracking_IO {α : Type } (a : Array α) : IO α := do
   -- Using monadLift to lift the random number generation from IO to MetaM
-  let idx ← monadLift <| IO.rand 0 (a.size - 1)
+  let idx ← monadLift $ IO.rand 0 (a.size - 1)
   let mem ←  option_to_IO (a[idx]?)
   return mem
 

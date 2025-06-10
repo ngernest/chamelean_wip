@@ -57,12 +57,6 @@ def printExpr_of_Name (name : Name) : MetaM Format := do
   let m ← Meta.ppExpr e
   return m
 
-def option_to_MetaM {α : Type} (o : Option α) (errorMsg : String := "Option is none") : MetaM α :=
-  match o with
-  | some a => return a
-  | none => throwError errorMsg
-
-
 def option_to_IO {α : Type} (o : Option α) (errorMsg : String := "Option is none") : IO α :=
   match o with
   | some a => return a
@@ -315,15 +309,7 @@ def is_ProdM (type: MetaM Expr) : MetaM Bool := do
   if ← isDefEq f p then return true
   return false
 
-def getType (e: Expr) : MetaM Expr := do
-  let f ← inferType e
-  return f
-
-def getTypeM (e: MetaM Expr) : MetaM Expr := do
-  let f ← inferType (← e)
-  return f
-
-
+/-- Converts a Lean list of terms into a list of strings -/
 def termToStringList (stx : TSyntax `term) : TermElabM (List String) := do
   match stx with
   | `([$xs,*]) =>
@@ -334,7 +320,7 @@ def termToStringList (stx : TSyntax `term) : TermElabM (List String) := do
       | `($x:str) => result := result.append [x.getString]
       | _ => throwError s!"Expected string literal, got {x}"
     return result
-  | _ => throwError "Expected list of strings"
+  | _ => throwError "Expected list of terms"
 
 
 def makeUnderscores (n : Nat) : String :=

@@ -3,6 +3,7 @@ import Std
 import Plausible.IR.Example
 import Plausible.IR.Prelude
 import Lean.Elab.Deriving.DecEq
+import Batteries.Data.List.Basic
 open Lean.Elab.Deriving.DecEq
 open List Nat Array String
 open Lean Elab Command Meta Term
@@ -13,6 +14,12 @@ open Std
 
 
 namespace Plausible.IR
+
+def Array.traverse [Monad M] (f : α → M β) (arr : Array α) : M (Array β) :=
+  Array.mapM f arr
+
+
+
 
 /- CODE -/
 
@@ -164,11 +171,12 @@ def isDependency (e : Expr) (current_namespace : Name) : MetaM Bool := do
     return true
   return false
 
+
 /-- Takes each argument in `input_args` and produces a corresponding `FVarId`,
     replacing the `i`-th argument in `conclusion` (if it is an application)
     with the `FVarId` corresponding to the `i`-th `input_arg` -/
-def extract_fvars (conclusion : Expr) (input_args : List String) : MetaM (List (FVarId × Expr)) := do
-  let fvar_ids := input_args.map (FVarId.mk ∘ Name.mkStr1)
+def extract_fvars (conclusion : Expr) (input_args : Array (TSyntax `term)) : MetaM (List (FVarId × Expr)) := do
+  let fvar_ids := Array.map (FVarId.mk ∘ Name.mkStr1) input_args
   let new_input_args := fvar_ids.map Expr.fvar
   let conclusion_args_and_new_inputs := List.zip (conclusion.getAppArgs.toList) new_input_args
   pure $ List.filterMap (fun (conclusion_arg, new_expr) =>
@@ -191,9 +199,9 @@ def replace_fvars_in_exprs (exprs_arr : Array Expr) (fvar_ids: List (FVarId × E
 /-- Unifies each argument in `arg_names` with each variable in the `conclusion`, returning
     the updated `hypotheses`, `conclusion` and `bound_var_ctx`. If `arg_names` is empty,
     this function just returns `hypotheses`, `conclusion` & `bound_var_ctx` as is. -/
-def unify_args_with_conclusion (hypotheses : Array Expr) (conclusion : Expr) (arg_names : List String)
+def unify_args_with_conclusion (hypotheses : Array Expr) (conclusion : Expr) (arg_names : Array (TSyntax `term))
   (bound_var_ctx : HashMap FVarId Expr) : MetaM (Array Expr × Expr × HashMap FVarId Expr) := do
-  if List.isEmpty arg_names then
+  if Array.isEmpty arg_names then
     return (hypotheses, conclusion, bound_var_ctx)
   else
     let mut new_ctx := bound_var_ctx
@@ -212,7 +220,7 @@ def unify_args_with_conclusion (hypotheses : Array Expr) (conclusion : Expr) (ar
     During this process, the names of input arguments (`arg_names`) are unified with variables in the
     conclusion of the constructor. -/
 def process_constructor_unify_args (ctor_type: Expr) (input_vars : Array Expr) (input_types : Array Expr)
-  (inductive_relation_name: Name) (arg_names : List String) : MetaM InductiveConstructor := do
+  (inductive_relation_name: Name) (arg_names : Array (TSyntax `term)) : MetaM InductiveConstructor := do
   let (bound_vars_and_types, _ , components_of_arrow_type) ← decomposeType ctor_type
 
   -- `bound_var_ctx` maps free variables (identified by their `FVarId`) to their types
@@ -239,7 +247,8 @@ def process_constructor_unify_args (ctor_type: Expr) (input_vars : Array Expr) (
     let mut dependencies := #[]
 
     let conclusion_args := conclusion.getAppArgs
-    let final_arg_in_conclusion ← option_to_MetaM conclusion_args.toList.getLast?
+    let final_arg_in_conclusion ← Option.getDM (conclusion_args.toList.getLast?)
+      (throwError "conclusion_args is an unexpected empty list")
 
     for hyp in hypotheses do
       if ← isDependency hyp.getAppFn inductive_relation_name.getRoot then
@@ -327,12 +336,12 @@ def mkArrayFreshVar (input_types : Array Expr) : MetaM (Array Expr) := do
   return vars
 
 /-- Takes in an expression of the form `R e1 ... en`, where `R` is an inductive relation
-    with arguments specified by `arg_names`, and extracts metadata corresponding to the `inductive`,
+    with arguments specified by `argNames`, and extracts metadata corresponding to the `inductive`,
     returning an `InductiveInfo` -/
-def getInductiveInfoWithArgs (input_expr : Expr) (arg_names : List String) : MetaM InductiveInfo := do
-  match input_expr.getAppFn.constName? with
+def getInductiveInfoWithArgs (inputExpr : Expr) (argNames : Array (TSyntax `term)) : MetaM InductiveInfo := do
+  match inputExpr.getAppFn.constName? with
   | some inductive_name => do
-    let type ← inferType input_expr
+    let type ← inferType inputExpr
     let tyexprs_in_arrow_type ← getComponentsOfArrowType type
 
     -- `input_types` contains all elements of `tyexprs_in_arrow_type` except the conclusion (which is `Prop`)
@@ -343,7 +352,7 @@ def getInductiveInfoWithArgs (input_expr : Expr) (arg_names : List String) : Met
     let input_vars_names := input_vars.map Expr.name?
 
     -- `output_type` is the last element (type expression) in the array `input_types`
-    let output_type ← option_to_MetaM (input_types.back?)
+    let output_type ← Option.getDM (input_types.back?) (throwError "unexpected empty input type")
     let output_var ← mkFreshExprMVar output_type (userName := `out)
     let output_var_name := Expr.name? output_var
 
@@ -359,10 +368,10 @@ def getInductiveInfoWithArgs (input_expr : Expr) (arg_names : List String) : Met
         let decomposed_ctor_type ← decomposeType ctor.type
         decomposed_ctor_types := decomposed_ctor_types.push decomposed_ctor_type
         let constructor ←
-          if List.isEmpty arg_names then
+          if Array.isEmpty argNames then
             process_constructor ctor.type input_vars input_types inductive_name
           else
-            process_constructor_unify_args ctor.type input_vars input_types inductive_name arg_names
+            process_constructor_unify_args ctor.type input_vars input_types inductive_name argNames
         ctors := ctors.push constructor
       let constructors_with_arity_zero := ctors.filter (fun ctor => ctor.all_hypotheses.size == 0)
       let constructors_with_args := ctors.filter (fun ctor => ctor.all_hypotheses.size != 0)
