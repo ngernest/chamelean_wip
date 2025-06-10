@@ -104,13 +104,13 @@ structure DecomposedInductiveHypothesis where
   fVarIds : Array FVarId
   variableEqualities : Array (FVarId × FVarId)
 
-/-- for any Fvar t appear more than 1 time in the expr, keep the first one as t,
-    replace the second one with t1, the third one with t2 ....
-    record the equations t = t1, t = t2 .... -/
-def separateFreeVarsInHypothesis (hyp : Expr) : MetaM DecomposedInductiveHypothesis := do
+/-- For each free variable `t` that appears more than once in the hypothesis `hyp`,
+    replace its second occurrence with `t1`, its 3rd occurrence with `t2`, etc.,
+    and record the equalities `t = t1, t = t2, ...` -/
+def separateFVars (hyp : Expr) : MetaM DecomposedInductiveHypothesis := do
   let fvars := extractFVars hyp
   let mut equations : Array (FVarId × FVarId) := #[]
-  let mut fvarids := fvars
+  let mut fVarIds := fvars
   let temp := Name.mkStr1 "temp000"
   let tempfvarid := FVarId.mk temp
   let mut newHyp := hyp
@@ -126,28 +126,31 @@ def separateFreeVarsInHypothesis (hyp : Expr) : MetaM DecomposedInductiveHypothe
       i:= i + 1
       currentFV := newFVarId
       equations := equations.push (fv, newFVarId)
-      fvarids := fvarids.push newFVarId
+      fVarIds := fVarIds.push newFVarId
   return {
     newHypothesis := newHyp
-    fVarIds:= fvarids
-    variableEqualities:= equations
+    fVarIds := fVarIds
+    variableEqualities := equations
   }
 
-def separate_fvar_in_cond (hypothesis : Expr) (initialFVars : Array FVarId) (hypIndex : Nat): MetaM DecomposedInductiveHypothesis := do
-  let hypFVars := extractFVars hypothesis
-  let fvars_init := Array.intersect hypFVars initialFVars
+/-- Variant of `separateFVars` that only examines
+    the free variables in `hypothesis` that appear in `initialFVars`,
+    and uses the index of the hypothesis (`hypIndex`) to generate fresh names -/
+def separateFVarsInHypothesis (hypothesis : Expr) (initialFVars : Array FVarId)
+  (hypIndex : Nat) : MetaM DecomposedInductiveHypothesis := do
+  let initializedFVars := Array.intersect (extractFVars hypothesis) initialFVars
   let mut newHypothesis := hypothesis
-  let mut eqs : Array (FVarId × FVarId) := #[]
-  for f in fvars_init do
-    let newname := Name.mkStr1 (f.name.toString ++ "_" ++ toString hypIndex)
-    let newfvarid := FVarId.mk newname
-    newHypothesis := newHypothesis.replaceFVarId f (mkFVar newfvarid)
-    eqs := eqs.push (f,newfvarid)
-  let sep ← separateFreeVarsInHypothesis newHypothesis
+  let mut equalities : Array (FVarId × FVarId) := #[]
+  for fvar in initializedFVars do
+    let newName := Name.mkStr1 (fvar.name.toString ++ "_" ++ toString hypIndex)
+    let newFVarId := FVarId.mk newName
+    newHypothesis := newHypothesis.replaceFVarId fvar (mkFVar newFVarId)
+    equalities := equalities.push (fvar, newFVarId)
+  let decomposedHypothesis ← separateFVars newHypothesis
   return {
-    newHypothesis := sep.newHypothesis
-    fVarIds := fvars_init ++ sep.fVarIds
-    variableEqualities := eqs ++ sep.variableEqualities
+    newHypothesis := decomposedHypothesis.newHypothesis
+    fVarIds := initializedFVars ++ decomposedHypothesis.fVarIds
+    variableEqualities := equalities ++ decomposedHypothesis.variableEqualities
   }
 
 
@@ -262,31 +265,32 @@ def GenCheckCalls_for_hypotheses (ctor : InductiveConstructor) (fvars : Array FV
       if allFVarsInExprInitialized hyp initializedFVars then
         result := result.push (GenCheckCall.check_IR hyp)
       else
-        let (pos, uninitset, tobeinit) ← getLastUninitializedArgAndFVars hyp initializedFVars
-        for fid in uninitset do
+        let (uninitializedArgIdx, uninitializedFVars, fVarsToBeInitialized)
+          ← getLastUninitializedArgAndFVars hyp initializedFVars
+        for fid in uninitializedFVars do
           let ty := ctor.bound_var_ctx.get! fid
           result := result.push (GenCheckCall.gen_fvar fid ty)
-        let gen_arg := hyp.getAppArgs[pos]!
-        initializedFVars := Array.appendUniqueElements initializedFVars uninitset
-        if gen_arg.isFVar then
-          let genid := gen_arg.fvarId!
-          result := result.push (GenCheckCall.gen_IR genid hyp pos)
+        let argToGenerate := hyp.getAppArgs[uninitializedArgIdx]!
+        initializedFVars := Array.appendUniqueElements initializedFVars uninitializedFVars
+        if argToGenerate.isFVar then
+          let fvarToGenerate := argToGenerate.fvarId!
+          result := result.push (GenCheckCall.gen_IR fvarToGenerate hyp uninitializedArgIdx)
         else
-          let genname := Name.mkStr1 ("tcond" ++ toString i)
-          let genid := FVarId.mk genname
-          let sp ← separate_fvar_in_cond gen_arg initializedFVars i
-          result := result.push (GenCheckCall.gen_IR genid hyp pos)
-          result := result.push (GenCheckCall.mat genid sp)
-        initializedFVars := Array.appendUniqueElements initializedFVars tobeinit
+          let nameOfFVarToGenerate := Name.mkStr1 ("tcond" ++ toString i)
+          let fvarToGenerate := FVarId.mk nameOfFVarToGenerate
+          let decomposedHypothesis ← separateFVarsInHypothesis argToGenerate initializedFVars i
+          result := result.push (GenCheckCall.gen_IR fvarToGenerate hyp uninitializedArgIdx)
+          result := result.push (GenCheckCall.mat fvarToGenerate decomposedHypothesis)
+        initializedFVars := Array.appendUniqueElements initializedFVars fVarsToBeInitialized
     else
       if allFVarsInExprInitialized hyp initializedFVars then
         result := result.push (GenCheckCall.check_nonIR hyp)
       else
-        let uninitset := getUninitializedFVars hyp initializedFVars
-        for fid in uninitset do
-          let ty := ctor.bound_var_ctx.get! fid
-          result := result.push (GenCheckCall.gen_fvar fid ty)
-        initializedFVars := Array.appendUniqueElements initializedFVars uninitset
+        let uninitializedFVars := getUninitializedFVars hyp initializedFVars
+        for fvar in uninitializedFVars do
+          let ty := ctor.bound_var_ctx.get! fvar
+          result := result.push (GenCheckCall.gen_fvar fvar ty)
+        initializedFVars := Array.appendUniqueElements initializedFVars uninitializedFVars
         result := result.push (GenCheckCall.check_nonIR hyp)
   return result
 

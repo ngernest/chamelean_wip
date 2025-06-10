@@ -63,7 +63,7 @@ def GenCheckCalls_grouping (gccs: Array GenCheckCall) : MetaM GenCheckCall_group
 
 def get_checker_backtrack_elem_from_constructor (ctor : InductiveConstructor) (inputNames : List String) : MetaM BacktrackElem := do
   --Get the match expr and inp
-  let conclusion ← separateFreeVarsInHypothesis ctor.conclusion
+  let conclusion ← separateFVars ctor.conclusion
   let args := (conclusion.newHypothesis.getAppArgs).toList
   let inputNamesAndArgs := inputNames.zip args
   let inputPairsThatNeedMatching := inputNamesAndArgs.filter (fun (_, arg) => !arg.isFVar)
@@ -251,7 +251,7 @@ def get_producer_backtrack_elem_from_constructor (ctor: InductiveConstructor) (i
   let tempfvar := Expr.fvar (FVarId.mk temp)
   let conclusion_args :=  ctor.conclusion.getAppArgs.set! genpos tempfvar
   let new_conclusion := mkAppN ctor.conclusion.getAppFn conclusion_args
-  let conclusion ← separateFreeVarsInHypothesis new_conclusion
+  let conclusion ← separateFVars new_conclusion
   let args := (conclusion.newHypothesis.getAppArgs).toList
   let inputNamesAndArgs := inputNames.zip args
   -- Take all elements of `inputNamesAndArgs`, but omit the element at the `genpos`-th index
