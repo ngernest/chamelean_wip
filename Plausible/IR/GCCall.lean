@@ -133,23 +133,22 @@ def separateFreeVarsInHypothesis (hyp : Expr) : MetaM DecomposedInductiveHypothe
     variableEqualities:= equations
   }
 
-def separate_fvar_in_cond (cond: Expr) (initset: Array FVarId) (cond_pos: Nat): MetaM DecomposedInductiveHypothesis := do
-  let fvars := extractFVars cond
-  let fvars_init := Array.intersect fvars initset
-  let mut newcond := cond
+def separate_fvar_in_cond (hypothesis : Expr) (initialFVars : Array FVarId) (hypIndex : Nat): MetaM DecomposedInductiveHypothesis := do
+  let hypFVars := extractFVars hypothesis
+  let fvars_init := Array.intersect hypFVars initialFVars
+  let mut newHypothesis := hypothesis
   let mut eqs : Array (FVarId × FVarId) := #[]
   for f in fvars_init do
-    let newname := Name.mkStr1 (f.name.toString ++ "_" ++ toString cond_pos)
+    let newname := Name.mkStr1 (f.name.toString ++ "_" ++ toString hypIndex)
     let newfvarid := FVarId.mk newname
-    newcond := newcond.replaceFVarId f (mkFVar newfvarid)
+    newHypothesis := newHypothesis.replaceFVarId f (mkFVar newfvarid)
     eqs := eqs.push (f,newfvarid)
-  let sep ← separateFreeVarsInHypothesis newcond
-  let newsep := {
-    newHypothesis:= sep.newHypothesis
-    fVarIds:= fvars_init ++ sep.fVarIds
+  let sep ← separateFreeVarsInHypothesis newHypothesis
+  return {
+    newHypothesis := sep.newHypothesis
+    fVarIds := fvars_init ++ sep.fVarIds
     variableEqualities := eqs ++ sep.variableEqualities
   }
-  return newsep
 
 
 
@@ -194,83 +193,96 @@ def get_producer_outset (c: InductiveConstructor) (genpos: Nat): MetaM (Array FV
       if ¬ Array.elem i outvar then outarr:=outarr.push i
     return outarr
 
-def get_uninit_set (hyp : Expr) (initset : Array FVarId) : Array FVarId :=
-  Array.removeAll (extractFVars hyp) initset
+/-- Removes all free variables in an expression `e` from `fvars`, returning
+    the resultant collection of `FVarId`s -/
+def getUninitializedFVars (e : Expr) (fvars : Array FVarId) : Array FVarId :=
+  Array.removeAll (extractFVars e) fvars
 
-def fully_init (cond : Expr) (initset : Array FVarId) : Bool :=
-  (get_uninit_set cond initset).size == 0
+/-- Determines if all the free variables in `fvars` have been
+    initialized in the expression `e`  -/
+def allFVarsInExprInitialized (e : Expr) (fvars : Array FVarId) : Bool :=
+  (getUninitializedFVars e fvars).size == 0
 
-def get_last_uninit (cond: Expr) (initset : Array FVarId): MetaM (Option Nat) := do
-  if  ¬ (← isInductiveRelationApplication cond) then throwError "not a inductive cond to get_last_uninit_arg "
-  let args:= cond.getAppArgs
-  let mut i:=0
-  let mut pos:=args.size + 1
+def get_last_uninit (hypothesis : Expr) (fvars : Array FVarId) : MetaM (Option Nat) := do
+  if !(← isInductiveRelationApplication hypothesis) then
+    throwError "not a inductive cond to get_last_uninit_arg "
+  let args := hypothesis.getAppArgs
+  let mut i := 0
+  let mut pos := args.size + 1
   for arg in args do
-    if ¬ fully_init arg initset then pos :=i
-    i:= i + 1
-  if pos = args.size + 1 then return none else return some pos
+    if !allFVarsInExprInitialized arg fvars then
+      pos := i
+    i := i + 1
+  if pos == args.size + 1 then
+    return none
+  else
+    return some pos
 
-def get_last_uninit_arg_and_uninitset (cond: Expr) (initset : Array FVarId): MetaM (Nat × Array FVarId × Array FVarId) := do
-  if  ¬ (← isInductiveRelationApplication cond) then throwError "not a inductive cond to get_last_uninit_arg "
-  let args:= cond.getAppArgs
-  let mut i:=0
-  let mut pos:=args.size + 1
-  let mut uninit_arg:= args[0]!
-  let mut tobeinit : Array FVarId := #[]
+def get_last_uninit_arg_and_uninitset
+  (hypothesis : Expr) (fvars : Array FVarId) : MetaM (Nat × Array FVarId × Array FVarId) := do
+  if !(← isInductiveRelationApplication hypothesis) then
+    throwError "not a inductive cond to get_last_uninit_arg "
+  let args := hypothesis.getAppArgs
+  let mut i := 0
+  let mut pos := args.size + 1
+  let mut uninit_arg := args[0]!
+  let mut tobeinit := #[]
   for arg in args do
-    if ¬ fully_init arg initset then
+    if ¬ allFVarsInExprInitialized arg fvars then
       {
-        pos :=i;
+        pos := i;
         uninit_arg := arg;
         tobeinit := extractFVars arg
       }
     i:= i + 1
-  if pos = args.size + 1 then return (args.size + 1, #[], #[])
-  let mut uninitset : Array FVarId := #[]
+  if pos = args.size + 1 then
+    return (args.size + 1, #[], #[])
+  let mut uninitset := #[]
   i := 0
-  for e in args do
-    if ¬ i = pos then uninitset := Array.appendUniqueElements uninitset (get_uninit_set e initset)
+  for arg in args do
+    if i != pos then
+      uninitset := Array.appendUniqueElements uninitset (getUninitializedFVars arg fvars)
   uninitset := Array.removeAll uninitset tobeinit
   return (pos, uninitset, tobeinit)
 
 
-def GenCheckCalls_for_hypotheses (ctor : InductiveConstructor) (initset0: Array FVarId) : MetaM (Array GenCheckCall) := do
-  let mut outarr : Array GenCheckCall := #[]
-  let mut initset := initset0
+def GenCheckCalls_for_hypotheses (ctor : InductiveConstructor) (fvars : Array FVarId) : MetaM (Array GenCheckCall) := do
+  let mut result := #[]
+  let mut initializedFVars := fvars
   let mut i := 0
   for hyp in ctor.all_hypotheses do
     i := i + 1
-    if ← isHypothesisOfInductiveConstructor hyp ctor then
-      if fully_init hyp initset then
-        outarr := outarr.push (GenCheckCall.check_IR hyp)
+    if (← isHypothesisOfInductiveConstructor hyp ctor) then
+      if allFVarsInExprInitialized hyp initializedFVars then
+        result := result.push (GenCheckCall.check_IR hyp)
       else
-        let (pos, uninitset, tobeinit) ← get_last_uninit_arg_and_uninitset hyp initset
+        let (pos, uninitset, tobeinit) ← get_last_uninit_arg_and_uninitset hyp initializedFVars
         for fid in uninitset do
           let ty := ctor.bound_var_ctx.get! fid
-          outarr := outarr.push (GenCheckCall.gen_fvar fid ty)
+          result := result.push (GenCheckCall.gen_fvar fid ty)
         let gen_arg := hyp.getAppArgs[pos]!
-        initset := Array.appendUniqueElements initset uninitset
+        initializedFVars := Array.appendUniqueElements initializedFVars uninitset
         if gen_arg.isFVar then
           let genid := gen_arg.fvarId!
-          outarr := outarr.push (GenCheckCall.gen_IR genid hyp pos)
+          result := result.push (GenCheckCall.gen_IR genid hyp pos)
         else
           let genname := Name.mkStr1 ("tcond" ++ toString i)
           let genid := FVarId.mk genname
-          let sp ←  separate_fvar_in_cond gen_arg initset i
-          outarr := outarr.push (GenCheckCall.gen_IR genid hyp pos)
-          outarr := outarr.push (GenCheckCall.mat genid sp)
-        initset := Array.appendUniqueElements initset tobeinit
+          let sp ← separate_fvar_in_cond gen_arg initializedFVars i
+          result := result.push (GenCheckCall.gen_IR genid hyp pos)
+          result := result.push (GenCheckCall.mat genid sp)
+        initializedFVars := Array.appendUniqueElements initializedFVars tobeinit
     else
-      if fully_init hyp initset then
-        outarr := outarr.push (GenCheckCall.check_nonIR hyp)
+      if allFVarsInExprInitialized hyp initializedFVars then
+        result := result.push (GenCheckCall.check_nonIR hyp)
       else
-        let uninitset := get_uninit_set hyp initset
+        let uninitset := getUninitializedFVars hyp initializedFVars
         for fid in uninitset do
           let ty := ctor.bound_var_ctx.get! fid
-          outarr := outarr.push (GenCheckCall.gen_fvar fid ty)
-        initset := Array.appendUniqueElements initset uninitset
-        outarr := outarr.push (GenCheckCall.check_nonIR hyp)
-  return outarr
+          result := result.push (GenCheckCall.gen_fvar fid ty)
+        initializedFVars := Array.appendUniqueElements initializedFVars uninitset
+        result := result.push (GenCheckCall.check_nonIR hyp)
+  return result
 
 def GenCheckCalls_for_checker (c: InductiveConstructor) : MetaM (Array GenCheckCall) := do
   let mut initset := get_checker_initset c
