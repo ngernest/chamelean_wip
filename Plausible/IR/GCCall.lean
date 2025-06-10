@@ -161,12 +161,16 @@ def is_inductive_constructor (e: Expr) : Bool := ¬ e.isFVar
 
 
 inductive GenCheckCall where
-  | check_IR (cond: Expr) : GenCheckCall
-  | check_nonIR (cond: Expr) : GenCheckCall
-  | gen_IR (id: FVarId) (cond: Expr) (pos: Nat): GenCheckCall
-  | mat (id: FVarId) (sp : DecomposedInductiveHypothesis) : GenCheckCall
-  | gen_fvar (id: FVarId) (type: Expr) : GenCheckCall
-  | ret (e: Expr): GenCheckCall
+  /-- Invoke a checker for the inductive relation specified in the hypothesis `hyp` -/
+  | check_IR (hyp : Expr) : GenCheckCall
+  | check_nonIR (hyp : Expr) : GenCheckCall
+  | gen_IR (fvar : FVarId) (hyp : Expr) (pos : Nat): GenCheckCall
+  /-- Match the `fvar` with the shape of the hypothesis `hyp` using an `if let` expression -/
+  | matchFVar (fvar : FVarId) (hyp : DecomposedInductiveHypothesis) : GenCheckCall
+  /-- Generate a free variable `fvar` with the given `type` -/
+  | genFVar (fvar : FVarId) (type : Expr) : GenCheckCall
+  /-- `return` the expression `e` in the `Gen` monad -/
+  | ret (e : Expr): GenCheckCall
 
 /-- Extracts all the free variables in the conclusion of a constructor
     for an inductive relation -/
@@ -271,7 +275,7 @@ def GenCheckCalls_for_hypotheses (ctor : InductiveConstructor) (fvars : Array FV
           ← getLastUninitializedArgAndFVars hyp initializedFVars
         for fid in uninitializedFVars do
           let ty := ctor.bound_var_ctx.get! fid
-          result := result.push (GenCheckCall.gen_fvar fid ty)
+          result := result.push (.genFVar fid ty)
         let argToGenerate := hyp.getAppArgs[uninitializedArgIdx]!
         initializedFVars := Array.appendUniqueElements initializedFVars uninitializedFVars
         if argToGenerate.isFVar then
@@ -282,7 +286,7 @@ def GenCheckCalls_for_hypotheses (ctor : InductiveConstructor) (fvars : Array FV
           let fvarToGenerate := FVarId.mk nameOfFVarToGenerate
           let decomposedHypothesis ← separateFVarsInHypothesis argToGenerate initializedFVars i
           result := result.push (GenCheckCall.gen_IR fvarToGenerate hyp uninitializedArgIdx)
-          result := result.push (GenCheckCall.mat fvarToGenerate decomposedHypothesis)
+          result := result.push (.matchFVar fvarToGenerate decomposedHypothesis)
         initializedFVars := Array.appendUniqueElements initializedFVars fVarsToBeInitialized
     else
       if allFVarsInExprInitialized hyp initializedFVars then
@@ -291,7 +295,7 @@ def GenCheckCalls_for_hypotheses (ctor : InductiveConstructor) (fvars : Array FV
         let uninitializedFVars := getUninitializedFVars hyp initializedFVars
         for fvar in uninitializedFVars do
           let ty := ctor.bound_var_ctx.get! fvar
-          result := result.push (GenCheckCall.gen_fvar fvar ty)
+          result := result.push (.genFVar fvar ty)
         initializedFVars := Array.appendUniqueElements initializedFVars uninitializedFVars
         result := result.push (GenCheckCall.check_nonIR hyp)
   return result
@@ -312,7 +316,7 @@ def GenCheckCalls_for_producer (ctor : InductiveConstructor) (genpos : Nat) : Me
   let uninitset := Array.removeAll (extractFVars gen_arg) initset
   for fid in uninitset do
     let ty := ctor.bound_var_ctx.get! fid
-    outarr := outarr.push (GenCheckCall.gen_fvar fid ty)
+    outarr := outarr.push (GenCheckCall.genFVar fid ty)
   outarr := outarr.push (GenCheckCall.ret gen_arg)
   return outarr
 
@@ -322,10 +326,11 @@ def GenCheckCalls_toStr (c: GenCheckCall) : MetaM String := do
   | GenCheckCall.check_IR cond => return  "check_IR_" ++ toString (← Meta.ppExpr cond)
   | GenCheckCall.check_nonIR cond => return  "check_nonIR_" ++ toString (← Meta.ppExpr cond)
   | GenCheckCall.gen_IR _ cond pos =>  return  "gen_IR_" ++ toString (← Meta.ppExpr cond) ++ " at "  ++ toString pos
-  | GenCheckCall.mat id sp => return "match " ++ id.name.toString ++ toString (← Meta.ppExpr sp.newHypothesis)
-  | GenCheckCall.gen_fvar id ty=>  return  "gen_fvar " ++ toString (id.name) ++ ": " ++ toString (← Meta.ppExpr ty)
+  | GenCheckCall.matchFVar id sp => return "match " ++ id.name.toString ++ toString (← Meta.ppExpr sp.newHypothesis)
+  | GenCheckCall.genFVar id ty=>  return  "gen_fvar " ++ toString (id.name) ++ ": " ++ toString (← Meta.ppExpr ty)
   | GenCheckCall.ret e =>  return  "ret " ++ toString (← Meta.ppExpr e)
 
+/-- Invoke the -/
 def gen_IR_at_pos (id: FVarId) (cond: Expr) (pos: Nat) : MetaM String := do
   let tt := Lean.mkFVar ⟨Name.mkStr1 "tt"⟩
   let new_args := cond.getAppArgs.set! pos tt
@@ -333,21 +338,22 @@ def gen_IR_at_pos (id: FVarId) (cond: Expr) (pos: Nat) : MetaM String := do
   let fun_proto := "fun tt => " ++ toString (← Meta.ppExpr new_cond)
   return "let " ++ toString (id.name)  ++ ":= gen_IR (" ++ fun_proto ++ ")"
 
+/-- Converts a `GenCheckCall` data structure to a string containing the
+    corresponding Lean expression -/
+def GenCheckCalls_toRawCode (genCheckCall : GenCheckCall) : MetaM String := do
+  match genCheckCall with
+  | .check_IR hyp => return  "check_IR (" ++ toString (← Meta.ppExpr hyp) ++ ")"
+  | .check_nonIR hyp => return  "check (" ++ toString (← Meta.ppExpr hyp) ++ ")"
+  | .gen_IR fvar hyp pos => gen_IR_at_pos fvar hyp pos
+  | .matchFVar fvar hypothesis => return  "if let " ++ toString (← Meta.ppExpr hypothesis.newHypothesis) ++ ":= " ++ toString (fvar.name) ++ " then "
+  | .genFVar id ty =>  return  "let " ++ toString (id.name) ++ ":= gen_rand " ++ toString (← Meta.ppExpr ty)
+  | .ret e => return "return " ++ toString (← Meta.ppExpr e)
 
-def GenCheckCalls_toRawCode (c: GenCheckCall) : MetaM String := do
-  match c with
-  | GenCheckCall.check_IR cond => return  "check_IR (" ++ toString (← Meta.ppExpr cond) ++ ")"
-  | GenCheckCall.check_nonIR cond => return  "check (" ++ toString (← Meta.ppExpr cond) ++ ")"
-  | GenCheckCall.gen_IR id cond pos => gen_IR_at_pos id cond pos
-  | GenCheckCall.mat id sp => return  "if let " ++ toString (← Meta.ppExpr sp.newHypothesis) ++ ":= " ++ toString (id.name) ++ " then "
-  | GenCheckCall.gen_fvar id ty =>  return  "let " ++ toString (id.name) ++ ":= gen_rand " ++ toString (← Meta.ppExpr ty)
-  | GenCheckCall.ret e => return "return " ++ toString (← Meta.ppExpr e)
 
 
+syntax (name := getCheckerCall) "#get_checker_call" term : command
 
-syntax (name := getChekerCall) "#get_checker_call" term : command
-
-@[command_elab getChekerCall]
+@[command_elab getCheckerCall]
 def elabCheckerCall : CommandElab := fun stx => do
   match stx with
   | `(#get_checker_call $t1:term) =>

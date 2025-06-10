@@ -41,9 +41,8 @@ def GenCheckCalls_grouping (gccs: Array GenCheckCall) : MetaM GenCheckCall_group
   let mut var_eq : Array (FVarId × FVarId) := #[]
   for gcc in gccs do
     match gcc with
-    | GenCheckCall.gen_fvar _ _
-    | GenCheckCall.gen_IR _ _ _ => gen_list := gen_list.push gcc
-    | GenCheckCall.mat _ sp =>
+    | GenCheckCall.genFVar _ _ | GenCheckCall.gen_IR _ _ _ => gen_list := gen_list.push gcc
+    | GenCheckCall.matchFVar _ sp =>
       {
         ifsome_list := ifsome_list.push gcc;
         gen_list := gen_list.push gcc;
@@ -84,16 +83,16 @@ def add_size_param (cond: Expr) : MetaM String := do
   let arg_str := (toString (← Meta.ppExpr cond)).drop (fnname.length)
   return fnname ++ " size" ++ arg_str
 
-def gen_IR_at_pos_toCode (id: FVarId) (cond: Expr) (pos: Nat) : MetaM String := do
-  let new_args := cond.getAppArgs.eraseIdx! pos
-  let mut fn_str := "gen_" ++ toString (← Meta.ppExpr cond.getAppFn) ++ "_at_" ++ toString pos ++ " size"
+def gen_IR_at_pos_toCode (fvar : FVarId) (hyp : Expr) (idx : Nat) : MetaM String := do
+  let new_args := hyp.getAppArgs.eraseIdx! idx
+  let mut fn_str := "gen_" ++ toString (← Meta.ppExpr hyp.getAppFn) ++ "_at_" ++ toString idx ++ " size"
   for a in new_args do
     fn_str := fn_str ++ " "
     if a.getAppArgs.size = 0 then
       fn_str := fn_str ++ toString (← Meta.ppExpr a)
     else
       fn_str := fn_str ++ "(" ++ toString (← Meta.ppExpr a) ++ ")"
-  return "let " ++ toString (id.name)  ++ " ← " ++ fn_str
+  return "let " ++ toString (fvar.name)  ++ " ← " ++ fn_str
 
 def gen_nonIR_toCode (id: FVarId) (ty: Expr) (monad: String :="IO") : MetaM String := do
   let mut out:= "let "++ toString (id.name)
@@ -110,8 +109,8 @@ def GenCheckCalls_toCode (c: GenCheckCall) (monad: String :="IO"): MetaM (String
   | GenCheckCall.check_IR cond => return  "← check_" ++ (← add_size_param cond)
   | GenCheckCall.check_nonIR cond => return  "(" ++ toString (← Meta.ppExpr cond) ++ ")"
   | GenCheckCall.gen_IR id cond pos => gen_IR_at_pos_toCode id cond pos
-  | GenCheckCall.mat id sp => return  "if let " ++ toString (← Meta.ppExpr sp.newHypothesis) ++ " := " ++ toString (id.name) ++ " then "
-  | GenCheckCall.gen_fvar id ty =>  gen_nonIR_toCode id ty monad
+  | GenCheckCall.matchFVar id sp => return  "if let " ++ toString (← Meta.ppExpr sp.newHypothesis) ++ " := " ++ toString (id.name) ++ " then "
+  | GenCheckCall.genFVar id ty =>  gen_nonIR_toCode id ty monad
   | GenCheckCall.ret e => return "return " ++ (if monad = "IO" then "" else "some ") ++ toString (← Meta.ppExpr e)
 
 def cbe_match_block (cbe: BacktrackElem) : MetaM String := do
@@ -132,7 +131,7 @@ def cbe_gen_block (cbe: BacktrackElem) (monad: String :="IO"): MetaM (String × 
   for gcc in cbe.gcc_group.gen_list do
     out := out ++ iden ++ (← GenCheckCalls_toCode gcc monad) ++ " \n"
     match gcc with
-    | GenCheckCall.mat _ _ => iden := iden ++ " "
+    | .matchFVar _ _ => iden := iden ++ " "
     | _ => continue
   if cbe.gcc_group.gen_list.size > 0 then
     out := ⟨out.data.dropLast.dropLast⟩
