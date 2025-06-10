@@ -16,18 +16,33 @@ namespace Plausible.IR
 
 -- BACKTRACK CHECKER ---
 
+-- Order is the same as the order of the constructors in the inductive relation
 structure GenCheckCall_group where
   gen_list: Array GenCheckCall
+  -- `ifsome_list` is the list of `if let ...` expressions
+  -- (Note: keep this for now)
   ifsome_list : Array GenCheckCall
   check_IR_list: Array GenCheckCall
   check_nonIR_list: Array GenCheckCall
   ret : Array GenCheckCall
   variableEqualities : Array (FVarId × FVarId)
 
+-- Should be called `BacktrackElemInfo`
+-- Contains metadata needed to derive a "backtrack element"
+-- (a sub-generator that is invoked from the main generator function)
 structure BacktrackElem where
+  /-- Argument names for each sub-generator / sub-checker (backtrack elem) -/
   inputs : Array String
+
+  /-- Arguments that should be matched in the outer-most
+      pattern match in the backtrack element -/
   inputsToBeMatched : Array String
+
+  /-- Cases (LHS) of the pattern match mentioned above -/
   exprsToBeMatched : Array Expr
+
+  /-- `gcc_group` is used to create the RHS of the first case
+      in the pattern match -/
   gcc_group : GenCheckCall_group
   variableEqualities : Array (FVarId × FVarId)
 
@@ -64,7 +79,8 @@ def GenCheckCalls_grouping (gccs: Array GenCheckCall) : MetaM GenCheckCall_group
     variableEqualities := variableEqualities
   }
 
-def get_checker_backtrack_elem_from_constructor (ctor : InductiveConstructor) (inputNames : List String) : MetaM BacktrackElem := do
+def get_checker_backtrack_elem_from_constructor (ctor : InductiveConstructor)
+  (inputNames : List String) : MetaM BacktrackElem := do
   --Get the match expr and inp
   let conclusion ← separateFVars ctor.conclusion
   let args := (conclusion.newHypothesis.getAppArgs).toList
@@ -81,6 +97,10 @@ def get_checker_backtrack_elem_from_constructor (ctor : InductiveConstructor) (i
     gcc_group := gcc_group
     variableEqualities := conclusion.variableEqualities ++ gcc_group.variableEqualities
   }
+
+-- The functions below create strings containing Lean code based on the information
+-- in a `BacktrackElement`
+-- TODO: rewrite to use `TSyntax`
 
 def add_size_param (cond: Expr) : MetaM String := do
   let fnname := toString (← Meta.ppExpr cond.getAppFn)
@@ -108,7 +128,9 @@ def gen_nonIR_toCode (id: FVarId) (ty: Expr) (monad: String :="IO") : MetaM Stri
     out := out ++ " ←  SampleableExt.interpSample " ++ typename
   return out
 
-def GenCheckCalls_toCode (c: GenCheckCall) (monad: String :="IO"): MetaM (String) := do
+/-- Produces a string containing the Lean code that corresponds to
+    a `GenCheckCall` -/
+def GenCheckCalls_toCode (c: GenCheckCall) (monad: String :="IO"): MetaM String := do
   match c with
   | GenCheckCall.check_IR cond => return  "← check_" ++ (← add_size_param cond)
   | GenCheckCall.check_nonIR cond => return  "(" ++ toString (← Meta.ppExpr cond) ++ ")"
@@ -117,6 +139,9 @@ def GenCheckCalls_toCode (c: GenCheckCall) (monad: String :="IO"): MetaM (String
   | GenCheckCall.genFVar id ty =>  gen_nonIR_toCode id ty monad
   | GenCheckCall.ret e => return "return " ++ (if monad = "IO" then "" else "some ") ++ toString (← Meta.ppExpr e)
 
+-- Produces the outer-most pattern-match block in a sub-generator
+-- based on the info in a `BacktrackElem`
+-- TODO: use the information from `GenCheckCall` to rpoduce the RHS of the pattern-match
 def cbe_match_block (cbe: BacktrackElem) : MetaM String := do
   let mut out := ""
   if cbe.inputsToBeMatched.size > 0 then
@@ -129,6 +154,11 @@ def cbe_match_block (cbe: BacktrackElem) : MetaM String := do
     out:= ⟨out.data.dropLast.dropLast⟩ ++ " =>  "
   return out
 
+/-- Produces expressions that invoke generators in a sub-generator
+  - `out` is the block of code that includes all the `gen` function calls
+  - `iden` (indentation) is a string containing whitespace to make the indentation right
+  - Note: this subsumes both `gen_IR` and `gen_nonIR`
+-/
 def cbe_gen_block (cbe: BacktrackElem) (monad: String :="IO"): MetaM (String × String) := do
   let mut out := ""
   let mut iden := ""
@@ -141,6 +171,9 @@ def cbe_gen_block (cbe: BacktrackElem) (monad: String :="IO"): MetaM (String × 
     out := ⟨out.data.dropLast.dropLast⟩
   return (out, iden)
 
+/-- Produces the `if let ...` expressions for a sub-generator based on the info in a `BacktrackElem`
+   - Note: we can get rid of this function
+   - Note: all the if-let statements are grouped together with the `gen`s -/
 def cbe_ifsome_block (cbe: BacktrackElem) (monad: String :="IO"): MetaM (String × String) := do
   let mut out := ""
   let iden := if cbe.gcc_group.ifsome_list.size > 0 then "  " else ""
@@ -155,6 +188,11 @@ def cbe_ifsome_block (cbe: BacktrackElem) (monad: String :="IO"): MetaM (String 
     out := ⟨out.data.dropLast.dropLast⟩
   return (out, iden)
 
+/-- Produces the assignments of the results of the checker to auxiliary free variables
+    ```
+    let check1 <- check bst lo x
+    ```
+ -/
 def cbe_gen_check_IR_block (cbe: BacktrackElem) (iden: String) (monad: String :="IO"): MetaM (String × (List String)) := do
   let mut out := ""
   let mut vars : List String := []
@@ -274,7 +312,10 @@ def get_producer_backtrack_elem_from_constructor (ctor: InductiveConstructor) (i
     variableEqualities := conclusion.variableEqualities ++ gcc_group.variableEqualities
   }
 
-
+/-- Produces the final if-statement that checks the conjunction of all the hypotheses
+    - `vars` is a list of free variables that were produced during the `check_IR` block
+    - e.g. `vars = ["1", "2", ...]`
+-/
 def cbe_if_return_producer (cbe: BacktrackElem) (iden: String) (vars: List String) (monad: String :="IO"): MetaM String := do
   let mut out:= ""
   if cbe.variableEqualities.size + cbe.gcc_group.check_nonIR_list.size + cbe.gcc_group.check_IR_list.size > 0 then
@@ -297,7 +338,7 @@ def cbe_if_return_producer (cbe: BacktrackElem) (iden: String) (vars: List Strin
     out:= out ++ "\n| " ++ makeUnderscores_commas cbe.inputsToBeMatched.size ++ " => " ++ monad_fail
   return out
 
-
+-- Note: the commented out code can be removed (note that we're no longer using `cbe_ifsome_block`)
 def backtrack_elem_toString_producer (cbe: BacktrackElem) (monad: String :="IO"): MetaM String := do
   let mut out := ""
   let matchblock ← cbe_match_block cbe

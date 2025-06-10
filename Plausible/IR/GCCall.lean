@@ -100,8 +100,14 @@ def subst_first_fVar (e: Expr) (old : FVarId) (new : FVarId) : MetaM Expr := do
      (which maps old `FVarId`s to new `FVarId`s), and `newHypothesis` is the resultant
      hypothesis after all the `FVarId`s have been rewritten according to `variableEqualities` -/
 structure DecomposedInductiveHypothesis where
+  /-- The resultant hypothesis after all the fvars in `fvarIds` have been rewritten
+      such that each fvar is unique -/
   newHypothesis : Expr
+  /-- A collection of the `FVarId`s that appear in `newHypothesis`
+     (including the new fvars that were produced) -/
   fVarIds : Array FVarId
+  /-- A collection of equations relating pairs of `FVarId`s to each other
+      (e.g. `t = t1`) -/
   variableEqualities : Array (FVarId × FVarId)
 
 /-- For each free variable `t` that appears more than once in the hypothesis `hyp`,
@@ -159,17 +165,31 @@ def separateFVarsInHypothesis (hypothesis : Expr) (initialFVars : Array FVarId)
 
 def is_inductive_constructor (e: Expr) : Bool := ¬ e.isFVar
 
-
+/-- Represents an expression in the RHS of the non-trivial pattern-match case
+    in a backtrack element (sub-generator) -/
 inductive GenCheckCall where
-  /-- Invoke a checker for the inductive relation specified in the hypothesis `hyp` -/
+  /-- Invoke a checker for the inductive relation specified in the hypothesis `hyp`
+      (`hyp` must be an inductive relation) -/
   | check_IR (hyp : Expr) : GenCheckCall
+
+  /-- The hypothesis `hyp` is not an inductive relation, but a function that returns
+      `Prop`, so we invoke a checker that determines whether the `Prop` is true -/
   | check_nonIR (hyp : Expr) : GenCheckCall
-  | gen_IR (fvar : FVarId) (hyp : Expr) (pos : Nat): GenCheckCall
-  /-- Match the `fvar` with the shape of the hypothesis `hyp` using an `if let` expression -/
+
+  /-- Generate an input at the given position `pos` for an inductive relation
+      specified by `hyp`. The generated value is assigned to the free variable `fvar`. -/
+  | gen_IR (fvar : FVarId) (hyp : Expr) (pos : Nat) : GenCheckCall
+
+  /-- Match the `fvar` with the shape of the hypothesis `hyp` using an `if let` expression
+      - `matchFVar` always comes after a `genFVar`
+      - Produces code of the form `if let hyp := fvar then ...`
+   -/
   | matchFVar (fvar : FVarId) (hyp : DecomposedInductiveHypothesis) : GenCheckCall
+
   /-- Generate a free variable `fvar` with the given `type` -/
   | genFVar (fvar : FVarId) (type : Expr) : GenCheckCall
-  /-- `return` the expression `e` in the `Gen` monad -/
+
+  /-- `return` the expression `e` in some ambient monad (e.g. `Gen`) -/
   | ret (e : Expr): GenCheckCall
 
 /-- Extracts all the free variables in the conclusion of a constructor
@@ -320,7 +340,7 @@ def GenCheckCalls_for_producer (ctor : InductiveConstructor) (genpos : Nat) : Me
   outarr := outarr.push (GenCheckCall.ret gen_arg)
   return outarr
 
--- TODO: figure out how each `GenCheckCall` is produced
+/-- Note: this function is purely for debugging purposes, it is not used in the main algorithm -/
 def GenCheckCalls_toStr (c: GenCheckCall) : MetaM String := do
   match c with
   | GenCheckCall.check_IR cond => return  "check_IR_" ++ toString (← Meta.ppExpr cond)
@@ -338,7 +358,8 @@ def gen_IR_at_pos (id: FVarId) (cond: Expr) (pos: Nat) : MetaM String := do
   return "let " ++ toString (id.name)  ++ ":= gen_IR (" ++ fun_proto ++ ")"
 
 /-- Converts a `GenCheckCall` data structure to a string containing the
-    corresponding Lean expression -/
+    corresponding Lean expression
+    - Note: this function is purely for debugging purposes, it is not used in the main algorithm -/
 def GenCheckCalls_toRawCode (genCheckCall : GenCheckCall) : MetaM String := do
   match genCheckCall with
   | .check_IR hyp => return  "check_IR (" ++ toString (← Meta.ppExpr hyp) ++ ")"
