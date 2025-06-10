@@ -19,12 +19,12 @@ namespace Plausible.IR
 -- Order is the same as the order of the constructors in the inductive relation
 structure GenCheckCall_group where
   gen_list: Array GenCheckCall
-  -- `ifsome_list` is the list of `if let ...` expressions
+  -- `iflet_list` is the list of `if let ...` expressions
   -- (Note: keep this for now)
-  ifsome_list : Array GenCheckCall
+  iflet_list : Array GenCheckCall
   check_IR_list: Array GenCheckCall
   check_nonIR_list: Array GenCheckCall
-  ret : Array GenCheckCall
+  ret_list : Array GenCheckCall
   variableEqualities : Array (FVarId × FVarId)
 
 -- Should be called `BacktrackElemInfo`
@@ -51,7 +51,7 @@ def GenCheckCalls_grouping (gccs: Array GenCheckCall) : MetaM GenCheckCall_group
   let mut gen_list : Array GenCheckCall := #[]
   let mut check_IR_list : Array GenCheckCall := #[]
   let mut check_nonIR_list : Array GenCheckCall := #[]
-  let mut ifsome_list : Array GenCheckCall := #[]
+  let mut iflet_list : Array GenCheckCall := #[]
   let mut ret : Array GenCheckCall := #[]
   let mut variableEqualities : Array (FVarId × FVarId) := #[]
   for gcc in gccs do
@@ -60,7 +60,7 @@ def GenCheckCalls_grouping (gccs: Array GenCheckCall) : MetaM GenCheckCall_group
     | GenCheckCall.gen_IR _ _ _ =>
         gen_list := gen_list.push gcc
     | GenCheckCall.matchFVar _ hyp => {
-        ifsome_list := ifsome_list.push gcc;
+        iflet_list := iflet_list.push gcc;
         gen_list := gen_list.push gcc;
         variableEqualities := variableEqualities ++ hyp.variableEqualities;
       }
@@ -74,8 +74,8 @@ def GenCheckCalls_grouping (gccs: Array GenCheckCall) : MetaM GenCheckCall_group
     gen_list := gen_list
     check_IR_list := check_IR_list
     check_nonIR_list := check_nonIR_list
-    ifsome_list := ifsome_list
-    ret := ret
+    iflet_list := iflet_list
+    ret_list := ret
     variableEqualities := variableEqualities
   }
 
@@ -203,7 +203,7 @@ def backtrackElem_return_checker (backtrackElem : BacktrackElem) (indentation : 
     out := out ++ (← GenCheckCalls_toCode gcc monad) ++ " && "
   if backtrackElem.variableEqualities.size + backtrackElem.gcc_group.check_nonIR_list.size + backtrackElem.gcc_group.check_IR_list.size > 0 then
     out:= ⟨out.data.dropLast.dropLast.dropLast⟩
-  if backtrackElem.gcc_group.ifsome_list.size > 0 then
+  if backtrackElem.gcc_group.iflet_list.size > 0 then
       out := out ++ "\nreturn false"
   if backtrackElem.inputsToBeMatched.size > 0 then
     out:= out ++ "\n| " ++ makeUnderscores_commas backtrackElem.inputsToBeMatched.size ++ " => return false"
@@ -307,9 +307,9 @@ def backtrackElem_if_return_producer (backtrackElem : BacktrackElem) (indentatio
     out := out ++ (← GenCheckCalls_toCode gcc monad) ++ " && "
   if backtrackElem.variableEqualities.size + backtrackElem.gcc_group.check_nonIR_list.size + backtrackElem.gcc_group.check_IR_list.size > 0 then
     out:= ⟨out.data.dropLast.dropLast.dropLast⟩ ++ "\n" ++ indentation ++  "then "
-  for gcc in backtrackElem.gcc_group.ret do
+  for gcc in backtrackElem.gcc_group.ret_list do
     out := out ++ indentation ++ (← GenCheckCalls_toCode gcc monad)
-  if backtrackElem.variableEqualities.size + backtrackElem.gcc_group.check_nonIR_list.size + backtrackElem.gcc_group.check_IR_list.size + backtrackElem.gcc_group.ifsome_list.size > 0 then
+  if backtrackElem.variableEqualities.size + backtrackElem.gcc_group.check_nonIR_list.size + backtrackElem.gcc_group.check_IR_list.size + backtrackElem.gcc_group.iflet_list.size > 0 then
     let monad_fail := if monad = "IO" then "throw (IO.userError \"fail at checkstep\")" else "return none"
     out := out ++ "\n" ++ monad_fail
   if backtrackElem.inputsToBeMatched.size > 0 then
@@ -362,7 +362,7 @@ def get_producer_backtrack_elems (inductiveRelation : Expr) (argNames: List Stri
 
 /-- Takes an `Expr` representing an inductive relation and a list of names (arguments to the inductive relation),
     and returns a collection of `BacktrackElem`s for a cecker -/
-def get_checker_backtrack_elems (inductiveRelation: Expr) (argNames : List String) : MetaM (Array BacktrackElem) := do
+def get_checker_backtrack_elems (inductiveRelation : Expr) (argNames : List String) : MetaM (Array BacktrackElem) := do
   let inductiveInfo ← getInductiveInfoWithArgs inductiveRelation argNames
   let mut output := #[]
   for ctor in inductiveInfo.constructors do
