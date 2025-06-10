@@ -168,7 +168,9 @@ inductive GenCheckCall where
   | gen_fvar (id: FVarId) (type: Expr) : GenCheckCall
   | ret (e: Expr): GenCheckCall
 
-def get_checker_initset (ctor : InductiveConstructor) : Array FVarId :=
+/-- Extracts all the free variables in the conclusion of a constructor
+    for an inductive relation -/
+def getFVarsInConclusion (ctor : InductiveConstructor) : Array FVarId :=
   extractFVars ctor.conclusion
 
 /-- Takes a constructor for an inductive relation,
@@ -294,10 +296,10 @@ def GenCheckCalls_for_hypotheses (ctor : InductiveConstructor) (fvars : Array FV
         result := result.push (GenCheckCall.check_nonIR hyp)
   return result
 
-def GenCheckCalls_for_checker (c: InductiveConstructor) : MetaM (Array GenCheckCall) := do
-  let mut initset := get_checker_initset c
-  let mut outarr ← GenCheckCalls_for_hypotheses c initset
-  return outarr
+def GenCheckCalls_for_checker (ctor : InductiveConstructor) : MetaM (Array GenCheckCall) := do
+  let mut initset := getFVarsInConclusion ctor
+  GenCheckCalls_for_hypotheses ctor initset
+
 
 def GenCheckCalls_for_producer (ctor : InductiveConstructor) (genpos : Nat) : MetaM (Array GenCheckCall) := do
   let mut initset ← getFVarsInConclusionArgs ctor genpos
