@@ -186,7 +186,9 @@ inductive GenCheckCall where
 
   /-- `return` the expression `e` in some ambient monad (e.g. `Gen`) -/
   | ret (e : Expr): GenCheckCall
+
   deriving Repr
+
 
 /-- Extracts all the free variables in the conclusion of a constructor
     for an inductive relation -/
@@ -316,6 +318,56 @@ def GenCheckCalls_for_hypotheses (ctor : InductiveConstructor) (fvars : Array FV
         result := result.push (GenCheckCall.check_nonIR hyp)
   return result
 
+
+/-- Note: this function is purely for debugging purposes, it is not used in the main algorithm -/
+def GenCheckCalls_toStr (c: GenCheckCall) : MetaM String := do
+  match c with
+  | GenCheckCall.check_IR cond => return "check_IR_" ++ toString (← Meta.ppExpr cond)
+  | GenCheckCall.check_nonIR cond => return "check_nonIR_" ++ toString (← Meta.ppExpr cond)
+  | GenCheckCall.gen_IR _ cond pos =>  return  "gen_IR_" ++ toString (← Meta.ppExpr cond) ++ " at "  ++ toString pos
+  | GenCheckCall.matchFVar fvar hypothesis => return  "if let " ++ toString (← Meta.ppExpr hypothesis.newHypothesis) ++ ":= " ++ toString (fvar.name) ++ " then "
+  | GenCheckCall.genFVar id ty =>  return  "gen_FVar " ++ toString (id.name) ++ ": " ++ toString (← Meta.ppExpr ty)
+  | GenCheckCall.ret e =>  return "return " ++ toString (← Meta.ppExpr e)
+
+def gen_IR_at_pos (id: FVarId) (cond: Expr) (pos: Nat) : MetaM String := do
+  let tt := Lean.mkFVar ⟨Name.mkStr1 "tt"⟩
+  let new_args := cond.getAppArgs.set! pos tt
+  let new_cond := Lean.mkAppN cond.getAppFn new_args
+  let fun_proto := "fun tt => " ++ toString (← Meta.ppExpr new_cond)
+  return "let " ++ toString (id.name)  ++ ":= gen_IR (" ++ fun_proto ++ ")"
+
+/-- Converts a `GenCheckCall` data structure to a string containing the
+    corresponding Lean expression
+    - Note: this function is purely for debugging purposes, it is not used in the main algorithm -/
+def GenCheckCalls_toRawCode (genCheckCall : GenCheckCall) : MetaM String := do
+  match genCheckCall with
+  | .check_IR hyp => MessageData.toString m!"check_IR ({← Meta.ppExpr hyp})"
+  | .check_nonIR hyp => return  "check (" ++ toString (← Meta.ppExpr hyp) ++ ")"
+  | .gen_IR fvar hyp pos => gen_IR_at_pos fvar hyp pos
+  | .matchFVar fvar hypothesis => return  "if let " ++ toString (← Meta.ppExpr hypothesis.newHypothesis) ++ ":= " ++ toString (fvar.name) ++ " then "
+  | .genFVar id ty =>  return  "let " ++ toString (id.name) ++ ":= gen_rand " ++ toString (← Meta.ppExpr ty)
+  | .ret e => return "return " ++ toString (← Meta.ppExpr e)
+
+
+-- To pretty-print a `GenCheckCall` idiomatically, we can just make it an instance
+-- of the `ToMessageData` typeclass, which allows us to use Lean's delaborator
+-- to pretty-print `Expr`s
+instance : ToMessageData GenCheckCall where
+  toMessageData (genCheckCall : GenCheckCall) : MessageData :=
+    match genCheckCall with
+    | .check_IR hyp => m!"check_IR {hyp}"
+    | .check_nonIR hyp => m!"check {hyp}"
+    | .gen_IR fvar hyp pos =>
+      let tt := Lean.mkFVar ⟨Name.mkStr1 "tt"⟩
+      let new_args := hyp.getAppArgs.set! pos tt
+      let new_hyp := Lean.mkAppN hyp.getAppFn new_args
+      m!"let {fvar.name} := gen_IR (fun {tt} => {new_hyp})"
+    | .matchFVar fvar hypothesis => m!"if let {hypothesis.newHypothesis} := {fvar.name} then ..."
+    | .genFVar id ty => m!"let {id.name} := gen_rand {ty}"
+    | .ret e => m!"return {e}"
+
+
+
 def GenCheckCalls_for_checker (ctor : InductiveConstructor) : MetaM (Array GenCheckCall) := do
   let mut initset := getFVarsInConclusion ctor
   GenCheckCalls_for_hypotheses ctor initset
@@ -335,37 +387,6 @@ def GenCheckCalls_for_producer (ctor : InductiveConstructor) (genpos : Nat) : Me
     outarr := outarr.push (GenCheckCall.genFVar fid ty)
   outarr := outarr.push (GenCheckCall.ret gen_arg)
   return outarr
-
-/-- Note: this function is purely for debugging purposes, it is not used in the main algorithm -/
-def GenCheckCalls_toStr (c: GenCheckCall) : MetaM String := do
-  match c with
-  | GenCheckCall.check_IR cond => return  "check_IR_" ++ toString (← Meta.ppExpr cond)
-  | GenCheckCall.check_nonIR cond => return  "check_nonIR_" ++ toString (← Meta.ppExpr cond)
-  | GenCheckCall.gen_IR _ cond pos =>  return  "gen_IR_" ++ toString (← Meta.ppExpr cond) ++ " at "  ++ toString pos
-  | GenCheckCall.matchFVar id sp => return "match " ++ id.name.toString ++ toString (← Meta.ppExpr sp.newHypothesis)
-  | GenCheckCall.genFVar id ty=>  return  "gen_fvar " ++ toString (id.name) ++ ": " ++ toString (← Meta.ppExpr ty)
-  | GenCheckCall.ret e =>  return  "ret " ++ toString (← Meta.ppExpr e)
-
-def gen_IR_at_pos (id: FVarId) (cond: Expr) (pos: Nat) : MetaM String := do
-  let tt := Lean.mkFVar ⟨Name.mkStr1 "tt"⟩
-  let new_args := cond.getAppArgs.set! pos tt
-  let new_cond := Lean.mkAppN cond.getAppFn new_args
-  let fun_proto := "fun tt => " ++ toString (← Meta.ppExpr new_cond)
-  return "let " ++ toString (id.name)  ++ ":= gen_IR (" ++ fun_proto ++ ")"
-
-/-- Converts a `GenCheckCall` data structure to a string containing the
-    corresponding Lean expression
-    - Note: this function is purely for debugging purposes, it is not used in the main algorithm -/
-def GenCheckCalls_toRawCode (genCheckCall : GenCheckCall) : MetaM String := do
-  match genCheckCall with
-  | .check_IR hyp => return  "check_IR (" ++ toString (← Meta.ppExpr hyp) ++ ")"
-  | .check_nonIR hyp => return  "check (" ++ toString (← Meta.ppExpr hyp) ++ ")"
-  | .gen_IR fvar hyp pos => gen_IR_at_pos fvar hyp pos
-  | .matchFVar fvar hypothesis => return  "if let " ++ toString (← Meta.ppExpr hypothesis.newHypothesis) ++ ":= " ++ toString (fvar.name) ++ " then "
-  | .genFVar id ty =>  return  "let " ++ toString (id.name) ++ ":= gen_rand " ++ toString (← Meta.ppExpr ty)
-  | .ret e => return "return " ++ toString (← Meta.ppExpr e)
-
-
 
 syntax (name := getCheckerCall) "#get_checker_call" term : command
 

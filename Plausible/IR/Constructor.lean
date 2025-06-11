@@ -17,16 +17,36 @@ namespace Plausible.IR
 -- BACKTRACK CHECKER ---
 
 -- Order is the same as the order of the constructors in the inductive relation
-structure GenCheckCall_group where
+structure GenCheckCallGroup where
   gen_list: Array GenCheckCall
-  -- `iflet_list` is the list of `if let ...` expressions
-  -- (Note: keep this for now)
+
+  /-- `iflet_list` is the list of `if let ...` expressions -/
   iflet_list : Array GenCheckCall
+
   check_IR_list: Array GenCheckCall
+
   check_nonIR_list: Array GenCheckCall
+
+  /-- `ret_list` is the `GenCheckCall`s which are all of the form `return e` -/
   ret_list : Array GenCheckCall
+
   variableEqualities : Array (FVarId × FVarId)
+
   deriving Repr
+
+-- Pretty print `GenCheckCallGroup`s using the `MessageData` typeclass
+instance : ToMessageData GenCheckCallGroup where
+  toMessageData group :=
+    let fields := [
+      m!"gen_list := {indentD $ toMessageData group.gen_list}",
+      m!"iflet_list := {indentD $ toMessageData group.iflet_list}",
+      m!"check_IR_list := {indentD $ toMessageData group.check_IR_list}",
+      m!"check_nonIR_list := {indentD $ toMessageData group.check_nonIR_list}",
+      m!"ret_list := {indentD $ toMessageData group.ret_list}",
+      m!"variableEqualities := {repr group.variableEqualities}",
+    ]
+    .bracket "{" (.ofList fields) "}"
+
 
 /-- The `BacktrackElem` datatype contains metadata needed to derive a "backtrack element"
     (a sub-generator that is invoked from the main generator function) -/
@@ -43,7 +63,7 @@ structure BacktrackElem where
 
   /-- `gcc_group` is used to create the RHS of the first case
       in the pattern match -/
-  gcc_group : GenCheckCall_group
+  gcc_group : GenCheckCallGroup
 
   /-- A list of equalities that must hold between free variables
       (used when rewriting free variabels in patterns) -/
@@ -51,14 +71,26 @@ structure BacktrackElem where
 
   deriving Repr
 
+-- Pretty print `BacktrackElem`s using the `MessageData` typeclass
+instance : ToMessageData BacktrackElem where
+  toMessageData backtrackElem : MessageData :=
+    let fields := [
+      m!"inputs := {toMessageData backtrackElem.inputs}",
+      m!"inputsToBeMatched := {toMessageData backtrackElem.inputsToBeMatched}",
+      m!"exprsToBeMatched := {indentD $ toMessageData backtrackElem.exprsToBeMatched}",
+      m!"gcc_group := {indentD $ toMessageData backtrackElem.gcc_group}",
+      m!"variableEqualities := {repr backtrackElem.variableEqualities}",
+    ]
+    .bracket "{" (.ofList fields) "}"
+
 
 /-- Converts an array of `GenCheckCall`s into a `GenCheckCall_group` -/
-def GenCheckCalls_grouping (gccs: Array GenCheckCall) : MetaM GenCheckCall_group := do
-  let mut gen_list : Array GenCheckCall := #[]
-  let mut check_IR_list : Array GenCheckCall := #[]
-  let mut check_nonIR_list : Array GenCheckCall := #[]
-  let mut iflet_list : Array GenCheckCall := #[]
-  let mut ret : Array GenCheckCall := #[]
+def GenCheckCalls_grouping (gccs: Array GenCheckCall) : MetaM GenCheckCallGroup := do
+  let mut gen_list := #[]
+  let mut check_IR_list := #[]
+  let mut check_nonIR_list := #[]
+  let mut iflet_list := #[]
+  let mut ret_list := #[]
   let mut variableEqualities : Array (FVarId × FVarId) := #[]
   for gcc in gccs do
     match gcc with
@@ -71,7 +103,7 @@ def GenCheckCalls_grouping (gccs: Array GenCheckCall) : MetaM GenCheckCall_group
         variableEqualities := variableEqualities ++ hyp.variableEqualities;
       }
     | GenCheckCall.ret _ =>
-        ret := ret.push gcc
+        ret_list := ret_list.push gcc
     | GenCheckCall.check_IR _ =>
         check_IR_list := check_IR_list.push gcc
     | _ =>
@@ -81,7 +113,7 @@ def GenCheckCalls_grouping (gccs: Array GenCheckCall) : MetaM GenCheckCall_group
     check_IR_list := check_IR_list
     check_nonIR_list := check_nonIR_list
     iflet_list := iflet_list
-    ret_list := ret
+    ret_list := ret_list
     variableEqualities := variableEqualities
   }
 
@@ -331,8 +363,8 @@ def backtrackElem_if_return_producer (backtrackElem : BacktrackElem) (indentatio
 /-- Assembles all the components of a sub-generator (a `BacktrackElem`) together, returning a string
     containing the Lean code for the sub-generator -/
 def backtrack_elem_toString_producer (backtrackElem : BacktrackElem) (monad: String :="IO"): MetaM String := do
-  IO.println s!"¬entered `backtrack_elem_toString_checker`:"
-  IO.println s!"{reprStr backtrackElem}"
+  logInfo s!"entered `backtrack_elem_toString_producer`:"
+  logInfo (toMessageData backtrackElem)
 
   let mut out := ""
   let matchblock ← backtrackElem_match_block backtrackElem
