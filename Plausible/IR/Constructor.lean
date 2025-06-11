@@ -159,7 +159,7 @@ def gen_IR_at_pos_toCode (fvar : FVarId) (hyp : Expr) (idx : Nat) : MetaM String
   return "let " ++ toString (fvar.name)  ++ " ← " ++ fn_str
 
 def gen_nonIR_toCode (fvar : FVarId) (ty : Expr) (monad : String :="IO") : MetaM String := do
-  let mut out:= "let "++ toString (fvar.name)
+  let mut out := "let "++ toString (fvar.name)
   let mut typename := afterLastDot (toString (← Meta.ppExpr ty))
   if typename.contains ' ' then typename:= "(" ++ typename ++ ")"
   if monad = "IO" then
@@ -188,10 +188,10 @@ def backtrackElem_match_block (backtrackElem : BacktrackElem) : MetaM String := 
     out := out ++ "match "
     for i in backtrackElem.inputsToBeMatched do
       out := out ++  i  ++ " , "
-    out:= ⟨out.data.dropLast.dropLast⟩ ++ " with \n| "
+    out := ⟨out.data.dropLast.dropLast⟩ ++ " with \n| "
     for a in backtrackElem.exprsToBeMatched do
       out := out ++ toString (← Meta.ppExpr a) ++ " , "
-    out:= ⟨out.data.dropLast.dropLast⟩ ++ " =>  "
+    out := ⟨out.data.dropLast.dropLast⟩ ++ " =>  "
   return out
 
 /-- Produces expressions that invoke generators in a sub-generator
@@ -242,11 +242,11 @@ def backtrackElem_return_checker (backtrackElem : BacktrackElem) (indentation : 
   for gcc in backtrackElem.gcc_group.check_nonIR_list do
     out := out ++ (← GenCheckCalls_toCode gcc monad) ++ " && "
   if backtrackElem.variableEqualities.size + backtrackElem.gcc_group.check_nonIR_list.size + backtrackElem.gcc_group.check_IR_list.size > 0 then
-    out:= ⟨out.data.dropLast.dropLast.dropLast⟩
+    out := ⟨out.data.dropLast.dropLast.dropLast⟩
   if backtrackElem.gcc_group.iflet_list.size > 0 then
       out := out ++ "\nreturn false"
   if backtrackElem.inputsToBeMatched.size > 0 then
-    out:= out ++ "\n| " ++ makeUnderscores_commas backtrackElem.inputsToBeMatched.size ++ " => return false"
+    out := out ++ "\n| " ++ makeUnderscores_commas backtrackElem.inputsToBeMatched.size ++ " => return false"
   return out
 
 /-- Assembles all the components of a sub-checker (a `BacktrackElem`) together, returning a string
@@ -260,13 +260,13 @@ def backtrack_elem_toString_checker (backtrackElem: BacktrackElem) (monad: Strin
   out := out ++ matchblock
   if genblock.length > 0 ∧ out.length > 0 then
     out := out ++ "\n"
-  out:= out ++ genblock
+  out := out ++ genblock
   if checkIRblock.length > 0 ∧ out.length > 0 then
     out := out ++ "\n"
-  out:= out ++ checkIRblock
+  out := out ++ checkIRblock
   if genblock.length + checkIRblock.length > 0 then
-    out:= out ++ "\n" ++ returnblock
-  else out:= out ++ returnblock
+    out := out ++ "\n" ++ returnblock
+  else out := out ++ returnblock
   return out
 
 
@@ -339,7 +339,7 @@ def get_producer_backtrack_elem_from_constructor (ctor: InductiveConstructor) (i
     - e.g. `vars = ["1", "2", ...]`
 -/
 def backtrackElem_if_return_producer (backtrackElem : BacktrackElem) (indentation : String) (vars: List String) (monad: String :="IO"): MetaM String := do
-  let mut out:= ""
+  let mut out := ""
   if backtrackElem.variableEqualities.size + backtrackElem.gcc_group.check_nonIR_list.size + backtrackElem.gcc_group.check_IR_list.size > 0 then
     out := out ++ indentation ++ "if "
   for j in vars do
@@ -349,7 +349,7 @@ def backtrackElem_if_return_producer (backtrackElem : BacktrackElem) (indentatio
   for gcc in backtrackElem.gcc_group.check_nonIR_list do
     out := out ++ (← GenCheckCalls_toCode gcc monad) ++ " && "
   if backtrackElem.variableEqualities.size + backtrackElem.gcc_group.check_nonIR_list.size + backtrackElem.gcc_group.check_IR_list.size > 0 then
-    out:= ⟨out.data.dropLast.dropLast.dropLast⟩ ++ "\n" ++ indentation ++  "then "
+    out := ⟨out.data.dropLast.dropLast.dropLast⟩ ++ "\n" ++ indentation ++  "then "
   for gcc in backtrackElem.gcc_group.ret_list do
     out := out ++ indentation ++ (← GenCheckCalls_toCode gcc monad)
   if backtrackElem.variableEqualities.size + backtrackElem.gcc_group.check_nonIR_list.size + backtrackElem.gcc_group.check_IR_list.size + backtrackElem.gcc_group.iflet_list.size > 0 then
@@ -357,14 +357,19 @@ def backtrackElem_if_return_producer (backtrackElem : BacktrackElem) (indentatio
     out := out ++ "\n" ++ monad_fail
   if backtrackElem.inputsToBeMatched.size > 0 then
     let monad_fail := if monad = "IO" then "throw (IO.userError \"fail\")" else "return none"
-    out:= out ++ "\n| " ++ makeUnderscores_commas backtrackElem.inputsToBeMatched.size ++ " => " ++ monad_fail
+    out := out ++ "\n| " ++ makeUnderscores_commas backtrackElem.inputsToBeMatched.size ++ " => " ++ monad_fail
+
+  IO.println "********************"
+  IO.println s!"inside if_return_producer: \n{out}"
+
   return out
 
 /-- Assembles all the components of a sub-generator (a `BacktrackElem`) together, returning a string
     containing the Lean code for the sub-generator -/
 def backtrack_elem_toString_producer (backtrackElem : BacktrackElem) (monad: String :="IO"): MetaM String := do
-  logInfo s!"entered `backtrack_elem_toString_producer`:"
-  logInfo (toMessageData backtrackElem)
+  IO.println "********************"
+  IO.println s!"entered `backtrack_elem_toString_producer`:"
+  IO.println (← MessageData.toString (toMessageData backtrackElem))
 
   let mut out := ""
   let matchblock ← backtrackElem_match_block backtrackElem
@@ -374,13 +379,19 @@ def backtrack_elem_toString_producer (backtrackElem : BacktrackElem) (monad: Str
   out := out ++ matchblock
   if genblock.length + checkIRblock.length + returnblock.length > 0 ∧ out.length > 0 then
     out := out ++ "\n"
-  out:= out ++ genblock
+  out := out ++ genblock
   if checkIRblock.length > 0 ∧ out.length > 0 then
     out := out ++ "\n"
-  out:= out ++ checkIRblock
+  out := out ++ checkIRblock
   if genblock.length + checkIRblock.length > 0 then
-    out:= out ++ "\n" ++ returnblock
-  else out:= out ++ returnblock
+    out := out ++ "\n" ++ returnblock
+  else out := out ++ returnblock
+
+  -- TODO: figure out how to assemble `out` using `TSyntax`es for the sub-components
+  IO.println "********************"
+  IO.println "back in `backtrack_elem_toString_producer`:"
+  IO.println s!"out = {out}"
+
   return out
 
 

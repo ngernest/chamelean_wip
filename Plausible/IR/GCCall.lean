@@ -367,19 +367,18 @@ instance : ToMessageData GenCheckCall where
     | .ret e => m!"return {e}"
 
 
-
+/-- Produces a collection of `GenCheckCalls` for a checker -/
 def GenCheckCalls_for_checker (ctor : InductiveConstructor) : MetaM (Array GenCheckCall) := do
   let mut initset := getFVarsInConclusion ctor
   GenCheckCalls_for_hypotheses ctor initset
 
 
+/-- Produces a collection of `GenCheckCalls` for a generator -/
 def GenCheckCalls_for_producer (ctor : InductiveConstructor) (genpos : Nat) : MetaM (Array GenCheckCall) := do
   let mut initset ← getFVarsInConclusionArgs ctor genpos
   let mut outarr ← GenCheckCalls_for_hypotheses ctor initset
   for hyp in ctor.all_hypotheses do
     initset := Array.appendUniqueElements initset (extractFVars hyp)
-  -- TODO: figure out how to extract the conclusion of the constructor so that we can produce
-  -- the corresponding generator
   let gen_arg := ctor.conclusion.getAppArgs[genpos]!
   let uninitset := Array.removeAll (extractFVars gen_arg) initset
   for fid in uninitset do
