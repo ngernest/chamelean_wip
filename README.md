@@ -2,9 +2,16 @@
 A property testing framework for Lean 4 that integrates into the tactic framework.
 
 ## New Metaprogramming Code
-- See the [`New`](./Plausible/New/) subdirectory for new code that uses `TSyntax` instead of `MetaM String` 
-- See [`Tests.lean`](./Plausible/New/Tests.lean) for example usage on how to use the new `#deriving` commands for deriving generators
-- See [`OptionTGen.lean`](./Plausible/New/OptionTGen.lean) for new generator combinators that work over the `OptionT Gen` monad transformer (representing generators that may fail)
+See the [`New`](./Plausible/New/) subdirectory for code that uses Lean's metaprogramming facilities (`TSyntax`) 
+to automatically derive generators/checkers for inductive relations, à la [Paraskevopoulou et al. 2022](https://lemonidas..github.io/pdf/ComputingCorrectly.pdf).
+
+Repo overview:
+- [`OptionTGen.lean`](./Plausible/New/OptionTGen.lean): Generator combinators that work over the `OptionT Gen` monad transformer (representing generators that may fail)
+- [`DeriveGenerator.lean`](./Plausible/New/DeriveGenerator.lean): Metaprogramming infrastructure for automatically deriving Plausible generators
+- [`DeriveChecker.lean`](./Plausible/New/DeriveChecker.lean): Metaprogramming infrastructure for automatically deriving checkers
+- [`Idents.lean`](./Plausible/New/Idents.lean): Utilities for dealing with identifiers / producing fresh names 
+- [`Constraints.lean`](./Plausible/New/Constraints.lean): Handles constraints related to constructors for inductive relations
+- [`Tests.lean`](./Plausible/New/Tests.lean): Example usage on how to use the new `#deriving` commands for deriving generators
 
 ## Usage
 If you are using built in types Plausible is usually able to handle them already:

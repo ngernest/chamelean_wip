@@ -18,4 +18,13 @@ def natIdent : Ident := mkIdent ``Nat
 def optionTIdent : Ident := mkIdent ``OptionT
 def genIdent : Ident := mkIdent ``Plausible.Gen
 
+/-- Produces a fresh user-facing & *accessible* identifier with respect to the local context
+    - Note: prefer using this function over `Core.mkFreshUserName`, which is meant
+      to create fresh names that are *inaccessible* to the user (i.e. `mkFreshUserName` will
+      add daggers (`†`) to the name to make them inaccessible).
+    - This function ensures that the identifier is fresh
+      by adding suffixes containing underscores/numbers when necessary (in lieu of adding daggers). -/
+def mkFreshAccessibleIdent (localCtx : LocalContext) (name : Name) : Ident :=
+  mkIdent $ LocalContext.getUnusedName localCtx name
+
 end Idents
