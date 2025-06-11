@@ -61,8 +61,6 @@ def elabGetprotoChecker : CommandElab := fun stx => do
       print_m_string proto
   | _ => throwError "Invalid syntax"
 
-#get_checker_prototype typing with_name ["L", "e", "t"]
-
 
 def prototype_for_producer(r: InductiveInfo) (inpname: List String) (genpos: Nat) (monad: String :="IO"): MetaM String := do
   let zipinp := [("size", Lean.mkConst `Nat)] ++ List.zip inpname r.input_types.toList
@@ -115,7 +113,5 @@ def elabGetprotoProducer : CommandElab := fun stx => do
       let proto := prototype_for_producer relation inpname pos
       print_m_string proto
   | _ => throwError "Invalid syntax"
-
-#get_producer_prototype typing with_name ["L", "e", "t"] for_arg 1
 
 end Plausible.IR

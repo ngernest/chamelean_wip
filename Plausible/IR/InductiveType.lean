@@ -29,8 +29,6 @@ structure IT_info where
   noinstance_dep : Array Expr
   constructors : Array IT_constructor
 
-#check SampleableExt
-
 def is_ind_IT_constructor (ITname: Name )(conargs: List Expr) : Bool := match conargs with
 | [] => false
 | h::t => (h.constName == ITname) || is_ind_IT_constructor ITname t
@@ -66,9 +64,6 @@ def extract_IT_info (inpexp : Expr) : MetaM (IT_info) := do
           then noinstance:= noinstance.push a
         let is_ind := is_ind_IT_constructor typeName cargs
         constructors := constructors.push ⟨typeName, ctor.name, cargs, is_ind⟩
-      --IO.println s!"No inst {noinstance}"
-      --let nonind_constructors:= constructors.filter (fun x => is_ind_IT_constructor typeName x.args)
-      --let ind_constructors:= constructors.filter (fun x =>  (is_ind_IT_constructor typeName x.args == false))
       return ⟨typeName, ← has_instance inpexp, noinstance, constructors⟩
     | some _ =>
       throwError "'{typeName}' is not an inductive type"
@@ -206,13 +201,13 @@ def elabDeriveGenerator : CommandElab := fun stx => do
 
 
 
-#derive_sampleable Tree with_size 5
+-- #derive_sampleable Tree with_size 5
 
 --instance : SampleableExt Tree :=
 --  SampleableExt.mkSelfContained (gen_Tree 3)
 
 
 
-#eval Gen.run (SampleableExt.interpSample Tree) 5
+-- #eval Gen.run (SampleableExt.interpSample Tree) 5
 
 end Plausible.IR

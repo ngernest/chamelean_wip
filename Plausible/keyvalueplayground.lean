@@ -16,13 +16,13 @@ open KeyValueStore
 
 
 
-#get_relation lookup_kv
-#get_checker_call lookup_kv
+-- #get_relation lookup_kv
+-- #get_checker_call lookup_kv
 
 
-#gen_producer lookup_kv with_name ["s", "l", "T"] for_arg 1 backtrack 10
+-- #gen_producer lookup_kv with_name ["s", "l", "T"] for_arg 1 backtrack 10
 
-#gen_mutual_rec lookup_kv with_name ["s", "l"] backtrack 10 monad "IO"
+-- #gen_mutual_rec lookup_kv with_name ["s", "l"] backtrack 10 monad "IO"
 mutual
 -- CHECKER
 
@@ -1048,6 +1048,6 @@ match size with
 end
 
 
-#eval gen_eval_state_api_call_at_1 5 [("aa" ,"bb"), ("cc", "dd")]
-#eval gen_eval_state_api_call_at_1 3 [("aa" ,"bb"), ("cc", "dd"), ("ee", "ff")]
-#eval gen_eval_state_api_call_at_1 3 [("aa" ,"bb"), ("cc", "dd"), ("ee", "ff")]
+-- #eval gen_eval_state_api_call_at_1 5 [("aa" ,"bb"), ("cc", "dd")]
+-- #eval gen_eval_state_api_call_at_1 3 [("aa" ,"bb"), ("cc", "dd"), ("ee", "ff")]
+-- #eval gen_eval_state_api_call_at_1 3 [("aa" ,"bb"), ("cc", "dd"), ("ee", "ff")]

@@ -50,7 +50,6 @@ inductive Tree  where
 | Leaf : Nat → Tree
 | Node : Nat → Tree  → Tree  → Tree
 
-
 structure IT_constructor where
   ITname : Name
   conname: Name
@@ -60,8 +59,6 @@ structure IT_info where
   name : Name
   noinstance : Array Expr
   constructors : Array IT_constructor
-
-#check SampleableExt
 
 def is_ind_IT_constructor (ITname: Name )(conargs: List Expr) : Bool := match conargs with
 | [] => false
@@ -190,4 +187,4 @@ def elabGetMutualBlock : CommandElab := fun stx => do
       print_m_string mc_block
   | _ => throwError "Invalid syntax"
 
-#gen_mutual_rec_IT Tree backtrack 1
+-- #gen_mutual_rec_IT Tree backtrack 1

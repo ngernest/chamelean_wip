@@ -443,9 +443,9 @@ def elabGetExpr : CommandElab := fun stx => do
 syntax (name := getRelationInfoChecker) "#get_relation_checker" term : command
 
 
-#get_relation balanced
-#get_relation bst
-#get_relation typing
+-- #get_relation balanced
+-- #get_relation bst
+-- #get_relation typing
 
 
 

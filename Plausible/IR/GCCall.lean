@@ -385,9 +385,9 @@ def elabCheckerCall : CommandElab := fun stx => do
   | _ => throwError "Invalid syntax"
 
 
-#get_checker_call typing
-#get_checker_call balanced
-#get_checker_call bst
+-- #get_checker_call typing
+-- #get_checker_call balanced
+-- #get_checker_call bst
 
 syntax (name := geGenCall) "#get_producer_call" term "for_arg" num : command
 
@@ -409,8 +409,8 @@ def elabGenCall : CommandElab := fun stx => do
   | _ => throwError "Invalid syntax"
 
 
-#get_producer_call typing for_arg 2
-#get_producer_call balanced for_arg 1
-#get_producer_call bst for_arg 2
+-- #get_producer_call typing for_arg 2
+-- #get_producer_call balanced for_arg 1
+-- #get_producer_call bst for_arg 2
 
 end Plausible.IR

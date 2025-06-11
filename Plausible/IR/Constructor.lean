@@ -51,6 +51,7 @@ structure BacktrackElem where
 
   deriving Repr
 
+
 /-- Converts an array of `GenCheckCall`s into a `GenCheckCall_group` -/
 def GenCheckCalls_grouping (gccs: Array GenCheckCall) : MetaM GenCheckCall_group := do
   let mut gen_list : Array GenCheckCall := #[]
@@ -265,9 +266,9 @@ def elabgetBackTrack : CommandElab := fun stx => do
       IO.println where_defs
   | _ => throwError "Invalid syntax"
 
-#get_backtrack_checker typing with_name ["L", "e", "t"]
-#get_backtrack_checker balanced with_name ["h", "T"]
-#get_backtrack_checker bst with_name ["lo", "hi", "T"]
+-- #get_backtrack_checker typing with_name ["L", "e", "t"]
+-- #get_backtrack_checker balanced with_name ["h", "T"]
+-- #get_backtrack_checker bst with_name ["lo", "hi", "T"]
 
 
 
@@ -330,6 +331,9 @@ def backtrackElem_if_return_producer (backtrackElem : BacktrackElem) (indentatio
 /-- Assembles all the components of a sub-generator (a `BacktrackElem`) together, returning a string
     containing the Lean code for the sub-generator -/
 def backtrack_elem_toString_producer (backtrackElem : BacktrackElem) (monad: String :="IO"): MetaM String := do
+  IO.println s!"¬entered `backtrack_elem_toString_checker`:"
+  IO.println s!"{reprStr backtrackElem}"
+
   let mut out := ""
   let matchblock ← backtrackElem_match_block backtrackElem
   let (genblock, iden) ← backtrackElem_gen_block backtrackElem monad
@@ -399,11 +403,11 @@ def elabgetBackTrackProducer : CommandElab := fun stx => do
       IO.println where_defs
   | _ => throwError "Invalid syntax"
 
-#get_backtrack_producer typing with_name ["L", "e", "t"] for_arg 0
-#get_backtrack_producer typing with_name ["L", "e", "t"] for_arg 2
-#get_backtrack_producer typing with_name ["L", "e", "t"] for_arg 1
-#get_backtrack_producer balanced with_name ["h", "T"] for_arg 1
-#get_backtrack_producer bst with_name ["lo", "hi", "T"] for_arg 2
+-- #get_backtrack_producer typing with_name ["L", "e", "t"] for_arg 0
+-- #get_backtrack_producer typing with_name ["L", "e", "t"] for_arg 2
+-- #get_backtrack_producer typing with_name ["L", "e", "t"] for_arg 1
+-- #get_backtrack_producer balanced with_name ["h", "T"] for_arg 1
+-- #get_backtrack_producer bst with_name ["lo", "hi", "T"] for_arg 2
 
 
 end Plausible.IR

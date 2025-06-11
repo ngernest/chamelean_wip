@@ -254,8 +254,6 @@ def mkListLevel (n:Nat) : MetaM (List Level) := do
     l:= l ++ [.zero]
   return l
 
-#eval mkListLevel 3
-
 def getVariant_GenericType (type : Expr): MetaM (List (Name × Expr)) := do
   let env ← getEnv
   let typename:= type.getAppFn.constName
@@ -346,8 +344,6 @@ def makeInputs_ptr (s: String) (n : Nat) := makeInputs_aux s n n
 where makeInputs_aux (s: String) (n : Nat) (z: Nat) : String := match n with
 | 0 => ""
 | succ n => s ++ "_" ++ (toString (z - n) ) ++ " " ++ (makeInputs_aux s n z)
-
-#eval makeInputs_ptr "in" 3
 
 def afterLastDot (s : String) : String :=
   match s.revFind (· == '.') with
