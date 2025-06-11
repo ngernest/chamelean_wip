@@ -26,6 +26,7 @@ structure GenCheckCall_group where
   check_nonIR_list: Array GenCheckCall
   ret_list : Array GenCheckCall
   variableEqualities : Array (FVarId × FVarId)
+  deriving Repr
 
 /-- The `BacktrackElem` datatype contains metadata needed to derive a "backtrack element"
     (a sub-generator that is invoked from the main generator function) -/
@@ -47,6 +48,8 @@ structure BacktrackElem where
   /-- A list of equalities that must hold between free variables
       (used when rewriting free variabels in patterns) -/
   variableEqualities : Array (FVarId × FVarId)
+
+  deriving Repr
 
 /-- Converts an array of `GenCheckCall`s into a `GenCheckCall_group` -/
 def GenCheckCalls_grouping (gccs: Array GenCheckCall) : MetaM GenCheckCall_group := do
@@ -359,18 +362,19 @@ def producer_where_defs (relation: InductiveInfo) (inpname: List String) (genpos
     out_str:= out_str ++ btStr ++ "\n"
   return out_str
 
-/-- Takes an `Expr` representing an inductive relation and a list of names (arguments to the inductive relation),
+/-- Takes an `Expr` representing an inductive relation, a list of names (arguments to the inductive relation),
+    and the index of the argument we wish to generate (`targetIdx`),
     and returns a collection of `BacktrackElem`s for a generator -/
-def get_producer_backtrack_elems (inductiveRelation : Expr) (argNames : Array String) (genpos: Nat) : MetaM (Array BacktrackElem) := do
+def get_producer_backtrack_elems (inductiveRelation : Expr) (argNames : Array String) (targetIdx: Nat) : MetaM (Array BacktrackElem) := do
   let inductiveInfo ← getInductiveInfoWithArgs inductiveRelation argNames
   let mut output := #[]
   for ctor in inductiveInfo.constructors do
-    let backtrackElem ← get_producer_backtrack_elem_from_constructor ctor argNames genpos
+    let backtrackElem ← get_producer_backtrack_elem_from_constructor ctor argNames targetIdx
     output := output.push backtrackElem
   return output
 
 /-- Takes an `Expr` representing an inductive relation and a list of names (arguments to the inductive relation),
-    and returns a collection of `BacktrackElem`s for a cecker -/
+    and returns a collection of `BacktrackElem`s for a checker -/
 def get_checker_backtrack_elems (inductiveRelation : Expr) (argNames : Array String) : MetaM (Array BacktrackElem) := do
   let inductiveInfo ← getInductiveInfoWithArgs inductiveRelation argNames
   let mut output := #[]

@@ -14,8 +14,6 @@ open Std
 
 namespace Plausible.IR
 
--- Process condition ---
-
 /-- Removes all elements of `xs` that are present in `ys`
     (variant of `List.removeAll` for arrays) -/
 def Array.removeAll [BEq α] (xs : Array α) (ys : Array α) : Array α :=
@@ -110,6 +108,8 @@ structure DecomposedInductiveHypothesis where
       (e.g. `t = t1`) -/
   variableEqualities : Array (FVarId × FVarId)
 
+  deriving Repr
+
 /-- For each free variable `t` that appears more than once in the hypothesis `hyp`,
     replace its second occurrence with `t1`, its 3rd occurrence with `t2`, etc.,
     and record the equalities `t = t1, t = t2, ...` -/
@@ -160,11 +160,6 @@ def separateFVarsInHypothesis (hypothesis : Expr) (initialFVars : Array FVarId)
   }
 
 
-
---TO BE IMPLEMENT-- separate function call with constructor
-
-def is_inductive_constructor (e: Expr) : Bool := ¬ e.isFVar
-
 /-- Represents an expression in the RHS of the non-trivial pattern-match case
     in a backtrack element (sub-generator) -/
 inductive GenCheckCall where
@@ -191,6 +186,7 @@ inductive GenCheckCall where
 
   /-- `return` the expression `e` in some ambient monad (e.g. `Gen`) -/
   | ret (e : Expr): GenCheckCall
+  deriving Repr
 
 /-- Extracts all the free variables in the conclusion of a constructor
     for an inductive relation -/

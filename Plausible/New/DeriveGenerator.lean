@@ -356,7 +356,7 @@ def elabDeriveGeneratorNew : CommandElab := fun stx => do
     let targetIdx := Option.get! targetIdxOpt
 
     -- Call helper function that produces Thanh's `BacktrackElem` data structure
-    let argNameStrings := termsToStrings args
+    let argNameStrings := convertIdentsToStrings args
     let _backtrackElems ← liftTermElabM $
       get_producer_backtrack_elems inductiveExpr argNameStrings targetIdx
 

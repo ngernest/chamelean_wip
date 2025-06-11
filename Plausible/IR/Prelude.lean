@@ -389,7 +389,7 @@ def parseCommands (inputs : Array String) : CommandElabM Unit := do
 
 /-- Converts an array of syntactic terms to an array of exprs that are all
     `Expr`s created using the `Expr.fvar` constructor -/
-def termsToFVarExprs (terms : Array (TSyntax `term)) : Array Expr :=
+def convertIdentsToFVarExprs (terms : Array (TSyntax `term)) : Array Expr :=
   Array.map (fun term =>
     let name :=
       match term with
@@ -398,7 +398,7 @@ def termsToFVarExprs (terms : Array (TSyntax `term)) : Array Expr :=
     Expr.fvar (FVarId.mk (Name.mkStr1 name))) terms
 
 /-- Converts an array of syntactic terms to an array of strings -/
-def termsToStrings (terms : Array (TSyntax `term)) : Array String :=
+def convertIdentsToStrings (terms : Array (TSyntax `term)) : Array String :=
   Array.map (fun term =>
       match term with
       | `($id:ident) => id.getId.toString
