@@ -11,6 +11,7 @@ open OptionTGen
 -- Click on the VS Code sidebar to insert the code of the derived generator into the Lean file
 #derive_generator (fun (t : Tree) => balanced n t)
 
+
 -- One can inspect the type of the derived generator like so:
 -- #check gen_balanced
 

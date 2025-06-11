@@ -5,3 +5,4 @@ import Plausible.New.GenOption
 import Plausible.New.Tests
 import Plausible.New.OptionTGen
 import Plausible.New.Idents
+import Plausible.New.Schedules

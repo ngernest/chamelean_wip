@@ -161,7 +161,12 @@ def separateFVarsInHypothesis (hypothesis : Expr) (initialFVars : Array FVarId)
 
 
 /-- Represents an expression in the RHS of the non-trivial pattern-match case
-    in a backtrack element (sub-generator) -/
+    in a backtrack element (sub-generator)
+    - TODO (Ernest): this is a super-set of QuickChick's `schedule_step`
+      (maybe just take `ret` out and have it be a separate thing, since we can only
+       have `return`s at the end of a schedule
+       - also Checkers don't have `return`s)
+    -/
 inductive GenCheckCall where
   /-- Invoke a checker for the inductive relation specified in the hypothesis `hyp`
       (`hyp` must be an inductive relation) -/
@@ -181,7 +186,9 @@ inductive GenCheckCall where
    -/
   | matchFVar (fvar : FVarId) (hyp : DecomposedInductiveHypothesis) : GenCheckCall
 
-  /-- Generate a free variable `fvar` with the given `type` -/
+  /-- Generate a free variable `fvar` with the given `type`
+      - this is `gen_UC` in QuickChick (i.e. `arbitrary`)
+   -/
   | genFVar (fvar : FVarId) (type : Expr) : GenCheckCall
 
   /-- `return` the expression `e` in some ambient monad (e.g. `Gen`) -/

@@ -93,6 +93,8 @@ structure InductiveConstructor where
   final_arg_in_conclusion : Expr
   conclusion_args : Array Expr
 
+  -- input equalities (equalities between the inputs to the inductive
+  -- and patterns for the inputs to the constructor)
   inp_eq: Array (Expr × Expr)
   ctor_expr: Expr
   num_inp_eq: Array (Expr × Expr)
