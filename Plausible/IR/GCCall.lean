@@ -356,7 +356,7 @@ instance : ToMessageData GenCheckCall where
   toMessageData (genCheckCall : GenCheckCall) : MessageData :=
     match genCheckCall with
     | .check_IR hyp => m!"check_IR {hyp}"
-    | .check_nonIR hyp => m!"check {hyp}"
+    | .check_nonIR hyp => m!"check ({hyp})"
     | .gen_IR fvar hyp pos =>
       let tt := Lean.mkFVar ⟨Name.mkStr1 "tt"⟩
       let new_args := hyp.getAppArgs.set! pos tt

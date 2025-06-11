@@ -6,25 +6,13 @@ import Plausible.IR.Constructor
 import Plausible.IR.GCCall
 import Plausible.Gen
 import Plausible.New.OptionTGen
+import Plausible.New.Constraints
+import Plausible.New.Idents
 
 open Plausible.IR
 open Lean Elab Command Meta Term Parser Std
+open Idents
 
-
--- Create idents for commonly-called functions & commonly-referenced types
-
-def thunkGenFn : Ident :=
-  mkIdent $ Name.mkStr2 "OptionTGen" "thunkGen"
-def backtrackFn : Ident :=
-  mkIdent $ Name.mkStr2 "OptionTGen" "backtrack"
-def interpSampleFn : Ident :=
-  mkIdent $ Name.mkStr3 "Plausible" "SampleableExt" "interpSample"
-
-
-def failFn : Ident := mkIdent $ Name.mkStr2 "OptionT" "fail"
-def natIdent : Ident := mkIdent ``Nat
-def optionTIdent : Ident := mkIdent ``OptionT
-def genIdent : Ident := mkIdent ``Plausible.Gen
 
 /-- Produces a fresh user-facing & *accessible* identifier with respect to the local context
     - Note: prefer using this function over `Core.mkFreshUserName`, which is meant
@@ -139,10 +127,6 @@ def getGeneratorForTarget (ctorName : Name) (targetIdx : Nat) : MetaM (TSyntax `
   | some (_hypotheses, conclusion) =>
     logInfo s!"conclusion = {conclusion}"
 
-    -- TOOD: handle the hypotheses for the constructor
-
-    -- TODO: handle other arguments in the conclusion (we need to generate them as well)
-    -- (see how free variables are generated in `GenCheckCalls_for_producer`)
 
     -- Find the argument (an `Expr`) corresponding to the value we wish to generate,
     -- then delaborate it to a `Term`

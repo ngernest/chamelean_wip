@@ -66,8 +66,8 @@ def elabGetProducer : CommandElab := fun stx => do
       let inductiveInfo ← getInductiveInfoWithArgs e inpname.toArray
       let pos := TSyntax.getNat t3
       let btnum := TSyntax.getNat t4
-      let _producer ← get_producer inductiveInfo inpname pos btnum
-      -- logInfo producer
+      let producer ← get_producer inductiveInfo inpname pos btnum
+      logInfo producer
   | _ => throwError "Invalid syntax"
 
 -- #gen_producer typing with_name ["L", "e", "t"] for_arg 2 backtrack 100

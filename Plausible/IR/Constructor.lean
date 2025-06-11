@@ -360,7 +360,7 @@ def backtrackElem_if_return_producer (backtrackElem : BacktrackElem) (indentatio
     out := out ++ "\n| " ++ makeUnderscores_commas backtrackElem.inputsToBeMatched.size ++ " => " ++ monad_fail
 
   IO.println "********************"
-  IO.println s!"inside if_return_producer: \n{out}"
+  IO.println s!"inside if_return_producer: \nout = {out}"
 
   return out
 
