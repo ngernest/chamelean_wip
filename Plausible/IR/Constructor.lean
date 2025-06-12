@@ -211,15 +211,16 @@ def backtrackElem_match_block (backtrackElem : SubGeneratorInfo) : MetaM String 
 -/
 def backtrackElem_gen_block (backtrackElem : SubGeneratorInfo) (monad: String :="IO"): MetaM (String × String) := do
   let mut out := ""
-  let mut iden := ""
-  for gcc in backtrackElem.actions.gen_list do
-    out := out ++ iden ++ (← Actions_toCode gcc monad) ++ " \n"
-    match gcc with
-    | .matchFVar _ _ => iden := iden ++ " "
+  let mut indentation := ""
+  for action in backtrackElem.actions.gen_list do
+    out := out ++ indentation ++ (← Actions_toCode action monad) ++ " \n"
+    match action with
+    | .matchFVar _ _ =>
+        indentation := indentation ++ " "
     | _ => continue
   if backtrackElem.actions.gen_list.size > 0 then
     out := ⟨out.data.dropLast.dropLast⟩
-  return (out, iden)
+  return (out, indentation)
 
 
 /-- Produces the assignments of the results of the checker to auxiliary free variables

@@ -364,11 +364,9 @@ instance : ToMessageData Action where
     match Action with
     | .checkInductive hyp => m!"check_IR {hyp}"
     | .checkNonInductive hyp => m!"check ({hyp})"
-    | .genInputForInductive fvar hyp pos =>
-      let tt := Lean.mkFVar ⟨Name.mkStr1 "tt"⟩
-      let new_args := hyp.getAppArgs.set! pos tt
-      let new_hyp := Lean.mkAppN hyp.getAppFn new_args
-      m!"let {fvar.name} := gen_IR (fun {tt} => {new_hyp})"
+    | .genInputForInductive fvar hyp idx =>
+      let remainingArgs := (hyp.getAppArgs.eraseIdx! idx).toList
+      m!"let {fvar.name} ← gen_{hyp.getAppFn}_at_{idx} size {remainingArgs}"
     | .matchFVar fvar hypothesis => m!"if let {hypothesis.newHypothesis} := {fvar.name} then ..."
     | .genFVar id ty => m!"let {id.name} := gen_rand {ty}"
     | .ret e => m!"return {e}"
