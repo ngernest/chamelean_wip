@@ -18,9 +18,10 @@ namespace Plausible.IR
 
 -- Order is the same as the order of the constructors in the inductive relation
 
-/-- Datatype representing an ordered collection of `Action`s
-    - Note: this type was previously called `GenCheckCall_group` -/
-structure ActionGroup where
+/-- Datatype representing an ordered collection of `Action`s, sorted according to
+    which constructor was used to create each `Action`
+    - Note: `GroupedActions` was previously called `GenCheckCall_group` -/
+structure GroupedActions where
   gen_list: Array Action
 
   /-- `iflet_list` is the list of `if let ...` expressions -/
@@ -37,8 +38,8 @@ structure ActionGroup where
 
   deriving Repr
 
--- Pretty print `ActionGroup`s using the `MessageData` typeclass
-instance : ToMessageData ActionGroup where
+-- Pretty print `GroupedActions`s using the `MessageData` typeclass
+instance : ToMessageData GroupedActions where
   toMessageData group :=
     let fields := [
       m!"gen_list := {indentD $ toMessageData group.gen_list}",
@@ -55,7 +56,7 @@ instance : ToMessageData ActionGroup where
     that is invoked from the main generator function
     - Note: this type was previously called `BacktrackElem` -/
 structure SubGeneratorInfo where
-  /-- Argument names for each sub-generator / sub-checker (backtrack elem) -/
+  /-- Argument names for each sub-generator / sub-checker -/
   inputs : Array String
 
   /-- Arguments that should be matched in the outer-most
@@ -65,9 +66,9 @@ structure SubGeneratorInfo where
   /-- Cases (LHS) of the pattern match mentioned above -/
   exprsToBeMatched : Array Expr
 
-  /-- `actionGroups` is used to create the RHS of the first case
+  /-- `actions` is used to create the RHS of the first case
       in the pattern match -/
-  actionGroups : ActionGroup
+  actions : GroupedActions
 
   /-- A list of equalities that must hold between free variables
       (used when rewriting free variabels in patterns) -/
@@ -88,14 +89,14 @@ instance : ToMessageData SubGeneratorInfo where
       m!"inputs := {toMessageData backtrackElem.inputs}",
       m!"inputsToBeMatched := {toMessageData backtrackElem.inputsToBeMatched}",
       m!"exprsToBeMatched := {indentD $ toMessageData backtrackElem.exprsToBeMatched}",
-      m!"actionGroups := {indentD $ toMessageData backtrackElem.actionGroups}",
+      m!"actions := {indentD $ toMessageData backtrackElem.actions}",
       m!"variableEqualities := {repr backtrackElem.variableEqualities}",
     ]
     .bracket "{" (.ofList fields) "}"
 
 
-/-- Converts an array of `Action`s into a `ActionGroup` -/
-def mkActionGroup (gccs: Array Action) : MetaM ActionGroup := do
+/-- Converts an array of `Action`s into a `GroupedActions` -/
+def mkGroupedActions (gccs: Array Action) : MetaM GroupedActions := do
   let mut gen_list := #[]
   let mut check_IR_list := #[]
   let mut check_nonIR_list := #[]
@@ -139,13 +140,13 @@ def mkSubCheckerInfoFromConstructor (ctor : InductiveConstructor)
   let (inputsToBeMatched, exprsToBeMatched) := inputPairsThatNeedMatching.unzip
   --Get Action
   let gccs ← Actions_for_checker ctor
-  let actionGroups ← mkActionGroup gccs
+  let actions ← mkGroupedActions gccs
   return {
     inputs := inputNames
     inputsToBeMatched := inputsToBeMatched
     exprsToBeMatched := exprsToBeMatched
-    actionGroups := actionGroups
-    variableEqualities := conclusion.variableEqualities ++ actionGroups.variableEqualities
+    actions := actions
+    variableEqualities := conclusion.variableEqualities ++ actions.variableEqualities
   }
 
 -- The functions below create strings containing Lean code based on the information
@@ -211,12 +212,12 @@ def backtrackElem_match_block (backtrackElem : SubGeneratorInfo) : MetaM String 
 def backtrackElem_gen_block (backtrackElem : SubGeneratorInfo) (monad: String :="IO"): MetaM (String × String) := do
   let mut out := ""
   let mut iden := ""
-  for gcc in backtrackElem.actionGroups.gen_list do
+  for gcc in backtrackElem.actions.gen_list do
     out := out ++ iden ++ (← Actions_toCode gcc monad) ++ " \n"
     match gcc with
     | .matchFVar _ _ => iden := iden ++ " "
     | _ => continue
-  if backtrackElem.actionGroups.gen_list.size > 0 then
+  if backtrackElem.actions.gen_list.size > 0 then
     out := ⟨out.data.dropLast.dropLast⟩
   return (out, iden)
 
@@ -230,17 +231,17 @@ def backtrackElem_gen_check_IR_block (backtrackElem : SubGeneratorInfo) (indenta
   let mut out := ""
   let mut vars : List String := []
   let mut checkcount := 1
-  for gcc in backtrackElem.actionGroups.check_IR_list do
+  for gcc in backtrackElem.actions.check_IR_list do
     out := out ++ indentation ++ "let check" ++ toString checkcount ++ " " ++ (← Actions_toCode gcc monad) ++ " \n"
     vars := vars ++ [toString checkcount]
     checkcount := checkcount + 1
-  if backtrackElem.actionGroups.check_IR_list.size > 0 then
+  if backtrackElem.actions.check_IR_list.size > 0 then
     out := ⟨out.data.dropLast.dropLast⟩
   return (out, vars)
 
 def backtrackElem_return_checker (backtrackElem : SubGeneratorInfo) (indentation : String) (vars : List String) (monad: String :="IO"): MetaM String := do
   let mut out := ""
-  if backtrackElem.variableEqualities.size + backtrackElem.actionGroups.check_nonIR_list.size + backtrackElem.actionGroups.check_IR_list.size > 0 then
+  if backtrackElem.variableEqualities.size + backtrackElem.actions.check_nonIR_list.size + backtrackElem.actions.check_IR_list.size > 0 then
     out := out ++ indentation ++ "return "
   else
     out := out ++ "return true"
@@ -248,11 +249,11 @@ def backtrackElem_return_checker (backtrackElem : SubGeneratorInfo) (indentation
     out := out ++ "check" ++ v ++ " && "
   for i in backtrackElem.variableEqualities do
     out := out ++  "(" ++ toString (i.1.name) ++ " == " ++ toString (i.2.name) ++ ") && "
-  for gcc in backtrackElem.actionGroups.check_nonIR_list do
+  for gcc in backtrackElem.actions.check_nonIR_list do
     out := out ++ (← Actions_toCode gcc monad) ++ " && "
-  if backtrackElem.variableEqualities.size + backtrackElem.actionGroups.check_nonIR_list.size + backtrackElem.actionGroups.check_IR_list.size > 0 then
+  if backtrackElem.variableEqualities.size + backtrackElem.actions.check_nonIR_list.size + backtrackElem.actions.check_IR_list.size > 0 then
     out := ⟨out.data.dropLast.dropLast.dropLast⟩
-  if backtrackElem.actionGroups.iflet_list.size > 0 then
+  if backtrackElem.actions.iflet_list.size > 0 then
       out := out ++ "\nreturn false"
   if backtrackElem.inputsToBeMatched.size > 0 then
     out := out ++ "\n| " ++ makeUnderscores_commas backtrackElem.inputsToBeMatched.size ++ " => return false"
@@ -334,13 +335,13 @@ def mkSubGeneratorInfoFromConstructor (ctor: InductiveConstructor) (inputNames :
   let (inputsToBeMatched, exprsToBeMatched) := inputPairsThatNeedMatching.unzip
   --Get Action
   let gccs ← Actions_for_producer ctor genpos
-  let actionGroups ← mkActionGroup gccs
+  let actions ← mkGroupedActions gccs
   return {
     inputs := (List.eraseIdx inputNamesList genpos).toArray
     inputsToBeMatched := inputsToBeMatched.toArray
     exprsToBeMatched := exprsToBeMatched.toArray
-    actionGroups := actionGroups
-    variableEqualities := conclusion.variableEqualities ++ actionGroups.variableEqualities
+    actions := actions
+    variableEqualities := conclusion.variableEqualities ++ actions.variableEqualities
   }
 
 /-- Produces the final if-statement that checks the conjunction of all the hypotheses
@@ -349,19 +350,19 @@ def mkSubGeneratorInfoFromConstructor (ctor: InductiveConstructor) (inputNames :
 -/
 def backtrackElem_if_return_producer (backtrackElem : SubGeneratorInfo) (indentation : String) (vars: List String) (monad: String :="IO"): MetaM String := do
   let mut out := ""
-  if backtrackElem.variableEqualities.size + backtrackElem.actionGroups.check_nonIR_list.size + backtrackElem.actionGroups.check_IR_list.size > 0 then
+  if backtrackElem.variableEqualities.size + backtrackElem.actions.check_nonIR_list.size + backtrackElem.actions.check_IR_list.size > 0 then
     out := out ++ indentation ++ "if "
   for j in vars do
     out := out ++ "check" ++ j ++ " && "
   for i in backtrackElem.variableEqualities do
     out := out ++  "(" ++ toString (i.1.name) ++ " == " ++ toString (i.2.name) ++ ") && "
-  for gcc in backtrackElem.actionGroups.check_nonIR_list do
+  for gcc in backtrackElem.actions.check_nonIR_list do
     out := out ++ (← Actions_toCode gcc monad) ++ " && "
-  if backtrackElem.variableEqualities.size + backtrackElem.actionGroups.check_nonIR_list.size + backtrackElem.actionGroups.check_IR_list.size > 0 then
+  if backtrackElem.variableEqualities.size + backtrackElem.actions.check_nonIR_list.size + backtrackElem.actions.check_IR_list.size > 0 then
     out := ⟨out.data.dropLast.dropLast.dropLast⟩ ++ "\n" ++ indentation ++  "then "
-  for gcc in backtrackElem.actionGroups.ret_list do
+  for gcc in backtrackElem.actions.ret_list do
     out := out ++ indentation ++ (← Actions_toCode gcc monad)
-  if backtrackElem.variableEqualities.size + backtrackElem.actionGroups.check_nonIR_list.size + backtrackElem.actionGroups.check_IR_list.size + backtrackElem.actionGroups.iflet_list.size > 0 then
+  if backtrackElem.variableEqualities.size + backtrackElem.actions.check_nonIR_list.size + backtrackElem.actions.check_IR_list.size + backtrackElem.actions.iflet_list.size > 0 then
     let monad_fail := if monad = "IO" then "throw (IO.userError \"fail at checkstep\")" else "return none"
     out := out ++ "\n" ++ monad_fail
   if backtrackElem.inputsToBeMatched.size > 0 then
@@ -369,13 +370,14 @@ def backtrackElem_if_return_producer (backtrackElem : SubGeneratorInfo) (indenta
     out := out ++ "\n| " ++ makeUnderscores_commas backtrackElem.inputsToBeMatched.size ++ " => " ++ monad_fail
 
   IO.println "********************"
-  IO.println s!"inside if_return_producer: \nout = {out}"
+  IO.println s!"inside if_return_producer: \n\
+               ```{out}```"
 
   return out
 
 /-- Assembles all the components of a sub-generator (a `BacktrackElem`) together, returning a string
     containing the Lean code for the sub-generator -/
-def backtrack_elem_toString_producer (backtrackElem : SubGeneratorInfo) (monad: String :="IO"): MetaM String := do
+def subGeneratorInfoToString (backtrackElem : SubGeneratorInfo) (monad: String :="IO"): MetaM String := do
   IO.println "********************"
   IO.println s!"entered `backtrack_elem_toString_producer`:"
   IO.println (← MessageData.toString (toMessageData backtrackElem))
@@ -414,7 +416,7 @@ def producer_where_defs (relation: InductiveInfo) (inpname: List String) (genpos
     out_str:= out_str ++ " → " ++ toString (← Meta.ppExpr ctor.conclusion) ++ "\n"
     out_str:= out_str ++ (← prototype_for_producer_by_con relation inpname genpos i monad) ++ ":= do\n"
     let bt ← mkSubGeneratorInfoFromConstructor ctor inpname.toArray genpos
-    let btStr ← backtrack_elem_toString_producer bt monad
+    let btStr ← subGeneratorInfoToString bt monad
     out_str:= out_str ++ btStr ++ "\n"
   return out_str
 
