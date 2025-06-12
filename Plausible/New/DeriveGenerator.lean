@@ -146,13 +146,9 @@ def getGeneratorForTarget (ctorName : Name) (targetIdx : Nat) : MetaM (TSyntax `
 
     -- let generatorCallsArray := TSyntaxArray.mk generatorCalls
     -- let doBlockBody ← `(doSeq| $generatorCallsArray* )
-
-    -- -- TODO: maybe just try to port the `GenCheckCall` stuff?? may be simpler
-
     -- let generatorBody ← `(fun _ => do $doBlockBody)
 
     let argToGenTerm ← PrettyPrinter.delab targetArg
-    let pureIdent := mkIdent (Name.mkStr1 "pure")
     let generatorBody ← `(fun _ => $pureIdent $argToGenTerm)
 
     `((1, $thunkGenFn ($generatorBody)))

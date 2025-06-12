@@ -65,8 +65,8 @@ def genBST (lo : Nat) (hi : Nat) : Nat → OptionT Gen Tree :=
     match size with
     | .zero =>
       backtrack [
-        (1, pure .Leaf),
-        (1, OptionT.fail)
+        (1, thunkGen $ fun _ => pure .Leaf),
+        (1, thunkGen $ fun _ => OptionT.fail)
       ]
     | .succ size' =>
       backtrack [

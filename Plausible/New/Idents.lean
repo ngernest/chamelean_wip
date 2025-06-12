@@ -17,6 +17,7 @@ def failFn : Ident := mkIdent $ Name.mkStr2 "OptionT" "fail"
 def natIdent : Ident := mkIdent ``Nat
 def optionTIdent : Ident := mkIdent ``OptionT
 def genIdent : Ident := mkIdent ``Plausible.Gen
+def pureIdent : Ident := mkIdent $ Name.mkStr1 "pure"
 
 /-- Produces a fresh user-facing & *accessible* identifier with respect to the local context
     - Note: prefer using this function over `Core.mkFreshUserName`, which is meant
