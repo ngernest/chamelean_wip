@@ -66,4 +66,4 @@ def elabMkCheckerHeader : CommandElab := fun stx => do
 -- Testing
 -----------
 
-#mk_checker_header (bst lo hi t)
+-- #mk_checker_header (bst lo hi t)

@@ -72,7 +72,9 @@ def mkWeightedThunkedSubGenerators (subGeneratorInfos : Array SubGeneratorInfo) 
 
     logInfo m!"generatorBody = {generatorBody}"
 
-    let thunkedGenerator ← `((1, $thunkGenFn (fun _ => $generatorBody)))
+    -- TODO: replace `failFn` with generatorBody
+
+    let thunkedGenerator ← `((1, $thunkGenFn (fun _ => $failFn)))
     weightedGenerators := weightedGenerators.push thunkedGenerator
 
   `([$weightedGenerators,*])
