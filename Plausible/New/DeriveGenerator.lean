@@ -217,7 +217,7 @@ def mkGeneratorFunction (inductiveName : Name) (targetVar : Name) (targetTypeSyn
   -- Convert the list of generator terms into a Lean list containing all the generators
   let generatorList ← `([$generators,*])
 
-  -- Generate the generator function name
+  -- Create the name for the top-level generator function
   let genFunName := mkIdent (Name.mkStr1 s!"gen_{inductiveName}")
 
   -- Create the cases for the pattern-match on the size argument
@@ -230,7 +230,6 @@ def mkGeneratorFunction (inductiveName : Name) (targetVar : Name) (targetTypeSyn
   caseExprs := caseExprs.push succCase
 
   -- Create function argument for the generator size
-  let sizeIdent := mkIdent `size
   let sizeParam ← `(Term.letIdBinder| ($sizeIdent : $natIdent))
   let matchExpr ← `(match $sizeIdent:ident with $caseExprs:matchAlt*)
 
@@ -265,11 +264,13 @@ def mkGeneratorFunction (inductiveName : Name) (targetVar : Name) (targetTypeSyn
   let generatorType ← `($optionTIdent $genIdent $targetTypeSyntax)
 
   -- Produce the definition for the generator function
-  `(def $genFunName $topLevelParams* : $natIdent → $generatorType :=
+  let generatorDefinition ←
+    `(def $genFunName $topLevelParams* : $natIdent → $generatorType :=
       let rec $auxArbIdent:ident $innerParams* : $generatorType :=
         $matchExpr
       fun $freshSizeIdent => $auxArbIdent $freshSizeIdent $paramIdents*)
 
+  return generatorDefinition
 
 
 
@@ -279,44 +280,65 @@ def mkGeneratorFunction (inductiveName : Name) (targetVar : Name) (targetTypeSyn
 
 syntax (name := derive_generator) "#derive_generator" "(" "fun" "(" ident ":" term ")" "=>" term ")" : command
 
-@[command_elab derive_generator]
-def elabDeriveGenerator : CommandElab := fun stx => do
-  match stx with
-  | `(#derive_generator ( fun ( $var:ident : $typeSyntax:term ) => $body:term )) => do
-    -- Parse the body of the lambda for an application of the inductive relation
-    let (inductiveName, args) ← parseInductiveApp body
-    let targetVar := var.getId
 
-    -- `genFunction` is the syntax for the derived generator function
-    let genFunction ← mkGeneratorFunction inductiveName targetVar typeSyntax args
+def mkTopLevelGenerator (generatorList : TSyntax `term) (inductiveStx : TSyntax `term)
+  (args : TSyntaxArray `term) (targetVar : Name)
+  (targetTypeSyntax : TSyntax `term) : CommandElabM (TSyntax `command) := do
+    let inductiveName := inductiveStx.raw.getId
 
-    -- Pretty-print the derived generator
-    let genFormat ← liftCoreM (PrettyPrinter.ppCommand genFunction)
+    -- Create function argument for the generator size
+    let sizeParam ← `(Term.letIdBinder| ($sizeIdent : $natIdent))
 
-    -- Display the code for the derived generator to the user
-    -- & prompt the user to accept it in the VS Code side panel
-    liftTermElabM $ Tactic.TryThis.addSuggestion stx
-      (Format.pretty genFormat) (header := "Try this generator: ")
+    -- Add parameters for each argument to the inductive relation (except the target)
+    let paramInfo ← analyzeInductiveArgs inductiveName args
 
-    logInfo m!"Derived generator:\n{genFormat}"
+    -- Top-level params are arguments to the top-level derived generator
+    let mut topLevelParams := #[]
 
-    elabCommand genFunction
+    -- Inner params are for the inner `aux_arb` function
+    let mut innerParams := #[]
+    innerParams := innerParams.push sizeParam
 
-  | _ => throwUnsupportedSyntax
+    let mut paramIdents := #[]
+    for (paramName, paramType) in paramInfo do
+      if paramName != targetVar then
+        let paramIdent := mkIdent paramName
+        paramIdents := paramIdents.push paramIdent
+
+        let topLevelParam ← `(bracketedBinder| ($paramIdent : $paramType))
+        topLevelParams := topLevelParams.push topLevelParam
+
+        let innerParam ← `(Term.letIdBinder| ($paramIdent : $paramType))
+        innerParams := innerParams.push innerParam
+
+    -- Produce a fresh name for the `size` argument for the lambda
+    -- at the end of the generator function
+    let localCtx ← liftTermElabM $ getLCtx
+    let freshSizeIdent := mkFreshAccessibleIdent localCtx `size
+    let auxArbIdent := mkFreshAccessibleIdent localCtx `aux_arb
+    let generatorType ← `($optionTIdent $genIdent $targetTypeSyntax)
+
+    let generatorIdent := mkIdent $ Name.mkStr1 s!"gen_{inductiveName}"
+
+    -- Produce the definition for the generator function
+    `(def $generatorIdent $topLevelParams* : $natIdent → $generatorType :=
+        let rec $auxArbIdent:ident $innerParams* : $generatorType :=
+          $backtrackFn $generatorList
+      fun $freshSizeIdent => $auxArbIdent $freshSizeIdent $paramIdents*)
+
 
 @[command_elab derive_generator]
 def elabDeriveGeneratorNew : CommandElab := fun stx => do
   match stx with
-  | `(#derive_generator ( fun ( $var:ident : $typeSyntax:term ) => $body:term )) => do
+  | `(#derive_generator ( fun ( $var:ident : $targetTypeSyntax:term ) => $body:term )) => do
 
     -- Parse the body of the lambda for an application of the inductive relation
-    let (inductiveStx, args) ← deconstructInductiveApplication body
+    let (inductiveName, args) ← deconstructInductiveApplication body
     let targetVar := var.getId
 
     -- Elaborate the name of the inductive relation and the type
     -- of the value to be generated
-    let inductiveExpr ← liftTermElabM $ elabTerm inductiveStx none
-    let _targetType ← liftTermElabM $ elabType typeSyntax
+    let inductiveExpr ← liftTermElabM $ elabTerm inductiveName none
 
     -- Find the index of the argument in the inductive application for the value we wish to generate
     -- (i.e. find `i` s.t. `args[i] == targetVar`)
@@ -327,11 +349,21 @@ def elabDeriveGeneratorNew : CommandElab := fun stx => do
 
     -- Call helper function that produces Thanh's `BacktrackElem` data structure
     let argNameStrings := convertIdentsToStrings args
-    let subGeneratorInfos ← liftTermElabM $
-      getSubGeneratorInfos inductiveExpr argNameStrings targetIdx
+    let subGeneratorInfos ← liftTermElabM $ getSubGeneratorInfos inductiveExpr argNameStrings targetIdx
+    let generatorList ← liftTermElabM $ mkWeightedThunkedSubGenerators subGeneratorInfos
 
+    let generatorDefinition ← mkTopLevelGenerator generatorList inductiveName args targetVar targetTypeSyntax
 
-    logInfo m!"hello world!"
+    -- Pretty-print the derived generator
+    let genFormat ← liftCoreM (PrettyPrinter.ppCommand generatorDefinition)
 
+    -- Display the code for the derived generator to the user
+    -- & prompt the user to accept it in the VS Code side panel
+    liftTermElabM $ Tactic.TryThis.addSuggestion stx
+      (Format.pretty genFormat) (header := "Try this generator: ")
+
+    logInfo m!"Derived generator:\n{genFormat}"
+
+    elabCommand generatorDefinition
 
   | _ => throwUnsupportedSyntax
