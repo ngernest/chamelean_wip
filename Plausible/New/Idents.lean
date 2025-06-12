@@ -6,18 +6,16 @@ open Lean Meta
 
 namespace Idents
 
-def thunkGenFn : Ident :=
-  mkIdent $ Name.mkStr2 "OptionTGen" "thunkGen"
-def backtrackFn : Ident :=
-  mkIdent $ Name.mkStr2 "OptionTGen" "backtrack"
-def interpSampleFn : Ident :=
-  mkIdent $ Name.mkStr3 "Plausible" "SampleableExt" "interpSample"
-
+def thunkGenFn : Ident := mkIdent $ Name.mkStr2 "OptionTGen" "thunkGen"
+def backtrackFn : Ident := mkIdent $ Name.mkStr2 "OptionTGen" "backtrack"
+def interpSampleFn : Ident := mkIdent $ Name.mkStr3 "Plausible" "SampleableExt" "interpSample"
+def auxArbFn : Ident := mkIdent $ Name.mkStr1 "aux_arb"
 def failFn : Ident := mkIdent $ Name.mkStr2 "OptionT" "fail"
 def natIdent : Ident := mkIdent ``Nat
 def optionTIdent : Ident := mkIdent ``OptionT
 def genIdent : Ident := mkIdent ``Plausible.Gen
 def pureIdent : Ident := mkIdent $ Name.mkStr1 "pure"
+def sizeIdent : Ident := mkIdent $ Name.mkStr1 "size"
 
 /-- Produces a fresh user-facing & *accessible* identifier with respect to the local context
     - Note: prefer using this function over `Core.mkFreshUserName`, which is meant
