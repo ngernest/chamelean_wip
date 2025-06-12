@@ -24,3 +24,5 @@ def mkTrivialGenerator (actionGroup : ActionGroup) : MetaM (TSyntax `term) := do
 
     -- Convert the list of generator terms into a Lean list containing all the generators
     `([$generators,*])
+
+-- TODO: implement variant of `mkGeneratorFunction` that takes as its argument an `Array` of `SubGeneratorInfo`s

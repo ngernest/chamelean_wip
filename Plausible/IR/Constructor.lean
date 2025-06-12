@@ -420,8 +420,8 @@ def producer_where_defs (relation: InductiveInfo) (inpname: List String) (genpos
 
 /-- Takes an `Expr` representing an inductive relation, a list of names (arguments to the inductive relation),
     and the index of the argument we wish to generate (`targetIdx`),
-    and returns a collection of `BacktrackElem`s for a generator -/
-def getSubProducerInfo (inductiveRelation : Expr) (argNames : Array String) (targetIdx: Nat) : MetaM (Array SubGeneratorInfo) := do
+    and returns a collection of `SubGeneratorInfo`s for a generator -/
+def getSubGeneratorInfos (inductiveRelation : Expr) (argNames : Array String) (targetIdx: Nat) : MetaM (Array SubGeneratorInfo) := do
   let inductiveInfo ← getInductiveInfoWithArgs inductiveRelation argNames
   let mut output := #[]
   for ctor in inductiveInfo.constructors do
@@ -431,7 +431,7 @@ def getSubProducerInfo (inductiveRelation : Expr) (argNames : Array String) (tar
 
 /-- Takes an `Expr` representing an inductive relation and a list of names (arguments to the inductive relation),
     and returns a collection of `BacktrackElem`s for a checker -/
-def getSubCheckerInfo (inductiveRelation : Expr) (argNames : Array String) : MetaM (Array SubCheckerInfo) := do
+def getSubCheckerInfos (inductiveRelation : Expr) (argNames : Array String) : MetaM (Array SubCheckerInfo) := do
   let inductiveInfo ← getInductiveInfoWithArgs inductiveRelation argNames
   let mut output := #[]
   for ctor in inductiveInfo.constructors do
