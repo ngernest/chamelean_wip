@@ -162,37 +162,37 @@ def separateFVarsInHypothesis (hypothesis : Expr) (initialFVars : Array FVarId)
 
 /-- Represents an expression in the RHS of the non-trivial pattern-match case
     in a backtrack element (sub-generator)
-    - TODO (Ernest): this is a super-set of QuickChick's `schedule_step`
+  - Note: this datatype was formerly known as `Action`
+  - TODO (Ernest): this is a super-set of QuickChick's `schedule_step`
       (maybe just take `ret` out and have it be a separate thing, since we can only
        have `return`s at the end of a schedule
-       - also Checkers don't have `return`s)
-    -/
-inductive GenCheckCall where
+       - also Checkers don't have `return`s) -/
+inductive Action where
   /-- Invoke a checker for the inductive relation specified in the hypothesis `hyp`
       (`hyp` must be an inductive relation) -/
-  | check_IR (hyp : Expr) : GenCheckCall
+  | checkInductive (hyp : Expr)
 
   /-- The hypothesis `hyp` is not an inductive relation, but a function that returns
       `Prop`, so we invoke a checker that determines whether the `Prop` is true -/
-  | check_nonIR (hyp : Expr) : GenCheckCall
+  | checkNonInductive (hyp : Expr)
 
   /-- Generate an input at the given position `pos` for an inductive relation
       specified by `hyp`. The generated value is assigned to the free variable `fvar`. -/
-  | gen_IR (fvar : FVarId) (hyp : Expr) (pos : Nat) : GenCheckCall
+  | genInputForInductive (fvar : FVarId) (hyp : Expr) (pos : Nat)
 
   /-- Match the `fvar` with the shape of the hypothesis `hyp` using an `if let` expression
       - `matchFVar` always comes after a `genFVar`
       - Produces code of the form `if let hyp := fvar then ...`
    -/
-  | matchFVar (fvar : FVarId) (hyp : DecomposedInductiveHypothesis) : GenCheckCall
+  | matchFVar (fvar : FVarId) (hyp : DecomposedInductiveHypothesis)
 
   /-- Generate a free variable `fvar` with the given `type`
       - this is `gen_UC` in QuickChick (i.e. `arbitrary`)
    -/
-  | genFVar (fvar : FVarId) (type : Expr) : GenCheckCall
+  | genFVar (fvar : FVarId) (type : Expr)
 
   /-- `return` the expression `e` in some ambient monad (e.g. `Gen`) -/
-  | ret (e : Expr): GenCheckCall
+  | ret (e : Expr)
 
   deriving Repr
 
@@ -286,7 +286,7 @@ def getLastUninitializedArgAndFVars
   return (uninitializedArgIdx, uninitializedFVars, fVarsToBeInitialized)
 
 
-def GenCheckCalls_for_hypotheses (ctor : InductiveConstructor) (fvars : Array FVarId) : MetaM (Array GenCheckCall) := do
+def Actions_for_hypotheses (ctor : InductiveConstructor) (fvars : Array FVarId) : MetaM (Array Action) := do
   let mut result := #[]
   let mut initializedFVars := fvars
   let mut i := 0
@@ -294,7 +294,7 @@ def GenCheckCalls_for_hypotheses (ctor : InductiveConstructor) (fvars : Array FV
     i := i + 1
     if (← isHypothesisOfInductiveConstructor hyp ctor) then
       if allFVarsInExprInitialized hyp initializedFVars then
-        result := result.push (GenCheckCall.check_IR hyp)
+        result := result.push (.checkInductive hyp)
       else
         let (uninitializedArgIdx, uninitializedFVars, fVarsToBeInitialized)
           ← getLastUninitializedArgAndFVars hyp initializedFVars
@@ -305,36 +305,36 @@ def GenCheckCalls_for_hypotheses (ctor : InductiveConstructor) (fvars : Array FV
         initializedFVars := Array.appendUniqueElements initializedFVars uninitializedFVars
         if argToGenerate.isFVar then
           let fvarToGenerate := argToGenerate.fvarId!
-          result := result.push (GenCheckCall.gen_IR fvarToGenerate hyp uninitializedArgIdx)
+          result := result.push (.genInputForInductive fvarToGenerate hyp uninitializedArgIdx)
         else
           let nameOfFVarToGenerate := Name.mkStr1 ("tcond" ++ toString i)
           let fvarToGenerate := FVarId.mk nameOfFVarToGenerate
           let decomposedHypothesis ← separateFVarsInHypothesis argToGenerate initializedFVars i
-          result := result.push (GenCheckCall.gen_IR fvarToGenerate hyp uninitializedArgIdx)
+          result := result.push (.genInputForInductive fvarToGenerate hyp uninitializedArgIdx)
           result := result.push (.matchFVar fvarToGenerate decomposedHypothesis)
         initializedFVars := Array.appendUniqueElements initializedFVars fVarsToBeInitialized
     else
       if allFVarsInExprInitialized hyp initializedFVars then
-        result := result.push (GenCheckCall.check_nonIR hyp)
+        result := result.push (.checkNonInductive hyp)
       else
         let uninitializedFVars := getUninitializedFVars hyp initializedFVars
         for fvar in uninitializedFVars do
           let ty := ctor.bound_var_ctx.get! fvar
           result := result.push (.genFVar fvar ty)
         initializedFVars := Array.appendUniqueElements initializedFVars uninitializedFVars
-        result := result.push (GenCheckCall.check_nonIR hyp)
+        result := result.push (.checkNonInductive hyp)
   return result
 
 
 /-- Note: this function is purely for debugging purposes, it is not used in the main algorithm -/
-def GenCheckCalls_toStr (c: GenCheckCall) : MetaM String := do
+def Actions_toStr (c: Action) : MetaM String := do
   match c with
-  | GenCheckCall.check_IR cond => return "check_IR_" ++ toString (← Meta.ppExpr cond)
-  | GenCheckCall.check_nonIR cond => return "check_nonIR_" ++ toString (← Meta.ppExpr cond)
-  | GenCheckCall.gen_IR _ cond pos =>  return  "gen_IR_" ++ toString (← Meta.ppExpr cond) ++ " at "  ++ toString pos
-  | GenCheckCall.matchFVar fvar hypothesis => return  "if let " ++ toString (← Meta.ppExpr hypothesis.newHypothesis) ++ ":= " ++ toString (fvar.name) ++ " then "
-  | GenCheckCall.genFVar id ty =>  return  "gen_FVar " ++ toString (id.name) ++ ": " ++ toString (← Meta.ppExpr ty)
-  | GenCheckCall.ret e =>  return "return " ++ toString (← Meta.ppExpr e)
+  | .checkInductive cond => return "check_IR_" ++ toString (← Meta.ppExpr cond)
+  | .checkNonInductive cond => return "check_nonIR_" ++ toString (← Meta.ppExpr cond)
+  | .genInputForInductive _ cond pos =>  return  "gen_IR_" ++ toString (← Meta.ppExpr cond) ++ " at "  ++ toString pos
+  | .matchFVar fvar hypothesis => return  "if let " ++ toString (← Meta.ppExpr hypothesis.newHypothesis) ++ ":= " ++ toString (fvar.name) ++ " then "
+  | .genFVar id ty =>  return  "gen_FVar " ++ toString (id.name) ++ ": " ++ toString (← Meta.ppExpr ty)
+  | .ret e =>  return "return " ++ toString (← Meta.ppExpr e)
 
 def gen_IR_at_pos (id: FVarId) (cond: Expr) (pos: Nat) : MetaM String := do
   let tt := Lean.mkFVar ⟨Name.mkStr1 "tt"⟩
@@ -343,28 +343,28 @@ def gen_IR_at_pos (id: FVarId) (cond: Expr) (pos: Nat) : MetaM String := do
   let fun_proto := "fun tt => " ++ toString (← Meta.ppExpr new_cond)
   return "let " ++ toString (id.name)  ++ ":= gen_IR (" ++ fun_proto ++ ")"
 
-/-- Converts a `GenCheckCall` data structure to a string containing the
+/-- Converts a `Action` data structure to a string containing the
     corresponding Lean expression
     - Note: this function is purely for debugging purposes, it is not used in the main algorithm -/
-def GenCheckCalls_toRawCode (genCheckCall : GenCheckCall) : MetaM String := do
-  match genCheckCall with
-  | .check_IR hyp => MessageData.toString m!"check_IR ({← Meta.ppExpr hyp})"
-  | .check_nonIR hyp => return  "check (" ++ toString (← Meta.ppExpr hyp) ++ ")"
-  | .gen_IR fvar hyp pos => gen_IR_at_pos fvar hyp pos
+def Actions_toRawCode (Action : Action) : MetaM String := do
+  match Action with
+  | .checkInductive hyp => MessageData.toString m!"check_IR ({← Meta.ppExpr hyp})"
+  | .checkNonInductive hyp => return  "check (" ++ toString (← Meta.ppExpr hyp) ++ ")"
+  | .genInputForInductive fvar hyp pos => gen_IR_at_pos fvar hyp pos
   | .matchFVar fvar hypothesis => return  "if let " ++ toString (← Meta.ppExpr hypothesis.newHypothesis) ++ ":= " ++ toString (fvar.name) ++ " then "
   | .genFVar id ty =>  return  "let " ++ toString (id.name) ++ ":= gen_rand " ++ toString (← Meta.ppExpr ty)
   | .ret e => return "return " ++ toString (← Meta.ppExpr e)
 
 
--- To pretty-print a `GenCheckCall` idiomatically, we can just make it an instance
+-- To pretty-print a `Action` idiomatically, we can just make it an instance
 -- of the `ToMessageData` typeclass, which allows us to use Lean's delaborator
 -- to pretty-print `Expr`s
-instance : ToMessageData GenCheckCall where
-  toMessageData (genCheckCall : GenCheckCall) : MessageData :=
-    match genCheckCall with
-    | .check_IR hyp => m!"check_IR {hyp}"
-    | .check_nonIR hyp => m!"check ({hyp})"
-    | .gen_IR fvar hyp pos =>
+instance : ToMessageData Action where
+  toMessageData (Action : Action) : MessageData :=
+    match Action with
+    | .checkInductive hyp => m!"check_IR {hyp}"
+    | .checkNonInductive hyp => m!"check ({hyp})"
+    | .genInputForInductive fvar hyp pos =>
       let tt := Lean.mkFVar ⟨Name.mkStr1 "tt"⟩
       let new_args := hyp.getAppArgs.set! pos tt
       let new_hyp := Lean.mkAppN hyp.getAppFn new_args
@@ -374,24 +374,24 @@ instance : ToMessageData GenCheckCall where
     | .ret e => m!"return {e}"
 
 
-/-- Produces a collection of `GenCheckCalls` for a checker -/
-def GenCheckCalls_for_checker (ctor : InductiveConstructor) : MetaM (Array GenCheckCall) := do
+/-- Produces a collection of `Actions` for a checker -/
+def Actions_for_checker (ctor : InductiveConstructor) : MetaM (Array Action) := do
   let mut initset := getFVarsInConclusion ctor
-  GenCheckCalls_for_hypotheses ctor initset
+  Actions_for_hypotheses ctor initset
 
 
-/-- Produces a collection of `GenCheckCalls` for a generator -/
-def GenCheckCalls_for_producer (ctor : InductiveConstructor) (genpos : Nat) : MetaM (Array GenCheckCall) := do
+/-- Produces a collection of `Actions` for a generator -/
+def Actions_for_producer (ctor : InductiveConstructor) (genpos : Nat) : MetaM (Array Action) := do
   let mut initset ← getFVarsInConclusionArgs ctor genpos
-  let mut outarr ← GenCheckCalls_for_hypotheses ctor initset
+  let mut outarr ← Actions_for_hypotheses ctor initset
   for hyp in ctor.all_hypotheses do
     initset := Array.appendUniqueElements initset (extractFVars hyp)
   let gen_arg := ctor.conclusion.getAppArgs[genpos]!
   let uninitset := Array.removeAll (extractFVars gen_arg) initset
   for fid in uninitset do
     let ty := ctor.bound_var_ctx.get! fid
-    outarr := outarr.push (GenCheckCall.genFVar fid ty)
-  outarr := outarr.push (GenCheckCall.ret gen_arg)
+    outarr := outarr.push (Action.genFVar fid ty)
+  outarr := outarr.push (Action.ret gen_arg)
   return outarr
 
 syntax (name := getCheckerCall) "#get_checker_call" term : command
@@ -406,9 +406,9 @@ def elabCheckerCall : CommandElab := fun stx => do
       for con in relation.constructors do
         IO.println s!"\n---- Cond prop : {con.all_hypotheses}"
         IO.println s!"---- Out prop : {con.conclusion}"
-        let proc_conds ← GenCheckCalls_for_checker con
+        let proc_conds ← Actions_for_checker con
         for pc in proc_conds do
-          IO.println (← GenCheckCalls_toRawCode pc)
+          IO.println (← Actions_toRawCode pc)
   | _ => throwError "Invalid syntax"
 
 
@@ -430,9 +430,9 @@ def elabGenCall : CommandElab := fun stx => do
         IO.println s!"\n---- Hypotheses : {ctor.all_hypotheses}"
         IO.println s!"---- Conclusion : {ctor.conclusion}"
         IO.println s!"---- Conclusion Args : {ctor.conclusion_args}"
-        let producer_genCheckCalls ← GenCheckCalls_for_producer ctor pos
-        for genCheckCall in producer_genCheckCalls do
-          IO.println (← GenCheckCalls_toRawCode genCheckCall)
+        let producer_Actions ← Actions_for_producer ctor pos
+        for Action in producer_Actions do
+          IO.println (← Actions_toRawCode Action)
   | _ => throwError "Invalid syntax"
 
 
