@@ -9,13 +9,13 @@ open Idents
 
 /-- Produces a trivial generator (e.g. `pure Leaf`)
     when all fields of a `ActionGroup` struct are empty except `ret_list` -/
-def mkTrivialGenerator (gccGroup : ActionGroup) : MetaM (TSyntax `term) := do
-  let blah := gccGroup.gen_list ++ gccGroup.iflet_list ++ gccGroup.check_IR_list ++ gccGroup.check_nonIR_list
+def mkTrivialGenerator (actionGroup : ActionGroup) : MetaM (TSyntax `term) := do
+  let blah := actionGroup.gen_list ++ actionGroup.iflet_list ++ actionGroup.check_IR_list ++ actionGroup.check_nonIR_list
   if not blah.isEmpty then
     `([])
   else
     let mut generators := #[]
-    for Action in gccGroup.ret_list do
+    for Action in actionGroup.ret_list do
         if let .ret expr := Action then
         let argToGenTerm ← PrettyPrinter.delab expr
         let generatorBody ← `(fun _ => $pureIdent $argToGenTerm)
