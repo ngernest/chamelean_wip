@@ -35,14 +35,24 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
       doElems := doElems.push bindExpr
     | _ => continue
 
+  -- TODO: change `groupedActions.ret_list` to a single element since each do-block can only
+  -- have one (final) `return` expression
   let returnList := subGenerator.groupedActions.ret_list
   let action := returnList[0]?
   if let some action' := action then
     if let .ret expr := action' then
       let argToGenTerm ← PrettyPrinter.delab expr
-      let retExpr ← `(doElem| return $argToGenTerm:term)
-      doElems := doElems.push retExpr
-      mkDoBlock doElems
+      -- If any let-bind expressions have already appeared,
+      -- then append `return $argToGenTerm` to the end of the do-block
+      if not doElems.isEmpty then
+        let retExpr ← `(doElem| return $argToGenTerm:term)
+        doElems := doElems.push retExpr
+        mkDoBlock doElems
+      -- No let-bind expressions have appeared in the do-block,
+      -- so we can just create `pure $argToGenTerm` without needing
+      -- to create a do-block
+      else
+        `($pureIdent $argToGenTerm:term)
     else
       throwUnsupportedSyntax
   else

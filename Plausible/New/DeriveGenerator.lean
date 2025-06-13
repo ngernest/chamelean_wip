@@ -177,110 +177,17 @@ def findNonRecursiveConstructors (inductiveName : Name) : MetaM (Array Name) := 
 def findTargetVarIndex (targetVar : Name) (args : TSyntaxArray `term) : Option Nat :=
   Array.findIdx? (fun arg => arg.getId == targetVar) (TSyntaxArray.raw args)
 
-
-/-- Produces the actual generator function.
-    - `inductiveName` is the name of the inductive relation
-    - `targetVar`, `targetType`: the variable name and type of the value to be generated
-    - `args`: the other arguments to the inductive relation -/
-def mkGeneratorFunction (inductiveName : Name) (targetVar : Name) (targetTypeSyntax : TSyntax `term)
-  (args : TSyntaxArray `term) : CommandElabM (TSyntax `command) := do
-
-  -- Fetch the ambient local context, which we need to generate user-facing fresh names
-  -- that are accessible to the user
-  let localCtx ← liftTermElabM $ getLCtx
-
-  -- Extract the names of the constructors for the inductive
-  let inductInfo ← getConstInfoInduct inductiveName
-  let _constructorNames := inductInfo.ctors
-
-  -- Find the index of the argument in the inductive application for the value we wish to generate
-  -- (i.e. find `i` s.t. `args[i] == targetVar`)
-  let targetIdxOpt := findTargetVarIndex targetVar args
-  if let .none := targetIdxOpt then
-    throwError "cannot find index of value to be generated"
-  let targetIdx := Option.get! targetIdxOpt
-
-  -- Find the names of all non-recursive constructors
-  let nonRecursiveConstructors ← liftTermElabM $ findNonRecursiveConstructors inductiveName
-  logInfo s!"nonRecursiveConstructors = {nonRecursiveConstructors}"
-
-  -- Populate a list of sub-generators
-  let mut generators := #[]
-  for ctor in nonRecursiveConstructors do
-    let gen ← liftTermElabM $ getGeneratorForTarget ctor targetIdx
-    generators := generators.push gen
-
-  -- Add generator that always fails
-  -- TODO: only add this failure generator to the case when `size == 0`
-  generators := generators.push (← `((1, $thunkGenFn (fun _ => $failFn))))
-
-  -- Convert the list of generator terms into a Lean list containing all the generators
-  let generatorList ← `([$generators,*])
-
-  -- Create the name for the top-level generator function
-  let genFunName := mkIdent (Name.mkStr1 s!"gen_{inductiveName}")
-
-  -- Create the cases for the pattern-match on the size argument
-  let mut caseExprs := #[]
-  let zeroCase ← `(Term.matchAltExpr| | $(mkIdent ``Nat.zero) => $backtrackFn $generatorList)
-  caseExprs := caseExprs.push zeroCase
-
-  let smallerSize := mkFreshAccessibleIdent localCtx `size'
-  let succCase ← `(Term.matchAltExpr| | $(mkIdent ``Nat.succ) $smallerSize => $backtrackFn $generatorList)
-  caseExprs := caseExprs.push succCase
-
-  -- Create function argument for the generator size
-  let sizeParam ← `(Term.letIdBinder| ($sizeIdent : $natIdent))
-  let matchExpr ← `(match $sizeIdent:ident with $caseExprs:matchAlt*)
-
-  -- Add parameters for each argument to the inductive relation (except the target)
-  let paramInfo ← analyzeInductiveArgs inductiveName args
-
-  -- Top-level params are arguments to the top-level derived generator
-  let mut topLevelParams := #[]
-
-  -- Inner params are for the inner `aux_arb` function
-  let mut innerParams := #[]
-  innerParams := innerParams.push sizeParam
-
-  let mut paramIdents := #[]
-  for (paramName, paramType) in paramInfo do
-    if paramName != targetVar then
-      let paramIdent := mkIdent paramName
-      paramIdents := paramIdents.push paramIdent
-
-      let topLevelParam ← `(bracketedBinder| ($paramIdent : $paramType))
-      topLevelParams := topLevelParams.push topLevelParam
-
-      let innerParam ← `(Term.letIdBinder| ($paramIdent : $paramType))
-      innerParams := innerParams.push innerParam
-
-  -- TODO: when `size == 0`, do `return C` for each arity-0 non-recursive constructor
-
-  -- Produce a fresh name for the `size` argument for the lambda
-  -- at the end of the generator function
-  let freshSizeIdent := mkFreshAccessibleIdent localCtx `size
-  let auxArbIdent := mkFreshAccessibleIdent localCtx `aux_arb
-  let generatorType ← `($optionTIdent $genIdent $targetTypeSyntax)
-
-  -- Produce the definition for the generator function
-  let generatorDefinition ←
-    `(def $genFunName $topLevelParams* : $natIdent → $generatorType :=
-      let rec $auxArbIdent:ident $innerParams* : $generatorType :=
-        $matchExpr
-      fun $freshSizeIdent => $auxArbIdent $freshSizeIdent $paramIdents*)
-
-  return generatorDefinition
-
-
-
 ----------------------------------------------------------------------
 -- Command elaborator for producing the Plausible generator
 -----------------------------------------------------------------------
 
 syntax (name := derive_generator) "#derive_generator" "(" "fun" "(" ident ":" term ")" "=>" term ")" : command
 
-
+/-- Creates the top-level derived generator based on:
+    - a list of `subGenerators` (represented as a Lean term)
+    - the name of the inductive relation (`inductiveStx`)
+    - the arguments (`args`) to the inductive relation
+    - the name and type for the value we wish to generate (`targetVar`, `targetTypeSyntax`) -/
 def mkTopLevelGenerator (subGenerators : TSyntax `term) (inductiveStx : TSyntax `term)
   (args : TSyntaxArray `term) (targetVar : Name)
   (targetTypeSyntax : TSyntax `term) : CommandElabM (TSyntax `command) := do
