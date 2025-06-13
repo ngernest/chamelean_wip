@@ -8,9 +8,10 @@ to automatically derive generators/checkers for inductive relations, à la [Para
 Repo overview:
 - [`OptionTGen.lean`](./Plausible/New/OptionTGen.lean): Generator combinators that work over the `OptionT Gen` monad transformer (representing generators that may fail)
 - [`DeriveGenerator.lean`](./Plausible/New/DeriveGenerator.lean): Metaprogramming infrastructure for automatically deriving Plausible generators
-- [`DeriveChecker.lean`](./Plausible/New/DeriveChecker.lean): Metaprogramming infrastructure for automatically deriving checkers
 - [`Idents.lean`](./Plausible/New/Idents.lean): Utilities for dealing with identifiers / producing fresh names 
-- [`Constraints.lean`](./Plausible/New/Constraints.lean): Handles constraints related to constructors for inductive relations
+- [`SubGenerators.lean`](./Plausible/New/SubGenerators.lean): Handles constraints when deriving sub-generators
+- [`DoBlocks.lean`](./Plausible/New/DoBlocks.lean): Metaprogramming utilities for creating monadic `do`-blocks
+- [`DeriveChecker.lean`](./Plausible/New/DeriveChecker.lean): Metaprogramming infrastructure for automatically deriving checkers
 - [`Tests.lean`](./Plausible/New/Tests.lean): Example usage on how to use the new `#deriving` commands for deriving generators
 
 ## Usage

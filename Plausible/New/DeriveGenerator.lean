@@ -6,7 +6,7 @@ import Plausible.IR.Constructor
 import Plausible.IR.GCCall
 import Plausible.Gen
 import Plausible.New.OptionTGen
-import Plausible.New.Constraints
+import Plausible.New.SubGenerators
 import Plausible.New.Idents
 
 open Plausible.IR
