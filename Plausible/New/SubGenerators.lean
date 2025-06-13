@@ -41,6 +41,9 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
       doElems := doElems.push bindExpr
     | _ => continue
 
+  -- TODO: need to add if-expressions to check that hypotheses are upheld
+  -- when we generate free variables (eg BST invariants)
+
   -- TODO: change `groupedActions.ret_list` to a single element since each do-block can only
   -- have one (final) `return` expression
   let returnList := subGenerator.groupedActions.ret_list

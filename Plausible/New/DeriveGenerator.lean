@@ -208,12 +208,17 @@ def elabDeriveGenerator : CommandElab := fun stx => do
       throwError "cannot find index of value to be generated"
     let targetIdx := Option.get! targetIdxOpt
 
-    -- Call helper function that produces Thanh's `BacktrackElem` data structure
     let argNameStrings := convertIdentsToStrings args
-    let subGeneratorInfos ← liftTermElabM $ getSubGeneratorInfos inductiveExpr argNameStrings targetIdx
 
-    let baseGenInfo := Array.filter (fun gen => gen.generatorSort == .BaseGenerator) subGeneratorInfos
-    let inductiveGenInfo := Array.filter (fun gen => gen.generatorSort == .InductiveGenerator) subGeneratorInfos
+    -- Create an auxiliary `SubGeneratorInfo` structure that
+    -- stores the metadata for each derived sub-generator
+    let allSubGeneratorInfos ← liftTermElabM $ getSubGeneratorInfos inductiveExpr argNameStrings targetIdx
+
+    -- Every generator is an inductive generator
+    -- (they can all be invoked in the inductive case of the top-level generator),
+    -- but only certain generators qualify as `BaseGenerator`s
+    let baseGenInfo := Array.filter (fun gen => gen.generatorSort == .BaseGenerator) allSubGeneratorInfos
+    let inductiveGenInfo := allSubGeneratorInfos
 
     let baseGenerators ← liftTermElabM $ mkWeightedThunkedSubGenerators baseGenInfo .BaseGenerator
     let inductiveGenerators ← liftTermElabM $ mkWeightedThunkedSubGenerators inductiveGenInfo .InductiveGenerator
