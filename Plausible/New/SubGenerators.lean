@@ -52,7 +52,9 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
   let action := returnList[0]?
   if let some action' := action then
     if let .ret expr := action' then
+        -- Delaborate `expr` to get a `TSyntax` for the argument we're generating
         let argToGenTerm ← PrettyPrinter.delab expr
+
         -- If any let-bind expressions have already appeared,
         -- then append `return $argToGenTerm` to the end of the do-block
         if !doElems.isEmpty then
