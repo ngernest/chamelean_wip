@@ -68,11 +68,15 @@ structure SubGeneratorInfo where
   inputs : Array String
 
   /-- Arguments that should be matched in the outer-most
-      pattern match in the backtrack element -/
-  inputsToBeMatched : Array String
+      pattern match in the backtrack element
+      (note that the input is the scrutinee for the match expression)
+      - Invariant: `exprsToMatch.length == inputsToMatch.length` -/
+  inputsToMatch : Array String
 
-  /-- Cases (LHS) of the pattern match mentioned above -/
-  exprsToBeMatched : Array Expr
+  /-- Cases (LHS) of the pattern match mentioned above
+    - The RHS of each case should be the derived generator
+    - Invariant: `exprsToMatch.length == inputsToMatch.length` -/
+  exprsToMatch : Array Expr
 
   /-- `groupedActions` is used to create the RHS of the first case
       in the pattern match -/
@@ -99,8 +103,8 @@ instance : ToMessageData SubGeneratorInfo where
   toMessageData backtrackElem : MessageData :=
     let fields := [
       m!"inputs := {toMessageData backtrackElem.inputs}",
-      m!"inputsToBeMatched := {toMessageData backtrackElem.inputsToBeMatched}",
-      m!"exprsToBeMatched := {indentD $ toMessageData backtrackElem.exprsToBeMatched}",
+      m!"inputsToMatch := {toMessageData backtrackElem.inputsToMatch}",
+      m!"exprsToMatch := {indentD $ toMessageData backtrackElem.exprsToMatch}",
       m!"actions := {indentD $ toMessageData backtrackElem.groupedActions}",
       m!"variableEqualities := {repr backtrackElem.variableEqualities}",
     ]
@@ -148,14 +152,14 @@ def mkSubCheckerInfoFromConstructor (ctor : InductiveConstructor)
   let args := (conclusion.newHypothesis.getAppArgs)
   let inputNamesAndArgs := inputNames.zip args
   let inputPairsThatNeedMatching := inputNamesAndArgs.filter (fun (_, arg) => !arg.isFVar)
-  let (inputsToBeMatched, exprsToBeMatched) := inputPairsThatNeedMatching.unzip
+  let (inputsToMatch, exprsToMatch) := inputPairsThatNeedMatching.unzip
   let actions ← Actions_for_checker ctor
   let groupedActions ← mkGroupedActions actions
   let generatorSort := if ctor.recursive_hypotheses.isEmpty then .BaseGenerator else .InductiveGenerator
   return {
     inputs := inputNames
-    inputsToBeMatched := inputsToBeMatched
-    exprsToBeMatched := exprsToBeMatched
+    inputsToMatch := inputsToMatch
+    exprsToMatch := exprsToMatch
     groupedActions := groupedActions
     variableEqualities := conclusion.variableEqualities ++ groupedActions.variableEqualities
     generatorSort := generatorSort
@@ -206,12 +210,12 @@ def actionToCode (Action : Action) (monad: String := "IO") : MetaM String := do
     based on the info in a `BacktrackElem` -/
 def backtrackElem_match_block (backtrackElem : SubGeneratorInfo) : MetaM String := do
   let mut out := ""
-  if backtrackElem.inputsToBeMatched.size > 0 then
+  if backtrackElem.inputsToMatch.size > 0 then
     out := out ++ "match "
-    for i in backtrackElem.inputsToBeMatched do
+    for i in backtrackElem.inputsToMatch do
       out := out ++  i  ++ " , "
     out := ⟨out.data.dropLast.dropLast⟩ ++ " with \n| "
-    for a in backtrackElem.exprsToBeMatched do
+    for a in backtrackElem.exprsToMatch do
       out := out ++ toString (← Meta.ppExpr a) ++ " , "
     out := ⟨out.data.dropLast.dropLast⟩ ++ " =>  "
   return out
@@ -268,8 +272,8 @@ def backtrackElem_return_checker (backtrackElem : SubGeneratorInfo) (indentation
     out := ⟨out.data.dropLast.dropLast.dropLast⟩
   if backtrackElem.groupedActions.iflet_list.size > 0 then
       out := out ++ "\nreturn false"
-  if backtrackElem.inputsToBeMatched.size > 0 then
-    out := out ++ "\n| " ++ makeUnderscores_commas backtrackElem.inputsToBeMatched.size ++ " => return false"
+  if backtrackElem.inputsToMatch.size > 0 then
+    out := out ++ "\n| " ++ makeUnderscores_commas backtrackElem.inputsToMatch.size ++ " => return false"
   return out
 
 /-- Assembles all the components of a sub-checker (a `BacktrackElem`) together, returning a string
@@ -331,33 +335,37 @@ def elabgetBackTrack : CommandElab := fun stx => do
 
 
 
-/-- Takes a constructor for an inductive relation, a list of argument names, the index of the argument we wish to generate (`genpos`),
+/-- Takes a constructor for an inductive relation, a list of argument names,
+    the index of the argument we wish to generate (`idx`),
     and returns a corresponding `SubGeneratorInfo` for a generator -/
-def mkSubGeneratorInfoFromConstructor (ctor : InductiveConstructor) (inputNames : Array String) (genpos: Nat)
-      : MetaM SubGeneratorInfo := do
+def mkSubGeneratorInfoFromConstructor (ctor : InductiveConstructor) (inputNames : Array String)
+  (idx : Nat) : MetaM SubGeneratorInfo := do
   let inputNamesList := inputNames.toList
   let tempFVar := Expr.fvar (FVarId.mk (Name.mkStr1 "temp000"))
-  let conclusion_args := ctor.conclusion.getAppArgs.set! genpos tempFVar
+  let conclusion_args := ctor.conclusion.getAppArgs.set! idx tempFVar
   let new_conclusion := mkAppN ctor.conclusion.getAppFn conclusion_args
   let conclusion ← separateFVars new_conclusion
   let args := conclusion.newHypothesis.getAppArgs.toList
   let zippedInputsAndArgs := List.zip inputNamesList args
+
   -- Take all elements of `inputNamesAndArgs`, but omit the element at the `genpos`-th index
-  let inputNamesAndArgs := List.eraseIdx zippedInputsAndArgs genpos
+  let inputNamesAndArgs := List.eraseIdx zippedInputsAndArgs idx
+
   -- Find all pairs where the argument is not a free variable
   -- (these are the arguments that need matching)
   let inputPairsThatNeedMatching := inputNamesAndArgs.filter (fun (_, arg) => !arg.isFVar)
-  let (inputsToBeMatched, exprsToBeMatched) := inputPairsThatNeedMatching.unzip
-  let actions ← Actions_for_producer ctor genpos
+  let (inputsToMatch, exprsToMatch) := inputPairsThatNeedMatching.unzip
+  let actions ← Actions_for_producer ctor idx
   let groupedActions ← mkGroupedActions actions
 
   -- Constructors with no hypotheses get `BaseGenerator`s
   -- (otherwise, the generator needs to make a recursive call and is thus inductively-defined)
   let generatorSort := if ctor.recursive_hypotheses.isEmpty then .BaseGenerator else .InductiveGenerator
+
   return {
-    inputs := (List.eraseIdx inputNamesList genpos).toArray
-    inputsToBeMatched := inputsToBeMatched.toArray
-    exprsToBeMatched := exprsToBeMatched.toArray
+    inputs := (List.eraseIdx inputNamesList idx).toArray
+    inputsToMatch := inputsToMatch.toArray
+    exprsToMatch := exprsToMatch.toArray
     groupedActions := groupedActions
     variableEqualities := conclusion.variableEqualities ++ groupedActions.variableEqualities
     generatorSort := generatorSort
@@ -384,9 +392,9 @@ def backtrackElem_if_return_producer (backtrackElem : SubGeneratorInfo) (indenta
   if backtrackElem.variableEqualities.size + backtrackElem.groupedActions.checkNonInductiveActions.size + backtrackElem.groupedActions.checkInductiveActions.size + backtrackElem.groupedActions.iflet_list.size > 0 then
     let monad_fail := if monad = "IO" then "throw (IO.userError \"fail at checkstep\")" else "return none"
     out := out ++ "\n" ++ monad_fail
-  if backtrackElem.inputsToBeMatched.size > 0 then
+  if backtrackElem.inputsToMatch.size > 0 then
     let monad_fail := if monad = "IO" then "throw (IO.userError \"fail\")" else "return none"
-    out := out ++ "\n| " ++ makeUnderscores_commas backtrackElem.inputsToBeMatched.size ++ " => " ++ monad_fail
+    out := out ++ "\n| " ++ makeUnderscores_commas backtrackElem.inputsToMatch.size ++ " => " ++ monad_fail
 
   IO.println "********************"
   IO.println s!"inside if_return_producer: \n\

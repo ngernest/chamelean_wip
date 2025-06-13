@@ -11,7 +11,7 @@ open Lean Elab Command
 -- Click on the VS Code sidebar to insert the code of the derived generator into the Lean file
 
 -- Some examples:
-#derive_generator (fun (t : Tree) => bst lo hi t)
+-- #derive_generator (fun (t : Tree) => bst lo hi t)
 
 /-
 The following generator is derived:
@@ -51,6 +51,8 @@ whether `lo < x < hi` immediately after we generate `x` so that the generator ca
 
 -- Some other examples:
 -- TODO: figure out how to pattern match on the argument `n` when generating Leafs for height 0
+-- TODO: uncomment Thanh's code for the BST example and try it out on the `balanced` example
 -- #derive_generator (fun (t : Tree) => balanced n t)
 
+-- TODO: figure out how to handle dependencies (references to other inductive relations) for the `typing` example
 -- #derive_generator (fun (e : term) => typing Γ e τ)

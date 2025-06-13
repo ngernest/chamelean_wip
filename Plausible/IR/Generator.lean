@@ -71,9 +71,9 @@ def elabGetProducer : CommandElab := fun stx => do
   | _ => throwError "Invalid syntax"
 
 -- #gen_producer typing with_name ["L", "e", "t"] for_arg 2 backtrack 100
--- #gen_producer balanced with_name ["h", "T"] for_arg 1 backtrack 100
+#gen_producer balanced with_name ["n", "T"] for_arg 1 backtrack 100
 
-#gen_producer bst with_name ["lo", "hi", "T"] for_arg 2 backtrack 100
+-- #gen_producer bst with_name ["lo", "hi", "T"] for_arg 2 backtrack 100
 
 
 def get_mutual_rec_block (r: InductiveInfo) (inpname: List String) (btnum: Nat) (monad: String :="IO"): MetaM String := do

@@ -233,8 +233,6 @@ def elabDeriveGenerator : CommandElab := fun stx => do
     liftTermElabM $ Tactic.TryThis.addSuggestion stx
       (Format.pretty genFormat) (header := "Try this generator: ")
 
-    logInfo m!"Derived generator:\n{genFormat}"
-
     elabCommand generatorDefinition
 
   | _ => throwUnsupportedSyntax

@@ -17,9 +17,12 @@ def mkLetBind (lhs : Ident) (rhsTerms : TSyntaxArray `term) : MetaM (TSyntax `do
 def mkDoBlock (doElems : TSyntaxArray `doElem) : MetaM (TSyntax `term) := do
   `(do $[$doElems:doElem]*)
 
-/-- `mkIfExprWithNaryAnd predicates trueBranch elseBranch` creates an if-expression
-    `if (p1 && … && pn) then $trueBranch else $elseBranch`, where `predicates := #[p1, …, pn]`
-    - Note: if `predicates` is empty, the expression created is `if True then $trueBranch else $elseBranch` -/
+/-- `mkIfExprWithNaryAnd predicates trueBranch elseBranch` creates a *monadic* if-expression
+    `if (p1 && … && pn) then $trueBranch else $elseBranch`, where `predicates := #[p1, …, pn]`.
+    Note:
+    - `trueBranch` and `elseBranch` are `doElem`s, since the if-expr is intended to be part of
+    a monadic `do`-block
+    - If `predicates` is empty, the expression created is `if True then $trueBranch else $elseBranch` -/
 def mkIfExprWithNaryAnd (predicates : Array Term)
   (trueBranch : TSyntax `doElem) (elseBranch : TSyntax `doElem) : MetaM (TSyntax `doElem) := do
   let condition ←
@@ -29,3 +32,6 @@ def mkIfExprWithNaryAnd (predicates : Array Term)
     | p :: ps =>
       List.foldlM (fun acc pred => `($acc && $pred)) (init := p) ps
   `(doElem| if $condition then $trueBranch:doElem else $elseBranch:doElem)
+
+def mkMatchExpr (scrutinee: Ident) (cases : TSyntaxArray ``Term.matchAlt) : MetaM (TSyntax `term) :=
+  `(match $scrutinee:ident with $cases:matchAlt*)
