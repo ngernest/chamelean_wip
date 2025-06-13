@@ -39,24 +39,22 @@ def size_pos_backtrack_for_checker (r: InductiveInfo): MetaM (Array String) := d
       out:= out.push bt
   return out
 
-def size_zero_backtrack_for_producer (r: InductiveInfo) (genpos: Nat): MetaM (Array String) := do
-  let mut i := 0
+/-- Finds the sub-producers corresponding to the case where `size == 0` -/
+def size_zero_backtrack_for_producer (inductiveInfo : InductiveInfo) (genpos: Nat): MetaM (Array String) := do
   let mut out : Array String := #[]
-  for con in r.constructors do
-    i := i + 1
-    if con.recursive_hypotheses.size = 0 then
-      let bt := "gen_" ++ afterLastDot r.inductive_name.toString ++ "_at_" ++ toString genpos  ++"_by_con_" ++ toString i
-      out:= out.push bt
+  for (ctor, i) in inductiveInfo.constructors.zipIdx do
+    if ctor.recursive_hypotheses.size == 0 then
+      let bt := "gen_" ++ afterLastDot inductiveInfo.inductive_name.toString ++ "_at_" ++ toString genpos  ++"_by_con_" ++ toString i
+      out := out.push bt
   return out
 
-def size_pos_backtrack_for_producer (r: InductiveInfo) (genpos: Nat): MetaM (Array String) := do
-  let mut i := 0
+/-- Finds the sub-producers corresponding to the case where `size != 0` -/
+def size_pos_backtrack_for_producer (inductiveInfo : InductiveInfo) (genpos: Nat) : MetaM (Array String) := do
   let mut out : Array String := #[]
-  for con in r.constructors do
-    i := i + 1
-    if con.recursive_hypotheses.size > 0 then
-      let bt := "gen_" ++ afterLastDot r.inductive_name.toString ++ "_at_" ++ toString genpos ++"_by_con_" ++ toString i
-      out:= out.push bt
+  for (ctor, i) in inductiveInfo.constructors.zipIdx do
+    if ctor.recursive_hypotheses.size > 0 then
+      let bt := "gen_" ++ afterLastDot inductiveInfo.inductive_name.toString ++ "_at_" ++ toString genpos ++"_by_con_" ++ toString i
+      out := out.push bt
   return out
 
 def uniform_backtrack_codeblock (btarray: Array String) (inps: List String) (backtracknum: Nat)
@@ -111,15 +109,15 @@ def checker_body (r: InductiveInfo) (inpname: List String) (backtracknum: Nat)
   return body
 
 
-def producer_body (r: InductiveInfo) (inpname: List String) (genpos: Nat) (backtracknum: Nat)
-    (monad: String :="IO") : MetaM (String) := do
+def producer_body (inductiveInfo : InductiveInfo) (inpname: List String) (genpos: Nat) (backtracknum: Nat)
+    (monad: String :="IO") : MetaM String := do
   let mut body := "match size with \n| zero => \n"
   let inps := inpname.take genpos ++ inpname.drop (genpos + 1)
-  let bt0 ← size_zero_backtrack_for_producer r genpos
+  let bt0 ← size_zero_backtrack_for_producer inductiveInfo genpos
   let btblock ← uniform_backtrack_codeblock bt0 inps backtracknum monad
   body := body ++ btblock
   body:= body ++ "\n| succ size => \n"
-  let btpos ← size_pos_backtrack_for_producer r genpos
+  let btpos ← size_pos_backtrack_for_producer inductiveInfo genpos
   let bts:= bt0.append btpos
   let btblock ← weight_backtrack_codeblock bts inps backtracknum bt0.size monad
   body := body ++ btblock

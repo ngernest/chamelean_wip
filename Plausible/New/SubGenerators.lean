@@ -7,6 +7,12 @@ open Plausible.IR
 open Lean Elab Command Meta Term Parser Std
 open Idents
 
+-- TODOs:
+-- 1. Figure out how to sort the subgenerators into ones to use when `size == 0` & ones to use when `size != 0`
+-- ^^ look at how Thanh's code achieves this
+-- 2. Figure out how to compute the weight of each subgenerator
+-- ^^ may need to ask the QuickChick folks how they do this??
+
 
 /-- `genInputForInductive fvar hyp idx` produces a let-bind expression of the form
     `let fvar ← aux_arb size e1 … en`, where `e1, …, en` are the arguments to the
@@ -60,7 +66,7 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
 
 
 /-- Constructs a list of weighted thunked sub-generators as a Lean term -/
-def mkWeightedThunkedSubGenerators (subGeneratorInfos : Array SubGeneratorInfo) : TermElabM (TSyntax `term) := do
+def mkWeightedThunkedSubGenerators (subGeneratorInfos : Array SubGeneratorInfo) (generatorSort : GeneratorSort) : TermElabM (TSyntax `term) := do
   let subGenerators ← Array.mapM mkSubGenerator subGeneratorInfos
   let mut weightedGenerators := #[]
 
@@ -72,8 +78,10 @@ def mkWeightedThunkedSubGenerators (subGeneratorInfos : Array SubGeneratorInfo) 
     let thunkedGenerator ← `((1, $thunkGenFn (fun _ => $generatorBody)))
     weightedGenerators := weightedGenerators.push thunkedGenerator
 
-  -- Add generator that only fails
-  -- TODO: only add this generator for the base case when `size = 0`
-  weightedGenerators := weightedGenerators.push (← `((1, $thunkGenFn (fun _ => $failFn))))
+  -- Add generator that always fails for the case when `size == 0`
+  -- (to represent running out of fuel / inability to synthesize a generator)
+
+  if let .BaseGenerator := generatorSort then
+    weightedGenerators := weightedGenerators.push (← `((1, $thunkGenFn (fun _ => $failFn))))
 
   `([$weightedGenerators,*])

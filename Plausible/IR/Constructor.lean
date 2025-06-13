@@ -51,6 +51,12 @@ instance : ToMessageData GroupedActions where
     ]
     .bracket "{" (.ofList fields) "}"
 
+/-- Determines whether a generator is to be invoked during the base case when `size == 0` (`BaseGenerator`),
+    or if it is inductively-defined (`InductiveGenerator`) and to be invoked when `size > 0` -/
+inductive GeneratorSort where
+  | BaseGenerator
+  | InductiveGenerator
+  deriving Repr, BEq
 
 /-- Datatype containing metadata needed to derive a sub-generator
     that is invoked from the main generator function
@@ -73,6 +79,10 @@ structure SubGeneratorInfo where
   /-- A list of equalities that must hold between free variables
       (used when rewriting free variabels in patterns) -/
   variableEqualities : Array (FVarId × FVarId)
+
+  /-- `generatorSort` determines if the generator is a base generator
+      or is inductively defined -/
+  generatorSort : GeneratorSort
 
   deriving Repr
 
@@ -132,21 +142,21 @@ def mkGroupedActions (gccs: Array Action) : MetaM GroupedActions := do
     and returns a corresponding `SubCheckerInfo` for a checker -/
 def mkSubCheckerInfoFromConstructor (ctor : InductiveConstructor)
   (inputNames : Array String) : MetaM SubCheckerInfo := do
-  --Get the match expr and inp
   let conclusion ← separateFVars ctor.conclusion
   let args := (conclusion.newHypothesis.getAppArgs)
   let inputNamesAndArgs := inputNames.zip args
   let inputPairsThatNeedMatching := inputNamesAndArgs.filter (fun (_, arg) => !arg.isFVar)
   let (inputsToBeMatched, exprsToBeMatched) := inputPairsThatNeedMatching.unzip
-  --Get Action
-  let gccs ← Actions_for_checker ctor
-  let actions ← mkGroupedActions gccs
+  let actions ← Actions_for_checker ctor
+  let groupedActions ← mkGroupedActions actions
+  let generatorSort := if ctor.recursive_hypotheses.isEmpty then .BaseGenerator else .InductiveGenerator
   return {
     inputs := inputNames
     inputsToBeMatched := inputsToBeMatched
     exprsToBeMatched := exprsToBeMatched
-    groupedActions := actions
-    variableEqualities := conclusion.variableEqualities ++ actions.variableEqualities
+    groupedActions := groupedActions
+    variableEqualities := conclusion.variableEqualities ++ groupedActions.variableEqualities
+    generatorSort := generatorSort
   }
 
 -- The functions below create strings containing Lean code based on the information
@@ -317,9 +327,11 @@ def elabgetBackTrack : CommandElab := fun stx => do
 
 -- BACKTRACK PRODUCER ---
 
+
+
 /-- Takes a constructor for an inductive relation, a list of argument names, the index of the argument we wish to generate (`genpos`),
     and returns a corresponding `SubGeneratorInfo` for a generator -/
-def mkSubGeneratorInfoFromConstructor (ctor: InductiveConstructor) (inputNames : Array String) (genpos: Nat)
+def mkSubGeneratorInfoFromConstructor (ctor : InductiveConstructor) (inputNames : Array String) (genpos: Nat)
       : MetaM SubGeneratorInfo := do
   let inputNamesList := inputNames.toList
   let tempFVar := Expr.fvar (FVarId.mk (Name.mkStr1 "temp000"))
@@ -334,15 +346,19 @@ def mkSubGeneratorInfoFromConstructor (ctor: InductiveConstructor) (inputNames :
   -- (these are the arguments that need matching)
   let inputPairsThatNeedMatching := inputNamesAndArgs.filter (fun (_, arg) => !arg.isFVar)
   let (inputsToBeMatched, exprsToBeMatched) := inputPairsThatNeedMatching.unzip
-  --Get Action
-  let gccs ← Actions_for_producer ctor genpos
-  let actions ← mkGroupedActions gccs
+  let actions ← Actions_for_producer ctor genpos
+  let groupedActions ← mkGroupedActions actions
+
+  -- Constructors with no hypotheses get `BaseGenerator`s
+  -- (otherwise, the generator needs to make a recursive call and is thus inductively-defined)
+  let generatorSort := if ctor.recursive_hypotheses.isEmpty then .BaseGenerator else .InductiveGenerator
   return {
     inputs := (List.eraseIdx inputNamesList genpos).toArray
     inputsToBeMatched := inputsToBeMatched.toArray
     exprsToBeMatched := exprsToBeMatched.toArray
-    groupedActions := actions
-    variableEqualities := conclusion.variableEqualities ++ actions.variableEqualities
+    groupedActions := groupedActions
+    variableEqualities := conclusion.variableEqualities ++ groupedActions.variableEqualities
+    generatorSort := generatorSort
   }
 
 /-- Produces the final if-statement that checks the conjunction of all the hypotheses
@@ -426,21 +442,21 @@ def producer_where_defs (relation: InductiveInfo) (inpname: List String) (genpos
     and returns a collection of `SubGeneratorInfo`s for a generator -/
 def getSubGeneratorInfos (inductiveRelation : Expr) (argNames : Array String) (targetIdx: Nat) : MetaM (Array SubGeneratorInfo) := do
   let inductiveInfo ← getInductiveInfoWithArgs inductiveRelation argNames
-  let mut output := #[]
+  let mut subGenerators := #[]
   for ctor in inductiveInfo.constructors do
-    let backtrackElem ← mkSubGeneratorInfoFromConstructor ctor argNames targetIdx
-    output := output.push backtrackElem
-  return output
+    let subGenerator ← mkSubGeneratorInfoFromConstructor ctor argNames targetIdx
+    subGenerators := subGenerators.push subGenerator
+  return subGenerators
 
 /-- Takes an `Expr` representing an inductive relation and a list of names (arguments to the inductive relation),
     and returns a collection of `BacktrackElem`s for a checker -/
 def getSubCheckerInfos (inductiveRelation : Expr) (argNames : Array String) : MetaM (Array SubCheckerInfo) := do
   let inductiveInfo ← getInductiveInfoWithArgs inductiveRelation argNames
-  let mut output := #[]
+  let mut subCheckers := #[]
   for ctor in inductiveInfo.constructors do
-    let backtrackElem ← mkSubCheckerInfoFromConstructor ctor argNames
-    output := output.push backtrackElem
-  return output
+    let subChecker ← mkSubCheckerInfoFromConstructor ctor argNames
+    subCheckers := subCheckers.push subChecker
+  return subCheckers
 
 
 syntax (name := getBackTrackProducer) "#get_backtrack_producer" term "with_name" term "for_arg" num: command

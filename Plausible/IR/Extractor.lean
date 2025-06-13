@@ -82,8 +82,14 @@ structure InductiveConstructor where
   bound_vars_with_non_base_types : Array Name
 
   -- Metadata about each of the constructor's hypotheses
+
+  /-- All the hypotheses for the constructor
+     (note that the conclusion is excluded) -/
   all_hypotheses : Array Expr
+
+  /-- All hypotheses that mention the name of the inductive relation -/
   recursive_hypotheses: Array Expr
+
   hypotheses_with_only_base_type_args : Array Expr
   hypotheses_that_are_inductive_applications: Array Expr
   nonlinear_hypotheses: Array Expr

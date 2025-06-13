@@ -126,11 +126,12 @@ def findTargetVarIndex (targetVar : Name) (args : TSyntaxArray `term) : Option N
 syntax (name := derive_generator) "#derive_generator" "(" "fun" "(" ident ":" term ")" "=>" term ")" : command
 
 /-- Creates the top-level derived generator based on:
-    - a list of `subGenerators` (represented as a Lean term)
+    - a list of `baseGenerators` (each represented as a Lean term), to be invoked when `size == 0`
+    - a list of `inductiveGenerators`, to be invoked when `size > 0`
     - the name of the inductive relation (`inductiveStx`)
     - the arguments (`args`) to the inductive relation
     - the name and type for the value we wish to generate (`targetVar`, `targetTypeSyntax`) -/
-def mkTopLevelGenerator (subGenerators : TSyntax `term) (inductiveStx : TSyntax `term)
+def mkTopLevelGenerator (baseGenerators : TSyntax `term) (inductiveGenerators : TSyntax `term) (inductiveStx : TSyntax `term)
   (args : TSyntaxArray `term) (targetVar : Name)
   (targetTypeSyntax : TSyntax `term) : CommandElabM (TSyntax `command) := do
     -- Fetch the ambient local context, which we need to produce user-accessible fresh names
@@ -140,10 +141,10 @@ def mkTopLevelGenerator (subGenerators : TSyntax `term) (inductiveStx : TSyntax 
 
     -- Create the cases for the pattern-match on the size argument
     let mut caseExprs := #[]
-    let zeroCase ← `(Term.matchAltExpr| | $(mkIdent ``Nat.zero) => $backtrackFn $subGenerators)
+    let zeroCase ← `(Term.matchAltExpr| | $(mkIdent ``Nat.zero) => $backtrackFn $baseGenerators)
     caseExprs := caseExprs.push zeroCase
 
-    let succCase ← `(Term.matchAltExpr| | $(mkIdent ``Nat.succ) $(mkIdent `size') => $backtrackFn $subGenerators)
+    let succCase ← `(Term.matchAltExpr| | $(mkIdent ``Nat.succ) $(mkIdent `size') => $backtrackFn $inductiveGenerators)
     caseExprs := caseExprs.push succCase
 
     -- Create function argument for the generator size
@@ -210,9 +211,14 @@ def elabDeriveGenerator : CommandElab := fun stx => do
     -- Call helper function that produces Thanh's `BacktrackElem` data structure
     let argNameStrings := convertIdentsToStrings args
     let subGeneratorInfos ← liftTermElabM $ getSubGeneratorInfos inductiveExpr argNameStrings targetIdx
-    let subGenerators ← liftTermElabM $ mkWeightedThunkedSubGenerators subGeneratorInfos
 
-    let generatorDefinition ← mkTopLevelGenerator subGenerators inductiveName args targetVar targetTypeSyntax
+    let baseGenInfo := Array.filter (fun gen => gen.generatorSort == .BaseGenerator) subGeneratorInfos
+    let inductiveGenInfo := Array.filter (fun gen => gen.generatorSort == .InductiveGenerator) subGeneratorInfos
+
+    let baseGenerators ← liftTermElabM $ mkWeightedThunkedSubGenerators baseGenInfo .BaseGenerator
+    let inductiveGenerators ← liftTermElabM $ mkWeightedThunkedSubGenerators inductiveGenInfo .InductiveGenerator
+
+    let generatorDefinition ← mkTopLevelGenerator baseGenerators inductiveGenerators inductiveName args targetVar targetTypeSyntax
 
     -- Pretty-print the derived generator
     let genFormat ← liftCoreM (PrettyPrinter.ppCommand generatorDefinition)
