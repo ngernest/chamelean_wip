@@ -15,6 +15,7 @@ set_option pp.raw.maxDepth 10
 -- (Note: we require users to explicitly provide a type annotation to the argument to the lambda)
 -- Click on the VS Code sidebar to insert the code of the derived generator into the Lean file
 
+-- TODO: figure out how to pattern match on the argument `n` when generating Leafs for height 0
 -- #derive_generator (fun (t : Tree) => balanced n t)
 
 

@@ -7,13 +7,6 @@ open Plausible.IR
 open Lean Elab Command Meta Term Parser Std
 open Idents
 
--- TODOs:
--- 1. Figure out how to sort the subgenerators into ones to use when `size == 0` & ones to use when `size != 0`
--- ^^ look at how Thanh's code achieves this
--- 2. Figure out how to compute the weight of each subgenerator
--- ^^ may need to ask the QuickChick folks how they do this??
-
-
 /-- `genInputForInductive fvar hyp idx` produces a let-bind expression of the form
     `let fvar ← aux_arb size e1 … en`, where `e1, …, en` are the arguments to the
     a hypothesis `hyp` for an inductive relation with the argument at index `idx` removed
@@ -24,7 +17,6 @@ def genInputForInductive (fvar : FVarId) (hyp : Expr) (idx : Nat) : MetaM (TSynt
   let lhs := mkIdent $ fvar.name
   let rhsTerms := #[auxArbFn, mkIdent `size'] ++ argTerms
   mkLetBind lhs rhsTerms
-
 
 /-- Constructs an anonymous sub-generator -/
 def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term) := do
@@ -67,23 +59,28 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
   else
     throwUnsupportedSyntax
 
+/-- Computes the weight of a generator
+    - `BaseGenerator`s are assigned weight 1
+    - `InductiveGenerator`s are assigned weight `Nat.succ size'`
+      (for the case when the top-level generator's `size` parameter is non-zero) -/
+def getGeneratorWeight (gen : SubGeneratorInfo) : TermElabM (TSyntax `term) := do
+  match gen.generatorSort with
+  | .BaseGenerator => `(1)
+  | .InductiveGenerator => `($(mkIdent ``Nat.succ) $(mkIdent `size'))
 
 /-- Constructs a list of weighted thunked sub-generators as a Lean term -/
 def mkWeightedThunkedSubGenerators (subGeneratorInfos : Array SubGeneratorInfo) (generatorSort : GeneratorSort) : TermElabM (TSyntax `term) := do
   let subGenerators ← Array.mapM mkSubGenerator subGeneratorInfos
+  let generatorWeights ← Array.mapM getGeneratorWeight subGeneratorInfos
+
   let mut weightedGenerators := #[]
 
-  -- TODO: find a way of figuring out what the right weight is
-  for generatorBody in subGenerators do
-
-    logInfo m!"generatorBody = {generatorBody}"
-
-    let thunkedGenerator ← `((1, $thunkGenFn (fun _ => $generatorBody)))
+  for (weight, generatorBody) in Array.zip generatorWeights subGenerators do
+    let thunkedGenerator ← `(($weight, $thunkGenFn (fun _ => $generatorBody)))
     weightedGenerators := weightedGenerators.push thunkedGenerator
 
   -- Add generator that always fails for the case when `size == 0`
   -- (to represent running out of fuel / inability to synthesize a generator)
-
   if let .BaseGenerator := generatorSort then
     weightedGenerators := weightedGenerators.push (← `((1, $thunkGenFn (fun _ => $failFn))))
 

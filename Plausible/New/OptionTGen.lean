@@ -99,7 +99,6 @@ def genBalancedTree (n : Nat) : Nat → OptionT Gen Tree :=
         (1, thunkGen $ fun _ => OptionT.fail)
       ]
     | .succ size' =>
-      -- TODO: figure out how QuickChick assigns the right weights to the different sub-generators
       backtrack [
         (1, thunkGen $ fun _ =>
             match n with
