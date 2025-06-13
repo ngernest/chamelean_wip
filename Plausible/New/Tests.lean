@@ -6,26 +6,23 @@ import Plausible.New.OptionTGen
 open OptionTGen
 open Lean Elab Command
 
--- set_option trace.PrettyPrinter.parenthesize true
-set_option pp.raw true
-set_option pp.raw.maxDepth 10
-
-
 -- Example usage:
 -- (Note: we require users to explicitly provide a type annotation to the argument to the lambda)
 -- Click on the VS Code sidebar to insert the code of the derived generator into the Lean file
 
--- TODO: figure out how to pattern match on the argument `n` when generating Leafs for height 0
--- #derive_generator (fun (t : Tree) => balanced n t)
-
+-- Some examples:
+#derive_generator (fun (t : Tree) => bst lo hi t)
 
 -- One can inspect the type of the derived generator like so:
--- #check gen_balanced
+-- #check gen_bst
 
 -- To sample from the generator, we have to do `OptionT.run` to extract the underlying generator,
 -- then invoke `Gen.run` to display the generated value in the IO monad
--- #eval runSizedGen (gen_balanced 2) 10
+-- #eval runSizedGen (gen_bst 1 10) 10
+
 
 -- Some other examples:
--- #derive_generator (fun (t : Tree) => bst lo hi t)
+-- TODO: figure out how to pattern match on the argument `n` when generating Leafs for height 0
+-- #derive_generator (fun (t : Tree) => balanced n t)
+
 -- #derive_generator (fun (e : term) => typing Γ e τ)

@@ -10,7 +10,10 @@ def thunkGenFn : Ident := mkIdent $ Name.mkStr2 "OptionTGen" "thunkGen"
 def backtrackFn : Ident := mkIdent $ Name.mkStr2 "OptionTGen" "backtrack"
 def interpSampleFn : Ident := mkIdent $ Name.mkStr3 "Plausible" "SampleableExt" "interpSample"
 def auxArbFn : Ident := mkIdent $ Name.mkStr1 "aux_arb"
+
+/-- `Ident` representing `OptionT.fail`-/
 def failFn : Ident := mkIdent $ Name.mkStr2 "OptionT" "fail"
+
 def natIdent : Ident := mkIdent ``Nat
 def optionTIdent : Ident := mkIdent ``OptionT
 def genIdent : Ident := mkIdent ``Plausible.Gen

@@ -18,28 +18,33 @@ def genInputForInductive (fvar : FVarId) (hyp : Expr) (idx : Nat) : MetaM (TSynt
   let rhsTerms := #[auxArbFn, mkIdent `size'] ++ argTerms
   mkLetBind lhs rhsTerms
 
-/-- Constructs an anonymous sub-generator -/
+/-- Constructs an anonymous sub-generator. See the comments in the body of this function
+    for details on how this sub-generator is created. -/
 def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term) := do
   let mut doElems := #[]
 
   for action in subGenerator.groupedActions.gen_list do
     match action with
     | .genInputForInductive fvar hyp idx =>
+      -- Recursively invoke the generator to generate an argument for the hypothesis `hyp` at index `idx`,
+      -- then bind the generated value to the free variable `fvar`
       let bindExpr ← liftMetaM $ genInputForInductive fvar hyp idx
       doElems := doElems.push bindExpr
     | .genFVar fvar ty =>
+      -- Generate a value of type `ty`, then bind it to `fvar`
       let typeSyntax ← PrettyPrinter.delab ty
       let bindExpr ← mkLetBind (mkIdent fvar.name) #[interpSampleFn, typeSyntax]
       doElems := doElems.push bindExpr
     | _ => continue
 
-  -- TODO: need to add if-expressions to check that hypotheses are upheld
-  -- when we generate free variables (eg BST invariants)
-  let mut predicatesToCheck := #[]
+  -- Check that hypotheses are upheld when we generate free variables
+  let mut hypothesesToCheck := #[]
   for action in subGenerator.groupedActions.checkNonInductiveActions do
     if let .checkNonInductive predicateExpr := action then
       let predicateTerm ← PrettyPrinter.delab predicateExpr
-      predicatesToCheck := predicatesToCheck.push predicateTerm
+      hypothesesToCheck := hypothesesToCheck.push predicateTerm
+
+  -- TODO: invoke checkers for auxiliary inductive relations (for `checkInductive` actions)
 
   -- TODO: change `groupedActions.ret_list` to a single element since each do-block can only
   -- have one (final) `return` expression
@@ -47,18 +52,27 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
   let action := returnList[0]?
   if let some action' := action then
     if let .ret expr := action' then
-      let argToGenTerm ← PrettyPrinter.delab expr
-      -- If any let-bind expressions have already appeared,
-      -- then append `return $argToGenTerm` to the end of the do-block
-      if not doElems.isEmpty then
-        let retExpr ← `(doElem| return $argToGenTerm:term)
-        doElems := doElems.push retExpr
-        mkDoBlock doElems
-      -- No let-bind expressions have appeared in the do-block,
-      -- so we can just create `pure $argToGenTerm` without needing
-      -- to create a do-block
-      else
-        `($pureIdent $argToGenTerm:term)
+        let argToGenTerm ← PrettyPrinter.delab expr
+        -- If any let-bind expressions have already appeared,
+        -- then append `return $argToGenTerm` to the end of the do-block
+        if !doElems.isEmpty then
+          let retExpr ← `(doElem| return $argToGenTerm:term)
+          -- Check that all hypotheses are satisfied before returning the generated value
+          if !hypothesesToCheck.isEmpty then
+            let ifExpr ← mkIfExprWithNaryAnd hypothesesToCheck retExpr (← `(doElem| $failFn:term))
+            doElems := doElems.push ifExpr
+          else
+            -- No hypotheses to check, we can just return the generated value directly
+            doElems := doElems.push retExpr
+
+          -- Create a monadic `do`-block containing all the exprs above
+          mkDoBlock doElems
+
+        -- No let-bind expressions have appeared in the do-block,
+        -- so we can just create `pure $argToGenTerm` without needing
+        -- to create a do-block
+        else
+          `($pureIdent $argToGenTerm:term)
     else
       throwUnsupportedSyntax
   else

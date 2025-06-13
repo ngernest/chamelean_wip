@@ -73,7 +73,7 @@ def genBST (lo : Nat) (hi : Nat) : Nat → OptionT Gen Tree :=
         (1, thunkGen $ fun _ => pure .Leaf),
         (.succ size', thunkGen $ fun _ => do
           let x ← SampleableExt.interpSample Nat
-          if x > lo then
+          if (lo < x && x < hi) then
             let l ← aux_arb size' lo x
             let r ← aux_arb size' x hi
             pure (.Node x l r)
