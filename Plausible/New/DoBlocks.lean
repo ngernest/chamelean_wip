@@ -12,7 +12,6 @@ def mkLetBind (lhs : Ident) (rhsTerms : TSyntaxArray `term) : MetaM (TSyntax `do
     `(doElem| let $lhs:term ← $f:term $argTerms* )
   | [] => throwError "rhsTerms can't be empty"
 
-
 /-- Constructs a Lean monadic `do` block out of an array of `doSeq`s
     (expressions that appear in the `do` block) -/
 def mkDoBlock (doElems : TSyntaxArray `doElem) : MetaM (TSyntax `term) := do
