@@ -149,7 +149,7 @@ def mkTopLevelGenerator (baseGenerators : TSyntax `term) (inductiveGenerators : 
 
     -- Create function argument for the generator size
     let sizeParam ← `(Term.letIdBinder| ($sizeIdent : $natIdent))
-    let matchExpr ← `(match $sizeIdent:ident with $caseExprs:matchAlt*)
+    let matchExpr ← liftTermElabM $ mkMatchExpr sizeIdent caseExprs
 
     -- Add parameters for each argument to the inductive relation (except the target)
     let paramInfo ← analyzeInductiveArgs inductiveName args

@@ -51,7 +51,7 @@ whether `lo < x < hi` immediately after we generate `x` so that the generator ca
 
 -- Some other examples:
 -- TODO: figure out how to rename the pattern `.succ n` to `.succ n'` in the last sub-generator
-#derive_generator (fun (t : Tree) => balanced n t)
+-- #derive_generator (fun (t : Tree) => balanced n t)
 
 -- TODO: figure out how to handle dependencies (references to other inductive relations) for the `typing` example
 -- #derive_generator (fun (e : term) => typing Γ e τ)
