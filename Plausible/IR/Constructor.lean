@@ -70,13 +70,13 @@ structure SubGeneratorInfo where
   /-- Arguments that should be matched in the outer-most
       pattern match in the backtrack element
       (note that the input is the scrutinee for the match expression)
-      - Invariant: `exprsToMatch.length == inputsToMatch.length` -/
+      - Invariant: `matchCases.length == inputsToMatch.length` -/
   inputsToMatch : Array String
 
   /-- Cases (LHS) of the pattern match mentioned above
     - The RHS of each case should be the derived generator
-    - Invariant: `exprsToMatch.length == inputsToMatch.length` -/
-  exprsToMatch : Array Expr
+    - Invariant: `matchCases.length == inputsToMatch.length` -/
+  matchCases : Array Expr
 
   /-- `groupedActions` is used to create the RHS of the first case
       in the pattern match -/
@@ -104,7 +104,7 @@ instance : ToMessageData SubGeneratorInfo where
     let fields := [
       m!"inputs := {toMessageData backtrackElem.inputs}",
       m!"inputsToMatch := {toMessageData backtrackElem.inputsToMatch}",
-      m!"exprsToMatch := {indentD $ toMessageData backtrackElem.exprsToMatch}",
+      m!"matchCases := {indentD $ toMessageData backtrackElem.matchCases}",
       m!"actions := {indentD $ toMessageData backtrackElem.groupedActions}",
       m!"variableEqualities := {repr backtrackElem.variableEqualities}",
     ]
@@ -152,14 +152,14 @@ def mkSubCheckerInfoFromConstructor (ctor : InductiveConstructor)
   let args := (conclusion.newHypothesis.getAppArgs)
   let inputNamesAndArgs := inputNames.zip args
   let inputPairsThatNeedMatching := inputNamesAndArgs.filter (fun (_, arg) => !arg.isFVar)
-  let (inputsToMatch, exprsToMatch) := inputPairsThatNeedMatching.unzip
+  let (inputsToMatch, matchCases) := inputPairsThatNeedMatching.unzip
   let actions ← Actions_for_checker ctor
   let groupedActions ← mkGroupedActions actions
   let generatorSort := if ctor.recursive_hypotheses.isEmpty then .BaseGenerator else .InductiveGenerator
   return {
     inputs := inputNames
     inputsToMatch := inputsToMatch
-    exprsToMatch := exprsToMatch
+    matchCases := matchCases
     groupedActions := groupedActions
     variableEqualities := conclusion.variableEqualities ++ groupedActions.variableEqualities
     generatorSort := generatorSort
@@ -215,7 +215,7 @@ def backtrackElem_match_block (backtrackElem : SubGeneratorInfo) : MetaM String 
     for i in backtrackElem.inputsToMatch do
       out := out ++  i  ++ " , "
     out := ⟨out.data.dropLast.dropLast⟩ ++ " with \n| "
-    for a in backtrackElem.exprsToMatch do
+    for a in backtrackElem.matchCases do
       out := out ++ toString (← Meta.ppExpr a) ++ " , "
     out := ⟨out.data.dropLast.dropLast⟩ ++ " =>  "
   return out
@@ -354,7 +354,7 @@ def mkSubGeneratorInfoFromConstructor (ctor : InductiveConstructor) (inputNames 
   -- Find all pairs where the argument is not a free variable
   -- (these are the arguments that need matching)
   let inputPairsThatNeedMatching := inputNamesAndArgs.filter (fun (_, arg) => !arg.isFVar)
-  let (inputsToMatch, exprsToMatch) := inputPairsThatNeedMatching.unzip
+  let (inputsToMatch, matchCases) := inputPairsThatNeedMatching.unzip
   let actions ← Actions_for_producer ctor idx
   let groupedActions ← mkGroupedActions actions
 
@@ -365,7 +365,7 @@ def mkSubGeneratorInfoFromConstructor (ctor : InductiveConstructor) (inputNames 
   return {
     inputs := (List.eraseIdx inputNamesList idx).toArray
     inputsToMatch := inputsToMatch.toArray
-    exprsToMatch := exprsToMatch.toArray
+    matchCases := matchCases.toArray
     groupedActions := groupedActions
     variableEqualities := conclusion.variableEqualities ++ groupedActions.variableEqualities
     generatorSort := generatorSort

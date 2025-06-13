@@ -23,6 +23,7 @@ def genInputForInductive (fvar : FVarId) (hyp : Expr) (idx : Nat) : MetaM (TSynt
 def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term) := do
   let mut doElems := #[]
 
+
   for action in subGenerator.groupedActions.gen_list do
     match action with
     | .genInputForInductive fvar hyp idx =>
@@ -51,12 +52,14 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
   let returnList := subGenerator.groupedActions.ret_list
   let action := returnList[0]?
   if let some action' := action then
-    if let .ret expr := action' then
-        -- Delaborate `expr` to get a `TSyntax` for the argument we're generating
-        let argToGenTerm ← PrettyPrinter.delab expr
+    match action' with
+    | .ret expr =>
+      -- Delaborate `expr` to get a `TSyntax` for the argument we're generating
+      let argToGenTerm ← PrettyPrinter.delab expr
 
-        -- If any let-bind expressions have already appeared,
-        -- then append `return $argToGenTerm` to the end of the do-block
+      -- If any let-bind expressions have already appeared,
+      -- then append `return $argToGenTerm` to the end of the do-block
+      let generatorBody ←
         if !doElems.isEmpty then
           let retExpr ← `(doElem| return $argToGenTerm:term)
           -- Check that all hypotheses are satisfied before returning the generated value
@@ -75,8 +78,29 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
         -- to create a do-block
         else
           `($pureIdent $argToGenTerm:term)
-    else
-      throwUnsupportedSyntax
+
+      -- If there are inputs on which we need to perform a pattern-match,
+      -- create a pattern-match expr which only returns the generator body
+      -- if the match succeeds
+      if !subGenerator.inputsToMatch.isEmpty then
+        let mut cases := #[]
+        -- For now, we assume there is only one scrutinee
+        let scrutinee := mkIdent $ Name.mkStr1 subGenerator.inputsToMatch[0]!
+
+        for patternExpr in subGenerator.matchCases do
+          let pattern ← PrettyPrinter.delab patternExpr
+          let case ← `(Term.matchAltExpr| | $pattern:term => $generatorBody:term)
+          cases := cases.push case
+
+        let catchAllCase ← `(Term.matchAltExpr| | _ => $failFn)
+        cases := cases.push catchAllCase
+
+        mkMatchExpr scrutinee cases
+      else
+        return generatorBody
+
+    | _ => throwUnsupportedSyntax
+
   else
     throwUnsupportedSyntax
 

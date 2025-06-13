@@ -33,5 +33,6 @@ def mkIfExprWithNaryAnd (predicates : Array Term)
       List.foldlM (fun acc pred => `($acc && $pred)) (init := p) ps
   `(doElem| if $condition then $trueBranch:doElem else $elseBranch:doElem)
 
+/-- Creates a match expression -/
 def mkMatchExpr (scrutinee: Ident) (cases : TSyntaxArray ``Term.matchAlt) : MetaM (TSyntax `term) :=
   `(match $scrutinee:ident with $cases:matchAlt*)
