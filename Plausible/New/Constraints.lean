@@ -9,7 +9,7 @@ open Idents
 
 /-- Constructs a Lean monadic `do` block out of an array of `doSeq`s
     (expressions that appear in the `do` block) -/
-def mkDoBlock (doBlockExprs : TSyntaxArray ``Term.doSeq) : MetaM (TSyntax `term) := do
+private def mkDoBlock (doBlockExprs : TSyntaxArray ``Term.doSeq) : MetaM (TSyntax `term) := do
   let doSeqElems := TSyntaxArray.mk doBlockExprs
   let doBlockBody ← `(doSeq| $doSeqElems*)
   `(do $doBlockBody)
@@ -17,7 +17,7 @@ def mkDoBlock (doBlockExprs : TSyntaxArray ``Term.doSeq) : MetaM (TSyntax `term)
 /-- `mkLetBind lhs rhsTerms` constructs a monadic let-bind expression of the form
     `let lhs ← e0 e1 … en`, where `rhsTerms := #[e0, e1, …, en]`.
     - Note: `rhsTerms` cannot be empty, otherwise this function throws an exception -/
-def mkLetBind (lhs : Ident) (rhsTerms : TSyntaxArray `term) : MetaM (TSyntax ``Term.doSeq) := do
+private def mkLetBind (lhs : Ident) (rhsTerms : TSyntaxArray `term) : MetaM (TSyntax ``Term.doSeq) := do
   let rhsList := rhsTerms.toList
   match rhsList with
   | f :: args =>

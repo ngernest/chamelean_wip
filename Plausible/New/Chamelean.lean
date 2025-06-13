@@ -7,3 +7,4 @@ import Plausible.New.OptionTGen
 import Plausible.New.Idents
 import Plausible.New.Schedules
 import Plausible.New.MWE
+import Plausible.New.DoBlocks
