@@ -10,7 +10,7 @@ Repo overview:
 - [`DeriveGenerator.lean`](./Plausible/New/DeriveGenerator.lean): Metaprogramming infrastructure for automatically deriving Plausible generators
 - [`Idents.lean`](./Plausible/New/Idents.lean): Utilities for dealing with identifiers / producing fresh names 
 - [`SubGenerators.lean`](./Plausible/New/SubGenerators.lean): Handles constraints when deriving sub-generators
-- [`DoBlocks.lean`](./Plausible/New/DoBlocks.lean): Metaprogramming utilities for creating monadic `do`-blocks
+- [`TSyntaxCombinators.lean`](./Plausible/New/TSyntaxCombinators.lean): Combinators over `TSyntax` for creating monadic `do`-blocks & other Lean expressions via metaprogramming
 - [`DeriveChecker.lean`](./Plausible/New/DeriveChecker.lean): Metaprogramming infrastructure for automatically deriving checkers
 - [`Tests.lean`](./Plausible/New/Tests.lean): Example usage on how to use the new `#deriving` commands for deriving generators
 

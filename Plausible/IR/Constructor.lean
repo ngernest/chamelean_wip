@@ -27,9 +27,11 @@ structure GroupedActions where
   /-- `iflet_list` is the list of `if let ...` expressions -/
   iflet_list : Array Action
 
-  check_IR_list: Array Action
+  /-- An array of `Action`s where all of them are created using the `checkInductive` constructor -/
+  checkInductiveActions: Array Action
 
-  check_nonIR_list: Array Action
+  /-- An array of `Action`s where all of them are created using the `checkNonInductive` constructor -/
+  checkNonInductiveActions: Array Action
 
   /-- `ret_list` is the `Action`s which are all of the form `return e` -/
   ret_list : Array Action
@@ -40,14 +42,14 @@ structure GroupedActions where
 
 -- Pretty print `GroupedActions`s using the `MessageData` typeclass
 instance : ToMessageData GroupedActions where
-  toMessageData group :=
+  toMessageData groupedActions :=
     let fields := [
-      m!"gen_list := {indentD $ toMessageData group.gen_list}",
-      m!"iflet_list := {indentD $ toMessageData group.iflet_list}",
-      m!"check_IR_list := {indentD $ toMessageData group.check_IR_list}",
-      m!"check_nonIR_list := {indentD $ toMessageData group.check_nonIR_list}",
-      m!"ret_list := {indentD $ toMessageData group.ret_list}",
-      m!"variableEqualities := {repr group.variableEqualities}",
+      m!"gen_list := {indentD $ toMessageData groupedActions.gen_list}",
+      m!"iflet_list := {indentD $ toMessageData groupedActions.iflet_list}",
+      m!"check_IR_list := {indentD $ toMessageData groupedActions.checkInductiveActions}",
+      m!"check_nonIR_list := {indentD $ toMessageData groupedActions.checkNonInductiveActions}",
+      m!"ret_list := {indentD $ toMessageData groupedActions.ret_list}",
+      m!"variableEqualities := {repr groupedActions.variableEqualities}",
     ]
     .bracket "{" (.ofList fields) "}"
 
@@ -131,8 +133,8 @@ def mkGroupedActions (gccs: Array Action) : MetaM GroupedActions := do
         check_nonIR_list := check_nonIR_list.push gcc
   return {
     gen_list := gen_list
-    check_IR_list := check_IR_list
-    check_nonIR_list := check_nonIR_list
+    checkInductiveActions := check_IR_list
+    checkNonInductiveActions := check_nonIR_list
     iflet_list := iflet_list
     ret_list := ret_list
     variableEqualities := variableEqualities
@@ -242,17 +244,17 @@ def backtrackElem_gen_check_IR_block (backtrackElem : SubGeneratorInfo) (indenta
   let mut out := ""
   let mut vars : List String := []
   let mut checkcount := 1
-  for gcc in backtrackElem.groupedActions.check_IR_list do
+  for gcc in backtrackElem.groupedActions.checkInductiveActions do
     out := out ++ indentation ++ "let check" ++ toString checkcount ++ " " ++ (← actionToCode gcc monad) ++ " \n"
     vars := vars ++ [toString checkcount]
     checkcount := checkcount + 1
-  if backtrackElem.groupedActions.check_IR_list.size > 0 then
+  if backtrackElem.groupedActions.checkInductiveActions.size > 0 then
     out := ⟨out.data.dropLast.dropLast⟩
   return (out, vars)
 
 def backtrackElem_return_checker (backtrackElem : SubGeneratorInfo) (indentation : String) (vars : List String) (monad: String :="IO"): MetaM String := do
   let mut out := ""
-  if backtrackElem.variableEqualities.size + backtrackElem.groupedActions.check_nonIR_list.size + backtrackElem.groupedActions.check_IR_list.size > 0 then
+  if backtrackElem.variableEqualities.size + backtrackElem.groupedActions.checkNonInductiveActions.size + backtrackElem.groupedActions.checkInductiveActions.size > 0 then
     out := out ++ indentation ++ "return "
   else
     out := out ++ "return true"
@@ -260,9 +262,9 @@ def backtrackElem_return_checker (backtrackElem : SubGeneratorInfo) (indentation
     out := out ++ "check" ++ v ++ " && "
   for i in backtrackElem.variableEqualities do
     out := out ++  "(" ++ toString (i.1.name) ++ " == " ++ toString (i.2.name) ++ ") && "
-  for gcc in backtrackElem.groupedActions.check_nonIR_list do
+  for gcc in backtrackElem.groupedActions.checkNonInductiveActions do
     out := out ++ (← actionToCode gcc monad) ++ " && "
-  if backtrackElem.variableEqualities.size + backtrackElem.groupedActions.check_nonIR_list.size + backtrackElem.groupedActions.check_IR_list.size > 0 then
+  if backtrackElem.variableEqualities.size + backtrackElem.groupedActions.checkNonInductiveActions.size + backtrackElem.groupedActions.checkInductiveActions.size > 0 then
     out := ⟨out.data.dropLast.dropLast.dropLast⟩
   if backtrackElem.groupedActions.iflet_list.size > 0 then
       out := out ++ "\nreturn false"
@@ -367,19 +369,19 @@ def mkSubGeneratorInfoFromConstructor (ctor : InductiveConstructor) (inputNames 
 -/
 def backtrackElem_if_return_producer (backtrackElem : SubGeneratorInfo) (indentation : String) (vars: List String) (monad: String :="IO"): MetaM String := do
   let mut out := ""
-  if backtrackElem.variableEqualities.size + backtrackElem.groupedActions.check_nonIR_list.size + backtrackElem.groupedActions.check_IR_list.size > 0 then
+  if backtrackElem.variableEqualities.size + backtrackElem.groupedActions.checkNonInductiveActions.size + backtrackElem.groupedActions.checkInductiveActions.size > 0 then
     out := out ++ indentation ++ "if "
   for j in vars do
     out := out ++ "check" ++ j ++ " && "
   for i in backtrackElem.variableEqualities do
     out := out ++  "(" ++ toString (i.1.name) ++ " == " ++ toString (i.2.name) ++ ") && "
-  for gcc in backtrackElem.groupedActions.check_nonIR_list do
+  for gcc in backtrackElem.groupedActions.checkNonInductiveActions do
     out := out ++ (← actionToCode gcc monad) ++ " && "
-  if backtrackElem.variableEqualities.size + backtrackElem.groupedActions.check_nonIR_list.size + backtrackElem.groupedActions.check_IR_list.size > 0 then
+  if backtrackElem.variableEqualities.size + backtrackElem.groupedActions.checkNonInductiveActions.size + backtrackElem.groupedActions.checkInductiveActions.size > 0 then
     out := ⟨out.data.dropLast.dropLast.dropLast⟩ ++ "\n" ++ indentation ++  "then "
   for gcc in backtrackElem.groupedActions.ret_list do
     out := out ++ indentation ++ (← actionToCode gcc monad)
-  if backtrackElem.variableEqualities.size + backtrackElem.groupedActions.check_nonIR_list.size + backtrackElem.groupedActions.check_IR_list.size + backtrackElem.groupedActions.iflet_list.size > 0 then
+  if backtrackElem.variableEqualities.size + backtrackElem.groupedActions.checkNonInductiveActions.size + backtrackElem.groupedActions.checkInductiveActions.size + backtrackElem.groupedActions.iflet_list.size > 0 then
     let monad_fail := if monad = "IO" then "throw (IO.userError \"fail at checkstep\")" else "return none"
     out := out ++ "\n" ++ monad_fail
   if backtrackElem.inputsToBeMatched.size > 0 then

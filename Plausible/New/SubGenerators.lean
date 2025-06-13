@@ -1,7 +1,7 @@
 import Lean
 import Plausible.IR.Constructor
 import Plausible.New.Idents
-import Plausible.New.DoBlocks
+import Plausible.New.TSyntaxCombinators
 
 open Plausible.IR
 open Lean Elab Command Meta Term Parser Std
@@ -35,6 +35,11 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
 
   -- TODO: need to add if-expressions to check that hypotheses are upheld
   -- when we generate free variables (eg BST invariants)
+  let mut predicatesToCheck := #[]
+  for action in subGenerator.groupedActions.checkNonInductiveActions do
+    if let .checkNonInductive predicateExpr := action then
+      let predicateTerm ← PrettyPrinter.delab predicateExpr
+      predicatesToCheck := predicatesToCheck.push predicateTerm
 
   -- TODO: change `groupedActions.ret_list` to a single element since each do-block can only
   -- have one (final) `return` expression

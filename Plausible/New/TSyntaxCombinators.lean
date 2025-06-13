@@ -16,3 +16,16 @@ def mkLetBind (lhs : Ident) (rhsTerms : TSyntaxArray `term) : MetaM (TSyntax `do
     (expressions that appear in the `do` block) -/
 def mkDoBlock (doElems : TSyntaxArray `doElem) : MetaM (TSyntax `term) := do
   `(do $[$doElems:doElem]*)
+
+/-- `mkNAryConjunctionIfExpr predicates trueBranch elseBranch` creates an if-expression
+    `if (p1 && … && pn) then $trueBranch else $elseBranch`, where `predicates := #[p1, …, pn]`
+    - Note: if `predicates` is empty, the expression created is `if True then $trueBranch else $elseBranch` -/
+def mkNAryConjunctionIfExpr (predicates : Array Term)
+  (trueBranch : Term) (elseBranch : Term) : MetaM (TSyntax `term) := do
+  let condition ←
+    match predicates.toList with
+    | [] => `(True)
+    | [p] => pure p
+    | p :: ps =>
+      List.foldlM (fun acc pred => `($acc && $pred)) (init := p) ps
+  `(if $condition then $trueBranch else $elseBranch)

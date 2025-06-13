@@ -182,13 +182,11 @@ inductive Action where
 
   /-- Match the `fvar` with the shape of the hypothesis `hyp` using an `if let` expression
       - `matchFVar` always comes after a `genFVar`
-      - Produces code of the form `if let hyp := fvar then ...`
-   -/
+      - Produces code of the form `if let hyp := fvar then ...` -/
   | matchFVar (fvar : FVarId) (hyp : DecomposedInductiveHypothesis)
 
   /-- Generate a free variable `fvar` with the given `type`
-      - this is `gen_UC` in QuickChick (i.e. `arbitrary`)
-   -/
+      - This is `gen_UC` (unconditional generation) in the QuickChick codebase (i.e. `arbitrary`) -/
   | genFVar (fvar : FVarId) (type : Expr)
 
   /-- `return` the expression `e` in some ambient monad (e.g. `Gen`) -/
