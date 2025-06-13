@@ -16,7 +16,7 @@ def genInputForInductive (fvar : FVarId) (hyp : Expr) (idx : Nat) : MetaM (TSynt
   let argExprs := hyp.getAppArgs.eraseIdx! idx
   let argTerms ← Array.mapM PrettyPrinter.delab argExprs
   let lhs := mkIdent $ fvar.name
-  let rhsTerms := #[auxArbFn, sizeIdent] ++ argTerms
+  let rhsTerms := #[auxArbFn, mkIdent `size'] ++ argTerms
   mkLetBind lhs rhsTerms
 
 

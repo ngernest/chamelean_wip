@@ -294,8 +294,7 @@ def mkTopLevelGenerator (subGenerators : TSyntax `term) (inductiveStx : TSyntax 
     let zeroCase ← `(Term.matchAltExpr| | $(mkIdent ``Nat.zero) => $backtrackFn $subGenerators)
     caseExprs := caseExprs.push zeroCase
 
-    let smallerSize := mkFreshAccessibleIdent localCtx `size'
-    let succCase ← `(Term.matchAltExpr| | $(mkIdent ``Nat.succ) $smallerSize => $backtrackFn $subGenerators)
+    let succCase ← `(Term.matchAltExpr| | $(mkIdent ``Nat.succ) $(mkIdent `size') => $backtrackFn $subGenerators)
     caseExprs := caseExprs.push succCase
 
     -- Create function argument for the generator size
