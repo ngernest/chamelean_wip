@@ -339,7 +339,7 @@ def mkTopLevelGenerator (subGenerators : TSyntax `term) (inductiveStx : TSyntax 
 
 
 @[command_elab derive_generator]
-def elabDeriveGeneratorNew : CommandElab := fun stx => do
+def elabDeriveGenerator : CommandElab := fun stx => do
   match stx with
   | `(#derive_generator ( fun ( $var:ident : $targetTypeSyntax:term ) => $body:term )) => do
 

@@ -62,4 +62,8 @@ def mkWeightedThunkedSubGenerators (subGeneratorInfos : Array SubGeneratorInfo) 
     let thunkedGenerator ← `((1, $thunkGenFn (fun _ => $generatorBody)))
     weightedGenerators := weightedGenerators.push thunkedGenerator
 
+  -- Add generator that only fails
+  -- TODO: only add this generator for the base case when `size = 0`
+  weightedGenerators := weightedGenerators.push (← `((1, $thunkGenFn (fun _ => $failFn))))
+
   `([$weightedGenerators,*])
