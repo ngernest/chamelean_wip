@@ -368,7 +368,7 @@ instance : ToMessageData Action where
       let remainingArgs := (hyp.getAppArgs.eraseIdx! idx).toList
       m!"let {fvar.name} ← gen_{hyp.getAppFn}_at_{idx} size {remainingArgs}"
     | .matchFVar fvar hypothesis => m!"if let {hypothesis.newHypothesis} := {fvar.name} then ..."
-    | .genFVar id ty => m!"let {id.name} := gen_rand {ty}"
+    | .genFVar fvar ty => m!"let {fvar.name} ← SampleableExt.interpSample {ty}"
     | .ret e => m!"return {e}"
 
 

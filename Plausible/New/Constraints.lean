@@ -22,13 +22,17 @@ def genInputForInductive (fvar : FVarId) (hyp : Expr) (idx : Nat) : MetaM (TSynt
 
 /-- Constructs an anonymous sub-generator -/
 def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term) := do
-  let mut doBlockExprs := #[]
+  let mut doElems := #[]
 
   for action in subGenerator.groupedActions.gen_list do
     match action with
     | .genInputForInductive fvar hyp idx =>
       let bindExpr ← liftMetaM $ genInputForInductive fvar hyp idx
-      doBlockExprs := doBlockExprs.push bindExpr
+      doElems := doElems.push bindExpr
+    | .genFVar fvar ty =>
+      let typeSyntax ← PrettyPrinter.delab ty
+      let bindExpr ← mkLetBind (mkIdent fvar.name) #[interpSampleFn, typeSyntax]
+      doElems := doElems.push bindExpr
     | _ => continue
 
   let returnList := subGenerator.groupedActions.ret_list
@@ -37,8 +41,8 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
     if let .ret expr := action' then
       let argToGenTerm ← PrettyPrinter.delab expr
       let retExpr ← `(doElem| return $argToGenTerm:term)
-      doBlockExprs := doBlockExprs.push retExpr
-      mkDoBlock doBlockExprs
+      doElems := doElems.push retExpr
+      mkDoBlock doElems
     else
       throwUnsupportedSyntax
   else
