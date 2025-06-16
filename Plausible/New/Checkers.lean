@@ -66,3 +66,50 @@ def checkLookup (Γ : List type) (x : Nat) (τ : type) : Nat → Option Bool :=
               | none => none)
       ]
   fun size => aux_arb size Γ x τ
+
+/-- A handwritten checker which checks `typing Γ e τ`, ignoring the case for `App`
+    (based on the auto-derived checker produced by QuickChick) -/
+def checkTyping (Γ : List type) (e : term) (τ : type) : Nat → Option Bool :=
+  let rec aux_arb (init_size : Nat) (size : Nat) (Γ : List type) (e : term) (τ : type) : Option Bool :=
+    match size with
+    | .zero =>
+      checkerBacktrack [
+        fun _ =>
+          match e with
+          | .Var x => checkLookup Γ x τ init_size
+          | _ => some false,
+        fun _ =>
+          match τ with
+          | .Nat =>
+            match e with
+            | .Const _ => some true
+            | _ => some false
+          | .Fun _ _ => some false,
+        fun _ => none
+      ]
+    | .succ size' =>
+      checkerBacktrack [
+        fun _ =>
+          match e with
+          | .Var x => checkLookup Γ x τ init_size
+          | _ => some false,
+        fun _ =>
+          match τ with
+          | .Nat =>
+            match e with
+            | .Const _ => some true
+            | _ => some false
+          | .Fun _ _ => some false,
+        fun _ =>
+          match τ with
+          | .Nat => some false
+          | .Fun unkn_17_ τ2 =>
+            match e with
+            | .Abs τ1 e =>
+              match decide (τ1 = unkn_17_) with
+              | true => aux_arb init_size size' (τ1 :: Γ) e τ2
+              | false => some false
+            | _ => none,
+        -- TODO: handle App case
+      ]
+  fun size => aux_arb size size Γ e τ
