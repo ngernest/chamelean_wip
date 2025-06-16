@@ -19,9 +19,9 @@ deriving Repr
 inductive balanced : Nat → Tree → Prop where
 | B0 : balanced 0 .Leaf
 | B1 : balanced 1 .Leaf
-| BS : ∀ n x Γ r,
-  balanced n Γ → balanced n r →
-  balanced (.succ n) (.Node x Γ r)
+| BS : ∀ n x l r,
+  balanced n l → balanced n r →
+  balanced (.succ n) (.Node x l r)
 
 /-- `bst lo hi t` describes whether a tree `t` is a BST that contains values strictly within `lo` and `hi` -/
 inductive bst : Nat → Nat → Tree → Prop where

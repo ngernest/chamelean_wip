@@ -9,31 +9,9 @@ open Lean Elab Command
 #derive_generator (fun (t : Tree) => bst lo hi t)
 
 /-
-The following generator is derived:
-```
-def gen_bst (lo : Nat) (hi : Nat) : Nat → OptionT Plausible.Gen Tree :=
-  let rec aux_arb (size : Nat) (lo : Nat) (hi : Nat) : OptionT Plausible.Gen Tree :=
-    match size with
-    | Nat.zero =>
-      OptionTGen.backtrack
-        [(1, OptionTGen.thunkGen (fun _ => pure Tree.Leaf)), (1, OptionTGen.thunkGen (fun _ => OptionT.fail))]
-    | Nat.succ size' =>
-      OptionTGen.backtrack
-        [(1, OptionTGen.thunkGen (fun _ => pure Tree.Leaf)),
-          (Nat.succ size',
-            OptionTGen.thunkGen
-              (fun _ => do
-                let x ← Plausible.SampleableExt.interpSample Nat
-                let l ← aux_arb size' lo x
-                let r ← aux_arb size' x hi
-                if lo < x && x < hi then
-                  return Tree.Node x l r
-                else
-                  OptionT.fail))]
-  fun size => aux_arb size lo hi
-```
 (Note: this is not the most efficient generator -- ideally we would be able to push the if-expression that checks
-whether `lo < x < hi` immediately after we generate `x` so that the generator can fail quickly if `x` is out of bounds.)
+whether `lo < x < hi` immediately after we generate `x` so that the generator can fail quickly if `x` is out of bounds.
+We can make this generator more efficient Segev's generator schedules.)
 -/
 
 -- One can inspect the type of the derived generator like so:
@@ -44,10 +22,15 @@ whether `lo < x < hi` immediately after we generate `x` so that the generator ca
 -- #eval runSizedGen (gen_bst 1 10) 10
 
 
--- Some other examples:
--- #derive_generator (fun (t : Tree) => balanced n t)
+#derive_generator (fun (t : Tree) => balanced n t)
 
--- TODO: figure out how to handle dependencies (references to other inductive relations) for the `typing` example
+
+
+
+
+
+
+-- Work in progress: extend generator deriver to handle STLC example
 -- TODO: figure out how to handle checkers
 -- TODO: add `init_size` parameter to derived generators (serves as fuel when invoking other generators)
 -- #derive_generator (fun (e : term) => typing Γ e τ)
