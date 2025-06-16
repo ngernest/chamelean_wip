@@ -11,13 +11,25 @@ namespace OptionTGen
 -- https://github.com/QuickChick/QuickChick/blob/master/src/Generators.v
 --------------------------------------------------------------------------
 
-/-- `pickDrop xs n` returns a weight & its generator `(k, gen)` such that `n < k`,
-    and also returns the tail of the list after `(k, gen)` -/
+/-- `pick default xs n` chooses a weight & a generator `(k, gen)` from the list `xs` such that `n < k`.
+    If `xs` is empty, the `default` generator with weight 0 is returned.  -/
+def pick (default : OptionT Gen α) (xs : List (Nat × OptionT Gen α)) (n : Nat) : Nat × OptionT Gen α :=
+  match xs with
+  | [] => (0, default)
+  | (k, x) :: xs =>
+    if n < k then
+      (k, x)
+    else
+      pick default xs (n - k)
+
+/-- `pickDrop xs n` returns a weight & its generator `(k, gen)` from the list `xs`
+     such that `n < k`, and also returns the tail of the list after `(k, gen)` -/
 def pickDrop (xs : List (Nat × OptionT Gen α)) (n : Nat) : Nat × OptionT Gen α × List (Nat × OptionT Gen α) :=
   match xs with
   | [] => (0, OptionT.fail, [])
   | (k, x) :: xs =>
-    if n < k then (k, x, xs)
+    if n < k then
+      (k, x, xs)
     else
       let (k', x', xs') := pickDrop xs (n - k)
       (k', x', (k, x)::xs')
@@ -45,6 +57,13 @@ def backtrack (gs : List (Nat × OptionT Gen α)) : OptionT Gen α :=
 /-- Delays the evaluation of a generator by taking in a function `f : Unit → OptionT Gen α` -/
 def thunkGen (f : Unit → OptionT Gen α) : OptionT Gen α :=
   f ()
+
+/-- `frequency` picks a generator from the list `gs` according to the weights in `gs`.
+    If `gs` is empty, `OptionT.fail` is returned to indicate failure.  -/
+def frequency (gs : List (Nat × OptionT Gen α)) : OptionT Gen α := do
+  let total := sumFst gs
+  let n ← Gen.choose Nat 0 (total - 1) (by omega)
+  .snd (pick OptionT.fail gs n)
 
 /-- Samples from an `OptionT Gen` generator that is parameterized by its `size`,
     returning the generated `Option α`  in the `IO` monad -/
