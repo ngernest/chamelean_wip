@@ -46,8 +46,8 @@ instance : ToMessageData GroupedActions where
     let fields := [
       m!"gen_list := {indentD $ toMessageData groupedActions.gen_list}",
       m!"iflet_list := {indentD $ toMessageData groupedActions.iflet_list}",
-      m!"check_IR_list := {indentD $ toMessageData groupedActions.checkInductiveActions}",
-      m!"check_nonIR_list := {indentD $ toMessageData groupedActions.checkNonInductiveActions}",
+      m!"checkInductiveActions := {indentD $ toMessageData groupedActions.checkInductiveActions}",
+      m!"checkNonInductiveActions := {indentD $ toMessageData groupedActions.checkNonInductiveActions}",
       m!"ret_list := {indentD $ toMessageData groupedActions.ret_list}",
       m!"variableEqualities := {repr groupedActions.variableEqualities}",
     ]
