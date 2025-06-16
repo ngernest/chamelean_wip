@@ -32,7 +32,7 @@ inductive bst : Nat → Nat → Tree → Prop where
 inductive type where
   | Nat : type
   | Fun: type → type → type
-  deriving BEq, Repr
+  deriving BEq, DecidableEq, Repr
 
 /-- Terms in the STLC extended with naturals and addition -/
 inductive term where
