@@ -65,6 +65,7 @@ def frequency (gs : List (Nat × OptionT Gen α)) : OptionT Gen α := do
   let n ← Gen.choose Nat 0 (total - 1) (by omega)
   .snd (pick OptionT.fail gs n)
 
+
 /-- Samples from an `OptionT Gen` generator that is parameterized by its `size`,
     returning the generated `Option α`  in the `IO` monad -/
 def runSizedGen {α} (sizedGen : Nat → OptionT Gen α) (size : Nat) : IO (Option α) :=
@@ -144,5 +145,33 @@ def genBalancedTree (n : Nat) : Nat → OptionT Gen Tree :=
 -- def tempSize := 5
 -- #eval runSizedGen (genBST 1 10) tempSize
 -- #eval runSizedGen (genBalancedTree 2) tempSize
+
+/-- A generator for types in the STLC -/
+def genType : Nat → OptionT Gen type :=
+  let rec arb_aux (size : Nat) : OptionT Gen type :=
+    match size with
+    | 0 => pure .Nat
+    | .succ size' =>
+        frequency
+          [(1, thunkGen $ fun _ => pure .Nat),
+          (.succ size',
+            thunkGen $ fun _ => do
+              let p0 ← arb_aux size'
+              let p1 ← arb_aux size'
+              pure (.Fun p0 p1))]
+  fun n => arb_aux n
+
+instance : Shrinkable type where
+  shrink := fun ty =>
+    match ty with
+    | .Nat => []
+    | .Fun τ1 τ2 => [τ1, τ2]
+
+-- TODO: figure out how to come up with a `SampleableExt` instance for `type`
+-- (right now the `OptionT` infrastructure we have makes this challenging)
+-- instance : SampleableExt type :=
+--   SampleableExt.mkSelfContained $ OptionT.run (genType 100)
+
+
 
 end OptionTGen

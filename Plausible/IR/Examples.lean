@@ -1,5 +1,6 @@
-import Lean
-open Nat
+import Plausible.Sampleable
+open Plausible
+
 
 /-- Dummy inductive relation for testing purposes -/
 inductive RGB where
@@ -20,7 +21,7 @@ inductive balanced : Nat → Tree → Prop where
 | B1 : balanced 1 .Leaf
 | BS : ∀ n x Γ r,
   balanced n Γ → balanced n r →
-  balanced (succ n) (.Node x Γ r)
+  balanced (.succ n) (.Node x Γ r)
 
 /-- `bst lo hi t` describes whether a tree `t` is a BST that contains values strictly within `lo` and `hi` -/
 inductive bst : Nat → Nat → Tree → Prop where
