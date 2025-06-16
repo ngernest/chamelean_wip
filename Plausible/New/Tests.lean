@@ -2,6 +2,7 @@ import Plausible.New.DeriveGenerator
 import Plausible.Gen
 
 import Plausible.New.OptionTGen
+import Plausible.New.DecOpt
 open OptionTGen
 open Lean Elab Command
 
@@ -23,9 +24,6 @@ We can make this generator more efficient using Segev's generator schedules.)
 -- #eval runSizedGen (gen_bst 1 10) 10
 
 
-
-
 -- Work in progress: extend generator deriver to handle STLC example
 -- TODO: figure out how to handle checkers
--- TODO: add `init_size` parameter to derived generators (serves as fuel when invoking other generators)
 -- #derive_generator (fun (e : term) => typing Γ e τ)
