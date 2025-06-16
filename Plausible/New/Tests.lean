@@ -6,11 +6,7 @@ open OptionTGen
 open Lean Elab Command
 
 -- Example usage:
--- (Note: we require users to explicitly provide a type annotation to the argument to the lambda)
--- Click on the VS Code sidebar to insert the code of the derived generator into the Lean file
-
--- Some examples:
--- #derive_generator (fun (t : Tree) => bst lo hi t)
+#derive_generator (fun (t : Tree) => bst lo hi t)
 
 /-
 The following generator is derived:
@@ -53,4 +49,5 @@ whether `lo < x < hi` immediately after we generate `x` so that the generator ca
 
 -- TODO: figure out how to handle dependencies (references to other inductive relations) for the `typing` example
 -- TODO: figure out how to handle checkers
+-- TODO: add `init_size` parameter to derived generators (serves as fuel when invoking other generators)
 -- #derive_generator (fun (e : term) => typing Γ e τ)

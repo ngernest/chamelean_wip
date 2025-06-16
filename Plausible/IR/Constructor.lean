@@ -279,6 +279,10 @@ def backtrackElem_return_checker (backtrackElem : SubGeneratorInfo) (indentation
 /-- Assembles all the components of a sub-checker (a `BacktrackElem`) together, returning a string
     containing the Lean code for the sub-checker -/
 def backtrack_elem_toString_checker (backtrackElem: SubGeneratorInfo) (monad: String :="IO") : MetaM String := do
+  IO.println "********************"
+  IO.println s!"entered `backtrack_elem_toString_checker`:"
+  IO.println (← MessageData.toString (toMessageData backtrackElem))
+
   let mut out := ""
   let matchblock ← backtrackElem_match_block backtrackElem
   let (genblock, iden) ← backtrackElem_gen_block backtrackElem monad
@@ -395,10 +399,6 @@ def backtrackElem_if_return_producer (backtrackElem : SubGeneratorInfo) (indenta
   if backtrackElem.inputsToMatch.size > 0 then
     let monad_fail := if monad = "IO" then "throw (IO.userError \"fail\")" else "return none"
     out := out ++ "\n| " ++ makeUnderscores_commas backtrackElem.inputsToMatch.size ++ " => " ++ monad_fail
-
-  IO.println "********************"
-  IO.println s!"inside if_return_producer: \n\
-               ```{out}```"
 
   return out
 
