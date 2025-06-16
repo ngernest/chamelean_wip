@@ -1,4 +1,4 @@
-import Plausible.IR.Example
+import Plausible.IR.Examples
 
 import Plausible.Gen
 import Plausible.Sampleable

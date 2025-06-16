@@ -1,6 +1,6 @@
 import Lean
 import Std
-import Plausible.IR.Example
+import Plausible.IR.Examples
 import Plausible.IR.Prelude
 import Lean.Elab.Deriving.DecEq
 import Batteries.Data.List.Basic
