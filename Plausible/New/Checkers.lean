@@ -38,9 +38,7 @@ def checkLookup (Γ : List type) (x : Nat) (τ : type) : Nat → Option Bool :=
             match Γ with
             | [] => some false
             | t :: _ =>
-              match decide (τ = t) with
-              | true => some true
-              | false => some false
+              if (τ = t) then some true else some false
           | .succ _ => some false),
         fun _ => none
       ]
@@ -66,6 +64,7 @@ def checkLookup (Γ : List type) (x : Nat) (τ : type) : Nat → Option Bool :=
               | none => none)
       ]
   fun size => aux_arb size Γ x τ
+
 
 /-- A handwritten checker which checks `typing Γ e τ`, ignoring the case for `App`
     (based on the auto-derived checker produced by QuickChick) -/

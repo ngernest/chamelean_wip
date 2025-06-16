@@ -18,6 +18,7 @@ def natIdent : Ident := mkIdent ``Nat
 def optionTIdent : Ident := mkIdent ``OptionT
 def genIdent : Ident := mkIdent ``Plausible.Gen
 def pureIdent : Ident := mkIdent $ Name.mkStr1 "pure"
+def initSizeIdent : Ident := mkIdent $ Name.mkStr1 "initSize"
 def sizeIdent : Ident := mkIdent $ Name.mkStr1 "size"
 
 /-- Produces a fresh user-facing & *accessible* identifier with respect to the local context

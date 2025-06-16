@@ -15,14 +15,13 @@ def genInputForInductive (fvar : FVarId) (hyp : Expr) (idx : Nat) : MetaM (TSynt
   let argExprs := hyp.getAppArgs.eraseIdx! idx
   let argTerms ← Array.mapM PrettyPrinter.delab argExprs
   let lhs := mkIdent $ fvar.name
-  let rhsTerms := #[auxArbFn, mkIdent `size'] ++ argTerms
+  let rhsTerms := #[auxArbFn, initSizeIdent, mkIdent `size'] ++ argTerms
   mkLetBind lhs rhsTerms
 
 /-- Constructs an anonymous sub-generator. See the comments in the body of this function
     for details on how this sub-generator is created. -/
 def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term) := do
   let mut doElems := #[]
-
 
   for action in subGenerator.groupedActions.gen_list do
     match action with

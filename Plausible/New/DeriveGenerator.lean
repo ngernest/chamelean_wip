@@ -147,6 +147,7 @@ def mkTopLevelGenerator (baseGenerators : TSyntax `term) (inductiveGenerators : 
     caseExprs := caseExprs.push succCase
 
     -- Create function argument for the generator size
+    let initSizeParam ← `(Term.letIdBinder| ($initSizeIdent : $natIdent))
     let sizeParam ← `(Term.letIdBinder| ($sizeIdent : $natIdent))
     let matchExpr ← liftTermElabM $ mkMatchExpr sizeIdent caseExprs
 
@@ -158,6 +159,7 @@ def mkTopLevelGenerator (baseGenerators : TSyntax `term) (inductiveGenerators : 
 
     -- Inner params are for the inner `aux_arb` function
     let mut innerParams := #[]
+    innerParams := innerParams.push initSizeParam
     innerParams := innerParams.push sizeParam
 
     let mut paramIdents := #[]
@@ -184,7 +186,7 @@ def mkTopLevelGenerator (baseGenerators : TSyntax `term) (inductiveGenerators : 
     `(def $generatorIdent $topLevelParams* : $natIdent → $generatorType :=
         let rec $auxArbIdent:ident $innerParams* : $generatorType :=
           $matchExpr
-      fun $freshSizeIdent => $auxArbIdent $freshSizeIdent $paramIdents*)
+      fun $freshSizeIdent => $auxArbIdent $freshSizeIdent $freshSizeIdent $paramIdents*)
 
 
 @[command_elab derive_generator]
