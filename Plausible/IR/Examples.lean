@@ -29,24 +29,40 @@ inductive bst : Nat → Nat → Tree → Prop where
 
 /-- Base types in the STLC (either Nat or functions) -/
 inductive type where
-| Nat : type
-| Fun: type → type → type
-deriving BEq, Repr
+  | Nat : type
+  | Fun: type → type → type
+  deriving BEq, Repr
 
-/-- Datatype for expressions in the STLC extended with naturals and addition -/
+/-- Terms in the STLC extended with naturals and addition -/
 inductive term where
-| Const: Nat → term
-| Add: term → term → term
-| Var: Nat → term
-| App: term → term → term
-| Abs: type → term → term
-deriving BEq, Repr
+  | Const: Nat → term
+  | Add: term → term → term
+  | Var: Nat → term
+  | App: term → term → term
+  | Abs: type → term → term
+  deriving BEq, Repr
 
-/- `typing Γ e τ` is the typing judgement `Γ ⊢ e : τ`.
-    For simplicity, we only include `TConst` and `TAdd` for now (the other cases require auxiliary `inductive`s) -/
+/-- `lookup Γ n τ` checks whether the `n`th element of the context `Γ` has type `τ` -/
+inductive lookup : List type -> Nat -> type -> Prop where
+  | LookupNow   : forall τ Γ, lookup (τ :: Γ) 0 τ
+  | LookupLater : forall τ τ' x Γ,
+      lookup Γ x τ -> lookup (τ' :: Γ) (.succ x) τ
+
+/- `typing Γ e τ` is the typing judgement `Γ ⊢ e : τ` -/
 inductive typing: List type → term → type → Prop where
-| TConst : ∀ n, typing Γ (.Const n) .Nat
-| TAdd: ∀ e1 e2, typing Γ e1 .Nat → typing Γ e2 .Nat → typing Γ (term.Add e1 e2) .Nat
-| TAbs: ∀ e t1 t2, typing (t1::L) e t2 → typing Γ (term.Abs t1 e) (.Fun t1 t2)
-| TVar: ∀ x t, typing Γ (term.Var x) t
-| TApp: ∀ e1 e2 t1 t2, typing Γ e2 t1 → typing Γ e1 (.Fun t1 t2) → typing Γ (term.App e1 e2) t2
+| TConst : ∀ n,
+    typing Γ (.Const n) .Nat
+| TAdd: ∀ e1 e2,
+    typing Γ e1 .Nat →
+    typing Γ e2 .Nat →
+    typing Γ (.Add e1 e2) .Nat
+| TAbs: ∀ e t1 t2,
+    typing (t1::L) e t2 →
+    typing Γ (.Abs t1 e) (.Fun t1 t2)
+| TVar: ∀ x t,
+    lookup Γ x τ →
+    typing Γ (.Var x) t
+| TApp: ∀ e1 e2 t1 t2,
+    typing Γ e2 t1 →
+    typing Γ e1 (.Fun t1 t2) →
+    typing Γ (.App e1 e2) t2
