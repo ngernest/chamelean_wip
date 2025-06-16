@@ -52,4 +52,5 @@ whether `lo < x < hi` immediately after we generate `x` so that the generator ca
 -- #derive_generator (fun (t : Tree) => balanced n t)
 
 -- TODO: figure out how to handle dependencies (references to other inductive relations) for the `typing` example
+-- TODO: figure out how to handle checkers
 -- #derive_generator (fun (e : term) => typing Γ e τ)

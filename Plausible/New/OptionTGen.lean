@@ -6,10 +6,10 @@ open Plausible
 
 namespace OptionTGen
 
---------------------------------------------------------------------------
--- Helper functions (adapted from QuickChick sourcecode)
+----------------------------------------------------------------------------------
+-- Combinators for generators that may fail (adapted from QuickChick sourcecode)
 -- https://github.com/QuickChick/QuickChick/blob/master/src/Generators.v
---------------------------------------------------------------------------
+----------------------------------------------------------------------------------
 
 /-- `pick default xs n` chooses a weight & a generator `(k, gen)` from the list `xs` such that `n < k`.
     If `xs` is empty, the `default` generator with weight 0 is returned.  -/

@@ -46,8 +46,8 @@ inductive term where
 /-- `lookup Γ n τ` checks whether the `n`th element of the context `Γ` has type `τ` -/
 inductive lookup : List type -> Nat -> type -> Prop where
   | LookupNow   : forall τ Γ, lookup (τ :: Γ) 0 τ
-  | LookupLater : forall τ τ' x Γ,
-      lookup Γ x τ -> lookup (τ' :: Γ) (.succ x) τ
+  | LookupLater : forall τ τ' n Γ,
+      lookup Γ n τ -> lookup (τ' :: Γ) (.succ n) τ
 
 /- `typing Γ e τ` is the typing judgement `Γ ⊢ e : τ` -/
 inductive typing: List type → term → type → Prop where
