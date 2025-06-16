@@ -26,7 +26,12 @@ inductive balanced : Nat → Tree → Prop where
 /-- `bst lo hi t` describes whether a tree `t` is a BST that contains values strictly within `lo` and `hi` -/
 inductive bst : Nat → Nat → Tree → Prop where
 | BstLeaf: bst lo hi .Leaf
-| BstNode: ∀ lo hi x l r, lo < x → x < hi → bst lo x l →  bst x hi r → bst lo hi (Tree.Node x l r)
+| BstNode: ∀ lo hi x l r,
+  lo < x →
+  x < hi →
+  bst lo x l →
+  bst x hi r →
+  bst lo hi (.Node x l r)
 
 /-- Base types in the STLC (either Nat or functions) -/
 inductive type where

@@ -6,4 +6,4 @@ import Plausible.New.OptionTGen
 import Plausible.New.Idents
 import Plausible.New.Schedules
 import Plausible.New.TSyntaxCombinators
-import Plausible.New.Checkers
+import Plausible.New.DecOpt
