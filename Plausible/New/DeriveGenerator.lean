@@ -1,6 +1,5 @@
 import Lean
 import Std
-import Plausible.New.GenOption
 import Plausible.IR.Prelude
 import Plausible.IR.Constructor
 import Plausible.IR.GCCall

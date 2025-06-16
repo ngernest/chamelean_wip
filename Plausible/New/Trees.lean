@@ -1,16 +1,11 @@
-import Plausible.New.GenOption
-
-import Plausible
-open Plausible
-
 /-- A datatype for binary trees -/
-inductive BinaryTree where
-  | Leaf : BinaryTree
-  | Node : Nat → BinaryTree → BinaryTree → BinaryTree
+inductive Tree where
+  | Leaf : Tree
+  | Node : Nat → Tree → Tree → Tree
   deriving Repr
 
 /-- `BST lo hi t` describes whether a tree `t` is a BST that contains values strictly within `lo` and `hi` -/
-inductive BST : Nat → Nat → BinaryTree → Prop where
+inductive BST : Nat → Nat → Tree → Prop where
   | BstLeaf: ∀ lo hi,
       BST lo hi .Leaf
   | BstNode: ∀ lo hi x l r,

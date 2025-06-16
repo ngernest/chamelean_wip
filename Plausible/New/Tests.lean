@@ -1,5 +1,4 @@
 import Plausible.New.DeriveGenerator
-import Plausible.New.GenOption
 import Plausible.Gen
 
 import Plausible.New.OptionTGen
