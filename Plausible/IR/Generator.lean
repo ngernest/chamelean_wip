@@ -41,8 +41,8 @@ def elabGetChecker : CommandElab := fun stx => do
       print_m_string checker
   | _ => throwError "Invalid syntax"
 
-#gen_checker lookup with_name ["Γ", "x", "τ"] backtrack 100
--- #gen_checker typing with_name ["G", "e", "t"] backtrack 100
+-- #gen_checker lookup with_name ["Γ", "x", "τ"] backtrack 100
+#gen_checker typing with_name ["Γ", "e", "t"] backtrack 100
 -- #gen_checker balanced with_name ["h", "T"] backtrack 100
 -- #gen_checker bst with_name ["lo", "hi", "T"] backtrack 100
 
@@ -68,10 +68,10 @@ def elabGetProducer : CommandElab := fun stx => do
       let pos := TSyntax.getNat t3
       let btnum := TSyntax.getNat t4
       let producer ← get_producer inductiveInfo inpname pos btnum
-      logInfo producer
+      -- logInfo producer
   | _ => throwError "Invalid syntax"
 
--- #gen_producer typing with_name ["Γ", "e", "τ"] for_arg 2 backtrack 100
+#gen_producer typing with_name ["Γ", "e", "τ"] for_arg 2 backtrack 100
 -- #gen_producer balanced with_name ["n", "T"] for_arg 1 backtrack 100
 -- #gen_producer bst with_name ["lo", "hi", "T"] for_arg 2 backtrack 100
 

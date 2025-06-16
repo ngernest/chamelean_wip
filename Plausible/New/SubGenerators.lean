@@ -37,14 +37,27 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
       doElems := doElems.push bindExpr
     | _ => continue
 
-  -- Check that hypotheses are upheld when we generate free variables
-  let mut hypothesesToCheck := #[]
+  -- Check that all hypotheses which are not `inductive`s are upheld when we generate free variables
+  let mut nonInductiveHypothesesToCheck := #[]
   for action in subGenerator.groupedActions.checkNonInductiveActions do
     if let .checkNonInductive predicateExpr := action then
       let predicateTerm ← PrettyPrinter.delab predicateExpr
-      hypothesesToCheck := hypothesesToCheck.push predicateTerm
+      nonInductiveHypothesesToCheck := nonInductiveHypothesesToCheck.push predicateTerm
 
   -- TODO: invoke checkers for auxiliary inductive relations (for `checkInductive` actions)
+  -- ^^ invoke `DecOpt.decOpt` here somehow
+
+
+  let mut inductiveHypothesesToCheck := #[]
+  for action in subGenerator.groupedActions.checkInductiveActions do
+    if let .checkInductive inductiveExpr := action then
+      let inductiveTerm ← PrettyPrinter.delab inductiveExpr
+      inductiveHypothesesToCheck := inductiveHypothesesToCheck.push inductiveTerm
+
+  logInfo "**********************"
+  logInfo m!"nonInductiveHypothesesToCheck = {nonInductiveHypothesesToCheck}"
+  logInfo m!"inductivesToCheck = {inductiveHypothesesToCheck}"
+  logInfo "**********************"
 
   -- TODO: change `groupedActions.ret_list` to a single element since each do-block can only
   -- have one (final) `return` expression
@@ -62,8 +75,8 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
         if !doElems.isEmpty then
           let retExpr ← `(doElem| return $argToGenTerm:term)
           -- Check that all hypotheses are satisfied before returning the generated value
-          if !hypothesesToCheck.isEmpty then
-            let ifExpr ← mkIfExprWithNaryAnd hypothesesToCheck retExpr (← `(doElem| $failFn:term))
+          if !nonInductiveHypothesesToCheck.isEmpty then
+            let ifExpr ← mkIfExprWithNaryAnd nonInductiveHypothesesToCheck retExpr (← `(doElem| $failFn:term))
             doElems := doElems.push ifExpr
           else
             -- No hypotheses to check, we can just return the generated value directly

@@ -361,7 +361,7 @@ instance : ToMessageData Action where
   toMessageData (Action : Action) : MessageData :=
     match Action with
     | .checkInductive hyp => m!"check_IR {hyp}"
-    | .checkNonInductive hyp => m!"check ({hyp})"
+    | .checkNonInductive hyp => m!"check_nonIR ({hyp})"
     | .genInputForInductive fvar hyp idx =>
       let remainingArgs := (hyp.getAppArgs.eraseIdx! idx).toList
       m!"let {fvar.name} ← gen_{hyp.getAppFn}_at_{idx} size {remainingArgs}"

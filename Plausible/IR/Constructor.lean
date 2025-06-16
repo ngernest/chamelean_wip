@@ -114,8 +114,8 @@ instance : ToMessageData SubGeneratorInfo where
 /-- Converts an array of `Action`s into a `GroupedActions` -/
 def mkGroupedActions (gccs: Array Action) : MetaM GroupedActions := do
   let mut gen_list := #[]
-  let mut check_IR_list := #[]
-  let mut check_nonIR_list := #[]
+  let mut checkInductiveActions := #[]
+  let mut checkNonInductiveActions := #[]
   let mut iflet_list := #[]
   let mut ret_list := #[]
   let mut variableEqualities : Array (FVarId × FVarId) := #[]
@@ -132,13 +132,13 @@ def mkGroupedActions (gccs: Array Action) : MetaM GroupedActions := do
     | .ret _ =>
         ret_list := ret_list.push gcc
     | .checkInductive _ =>
-        check_IR_list := check_IR_list.push gcc
-    | _ =>
-        check_nonIR_list := check_nonIR_list.push gcc
+        checkInductiveActions := checkInductiveActions.push gcc
+    | .checkNonInductive _ =>
+        checkNonInductiveActions := checkNonInductiveActions.push gcc
   return {
     gen_list := gen_list
-    checkInductiveActions := check_IR_list
-    checkNonInductiveActions := check_nonIR_list
+    checkInductiveActions := checkInductiveActions
+    checkNonInductiveActions := checkNonInductiveActions
     iflet_list := iflet_list
     ret_list := ret_list
     variableEqualities := variableEqualities
