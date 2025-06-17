@@ -12,10 +12,10 @@ open GenSizedSuchThat
 -- Some example `OptionT Gen α` generators
 --------------------------------------------------------------------------
 
-/-- `genSizedST` contains a handwritten generator for BSTs
+/- `genSizedST` contains a handwritten generator for BSTs
     (modelled after the automatically derived generator produced by QuickChick).
     Note that:
-    - We use the `OptionT` monad to add the possibility of failure to the `Gen` monad
+    - We use the `OptionT` monad transformer to add the possibility of failure to the `Gen` monad
     - All the generators supplied to the `backtrack` combinator are thunked, to avoid unnecessary
       computation (since Lean is strict) -/
 instance : GenSizedSuchThat Tree (fun t => bst lo hi t) where

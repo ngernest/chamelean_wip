@@ -180,14 +180,12 @@ def mkTopLevelGenerator (baseGenerators : TSyntax `term) (inductiveGenerators : 
     let auxArbIdent := mkFreshAccessibleIdent localCtx `aux_arb
     let generatorType ← `($optionTIdent $genIdent $targetTypeSyntax)
 
-    let generatorIdent := mkIdent $ Name.mkStr1 s!"gen_{inductiveName}"
-
-    -- Produce the definition for the generator function
-    -- TODO: produce an instance of the `GenSizedSuchThat` typeclass that uses the derived generator
-    `(def $generatorIdent $topLevelParams* : $natIdent → $generatorType :=
-        let rec $auxArbIdent:ident $innerParams* : $generatorType :=
-          $matchExpr
-      fun $freshSizeIdent => $auxArbIdent $freshSizeIdent $freshSizeIdent $paramIdents*)
+    -- Produces an instance of `GenSizedSuchThat` typeclass containing the definition for the derived generator
+    `(instance : $genSizedSuchThatTypeclass:ident $targetTypeSyntax (fun $(mkIdent targetVar) => $inductiveStx $args*) where
+        $genSizedSTIdent:ident :=
+          let rec $auxArbIdent:ident $innerParams* : $generatorType :=
+            $matchExpr
+          fun $freshSizeIdent => $auxArbIdent $freshSizeIdent $freshSizeIdent $paramIdents*)
 
 
 @[command_elab derive_generator]
