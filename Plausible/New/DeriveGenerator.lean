@@ -155,9 +155,6 @@ def mkTopLevelGenerator (baseGenerators : TSyntax `term) (inductiveGenerators : 
     -- Add parameters for each argument to the inductive relation (except the target)
     let paramInfo ← analyzeInductiveArgs inductiveName args
 
-    -- Top-level params are arguments to the top-level derived generator
-    let mut topLevelParams := #[]
-
     -- Inner params are for the inner `aux_arb` function
     let mut innerParams := #[]
     innerParams := innerParams.push initSizeParam
@@ -169,9 +166,6 @@ def mkTopLevelGenerator (baseGenerators : TSyntax `term) (inductiveGenerators : 
         let paramIdent := mkIdent paramName
         paramIdents := paramIdents.push paramIdent
 
-        let topLevelParam ← `(bracketedBinder| ($paramIdent : $paramType))
-        topLevelParams := topLevelParams.push topLevelParam
-
         let innerParam ← `(Term.letIdBinder| ($paramIdent : $paramType))
         innerParams := innerParams.push innerParam
 
@@ -182,7 +176,7 @@ def mkTopLevelGenerator (baseGenerators : TSyntax `term) (inductiveGenerators : 
     let generatorType ← `($optionTIdent $genIdent $targetTypeSyntax)
 
     -- Produces an instance of `GenSizedSuchThat` typeclass containing the definition for the derived generator
-    `(instance : $genSizedSuchThatTypeclass:ident $targetTypeSyntax (fun $(mkIdent targetVar) => $inductiveStx $args*) where
+    `(instance : $genSizedSuchThatTypeclass $targetTypeSyntax (fun $(mkIdent targetVar) => $inductiveStx $args*) where
         $genSizedSTIdent:ident :=
           let rec $auxArbIdent:ident $innerParams* : $generatorType :=
             $matchExpr
