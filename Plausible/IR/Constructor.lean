@@ -122,7 +122,7 @@ def mkGroupedActions (gccs: Array Action) : MetaM GroupedActions := do
   for gcc in gccs do
     match gcc with
     | .genFVar _ _
-    | .genInputForInductive _ _ _ =>
+    | .genInputForInductive _ _ _ _ =>
         gen_list := gen_list.push gcc
     | .matchFVar _ hyp => {
         iflet_list := iflet_list.push gcc;
@@ -174,8 +174,9 @@ def add_size_param (hyp : Expr) : MetaM String := do
   let arg_str := (toString (← Meta.ppExpr hyp)).drop (fnname.length)
   return fnname ++ " size" ++ arg_str
 
-def genInputForInductiveToCode (fvar : FVarId) (hyp : Expr) (idx : Nat) : MetaM String := do
+def genInputForInductiveToCode (fvar : FVarId) (hyp : Expr) (idx : Nat)  : MetaM String := do
   let new_args := hyp.getAppArgs.eraseIdx! idx
+
   let mut fn_str := "gen_" ++ toString (← Meta.ppExpr hyp.getAppFn) ++ "_at_" ++ toString idx ++ " size"
   for a in new_args do
     fn_str := fn_str ++ " "
@@ -201,7 +202,7 @@ def actionToCode (Action : Action) (monad: String := "IO") : MetaM String := do
   match Action with
   | .checkInductive hyp => return  "← check_" ++ (← add_size_param hyp)
   | .checkNonInductive hyp => return  "(" ++ toString (← Meta.ppExpr hyp) ++ ")"
-  | .genInputForInductive fvar hyp pos => genInputForInductiveToCode fvar hyp pos
+  | .genInputForInductive fvar hyp pos _ => genInputForInductiveToCode fvar hyp pos
   | .matchFVar fvar hyp => return  "if let " ++ toString (← Meta.ppExpr hyp.newHypothesis) ++ " := " ++ toString (fvar.name) ++ " then "
   | .genFVar fvar ty =>  gen_nonIR_toCode fvar ty monad
   | .ret e => return "return " ++ (if monad = "IO" then "" else "some ") ++ toString (← Meta.ppExpr e)

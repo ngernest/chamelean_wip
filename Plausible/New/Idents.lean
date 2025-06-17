@@ -13,6 +13,8 @@ def auxArbFn : Ident := mkIdent $ Name.mkStr1 "aux_arb"
 
 def genSizedSuchThatTypeclass : Ident := mkIdent $ Name.mkStr1 "GenSizedSuchThat"
 def genSizedSTIdent : Ident := mkIdent $ Name.mkStr1 "genSizedST"
+def qualifiedGenSizedSTIdent : Ident := mkIdent $ Name.mkStr2 "GenSuchThat" "genST"
+
 
 /-- `Ident` representing `OptionT.fail`-/
 def failFn : Ident := mkIdent $ Name.mkStr2 "OptionT" "fail"

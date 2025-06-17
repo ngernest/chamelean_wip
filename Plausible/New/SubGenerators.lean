@@ -7,15 +7,30 @@ open Plausible.IR
 open Lean Elab Command Meta Term Parser Std
 open Idents
 
-/-- `genInputForInductive fvar hyp idx` produces a let-bind expression of the form
-    `let fvar ← aux_arb size e1 … en`, where `e1, …, en` are the arguments to the
-    a hypothesis `hyp` for an inductive relation with the argument at index `idx` removed
-    (since `fvar` is the argument at index `idx`, and we are generating `fvar`) -/
-def genInputForInductive (fvar : FVarId) (hyp : Expr) (idx : Nat) : MetaM (TSyntax `doElem) := do
+/-- `genInputForInductive fvar hyp idx generationStyle` produces a let-bind expression of the form
+    based on the `generationStyle` specified:
+    - If `generationStyle = .RecursiveCall`, we produce the term
+      `let fvar ← aux_arb size e1 … en`, where `e1, …, en` are the arguments to the
+      a hypothesis `hyp` for an inductive relation with the argument at index `idx` removed
+      (since `fvar` is the argument at index `idx`, and we are generating `fvar`)
+    - If `generationSTyle = .TypeClassresolution`, we produce the term
+      `let fvar ← GenSuchThat.genST (fun fvar => hyp)`, i.e.
+      we use typeclass resolution to invoke the generator from the
+      `GenSuchThat.genST` which produces values satisfying the hypothesis `hyp`
+      (note: this requires that such an typeclass instance already exists). -/
+def genInputForInductive (fvar : FVarId) (hyp : Expr) (idx : Nat) (generationStyle : GenerationStyle) : MetaM (TSyntax `doElem) := do
   let argExprs := hyp.getAppArgs.eraseIdx! idx
   let argTerms ← Array.mapM PrettyPrinter.delab argExprs
   let lhs := mkIdent $ fvar.name
-  let rhsTerms := #[auxArbFn, initSizeIdent, mkIdent `size'] ++ argTerms
+
+  let hypTerm ← PrettyPrinter.delab hyp
+  let generatorConstraint ← `((fun $lhs:ident => $hypTerm))
+
+  let rhsTerms :=
+    match generationStyle with
+    | .RecursiveCall => #[auxArbFn, initSizeIdent, mkIdent `size'] ++ argTerms
+    | .TypeClassResolution => #[qualifiedGenSizedSTIdent, generatorConstraint]
+
   mkLetBind lhs rhsTerms
 
 /-- Constructs an anonymous sub-generator. See the comments in the body of this function
@@ -25,10 +40,12 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
 
   for action in subGenerator.groupedActions.gen_list do
     match action with
-    | .genInputForInductive fvar hyp idx =>
+    | .genInputForInductive fvar hyp idx style =>
+      -- TODO: handle generationStyle here
+
       -- Recursively invoke the generator to generate an argument for the hypothesis `hyp` at index `idx`,
       -- then bind the generated value to the free variable `fvar`
-      let bindExpr ← liftMetaM $ genInputForInductive fvar hyp idx
+      let bindExpr ← liftMetaM $ genInputForInductive fvar hyp idx style
       doElems := doElems.push bindExpr
     | .genFVar fvar ty =>
       -- Generate a value of type `ty`, then bind it to `fvar`
@@ -46,7 +63,6 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
 
   -- TODO: invoke checkers for auxiliary inductive relations (for `checkInductive` actions)
   -- ^^ invoke `DecOpt.decOpt` here somehow
-
 
   let mut inductiveHypothesesToCheck := #[]
   for action in subGenerator.groupedActions.checkInductiveActions do

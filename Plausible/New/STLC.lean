@@ -197,7 +197,7 @@ def gen_lookup (Γ : List type) (τ : type) : Nat → OptionT Plausible.Gen Nat 
                   return Nat.succ x))]
   fun size => aux_arb size size Γ τ
 
-/-- `lookup Γ x τ` is an instance of the `GenSizedSuchThat` typeclass,
+/- `lookup Γ x τ` is an instance of the `GenSizedSuchThat` typeclass,
     which describes generators for values that satisfy a proposition -/
 instance : GenSizedSuchThat Nat (fun x => lookup Γ x τ) where
   genSizedST := gen_lookup Γ τ
@@ -263,7 +263,7 @@ def gen_typing (G_ : List type) (t_ : type) : Nat → OptionT Plausible.Gen term
                 return term.App (.Abs .Nat e1) e2))]
   fun size => aux_arb size size G_ t_
 
-/-- `typing Γ e τ` is an instance of the `GenSizedSuchThat` typeclass,
+/- `typing Γ e τ` is an instance of the `GenSizedSuchThat` typeclass,
     which describes generators for values that satisfy a proposition -/
-instance : GenSizedSuchThat term (fun e => typing Γ e τ) where
-  genSizedST := gen_typing Γ τ
+-- instance : GenSizedSuchThat term (fun e => typing Γ e τ) where
+--   genSizedST := gen_typing Γ τ

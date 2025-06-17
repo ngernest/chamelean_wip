@@ -161,6 +161,14 @@ def separateFVarsInHypothesis (hypothesis : Expr) (initialFVars : Array FVarId)
     variableEqualities := equalities ++ decomposedHypothesis.variableEqualities
   }
 
+/-- The `GenerationStyle` datatype describes the "style" in which a generator should be invoked:
+    - `RecursiveCall` indicates that we should recursively call the current generator function
+    - `TypeClassResolution` indicates that we should call the generator via typeclass resolution
+      (i.e. call the generator from the `GenSizedSuchThat` typeclass) -/
+inductive GenerationStyle
+  | RecursiveCall
+  | TypeClassResolution
+  deriving Repr
 
 /-- Represents an expression in the RHS of the non-trivial pattern-match case
     in a backtrack element (sub-generator)
@@ -179,8 +187,9 @@ inductive Action where
   | checkNonInductive (hyp : Expr)
 
   /-- Generate an input at the given position `pos` for an inductive relation
-      specified by `hyp`. The generated value is assigned to the free variable `fvar`. -/
-  | genInputForInductive (fvar : FVarId) (hyp : Expr) (pos : Nat)
+      specified by `hyp`. The generated value is assigned to the free variable `fvar`.
+      The generator is to be called using the `style` specified by the `GenerationStyle` type -/
+  | genInputForInductive (fvar : FVarId) (hyp : Expr) (pos : Nat) (style : GenerationStyle)
 
   /-- Match the `fvar` with the shape of the hypothesis `hyp` using an `if let` expression
       - `matchFVar` always comes after a `genFVar`
@@ -305,14 +314,20 @@ def Actions_for_hypotheses (ctor : InductiveConstructor) (fvars : Array FVarId) 
           result := result.push (.genFVar fid ty)
         let argToGenerate := hyp.getAppArgs[uninitializedArgIdx]!
         initializedFVars := Array.appendUniqueElements initializedFVars uninitializedFVars
+
+        let generationStyle :=
+          if hypothesisRecursivelyCallsCurrentInductive hyp ctor
+          then .RecursiveCall
+          else .TypeClassResolution
+
         if argToGenerate.isFVar then
           let fvarToGenerate := argToGenerate.fvarId!
-          result := result.push (.genInputForInductive fvarToGenerate hyp uninitializedArgIdx)
+          result := result.push (.genInputForInductive fvarToGenerate hyp uninitializedArgIdx generationStyle)
         else
           let nameOfFVarToGenerate := Name.mkStr1 ("tcond" ++ toString i)
           let fvarToGenerate := FVarId.mk nameOfFVarToGenerate
           let decomposedHypothesis ← separateFVarsInHypothesis argToGenerate initializedFVars i
-          result := result.push (.genInputForInductive fvarToGenerate hyp uninitializedArgIdx)
+          result := result.push (.genInputForInductive fvarToGenerate hyp uninitializedArgIdx generationStyle)
           result := result.push (.matchFVar fvarToGenerate decomposedHypothesis)
         initializedFVars := Array.appendUniqueElements initializedFVars fVarsToBeInitialized
     else
@@ -333,7 +348,7 @@ def Actions_toStr (c: Action) : MetaM String := do
   match c with
   | .checkInductive cond => return "check_IR_" ++ toString (← Meta.ppExpr cond)
   | .checkNonInductive cond => return "check_nonIR_" ++ toString (← Meta.ppExpr cond)
-  | .genInputForInductive _ cond pos =>  return  "gen_IR_" ++ toString (← Meta.ppExpr cond) ++ " at "  ++ toString pos
+  | .genInputForInductive _ cond pos _ =>  return  "gen_IR_" ++ toString (← Meta.ppExpr cond) ++ " at "  ++ toString pos
   | .matchFVar fvar hypothesis => return  "if let " ++ toString (← Meta.ppExpr hypothesis.newHypothesis) ++ ":= " ++ toString (fvar.name) ++ " then "
   | .genFVar id ty =>  return  "gen_FVar " ++ toString (id.name) ++ ": " ++ toString (← Meta.ppExpr ty)
   | .ret e =>  return "return " ++ toString (← Meta.ppExpr e)
@@ -352,7 +367,7 @@ def Actions_toRawCode (Action : Action) : MetaM String := do
   match Action with
   | .checkInductive hyp => MessageData.toString m!"check_IR ({← Meta.ppExpr hyp})"
   | .checkNonInductive hyp => return  "check (" ++ toString (← Meta.ppExpr hyp) ++ ")"
-  | .genInputForInductive fvar hyp pos => gen_IR_at_pos fvar hyp pos
+  | .genInputForInductive fvar hyp pos _ => gen_IR_at_pos fvar hyp pos
   | .matchFVar fvar hypothesis => return  "if let " ++ toString (← Meta.ppExpr hypothesis.newHypothesis) ++ ":= " ++ toString (fvar.name) ++ " then "
   | .genFVar id ty =>  return  "let " ++ toString (id.name) ++ ":= gen_rand " ++ toString (← Meta.ppExpr ty)
   | .ret e => return "return " ++ toString (← Meta.ppExpr e)
@@ -366,9 +381,13 @@ instance : ToMessageData Action where
     match Action with
     | .checkInductive hyp => m!"check_IR {hyp}"
     | .checkNonInductive hyp => m!"check_nonIR ({hyp})"
-    | .genInputForInductive fvar hyp idx =>
-      let remainingArgs := (hyp.getAppArgs.eraseIdx! idx).toList
-      m!"let {fvar.name} ← gen_{hyp.getAppFn}_at_{idx} size {remainingArgs}"
+    | .genInputForInductive fvar hyp idx generationStyle =>
+      match generationStyle with
+      | .RecursiveCall =>
+        let remainingArgs := (hyp.getAppArgs.eraseIdx! idx).toList
+        m!"let {fvar.name} ← aux_arb size' {remainingArgs}"
+      | .TypeClassResolution =>
+        m!"let {fvar.name} ← GenSuchThat.genST (fun {fvar.name} => {hyp})"
     | .matchFVar fvar hypothesis => m!"if let {hypothesis.newHypothesis} := {fvar.name} then ..."
     | .genFVar fvar ty => m!"let {fvar.name} ← SampleableExt.interpSample {ty}"
     | .ret e => m!"return {e}"

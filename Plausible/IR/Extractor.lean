@@ -231,21 +231,24 @@ def isInductiveRelationApplication (e : Expr) : MetaM Bool := do
    for an inductive relation -/
 def isHypothesisOfInductiveConstructor (e : Expr) (ctor : InductiveConstructor) : MetaM Bool := do
   logInfo m!"hyp = {e}"
-  logInfo m!"ctor = {ctor}"
 
   let isIndRel ← isInductiveRelation e.getAppFn
-  logInfo m!"isIndRel = {isIndRel}"
-
   let exprNamespace := e.getAppFn.constName.getRoot
-  logInfo m!"exprNamespace = {exprNamespace}"
 
-  if isIndRel then
-    return true
-  else if exprNamespace == ctor.name_space then
-    logInfo m!"same namespace"
+  logInfo m!"exprNamespace = {exprNamespace}"
+  logInfo m!"ctorNamespace = {ctor.name_space}"
+
+
+  if isIndRel || exprNamespace == ctor.name_space then
     return true
   else
     return false
+
+/-- Determines if a hypothesis `hyp` is a recursive call to the inductive relation for which
+    `ctor` is a constructor
+    (under the hood, this checks that `hyp` and `ctor` are defined in the same namespace) -/
+def hypothesisRecursivelyCallsCurrentInductive (hyp : Expr) (ctor : InductiveConstructor) : Bool :=
+  hyp.getAppFn.constName.getRoot == ctor.name_space
 
 /-- Determines whether an expression `e` is a dependency of an inductive relation
     (i.e. if `e` is an inductive relation that is defined within the current namespace) -/
