@@ -124,7 +124,8 @@ def findTargetVarIndex (targetVar : Name) (args : TSyntaxArray `term) : Option N
 
 syntax (name := derive_generator) "#derive_generator" "(" "fun" "(" ident ":" term ")" "=>" term ")" : command
 
-/-- Creates the top-level derived generator based on:
+/-- Produces an instance of `GenSizedSuchThat` typeclass containing the definition for the top-level derived generator.
+    The arguments to this function are:
     - a list of `baseGenerators` (each represented as a Lean term), to be invoked when `size == 0`
     - a list of `inductiveGenerators`, to be invoked when `size > 0`
     - the name of the inductive relation (`inductiveStx`)
@@ -223,16 +224,16 @@ def elabDeriveGenerator : CommandElab := fun stx => do
     let baseGenerators ← liftTermElabM $ mkWeightedThunkedSubGenerators baseGenInfo .BaseGenerator
     let inductiveGenerators ← liftTermElabM $ mkWeightedThunkedSubGenerators inductiveGenInfo .InductiveGenerator
 
-    let generatorDefinition ← mkTopLevelGenerator baseGenerators inductiveGenerators inductiveName args targetVar targetTypeSyntax
+    let typeclassInstance ← mkTopLevelGenerator baseGenerators inductiveGenerators inductiveName args targetVar targetTypeSyntax
 
     -- Pretty-print the derived generator
-    let genFormat ← liftCoreM (PrettyPrinter.ppCommand generatorDefinition)
+    let genFormat ← liftCoreM (PrettyPrinter.ppCommand typeclassInstance)
 
     -- Display the code for the derived generator to the user
     -- & prompt the user to accept it in the VS Code side panel
     liftTermElabM $ Tactic.TryThis.addSuggestion stx
       (Format.pretty genFormat) (header := "Try this generator: ")
 
-    elabCommand generatorDefinition
+    elabCommand typeclassInstance
 
   | _ => throwUnsupportedSyntax
