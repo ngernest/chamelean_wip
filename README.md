@@ -8,7 +8,9 @@ to automatically derive generators/checkers for inductive relations, à la [Para
 Repo overview:
 - [`Examples.lean`](./Plausible/IR/Examples.lean): Some example inductive relations (BSTs, balanced trees, STLC)
 - [`OptionTGen.lean`](./Plausible/New/OptionTGen.lean): Generator combinators that work over the `OptionT Gen` monad transformer (representing generators that may fail) + example generators for BSTs/balanced trees 
-- [`DecOpt.lean`](./Plausible/New/DecOpt.lean): The `DecOpt` typeclass for partially decidable propositions
+- [`DecOpt.lean`](./Plausible/New/DecOpt.lean): The `DecOpt` typeclass for partially decidable propositions, adapted from QuickChick
+- [`GenSuchThat.lean`](./Plausible/New/GenSuchThat.lean): The `GenSuchThat` & `GenSizedSuchThat` typeclasses for constrained generators (generators of values satisfying a proposition), adapted from QuickChick
+- [`GeneratorCombinators.lean`](./Plausible/New/GeneratorCombinators.lean): Extra combinators for Plausible generators (e.g. analogs of the `sized` and `frequency` combinators from Haskell QuickCheck)
 - [`STLC.lean`](./Plausible/New/STLC.lean): Example checkers & generators for well-typed STLC terms
 - [`DeriveGenerator.lean`](./Plausible/New/DeriveGenerator.lean): Metaprogramming infrastructure for automatically deriving Plausible generators
 - [`SubGenerators.lean`](./Plausible/New/SubGenerators.lean): Handles constraints when deriving sub-generators
