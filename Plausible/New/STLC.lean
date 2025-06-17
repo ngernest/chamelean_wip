@@ -1,12 +1,15 @@
 import Plausible.IR.Examples
 import Plausible.New.OptionTGen
 import Plausible.New.DecOpt
+import Plausible.New.GenSuchThat
+import Plausible.New.GeneratorCombinators
 
 import Plausible.Gen
 import Plausible.Sampleable
 
 open Plausible
 open OptionTGen
+open GeneratorCombinators
 
 -------------------------------------------------------------------------
 -- Some example `DecOpt` checkers
@@ -56,6 +59,8 @@ def checkLookup (Γ : List type) (x : Nat) (τ : type) : Nat → Option Bool :=
       ]
   fun size => aux_arb size size Γ x τ
 
+/-- `lookup Γ x τ` is an instance of the `DecOpt` typeclass which describes
+     partially decidable propositions -/
 instance : DecOpt (lookup Γ x τ) where
   decOpt := checkLookup Γ x τ
 
@@ -115,6 +120,8 @@ def checkTyping (Γ : List type) (e : term) (τ : type) : Nat → Option Bool :=
       ]
   fun size => aux_arb size size Γ e τ
 
+/-- `typing Γ e τ` is an instance of the `DecOpt` typeclass which describes
+     partially decidable propositions -/
 instance : DecOpt (typing Γ e τ) where
   decOpt := checkTyping Γ e τ
 
@@ -123,12 +130,12 @@ instance : DecOpt (typing Γ e τ) where
 --------------------------------------------------------------------------
 
 /-- A generator for STLC types -/
-def genType : Nat → OptionT Gen type :=
-  let rec arb_aux (size : Nat) : OptionT Gen type :=
+def genType : Nat → Gen type :=
+  let rec arb_aux (size : Nat) : Gen type :=
     match size with
     | 0 => pure .Nat
     | .succ size' =>
-        frequency
+        frequency (pure .Nat)
           [(1, thunkGen $ fun _ => pure .Nat),
           (.succ size',
             thunkGen $ fun _ => do
@@ -143,10 +150,10 @@ instance : Shrinkable type where
     | .Nat => []
     | .Fun τ1 τ2 => [τ1, τ2]
 
--- TODO: figure out how to come up with a `SampleableExt` instance for `type`
--- (right now the `OptionT` infrastructure we have makes this challenging)
--- instance : SampleableExt type :=
---   SampleableExt.mkSelfContained $ OptionT.run (genType 100)
+/-- `SampleableExt` instance for STLC types -/
+instance : SampleableExt type :=
+  SampleableExt.mkSelfContained do
+    genType (← Gen.getSize)
 
 -------------------------------------------------------------------------
 -- Constrained generators
@@ -190,6 +197,11 @@ def gen_lookup (Γ : List type) (τ : type) : Nat → OptionT Plausible.Gen Nat 
                   return Nat.succ x))]
   fun size => aux_arb size size Γ τ
 
+/-- `lookup Γ x τ` is an instance of the `GenSizedSuchThat` typeclass,
+    which describes generators for values that satisfy a proposition -/
+instance : GenSizedSuchThat Nat (fun x => lookup Γ x τ) where
+  genSizedST := gen_lookup Γ τ
+
 /-- Generator which produces well-typed terms `e` such that `typing Γ e τ` holds -/
 def gen_typing (G_ : List type) (t_ : type) : Nat → OptionT Plausible.Gen term :=
   let rec aux_arb (initSize : Nat) (size : Nat) (G_0 : List type) (t_0 : type) : OptionT Plausible.Gen term :=
@@ -201,13 +213,13 @@ def gen_typing (G_ : List type) (t_ : type) : Nat → OptionT Plausible.Gen term
               (fun _ =>
                 match t_0 with
                 | .Nat => do
-                  let n ← Plausible.SampleableExt.interpSample Nat
+                  let n ← SampleableExt.interpSample Nat
                   return term.Const n
                 | .Fun _ _ => OptionT.fail)),
           (1,
             OptionTGen.thunkGen
               (fun _ => do
-                let x ← gen_lookup G_0 t_0 initSize
+                let x ← GenSuchThat.genST (fun x => lookup G_0 x t_0)
                 return term.Var x)),
           (1, OptionTGen.thunkGen (fun _ => OptionT.fail))]
     | Nat.succ size' =>
@@ -217,7 +229,7 @@ def gen_typing (G_ : List type) (t_ : type) : Nat → OptionT Plausible.Gen term
               (fun _ =>
                 match t_0 with
                 | type.Nat => do
-                  let n ← Plausible.SampleableExt.interpSample Nat
+                  let n ← SampleableExt.interpSample Nat
                   return term.Const n
                 | _ => OptionT.fail)),
           (Nat.succ size',
@@ -240,13 +252,18 @@ def gen_typing (G_ : List type) (t_ : type) : Nat → OptionT Plausible.Gen term
           (1,
             OptionTGen.thunkGen
               (fun _ => do
-                let x ← gen_lookup G_0 t_0 initSize
+                let x ← GenSuchThat.genST (fun x => lookup G_0 x t_0)
                 return term.Var x)),
           (Nat.succ size',
             OptionTGen.thunkGen
               (fun _ => do
-                let t1 ← genType initSize
+                let t1 ← SampleableExt.interpSample type
                 let e2 ← aux_arb initSize size' G_0 t1
                 let e1 ← aux_arb initSize size' G_0 (type.Fun t1 t_0)
                 return term.App (.Abs .Nat e1) e2))]
   fun size => aux_arb size size G_ t_
+
+/-- `typing Γ e τ` is an instance of the `GenSizedSuchThat` typeclass,
+    which describes generators for values that satisfy a proposition -/
+instance : GenSizedSuchThat term (fun e => typing Γ e τ) where
+  genSizedST := gen_typing Γ τ

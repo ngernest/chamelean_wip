@@ -1,7 +1,11 @@
 import Plausible.Gen
 open Plausible
 
-namespace Gen
+-- TODO: figure out some way to avoid having two versions of `frequency, sized, thunkGen`
+-- between `GeneratorCombinators.lean` and `OptionTGen.lean`
+-- (one for `Gen α`, the other for `OptionT Gen α`)
+
+namespace GeneratorCombinators
 
 /-- `pick default xs n` chooses a weight & a generator `(k, gen)` from the list `xs` such that `n < k`.
     If `xs` is empty, the `default` generator with weight 0 is returned.  -/
@@ -29,4 +33,8 @@ def frequency (default : Gen α) (gs : List (Nat × Gen α)) : Gen α := do
 def sized (f : Nat → Gen α) : Gen α :=
   Gen.getSize >>= f
 
-end Gen
+/-- Delays the evaluation of a generator by taking in a function `f : Unit → Gen α` -/
+def thunkGen (f : Unit → Gen α) : Gen α :=
+  f ()
+
+end GeneratorCombinators
