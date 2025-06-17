@@ -27,6 +27,7 @@ We can make this generator more efficient using Segev's generator schedules.)
 
 
 -- Work in progress: extend generator deriver to handle STLC example
--- TODO: investigate why the `lookup Γ e τ` hypothesis is classified as a non-inductive hypothesis instead of an inductive one
+-- TODO: change the call to `aux_arb` for lookup into a call to the appropriate typeclass method
+-- ^^ TODO: add typeclass stuff?
 -- TODO: figure out how to handle checkers
 -- #derive_generator (fun (e : term) => typing Γ e τ)
