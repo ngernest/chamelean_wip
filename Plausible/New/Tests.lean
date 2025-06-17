@@ -4,6 +4,8 @@ import Plausible.Gen
 import Plausible.New.OptionTGen
 import Plausible.New.DecOpt
 import Plausible.New.GenSizedSuchThat
+import Plausible.New.STLC
+
 
 open GenSizedSuchThat OptionTGen
 

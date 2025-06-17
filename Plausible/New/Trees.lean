@@ -18,33 +18,35 @@ open GenSizedSuchThat
     - We use the `OptionT` monad transformer to add the possibility of failure to the `Gen` monad
     - All the generators supplied to the `backtrack` combinator are thunked, to avoid unnecessary
       computation (since Lean is strict) -/
-instance : GenSizedSuchThat Tree (fun t => bst lo hi t) where
-  genSizedST :=
-    let rec aux_arb (size : Nat) (lo : Nat) (hi : Nat) : OptionT Gen Tree :=
-      match size with
-      | .zero =>
-        backtrack [
-          (1, thunkGen $ fun _ => pure .Leaf),
-          (1, thunkGen $ fun _ => OptionT.fail)
-        ]
-      | .succ size' =>
-        backtrack [
-          (1, thunkGen $ fun _ => pure .Leaf),
-          (.succ size', thunkGen $ fun _ => do
-            let x ← SampleableExt.interpSample Nat
-            if (lo < x && x < hi) then
-              let l ← aux_arb size' lo x
-              let r ← aux_arb size' x hi
-              pure (.Node x l r)
-            else OptionT.fail)
-        ]
+def genBST (lo : Nat) (hi : Nat) : Nat → OptionT Gen Tree :=
+  let rec aux_arb (size : Nat) (lo : Nat) (hi : Nat) : OptionT Gen Tree :=
+    match size with
+    | .zero =>
+      backtrack [
+        (1, thunkGen $ fun _ => pure .Leaf),
+        (1, thunkGen $ fun _ => OptionT.fail)
+      ]
+    | .succ size' =>
+      backtrack [
+        (1, thunkGen $ fun _ => pure .Leaf),
+        (.succ size', thunkGen $ fun _ => do
+          let x ← SampleableExt.interpSample Nat
+          if (lo < x && x < hi) then
+            let l ← aux_arb size' lo x
+            let r ← aux_arb size' x hi
+            pure (.Node x l r)
+          else OptionT.fail)
+      ]
   fun size => aux_arb size lo hi
 
-/-- `genSizedST` contains a handwritten generator for balanced trees of height `n`
+/- Instance of the `GenSizedSuchThat` typeclass for generators of BSTs -/
+-- instance : GenSizedSuchThat Tree (fun t => bst lo hi t) where
+--   genSizedST := genBST lo hi
+
+/-- A handwritten generator for balanced trees of height `n`
     (modelled after the automatically derived generator produced by QuickChick) -/
-instance : GenSizedSuchThat Tree (fun t => balanced n t) where
-  genSizedST :=
-    let rec aux_arb (size : Nat) (n : Nat) : OptionT Gen Tree :=
+def genBalancedTree (n : Nat) : Nat → OptionT Gen Tree :=
+  let rec aux_arb (size : Nat) (n : Nat) : OptionT Gen Tree :=
       match size with
       | .zero =>
         backtrack [
@@ -78,6 +80,12 @@ instance : GenSizedSuchThat Tree (fun t => balanced n t) where
               pure (.Node x l r))
         ]
   fun size => aux_arb size n
+
+/- Instance of the `GenSizedSuchThat` typeclass for generators of balanced trees
+   of height `n` -/
+-- instance : GenSizedSuchThat Tree (fun t => balanced n t) where
+--   genSizedST := genBalancedTree n
+
 
 /-
 Example usage:
