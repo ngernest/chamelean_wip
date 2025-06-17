@@ -13,7 +13,7 @@ open Idents
       `let fvar ← aux_arb size e1 … en`, where `e1, …, en` are the arguments to the
       a hypothesis `hyp` for an inductive relation with the argument at index `idx` removed
       (since `fvar` is the argument at index `idx`, and we are generating `fvar`)
-    - If `generationSTyle = .TypeClassresolution`, we produce the term
+    - If `generationStyle = .TypeClassresolution`, we produce the term
       `let fvar ← GenSuchThat.genST (fun fvar => hyp)`, i.e.
       we use typeclass resolution to invoke the generator from the
       `GenSuchThat.genST` which produces values satisfying the hypothesis `hyp`
@@ -41,8 +41,6 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
   for action in subGenerator.groupedActions.gen_list do
     match action with
     | .genInputForInductive fvar hyp idx style =>
-      -- TODO: handle generationStyle here
-
       -- Recursively invoke the generator to generate an argument for the hypothesis `hyp` at index `idx`,
       -- then bind the generated value to the free variable `fvar`
       let bindExpr ← liftMetaM $ genInputForInductive fvar hyp idx style
