@@ -7,4 +7,6 @@ import Plausible.New.Idents
 import Plausible.New.Schedules
 import Plausible.New.TSyntaxCombinators
 import Plausible.New.DecOpt
+import Plausible.New.GeneratorCombinators
+import Plausible.New.GenSuchThat
 import Plausible.New.STLC

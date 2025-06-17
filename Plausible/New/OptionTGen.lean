@@ -1,4 +1,5 @@
 import Plausible.IR.Examples
+import Plausible.New.GeneratorCombinators
 
 import Plausible.Gen
 open Plausible
@@ -63,10 +64,6 @@ def frequency (gs : List (Nat × OptionT Gen α)) : OptionT Gen α := do
   let total := sumFst gs
   let n ← Gen.choose Nat 0 (total - 1) (by omega)
   .snd (pick OptionT.fail gs n)
-
-/-- `sized f` constructs a generator that depends on its `size` parameter -/
-def sized (f : Nat → OptionT Gen α) : OptionT Gen α :=
-  Gen.getSize >>= f
 
 /-- Samples from an `OptionT Gen` generator that is parameterized by its `size`,
     returning the generated `Option α`  in the `IO` monad -/
