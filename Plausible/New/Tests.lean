@@ -10,6 +10,8 @@ open Lean Elab Command
 -- #derive_generator (fun (t : Tree) => bst lo hi t)
 -- #derive_generator (fun (t : Tree) => balanced n t)
 
+-- #derive_generator (fun (x : Nat) => lookup Γ x τ)
+
 /-
 (Note: this is not the most efficient generator -- ideally we would be able to push the if-expression that checks
 whether `lo < x < hi` immediately after we generate `x` so that the generator can fail quickly if `x` is out of bounds.
