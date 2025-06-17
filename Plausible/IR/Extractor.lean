@@ -72,6 +72,8 @@ def mkFVars (a : Array Name) : Array Expr := a.map (fun x => mkFVar ⟨x⟩)
     - Note: The 3rd component is an array containing each subterm of the arrow type -/
 abbrev DecomposedConstructorType := Array (Name × Expr) × Expr × Array Expr
 
+
+
 /-- The datatype `InductiveConstructor` bundles together metadata
     for a constructor of an inductive relation -/
 structure InductiveConstructor where
@@ -134,6 +136,44 @@ structure InductiveConstructor where
   /-- Expressions `e` that are *dependencies* of the inductive relation
       (i.e. if `e` is an inductive relation that is defined within the current namespace) -/
   dependencies : Array Expr
+
+  deriving Repr
+
+/-- `ToMessageData` instance for polymorphic `HashMap`s
+    where the keys implement `Repr` and the values implement `ToMessageData` -/
+instance [Repr k] [BEq k] [Hashable k] [ToMessageData v]
+  : ToMessageData (HashMap k v) where
+  toMessageData hashMap :=
+    let entries := hashMap.toList.map fun (key, val) =>
+      let kMsg := .ofFormat (repr key)
+      let vMsg := toMessageData val
+      .compose kMsg (.compose " ↦ " vMsg)
+    .bracket "{" (.ofList entries) "}"
+
+instance : ToMessageData InductiveConstructor where
+  toMessageData inductiveCtor :=
+    let fields := [
+      m!"ctorType: {indentD $ inductiveCtor.ctorType}",
+      m!"bound_vars: {inductiveCtor.bound_vars}",
+      m!"bound_var_ctx: {inductiveCtor.bound_var_ctx}",
+      m!"bound_vars_with_base_types: {inductiveCtor.bound_vars_with_base_types}",
+      m!"bound_vars_with_non_base_types: {inductiveCtor.bound_vars_with_non_base_types}",
+      m!"all_hypotheses: {inductiveCtor.all_hypotheses}",
+      m!"recursive_hypotheses: {inductiveCtor.recursive_hypotheses}",
+      m!"hypotheses_with_only_base_type_args: {inductiveCtor.hypotheses_with_only_base_type_args}",
+      m!"hypotheses_that_are_inductive_applications: {inductiveCtor.hypotheses_that_are_inductive_applications}",
+      m!"nonlinear_hypotheses: {inductiveCtor.nonlinear_hypotheses}",
+      m!"conclusion: {inductiveCtor.conclusion}",
+      m!"final_arg_in_conclusion: {inductiveCtor.final_arg_in_conclusion}",
+      m!"conclusion_args: {inductiveCtor.conclusion_args}",
+      m!"inputEqualities: {inductiveCtor.inputEqualities}",
+      m!"baseTypeInputEqualities: {inductiveCtor.baseTypeInputEqualities}",
+      m!"nonBaseTypeInputEqualities: {inductiveCtor.nonBaseTypeInputEqualities}",
+      m!"name_space: {inductiveCtor.name_space}",
+      m!"dependencies: {inductiveCtor.dependencies}"
+    ]
+    .bracket "{" (.ofList fields) "}"
+
 
 /-- The datatype `InductiveInfo` bundles together metadata for an inductive relation -/
 structure InductiveInfo where

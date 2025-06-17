@@ -291,7 +291,8 @@ def Actions_for_hypotheses (ctor : InductiveConstructor) (fvars : Array FVarId) 
   let mut initializedFVars := fvars
   for (hyp, i) in ctor.all_hypotheses.zipIdx do
     let isHypOfInductiveCtor ← isHypothesisOfInductiveConstructor hyp ctor
-    -- logInfo m!"hyp = {hyp}, ctor = {ctor}, isHypOfInductiveCtor = {isHypOfInductiveCtor}"
+
+    logInfo m!"hyp = {hyp}, ctor = {ctor}, isHypOfInductiveCtor = {isHypOfInductiveCtor}"
 
     if isHypOfInductiveCtor then
       if allFVarsInExprInitialized hyp initializedFVars then

@@ -38,7 +38,7 @@ def elabGetChecker : CommandElab := fun stx => do
       logInfo s!"input variable names = {relation.input_var_names}"
       let btnum := TSyntax.getNat t3
       let checker := get_checker relation inpname btnum
-      print_m_string checker
+      -- print_m_string checker
   | _ => throwError "Invalid syntax"
 
 -- #gen_checker lookup with_name ["Γ", "x", "τ"] backtrack 100
@@ -71,7 +71,7 @@ def elabGetProducer : CommandElab := fun stx => do
       -- logInfo producer
   | _ => throwError "Invalid syntax"
 
-#gen_producer typing with_name ["Γ", "e", "τ"] for_arg 2 backtrack 100
+-- #gen_producer typing with_name ["Γ", "e", "τ"] for_arg 2 backtrack 100
 -- #gen_producer balanced with_name ["n", "T"] for_arg 1 backtrack 100
 -- #gen_producer bst with_name ["lo", "hi", "T"] for_arg 2 backtrack 100
 
