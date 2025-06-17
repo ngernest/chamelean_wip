@@ -183,6 +183,7 @@ def mkTopLevelGenerator (baseGenerators : TSyntax `term) (inductiveGenerators : 
     let generatorIdent := mkIdent $ Name.mkStr1 s!"gen_{inductiveName}"
 
     -- Produce the definition for the generator function
+    -- TODO: produce an instance of the `GenSizedSuchThat` typeclass that uses the derived generator
     `(def $generatorIdent $topLevelParams* : $natIdent → $generatorType :=
         let rec $auxArbIdent:ident $innerParams* : $generatorType :=
           $matchExpr

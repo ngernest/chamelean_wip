@@ -1,7 +1,7 @@
 import Plausible.IR.Examples
 import Plausible.New.OptionTGen
 import Plausible.New.DecOpt
-import Plausible.New.GenSuchThat
+import Plausible.New.GenSizedSuchThat
 import Plausible.New.GeneratorCombinators
 
 import Plausible.Gen

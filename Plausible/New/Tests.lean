@@ -3,7 +3,7 @@ import Plausible.Gen
 
 import Plausible.New.OptionTGen
 import Plausible.New.DecOpt
-import Plausible.New.GenSuchThat
+import Plausible.New.GenSizedSuchThat
 open OptionTGen
 open Lean Elab Command
 
