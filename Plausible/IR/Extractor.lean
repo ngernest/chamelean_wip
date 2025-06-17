@@ -73,7 +73,6 @@ def mkFVars (a : Array Name) : Array Expr := a.map (fun x => mkFVar ⟨x⟩)
 abbrev DecomposedConstructorType := Array (Name × Expr) × Expr × Array Expr
 
 
-
 /-- The datatype `InductiveConstructor` bundles together metadata
     for a constructor of an inductive relation -/
 structure InductiveConstructor where
@@ -231,11 +230,22 @@ def isInductiveRelationApplication (e : Expr) : MetaM Bool := do
 /-- Determines whether an expression `e` is a hypothesis of a constructor `ctor`
    for an inductive relation -/
 def isHypothesisOfInductiveConstructor (e : Expr) (ctor : InductiveConstructor) : MetaM Bool := do
-  if !(← isInductiveRelation e.getAppFn) then
-    return false
-  if e.getAppFn.constName.getRoot == ctor.name_space then
+  logInfo m!"hyp = {e}"
+  logInfo m!"ctor = {ctor}"
+
+  let isIndRel ← isInductiveRelation e.getAppFn
+  logInfo m!"isIndRel = {isIndRel}"
+
+  let exprNamespace := e.getAppFn.constName.getRoot
+  logInfo m!"exprNamespace = {exprNamespace}"
+
+  if isIndRel then
     return true
-  return false
+  else if exprNamespace == ctor.name_space then
+    logInfo m!"same namespace"
+    return true
+  else
+    return false
 
 /-- Determines whether an expression `e` is a dependency of an inductive relation
     (i.e. if `e` is an inductive relation that is defined within the current namespace) -/

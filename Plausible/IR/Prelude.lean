@@ -357,7 +357,7 @@ where makeInputs_aux (s: String) (n : Nat) (z: Nat) : List String := match n wit
 | succ n => [s ++ "_" ++ (toString (z - n) )] ++ (makeInputs_aux s n z)
 
 
-def print_m_string (m: MetaM String) : MetaM Unit :=do
+def print_m_string (m: MetaM String) : MetaM Unit := do
   IO.println s!"{← m}"
 
 def print_m_arr_string (a: MetaM (Array String)) : MetaM Unit :=do
