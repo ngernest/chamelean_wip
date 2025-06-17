@@ -101,9 +101,11 @@ structure DecomposedInductiveHypothesis where
   /-- The resultant hypothesis after all the fvars in `fvarIds` have been rewritten
       such that each fvar is unique -/
   newHypothesis : Expr
+
   /-- A collection of the `FVarId`s that appear in `newHypothesis`
      (including the new fvars that were produced) -/
   fVarIds : Array FVarId
+
   /-- A collection of equations relating pairs of `FVarId`s to each other
       (e.g. `t = t1`) -/
   variableEqualities : Array (FVarId × FVarId)
@@ -287,10 +289,11 @@ def getLastUninitializedArgAndFVars
 def Actions_for_hypotheses (ctor : InductiveConstructor) (fvars : Array FVarId) : MetaM (Array Action) := do
   let mut result := #[]
   let mut initializedFVars := fvars
-  let mut i := 0
-  for hyp in ctor.all_hypotheses do
-    i := i + 1
-    if (← isHypothesisOfInductiveConstructor hyp ctor) then
+  for (hyp, i) in ctor.all_hypotheses.zipIdx do
+    let isHypOfInductiveCtor ← isHypothesisOfInductiveConstructor hyp ctor
+    -- logInfo m!"hyp = {hyp}, ctor = {ctor}, isHypOfInductiveCtor = {isHypOfInductiveCtor}"
+
+    if isHypOfInductiveCtor then
       if allFVarsInExprInitialized hyp initializedFVars then
         result := result.push (.checkInductive hyp)
       else

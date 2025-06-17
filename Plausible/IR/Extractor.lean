@@ -75,38 +75,65 @@ abbrev DecomposedConstructorType := Array (Name × Expr) × Expr × Array Expr
 /-- The datatype `InductiveConstructor` bundles together metadata
     for a constructor of an inductive relation -/
 structure InductiveConstructor where
-  -- Bound variables and their types
-  bound_vars: Array Name
-  bound_var_ctx : HashMap FVarId Expr
-  bound_vars_with_base_types : Array Name
-  bound_vars_with_non_base_types : Array Name
+  /-- The type of the constructor, represented as an `Expr` -/
+  ctorType : Expr
 
-  -- Metadata about each of the constructor's hypotheses
+  /-- Bound variables in the type of the constructor
+      (i.e. universally-quantified variables) -/
+  bound_vars : Array Name
+
+  /-- Typing context mapping each bound variable to its type -/
+  bound_var_ctx : HashMap FVarId Expr
+
+  /-- Bound variables that have base types -/
+  bound_vars_with_base_types : Array Name
+
+  /-- Bound variables that have non-base types -/
+  bound_vars_with_non_base_types : Array Name
 
   /-- All the hypotheses for the constructor
      (note that the conclusion is excluded) -/
   all_hypotheses : Array Expr
 
   /-- All hypotheses that mention the name of the inductive relation -/
-  recursive_hypotheses: Array Expr
+  recursive_hypotheses : Array Expr
 
+  /-- Hypotheses where all arguments have base types -/
   hypotheses_with_only_base_type_args : Array Expr
-  hypotheses_that_are_inductive_applications: Array Expr
-  nonlinear_hypotheses: Array Expr
 
-  -- Metadata about the constructor's conclusion
+  /-- Hypotheses of the form `R e1 ... en`, where `R` is an inductive relation -/
+  hypotheses_that_are_inductive_applications : Array Expr
+
+  /-- Hypotheses in which variables appaer non-linearly (i.e. more than once) -/
+  nonlinear_hypotheses : Array Expr
+
+  /-- The conclusion of the constructor, rewritten after
+      free variables in the conclusion have been unified with
+      the input arguments -/
   conclusion : Expr
+
+  /-- The final argument to the constructor after free variables
+      have been rewritten -/
   final_arg_in_conclusion : Expr
+
+  /-- The arguments to the conclusion -/
   conclusion_args : Array Expr
 
-  -- input equalities (equalities between the inputs to the inductive
-  -- and patterns for the inputs to the constructor)
-  inp_eq: Array (Expr × Expr)
-  ctor_expr: Expr
-  num_inp_eq: Array (Expr × Expr)
-  notnum_inp_eq: Array (Expr × Expr)
-  name_space: Name
-  dependencies: Array Expr
+  /-- Maps each argument to the conclusion to the corresponding input variable -/
+  inputEqualities: Array (Expr × Expr)
+
+  /-- `inputEqualities` where the type of the input variable is a base type -/
+  baseTypeInputEqualities : Array (Expr × Expr)
+
+  /-- `inputEqualities` where the type of the input variable is *not* a base type -/
+  nonBaseTypeInputEqualities : Array (Expr × Expr)
+
+  /-- The namespace in which the inductive relation was defined -/
+  name_space : Name
+
+  /-- Expressions `e` that are *dependencies* of the inductive relation
+      (i.e. if `e` is an inductive relation that is defined within the current namespace) -/
+  dependencies : Array Expr
 
 /-- The datatype `InductiveInfo` bundles together metadata for an inductive relation -/
 structure InductiveInfo where
@@ -269,12 +296,13 @@ def process_constructor_unify_args (ctor_type: Expr) (input_vars : Array Expr) (
       else
         nonlinear_hypotheses := nonlinear_hypotheses.push hyp
 
-    let inp_eq :=  conclusion_args.zip input_vars
-    let inp_eq_ztype := inp_eq.zip input_types
-    let (num_inp_eq,_) := (inp_eq_ztype.filter (fun (_, t) => isBaseType t)).unzip
-    let (notnum_inp_eq,_) := (inp_eq_ztype.filter (fun (_, t) => ¬ isBaseType t)).unzip
+    let inputEqualities := conclusion_args.zip input_vars
+    let inputEqualitiesWithTypes := inputEqualities.zip input_types
+    let (baseTypeInputEqualities, _) := (inputEqualitiesWithTypes.filter (fun (_, ty) => isBaseType ty)).unzip
+    let (nonBaseTypeInputEqualities, _) := (inputEqualitiesWithTypes.filter (fun (_, ty) => !isBaseType ty)).unzip
+
     return {
-      ctor_expr := ctor_type
+      ctorType := ctor_type
       bound_vars := bound_vars,
       bound_var_ctx := new_ctx,
       all_hypotheses := hypotheses,
@@ -287,9 +315,9 @@ def process_constructor_unify_args (ctor_type: Expr) (input_vars : Array Expr) (
       nonlinear_hypotheses := nonlinear_hypotheses
       hypotheses_that_are_inductive_applications := hypotheses_that_are_inductive_applications
       recursive_hypotheses := recursive_hypotheses
-      inp_eq := inp_eq
-      num_inp_eq := num_inp_eq
-      notnum_inp_eq := notnum_inp_eq
+      inputEqualities := inputEqualities
+      baseTypeInputEqualities := baseTypeInputEqualities
+      nonBaseTypeInputEqualities := nonBaseTypeInputEqualities
       name_space := inductive_relation_name.getRoot
       dependencies := dependencies
     }
@@ -322,7 +350,7 @@ def process_constructor_print (pc: InductiveConstructor) : MetaM Unit := do
   IO.println s!" nonlinear_conds:  {pc.nonlinear_hypotheses}"
   IO.println s!" inductive_conds:  {pc.hypotheses_that_are_inductive_applications}"
   IO.println s!" recursive_conds:  {pc.recursive_hypotheses}"
-  IO.println s!" inp eqs:  {pc.inp_eq}"
+  IO.println s!" inp eqs:  {pc.inputEqualities}"
 
 
 
