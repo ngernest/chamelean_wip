@@ -19,6 +19,9 @@ open GenSizedSuchThat OptionTGen
   (Note: you may need to comment out the typeclass instances in `Trees.lean` if Lean complains about overlapping instances.)
 -/
 
+-- #derive_generator (fun (t : Tree) => balanced n t)
+-- #derive_generator (fun (t : Tree) => bst lo hi t)
+
 -- TODO: update derived generator to use this template
 -- def aux_arb a1 a2 size :=
 --   match size with
