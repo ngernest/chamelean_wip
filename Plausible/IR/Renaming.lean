@@ -158,4 +158,4 @@ def testSimpleRenaming : MetaM Unit := do
         logInfo m!"After renaming - aux call: {renamedAuxCall}"
 
 
-#eval testSimpleRenaming
+-- #eval testSimpleRenaming
