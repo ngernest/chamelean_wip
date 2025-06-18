@@ -163,6 +163,7 @@ def mkTopLevelGenerator (baseGenerators : TSyntax `term) (inductiveGenerators : 
     let mut paramIdents := #[]
     for (paramName, paramType) in paramInfo do
       if paramName != targetVar then
+        -- TODO: add `"_0"` to the end of `paramName` (same as what QuickChick does)
         let paramIdent := mkIdent paramName
         paramIdents := paramIdents.push paramIdent
 
