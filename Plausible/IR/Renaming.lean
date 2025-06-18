@@ -5,8 +5,12 @@ import Plausible.IR.GCCall
 
 open Lean Meta Std Plausible.IR
 
--- Extract pattern variables from a match case expression
+/-- Extracts pattern variables from an expression `matchCase` that is a case
+    in a pattern-match, returning an array of `FVarId`s -/
 def extractPatternVariables (matchCase : Expr) : MetaM (Array FVarId) := do
+  -- `collectVars` collects the pattern variables in an `expr`,
+  -- with `acc` being the `Array` of `FVarId`s
+  -- collected so far, returning an updated `Array` of `FVarId`s
   let rec collectVars (e : Expr) (acc : Array FVarId) : MetaM (Array FVarId) := do
     match e with
     | Expr.fvar id =>
@@ -22,7 +26,8 @@ def extractPatternVariables (matchCase : Expr) : MetaM (Array FVarId) := do
       collectVars fn acc'
 
     | Expr.const _ _ =>
-      -- This is a constructor like `Nat.zero`, `List.nil` - no variables to collect
+      -- This is a constructor like `Nat.zero` or `List.nil`, so there are
+      -- no variables to collect
       pure acc
 
     | Expr.lam _binderName binderType body _ =>
@@ -68,41 +73,41 @@ def extractPatternVariables (matchCase : Expr) : MetaM (Array FVarId) := do
 
   collectVars matchCase #[]
 
-
+/-- Collects the `FVarId`s corresponding to all pattern variables (variables on the LHS of a pattern match)
+    that need renaming. A pattern variable needs to be renamed if it shadows the scrutinee of the pattern match.  -/
+def getPatternVarsThatNeedRenaming (subGen : SubGeneratorInfo) : MetaM (Array FVarId) := do
+  let mut fvarsToRename : Array FVarId := #[]
+  for (scrutineeName, matchCase) in Array.zip subGen.inputsToMatch subGen.matchCases do
+    let patternVars ← extractPatternVariables matchCase
+    for patternVar in patternVars do
+      let patternVarName ← patternVar.getUserName
+      -- If the pattern variable's name is the same as the scrutinee's, then shadowing has occurred,
+      -- so we need to rename the pattern variable
+      if patternVarName.toString == scrutineeName then
+        fvarsToRename := fvarsToRename.push patternVar
+  pure fvarsToRename
 
 
 -- -- Simplified approach using LocalContext.renameUserName
 def renameVariablesInSubGeneratorSimple (subGen : SubGeneratorInfo) : MetaM LocalContext := do
-  logInfo m!"=== SIMPLE RENAMING APPROACH ==="
-
-  -- Collect all FVarIds that need renaming
-  let mut fvarsToRename : Array FVarId := #[]
-
-  for (scrutineeName, matchCase) in subGen.inputsToMatch.zip subGen.matchCases do
-    let patternVars ← extractPatternVariables matchCase
-    for patternVar in patternVars do
-      let patternVarName ← patternVar.getUserName
-      if patternVarName.toString == scrutineeName then
-        logInfo m!"Found shadowing: {patternVarName} shadows scrutinee '{scrutineeName}'"
-        fvarsToRename := fvarsToRename.push patternVar
-
-  -- Apply renaming using LocalContext.renameUserName
+  let fvarsToRename ← getPatternVarsThatNeedRenaming subGen
   let mut lctx ← getLCtx
 
+  -- No pattern variables shadow the scrutinee, so we can just return the original `LocalContext`
   if fvarsToRename.isEmpty then
-    logInfo m!"No shadowing found - returning original"
     return lctx
-
 
   for fvar in fvarsToRename do
     let oldName ← fvar.getUserName
-    let newName := (LocalContext.getUnusedName lctx oldName)
-    logInfo m!"Renaming {oldName} → {newName}"
+    -- Create a new, user-accessible fresh name using the `LocalContext`
+    let newName := LocalContext.getUnusedName lctx oldName
 
+    -- REplace all occurences of the `oldName` in the `LocalContext` with the  `newName`
     lctx := lctx.renameUserName oldName newName
 
+  -- Return updated local context
+  -- (callers should use `withLCtx'` to enter the updated local context)
   return lctx
-
 
 
 -- Test the simple approach

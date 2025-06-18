@@ -50,7 +50,8 @@ def backtrackFuel (fuel : Nat) (total : Nat) (gs : List (Nat × OptionT Gen α))
     OptionT.tryCatch g (fun () => backtrackFuel fuel' (total - k) gs')
 
 /-- Tries all generators until one returns a Some value or all failed once with None.
-   The generators are picked at random according to their weights (like frequency), and each one is run at most once. -/
+   The generators are picked at random according to their weights (like `frequency` in Haskell QuickCheck),
+   and each generator is run at most once. -/
 def backtrack (gs : List (Nat × OptionT Gen α)) : OptionT Gen α :=
   backtrackFuel (gs.length) (sumFst gs) gs
 
