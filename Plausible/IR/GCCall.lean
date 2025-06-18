@@ -172,7 +172,7 @@ inductive GenerationStyle
 
 /-- Represents an expression in the RHS of the non-trivial pattern-match case
     in a backtrack element (sub-generator)
-  - Note: this datatype was formerly known as `Action`
+  - Note: this datatype was formerly known as `GenCheckCall`
   - TODO (Ernest): this is a super-set of QuickChick's `schedule_step`
       (maybe just take `ret` out and have it be a separate thing, since we can only
        have `return`s at the end of a schedule

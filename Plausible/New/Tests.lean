@@ -43,8 +43,8 @@ For example:
 
 
 -- Work in progress: extend generator deriver to handle STLC example
--- TODO: change the call to `aux_arb` for lookup into a call to the appropriate typeclass method
--- ^^ TODO: add typeclass stuff?
+-- TODO: figure out issue with `TApp` in the derived generator for `typing`
+-- TODO: rename variables so that top-level inputs have the "_0" suffix added to their names (same as QuickChick)
 -- TODO: figure out how to handle checkers
 -- #derive_generator (fun (x : Nat) => lookup Γ x τ)
 -- #derive_generator (fun (e : term) => typing Γ e τ)

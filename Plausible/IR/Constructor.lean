@@ -405,16 +405,16 @@ def backtrackElem_if_return_producer (backtrackElem : SubGeneratorInfo) (indenta
 
 /-- Assembles all the components of a sub-generator (a `BacktrackElem`) together, returning a string
     containing the Lean code for the sub-generator -/
-def subGeneratorInfoToString (backtrackElem : SubGeneratorInfo) (monad: String :="IO"): MetaM String := do
+def subGeneratorInfoToString (subGeneratorInfo : SubGeneratorInfo) (monad: String :="IO"): MetaM String := do
   IO.println "********************"
   IO.println s!"entered `backtrack_elem_toString_producer`:"
-  IO.println (← MessageData.toString (toMessageData backtrackElem))
+  IO.println (← MessageData.toString (toMessageData subGeneratorInfo))
 
   let mut out := ""
-  let matchblock ← backtrackElem_match_block backtrackElem
-  let (genblock, iden) ← backtrackElem_gen_block backtrackElem monad
-  let (checkIRblock, vars) ← backtrackElem_gen_check_IR_block backtrackElem iden monad
-  let returnblock ← backtrackElem_if_return_producer backtrackElem iden vars monad
+  let matchblock ← backtrackElem_match_block subGeneratorInfo
+  let (genblock, iden) ← backtrackElem_gen_block subGeneratorInfo monad
+  let (checkIRblock, vars) ← backtrackElem_gen_check_IR_block subGeneratorInfo iden monad
+  let returnblock ← backtrackElem_if_return_producer subGeneratorInfo iden vars monad
   out := out ++ matchblock
   if genblock.length + checkIRblock.length + returnblock.length > 0 ∧ out.length > 0 then
     out := out ++ "\n"
