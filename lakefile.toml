@@ -9,6 +9,9 @@ name = "Test"
 [[lean_lib]]
 name = "Plausible"
 
+[[lean_lib]]
+name = "ChameleanTests"
+
 [[require]]
 name = "aesop"
 git = "https://github.com/leanprover-community/aesop"

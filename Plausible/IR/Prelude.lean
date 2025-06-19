@@ -1,6 +1,5 @@
 import Lean
 import Std
-import Plausible.IR.Examples
 import Lean.Elab.Deriving.DecEq
 import Lean.Meta.Tactic.Simp.Main
 

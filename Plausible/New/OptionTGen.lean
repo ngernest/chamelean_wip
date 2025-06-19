@@ -1,4 +1,3 @@
-import Plausible.IR.Examples
 import Plausible.New.GeneratorCombinators
 
 import Plausible.Gen
