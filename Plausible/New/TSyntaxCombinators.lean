@@ -36,3 +36,6 @@ def mkIfExprWithNaryAnd (predicates : Array Term)
 /-- Creates a match expression -/
 def mkMatchExpr (scrutinee: Ident) (cases : TSyntaxArray ``Term.matchAlt) : MetaM (TSyntax `term) :=
   `(match $scrutinee:ident with $cases:matchAlt*)
+
+def mkMatchExprWithScrutineeTerm (scrutinee: TSyntax `term) (cases : TSyntaxArray ``Term.matchAlt) : MetaM (TSyntax `term) :=
+  `(match $scrutinee:term with $cases:matchAlt*)

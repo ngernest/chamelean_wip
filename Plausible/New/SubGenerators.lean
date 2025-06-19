@@ -59,14 +59,25 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
       let predicateTerm ← PrettyPrinter.delab predicateExpr
       nonInductiveHypothesesToCheck := nonInductiveHypothesesToCheck.push predicateTerm
 
-  -- TODO: invoke checkers for auxiliary inductive relations (for `checkInductive` actions)
-  -- ^^ invoke `DecOpt.decOpt` here somehow
-
-  let mut inductiveHypothesesToCheck := #[]
+  let mut inductiveHypothesesToCheck : TSyntaxArray `term := #[]
   for action in subGenerator.groupedActions.checkInductiveActions do
     if let .checkInductive inductiveExpr := action then
+      -- Use the delaborator to convert an `Expr` into a `Term`
       let inductiveTerm ← PrettyPrinter.delab inductiveExpr
-      inductiveHypothesesToCheck := inductiveHypothesesToCheck.push inductiveTerm
+
+      -- Conver the `Term` into a `TSyntax term`
+      let typedInductiveTerm ← `($inductiveTerm:term)
+
+      inductiveHypothesesToCheck := inductiveHypothesesToCheck.push typedInductiveTerm
+
+  -- Add equality checks for any pairs of variables in `variableEqualities`
+  let mut variableEqualitiesToCheck := #[]
+  for (fvar1, fvar2) in subGenerator.variableEqualities do
+    let ident1 := mkIdent fvar1.name
+    let ident2 := mkIdent fvar2.name
+    logWarning m!"ident1 = {ident1}, ident2 = {ident2}"
+    let equalityCheck ← `($ident1:ident = $ident2:ident)
+    variableEqualitiesToCheck := variableEqualitiesToCheck.push equalityCheck
 
   logWarning "**********************"
   logWarning m!"nonInductiveHypothesesToCheck = {nonInductiveHypothesesToCheck}"
@@ -84,7 +95,7 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
       let argToGenTerm ← PrettyPrinter.delab expr
 
       -- If any let-bind expressions have already appeared,
-      -- then append `return $argToGenTerm` to the end of the do-block
+      -- append `return $argToGenTerm` to the end of the do-block
       let generatorBody ←
         if !doElems.isEmpty then
           let retExpr ← `(doElem| return $argToGenTerm:term)
@@ -105,17 +116,35 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
         else
           `($pureIdent $argToGenTerm:term)
 
+      -- TODO: invoke checkers for auxiliary inductive relations (for `checkInductive` actions)
+      -- ^^ invoke `DecOpt.decOpt` here somehow
+
+      -- TODO: figure out why this breaks the BST/balanced tree generators
+      let updatedGeneratorBody ←
+        if !variableEqualitiesToCheck.isEmpty then
+          -- Note: we assume `variableEqualitiesToCheck` only has length 1 for now
+          let equality := variableEqualitiesToCheck[0]!
+          let constraint ← `($qualifiedDecOptIdent:ident ($equality) $initSizeIdent)
+          let trueCase ← `(Term.matchAltExpr| | $(mkIdent ``some) $(mkIdent ``true) => $generatorBody)
+          let catchAllCase ← `(Term.matchAltExpr| | _ => $failFn)
+          mkMatchExprWithScrutineeTerm constraint #[trueCase, catchAllCase]
+        else
+          return generatorBody
+
+
       -- If there are inputs on which we need to perform a pattern-match,
       -- create a pattern-match expr which only returns the generator body
       -- if the match succeeds
       if !subGenerator.inputsToMatch.isEmpty then
         let mut cases := #[]
-        -- For now, we assume there is only one scrutinee
-        let scrutinee := mkIdent $ genFreshName (Name.mkStr1 <$> subGenerator.inputsToMatch) (Name.mkStr1 subGenerator.inputsToMatch[0]!)
+        -- For now, we assume there is only one scrutinee. We give it a fresh name
+        -- so that it doesn't get shadowed by any variables in the match patterns
+        let scrutinee := mkIdent $ genFreshName
+          (Name.mkStr1 <$> subGenerator.inputsToMatch) (Name.mkStr1 subGenerator.inputsToMatch[0]!)
 
         for patternExpr in subGenerator.matchCases do
           let pattern ← PrettyPrinter.delab patternExpr
-          let case ← `(Term.matchAltExpr| | $pattern:term => $generatorBody:term)
+          let case ← `(Term.matchAltExpr| | $pattern:term => $updatedGeneratorBody:term)
           cases := cases.push case
 
         let catchAllCase ← `(Term.matchAltExpr| | _ => $failFn)
@@ -123,7 +152,7 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
 
         mkMatchExpr scrutinee cases
       else
-        return generatorBody
+        return updatedGeneratorBody
 
     | _ => throwUnsupportedSyntax
 
