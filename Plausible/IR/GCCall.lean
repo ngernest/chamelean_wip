@@ -126,7 +126,7 @@ def separateFVars (hyp : Expr) : MetaM DecomposedInductiveHypothesis := do
     let mut i := 0
     let mut currentFV := fv
     while (numMatchingFVars newHyp currentFV > 1) do
-      let newName := Name.mkNum fv.name i
+      let newName := Name.appendAfter fv.name s!"_{i}"
       let newFVarId := FVarId.mk newName
       newHyp ← subst_first_fVar newHyp currentFV tempfvarid
       newHyp := newHyp.replaceFVarId currentFV (mkFVar newFVarId)

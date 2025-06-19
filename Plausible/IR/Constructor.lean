@@ -380,26 +380,29 @@ def mkSubGeneratorInfoFromConstructor (ctor : InductiveConstructor) (inputNames 
     - `vars` is a list of free variables that were produced during the `check_IR` block
     - e.g. `vars = ["1", "2", ...]`
 -/
-def backtrackElem_if_return_producer (backtrackElem : SubGeneratorInfo) (indentation : String) (vars: List String) (monad: String :="IO"): MetaM String := do
+def backtrackElem_if_return_producer (subGeneratorInfo : SubGeneratorInfo) (indentation : String) (vars: List String) (monad: String :="IO"): MetaM String := do
+  logWarning "inside backtrackElem_if_return_producer"
+  logWarning m!"subGeneratorInfo = {subGeneratorInfo}"
+
   let mut out := ""
-  if backtrackElem.variableEqualities.size + backtrackElem.groupedActions.checkNonInductiveActions.size + backtrackElem.groupedActions.checkInductiveActions.size > 0 then
+  if subGeneratorInfo.variableEqualities.size + subGeneratorInfo.groupedActions.checkNonInductiveActions.size + subGeneratorInfo.groupedActions.checkInductiveActions.size > 0 then
     out := out ++ indentation ++ "if "
   for j in vars do
     out := out ++ "check" ++ j ++ " && "
-  for i in backtrackElem.variableEqualities do
+  for i in subGeneratorInfo.variableEqualities do
     out := out ++  "(" ++ toString (i.1.name) ++ " == " ++ toString (i.2.name) ++ ") && "
-  for gcc in backtrackElem.groupedActions.checkNonInductiveActions do
+  for gcc in subGeneratorInfo.groupedActions.checkNonInductiveActions do
     out := out ++ (← actionToCode gcc monad) ++ " && "
-  if backtrackElem.variableEqualities.size + backtrackElem.groupedActions.checkNonInductiveActions.size + backtrackElem.groupedActions.checkInductiveActions.size > 0 then
+  if subGeneratorInfo.variableEqualities.size + subGeneratorInfo.groupedActions.checkNonInductiveActions.size + subGeneratorInfo.groupedActions.checkInductiveActions.size > 0 then
     out := ⟨out.data.dropLast.dropLast.dropLast⟩ ++ "\n" ++ indentation ++  "then "
-  for gcc in backtrackElem.groupedActions.ret_list do
+  for gcc in subGeneratorInfo.groupedActions.ret_list do
     out := out ++ indentation ++ (← actionToCode gcc monad)
-  if backtrackElem.variableEqualities.size + backtrackElem.groupedActions.checkNonInductiveActions.size + backtrackElem.groupedActions.checkInductiveActions.size + backtrackElem.groupedActions.iflet_list.size > 0 then
+  if subGeneratorInfo.variableEqualities.size + subGeneratorInfo.groupedActions.checkNonInductiveActions.size + subGeneratorInfo.groupedActions.checkInductiveActions.size + subGeneratorInfo.groupedActions.iflet_list.size > 0 then
     let monad_fail := if monad = "IO" then "throw (IO.userError \"fail at checkstep\")" else "return none"
     out := out ++ "\n" ++ monad_fail
-  if backtrackElem.inputsToMatch.size > 0 then
+  if subGeneratorInfo.inputsToMatch.size > 0 then
     let monad_fail := if monad = "IO" then "throw (IO.userError \"fail\")" else "return none"
-    out := out ++ "\n| " ++ makeUnderscores_commas backtrackElem.inputsToMatch.size ++ " => " ++ monad_fail
+    out := out ++ "\n| " ++ makeUnderscores_commas subGeneratorInfo.inputsToMatch.size ++ " => " ++ monad_fail
 
   return out
 

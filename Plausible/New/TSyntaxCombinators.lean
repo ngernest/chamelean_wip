@@ -33,6 +33,16 @@ def mkIfExprWithNaryAnd (predicates : Array Term)
       List.foldlM (fun acc pred => `($acc && $pred)) (init := p) ps
   `(doElem| if $condition then $trueBranch:doElem else $elseBranch:doElem)
 
-/-- Creates a match expression -/
-def mkMatchExpr (scrutinee: Ident) (cases : TSyntaxArray ``Term.matchAlt) : MetaM (TSyntax `term) :=
+/-- Creates a match expression (represented as a `TSyntax term`),
+    where the `scrutinee` is an `Ident` and the `cases` are specified as an array of `matchAlt`s -/
+def mkMatchExpr (scrutinee : Ident) (cases : TSyntaxArray ``Term.matchAlt) : MetaM (TSyntax `term) :=
   `(match $scrutinee:ident with $cases:matchAlt*)
+
+/-- Variant of `mkMatchExpr` where the `scrutinee` is a `TSyntax term` rather than an `Ident` -/
+def mkMatchExprWithScrutineeTerm (scrutinee : TSyntax `term) (cases : TSyntaxArray ``Term.matchAlt) : MetaM (TSyntax `term) :=
+  `(match $scrutinee:term with $cases:matchAlt*)
+
+/-- Variant of `mkMatchExpr` where the `scrutinee` is a `TSyntax term`, and the resultant match expression
+    is a `doElem` (i.e. it is part of a monadic `do`-block) -/
+def mkDoElemMatchExpr (scrutinee : TSyntax `term) (cases : TSyntaxArray ``Term.matchAlt) : MetaM (TSyntax `doElem) :=
+  `(doElem| match $scrutinee:term with $cases:matchAlt*)
