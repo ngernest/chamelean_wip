@@ -25,7 +25,7 @@ to automatically derive generators/checkers for inductive relations, à la [Para
 **Tests**:      
 - The [`Test`](./Test/) subdirectory contains [snapshot tests](https://www.cs.cornell.edu/~asampson/blog/turnt.html) (aka [expect tests](https://blog.janestreet.com/the-joy-of-expect-tests/)) for the `#derive_generator` command elaborator. 
 - Run `lake test` to check that the derived generators in [`Test`](./Test/) typecheck, and that the code for the derived generators match the expected output.
-- See [`Test/DeriveBSTGenerator.lean`](./Test/DeriveBSTGenerator.lean) & [`Test/DeriveBalancedTreeGenerator.lean`](./Test/DeriveBalancedTreeGenerator.lean) for example snapshot tests.
+- See [`DeriveBSTGenerator.lean`](./Test/DeriveBSTGenerator.lean) & [`DeriveBalancedTreeGenerator.lean`](./Test/DeriveBalancedTreeGenerator.lean) for examples of snapshot tests. Follow the template in these two files to add new snapshot tests.
 
 
 
