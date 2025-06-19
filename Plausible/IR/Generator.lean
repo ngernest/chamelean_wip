@@ -11,6 +11,7 @@ open List Nat Array String
 open Lean Elab Command Meta Term
 open Lean.Parser.Term
 
+set_option linter.unusedVariables false
 
 namespace Plausible.IR
 -- Generate function --
