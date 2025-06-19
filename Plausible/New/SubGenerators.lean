@@ -111,12 +111,9 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
       if !subGenerator.inputsToMatch.isEmpty then
         let mut cases := #[]
         -- For now, we assume there is only one scrutinee
-        let scrutinee := mkIdent $ Name.mkStr1 subGenerator.inputsToMatch[0]!
+        let scrutinee := mkIdent $ genFreshName (Name.mkStr1 <$> subGenerator.inputsToMatch) (Name.mkStr1 subGenerator.inputsToMatch[0]!)
 
         for patternExpr in subGenerator.matchCases do
-          -- TODO: if the scrutinee appears in the pattern, rename the pattern to avoid name clashes?
-          -- Right now, the derived generator works due to shadowing, but not sure if we should judiciously rename
-          -- free variables in the `generatorBody` (this would be somewhat laborious)
           let pattern ← PrettyPrinter.delab patternExpr
           let case ← `(Term.matchAltExpr| | $pattern:term => $generatorBody:term)
           cases := cases.push case

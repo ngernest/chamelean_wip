@@ -160,13 +160,18 @@ def mkTopLevelGenerator (baseGenerators : TSyntax `term) (inductiveGenerators : 
     innerParams := innerParams.push initSizeParam
     innerParams := innerParams.push sizeParam
 
-    let mut paramIdents := #[]
+    -- Outer params are for the top-level lambda function which invokes `aux_arb`
+    let mut outerParams := #[]
     for (paramName, paramType) in paramInfo do
       if paramName != targetVar then
-        let paramIdent := mkIdent paramName
-        paramIdents := paramIdents.push paramIdent
+        let outerParamIdent := mkIdent paramName
+        outerParams := outerParams.push outerParamIdent
 
-        let innerParam ← `(Term.letIdBinder| ($paramIdent : $paramType))
+        -- Each parameter to the inner `aux_arb` function needs to be a fresh name
+        -- (so that if we pattern match on the parameter, we avoid pattern variables from shadowing it)
+        let innerParamIdent := mkIdent $ genFreshName (Array.map Prod.fst paramInfo) paramName
+
+        let innerParam ← `(Term.letIdBinder| ($innerParamIdent : $paramType))
         innerParams := innerParams.push innerParam
 
     -- Produce a fresh name for the `size` argument for the lambda
@@ -180,7 +185,7 @@ def mkTopLevelGenerator (baseGenerators : TSyntax `term) (inductiveGenerators : 
         $genSizedSTIdent:ident :=
           let rec $auxArbIdent:ident $innerParams* : $generatorType :=
             $matchExpr
-          fun $freshSizeIdent => $auxArbIdent $freshSizeIdent $freshSizeIdent $paramIdents*)
+          fun $freshSizeIdent => $auxArbIdent $freshSizeIdent $freshSizeIdent $outerParams*)
 
 
 @[command_elab derive_generator]

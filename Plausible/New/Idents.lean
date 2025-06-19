@@ -35,4 +35,19 @@ def sizeIdent : Ident := mkIdent $ Name.mkStr1 "size"
 def mkFreshAccessibleIdent (localCtx : LocalContext) (name : Name) : Ident :=
   mkIdent $ LocalContext.getUnusedName localCtx name
 
+/-- `genFreshName existingNames namePrefix` produces a thunked function
+    that produces a fresh name (with prefix `namePrefix`) that are guaranteed to be
+    not within the existing set of names
+    - Note: the body of this function operates in the identity monad since
+      we want local mutable state and access to the syntactic sugar
+      provided by `while` loops -/
+def genFreshName (existingNames : Array Name) (namePrefix : Name) : Name :=
+  Id.run do
+    let mut count := 0
+    let mut freshName := Name.appendAfter namePrefix s!"_{count}"
+    while (existingNames.contains freshName) do
+      count := count + 1
+      freshName := Name.appendAfter namePrefix s!"_{count}"
+    return freshName
+
 end Idents

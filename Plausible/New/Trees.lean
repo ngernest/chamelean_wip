@@ -19,7 +19,7 @@ open GenSizedSuchThat
     - All the generators supplied to the `backtrack` combinator are thunked, to avoid unnecessary
       computation (since Lean is strict) -/
 def genBST (lo : Nat) (hi : Nat) : Nat → OptionT Gen Tree :=
-  let rec aux_arb (size : Nat) (lo : Nat) (hi : Nat) : OptionT Gen Tree :=
+  let rec aux_arb (initSize : Nat) (size : Nat) (lo_0 : Nat) (hi_0 : Nat) : OptionT Gen Tree :=
     match size with
     | .zero =>
       backtrack [
@@ -31,13 +31,13 @@ def genBST (lo : Nat) (hi : Nat) : Nat → OptionT Gen Tree :=
         (1, thunkGen $ fun _ => pure .Leaf),
         (.succ size', thunkGen $ fun _ => do
           let x ← SampleableExt.interpSample Nat
-          if (lo < x && x < hi) then
-            let l ← aux_arb size' lo x
-            let r ← aux_arb size' x hi
+          if (lo_0 < x && x < hi_0) then
+            let l ← aux_arb initSize size' lo_0 x
+            let r ← aux_arb initSize size' x hi_0
             pure (.Node x l r)
           else OptionT.fail)
       ]
-  fun size => aux_arb size lo hi
+  fun size => aux_arb size size lo hi
 
 /- Instance of the `GenSizedSuchThat` typeclass for generators of BSTs -/
 -- instance : GenSizedSuchThat Tree (fun t => bst lo hi t) where
@@ -46,16 +46,16 @@ def genBST (lo : Nat) (hi : Nat) : Nat → OptionT Gen Tree :=
 /-- A handwritten generator for balanced trees of height `n`
     (modelled after the automatically derived generator produced by QuickChick) -/
 def genBalancedTree (n : Nat) : Nat → OptionT Gen Tree :=
-  let rec aux_arb (size : Nat) (n : Nat) : OptionT Gen Tree :=
+  let rec aux_arb (initSize : Nat) (size : Nat) (n_0 : Nat) : OptionT Gen Tree :=
       match size with
       | .zero =>
         backtrack [
           (1, thunkGen $ fun _ =>
-              match n with
+              match n_0 with
               | .zero => pure .Leaf
               | .succ _ => OptionT.fail),
           (1, thunkGen $ fun _ =>
-              match n with
+              match n_0 with
               | 1 => pure .Leaf
               | _ => OptionT.fail),
           (1, thunkGen $ fun _ => OptionT.fail)
@@ -63,23 +63,23 @@ def genBalancedTree (n : Nat) : Nat → OptionT Gen Tree :=
       | .succ size' =>
         backtrack [
           (1, thunkGen $ fun _ =>
-              match n with
+              match n_0 with
               | .zero => pure .Leaf
               | _ => OptionT.fail),
           (1, thunkGen $ fun _ =>
-              match n with
+              match n_0 with
               | 1 => pure .Leaf
               | _ => OptionT.fail),
           (.succ size', thunkGen $ fun _ =>
-            match n with
+            match n_0 with
             | .zero => OptionT.fail
             | .succ n => do
-              let l ← aux_arb size' n
-              let r ← aux_arb size' n
+              let l ← aux_arb initSize size' n
+              let r ← aux_arb initSize size' n
               let x ← SampleableExt.interpSample Nat
               pure (.Node x l r))
         ]
-  fun size => aux_arb size n
+  fun size => aux_arb size size n
 
 /- Instance of the `GenSizedSuchThat` typeclass for generators of balanced trees
    of height `n` -/
