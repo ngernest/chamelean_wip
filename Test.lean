@@ -6,3 +6,4 @@ Authors: Henrik Böving
 import Test.Tactic
 import Test.Testable
 import Test.DeriveBSTGenerator
+import Test.DeriveBalancedTreeGenerator
