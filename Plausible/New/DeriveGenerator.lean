@@ -160,14 +160,16 @@ def mkTopLevelGenerator (baseGenerators : TSyntax `term) (inductiveGenerators : 
     innerParams := innerParams.push initSizeParam
     innerParams := innerParams.push sizeParam
 
-    let mut paramIdents := #[]
+    let mut outerParams := #[]
     for (paramName, paramType) in paramInfo do
       if paramName != targetVar then
-        -- TODO: add `"_0"` to the end of `paramName` (same as what QuickChick does)
-        let paramIdent := mkIdent paramName
-        paramIdents := paramIdents.push paramIdent
+        let outerParamIdent := mkIdent paramName
+        outerParams := outerParams.push outerParamIdent
 
-        let innerParam ← `(Term.letIdBinder| ($paramIdent : $paramType))
+        -- TODO: add `"_0"` to the end of `paramName` (same as what QuickChick does)c
+        let innerParamIdent := mkIdent $ Name.appendAfter paramName "_0"
+
+        let innerParam ← `(Term.letIdBinder| ($innerParamIdent : $paramType))
         innerParams := innerParams.push innerParam
 
     -- Produce a fresh name for the `size` argument for the lambda
@@ -181,7 +183,7 @@ def mkTopLevelGenerator (baseGenerators : TSyntax `term) (inductiveGenerators : 
         $genSizedSTIdent:ident :=
           let rec $auxArbIdent:ident $innerParams* : $generatorType :=
             $matchExpr
-          fun $freshSizeIdent => $auxArbIdent $freshSizeIdent $freshSizeIdent $paramIdents*)
+          fun $freshSizeIdent => $auxArbIdent $freshSizeIdent $freshSizeIdent $outerParams*)
 
 
 @[command_elab derive_generator]
