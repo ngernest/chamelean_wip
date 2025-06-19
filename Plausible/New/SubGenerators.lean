@@ -111,8 +111,7 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
       if !subGenerator.inputsToMatch.isEmpty then
         let mut cases := #[]
         -- For now, we assume there is only one scrutinee
-        -- TODO: append `"_0"` to the end of the name of each scrutinee to match the renamed inputs to `aux_arb`
-        let scrutinee := mkIdent $ Name.appendAfter (Name.mkStr1 subGenerator.inputsToMatch[0]!) "_0"
+        let scrutinee := mkIdent $ genFreshName (Name.mkStr1 <$> subGenerator.inputsToMatch) (Name.mkStr1 subGenerator.inputsToMatch[0]!)
 
         for patternExpr in subGenerator.matchCases do
           let pattern ← PrettyPrinter.delab patternExpr

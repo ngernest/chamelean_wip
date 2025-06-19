@@ -160,14 +160,16 @@ def mkTopLevelGenerator (baseGenerators : TSyntax `term) (inductiveGenerators : 
     innerParams := innerParams.push initSizeParam
     innerParams := innerParams.push sizeParam
 
+    -- Outer params are for the top-level lambda function which invokes `aux_arb`
     let mut outerParams := #[]
     for (paramName, paramType) in paramInfo do
       if paramName != targetVar then
         let outerParamIdent := mkIdent paramName
         outerParams := outerParams.push outerParamIdent
 
-        -- TODO: add `"_0"` to the end of `paramName` (same as what QuickChick does)c
-        let innerParamIdent := mkIdent $ Name.appendAfter paramName "_0"
+        -- Each parameter to the inner `aux_arb` function needs to be a fresh name
+        -- (so that if we pattern match on the parameter, we avoid pattern variables from shadowing it)
+        let innerParamIdent := mkIdent $ genFreshName (Array.map Prod.fst paramInfo) paramName
 
         let innerParam ← `(Term.letIdBinder| ($innerParamIdent : $paramType))
         innerParams := innerParams.push innerParam
