@@ -21,7 +21,12 @@ to automatically derive generators/checkers for inductive relations, à la [Para
 - [`Examples.lean`](./Plausible/IR/Examples.lean): Some example inductive relations (BSTs, balanced trees, STLC)
 - [`STLC.lean`](./Plausible/New/STLC.lean): Example checkers & generators for well-typed STLC terms
 - [`Trees.lean`](./Plausible/New/Trees.lean): Example generators for balanced trees & BSTs
-- [`Tests.lean`](./Plausible/New/Tests.lean): Example usage on how to use the new `#deriving` commands for deriving generators
+
+**Tests**:      
+- The [`Test`](./Test/) subdirectory contains [snapshot tests](https://www.cs.cornell.edu/~asampson/blog/turnt.html) (aka [expect tests](https://blog.janestreet.com/the-joy-of-expect-tests/)) for the `#derive_generator` command elaborator. 
+- Run `lake test` to check that the derived generators in [`Test`](./Test/) typecheck, and that the code for the derived generators match the expected output.
+- See [`Test/DeriveBSTGenerator.lean`](./Test/DeriveBSTGenerator.lean) & [`Test/DeriveBalancedTreeGenerator.lean`](./Test/DeriveBalancedTreeGenerator.lean) for example snapshot tests.
+
 
 
 ## Usage
