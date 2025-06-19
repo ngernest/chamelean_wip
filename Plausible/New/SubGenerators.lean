@@ -70,6 +70,8 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
 
       inductiveHypothesesToCheck := inductiveHypothesesToCheck.push typedInductiveTerm
 
+  logWarning "**********************"
+
   -- Add equality checks for any pairs of variables in `variableEqualities`
   let mut variableEqualitiesToCheck := #[]
   for (fvar1, fvar2) in subGenerator.variableEqualities do
@@ -79,10 +81,10 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
     let equalityCheck ← `($ident1:ident = $ident2:ident)
     variableEqualitiesToCheck := variableEqualitiesToCheck.push equalityCheck
 
-  logWarning "**********************"
   logWarning m!"nonInductiveHypothesesToCheck = {nonInductiveHypothesesToCheck}"
   logWarning m!"inductivesToCheck = {inductiveHypothesesToCheck}"
-  logWarning "**********************"
+  logWarning m!"variableEqualitiesToCheck = {variableEqualitiesToCheck}"
+  logWarning m!"doElems = {doElems}"
 
   -- TODO: change `groupedActions.ret_list` to a single element since each do-block can only
   -- have one (final) `return` expression
@@ -104,8 +106,21 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
             let ifExpr ← mkIfExprWithNaryAnd nonInductiveHypothesesToCheck retExpr (← `(doElem| $failFn:term))
             doElems := doElems.push ifExpr
           else
-            -- No hypotheses to check, we can just return the generated value directly
-            doElems := doElems.push retExpr
+            if !variableEqualitiesToCheck.isEmpty then
+              logWarning "entering `!variableEqualitiesToCheck.isEmpty` case"
+
+              -- Note: we assume `variableEqualitiesToCheck` only has length 1 for now
+              let equality := variableEqualitiesToCheck[0]!
+              let constraint ← `($qualifiedDecOptIdent:ident ($equality) $initSizeIdent)
+
+              let trueCase ← `(Term.matchAltExpr| | $(mkIdent ``some) $(mkIdent ``true) => $(← mkDoBlock #[retExpr]):term)
+              let catchAllCase ← `(Term.matchAltExpr| | _ => $failFn)
+              let cases := #[trueCase, catchAllCase]
+              let matchExpr ← `(doElem| match $constraint:term with $cases:matchAlt*)
+              doElems := doElems.push matchExpr
+            else
+              -- No hypotheses to check, we can just return the generated value directly
+              doElems := doElems.push retExpr
 
           -- Create a monadic `do`-block containing all the exprs above
           mkDoBlock doElems
@@ -114,22 +129,28 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
         -- so we can just create `pure $argToGenTerm` without needing
         -- to create a do-block
         else
-          `($pureIdent $argToGenTerm:term)
+
+          -- TODO: avoid duplicating code for the variableEqualities stuff
+
+          -- If there are any variable equalities that we need to check,
+          -- create a match expression before doing `pure $argToGenTerm`
+          if !variableEqualitiesToCheck.isEmpty then
+            let retExpr ← `($pureIdent $argToGenTerm:term)
+            logWarning "entering `!variableEqualitiesToCheck.isEmpty` case"
+
+            -- Note: we assume `variableEqualitiesToCheck` only has length 1 for now
+            let equality := variableEqualitiesToCheck[0]!
+            let constraint ← `($qualifiedDecOptIdent:ident ($equality) $initSizeIdent)
+
+            let trueCase ← `(Term.matchAltExpr| | $(mkIdent ``some) $(mkIdent ``true) => $retExpr:term)
+            let catchAllCase ← `(Term.matchAltExpr| | _ => $failFn)
+            let cases := #[trueCase, catchAllCase]
+            `(match $constraint:term with $cases:matchAlt*)
+          else
+            `($pureIdent $argToGenTerm:term)
 
       -- TODO: invoke checkers for auxiliary inductive relations (for `checkInductive` actions)
       -- ^^ invoke `DecOpt.decOpt` here somehow
-
-      -- TODO: figure out why this breaks the BST/balanced tree generators
-      let updatedGeneratorBody ←
-        if !variableEqualitiesToCheck.isEmpty then
-          -- Note: we assume `variableEqualitiesToCheck` only has length 1 for now
-          let equality := variableEqualitiesToCheck[0]!
-          let constraint ← `($qualifiedDecOptIdent:ident ($equality) $initSizeIdent)
-          let trueCase ← `(Term.matchAltExpr| | $(mkIdent ``some) $(mkIdent ``true) => $generatorBody)
-          let catchAllCase ← `(Term.matchAltExpr| | _ => $failFn)
-          mkMatchExprWithScrutineeTerm constraint #[trueCase, catchAllCase]
-        else
-          return generatorBody
 
 
       -- If there are inputs on which we need to perform a pattern-match,
@@ -144,7 +165,7 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
 
         for patternExpr in subGenerator.matchCases do
           let pattern ← PrettyPrinter.delab patternExpr
-          let case ← `(Term.matchAltExpr| | $pattern:term => $updatedGeneratorBody:term)
+          let case ← `(Term.matchAltExpr| | $pattern:term => $generatorBody:term)
           cases := cases.push case
 
         let catchAllCase ← `(Term.matchAltExpr| | _ => $failFn)
@@ -152,7 +173,7 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
 
         mkMatchExpr scrutinee cases
       else
-        return updatedGeneratorBody
+        return generatorBody
 
     | _ => throwUnsupportedSyntax
 

@@ -192,8 +192,8 @@ def gen_lookup (Γ : List type) (τ : type) : Nat → OptionT Plausible.Gen Nat 
               (fun _ =>
                 match Γ_0 with
                 | [] => OptionT.fail
-                | _ :: Γ0 => do
-                  let x ← aux_arb initSize size' Γ0 τ_0
+                | _ :: Γ => do
+                  let x ← aux_arb initSize size' Γ τ_0
                   return Nat.succ x))]
   fun size => aux_arb size size Γ τ
 

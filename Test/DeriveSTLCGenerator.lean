@@ -38,9 +38,12 @@ info: Try this generator: instance : GenSizedSuchThat Nat (fun x => lookup Γ x 
                   | _ => OptionT.fail)),
             (Nat.succ size',
               OptionTGen.thunkGen
-                (fun _ => do
-                  let n ← aux_arb initSize size' Γ τ
-                  return Nat.succ n))]
+                (fun _ =>
+                  match Γ_0 with
+                  | τ' :: Γ => do
+                    let n ← aux_arb initSize size' Γ τ
+                    return Nat.succ n
+                  | _ => OptionT.fail))]
     fun size => aux_arb size size Γ τ
 -/
 #guard_msgs(info, drop warning) in

@@ -8,3 +8,4 @@ import Test.Testable
 import Test.DeriveBSTGenerator
 import Test.DeriveBalancedTreeGenerator
 import Test.DeriveRegexGenerator
+import Test.DeriveSTLCGenerator
