@@ -68,10 +68,10 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
       let inductiveTerm ← PrettyPrinter.delab inductiveExpr
       inductiveHypothesesToCheck := inductiveHypothesesToCheck.push inductiveTerm
 
-  logInfo "**********************"
-  logInfo m!"nonInductiveHypothesesToCheck = {nonInductiveHypothesesToCheck}"
-  logInfo m!"inductivesToCheck = {inductiveHypothesesToCheck}"
-  logInfo "**********************"
+  logWarning "**********************"
+  logWarning m!"nonInductiveHypothesesToCheck = {nonInductiveHypothesesToCheck}"
+  logWarning m!"inductivesToCheck = {inductiveHypothesesToCheck}"
+  logWarning "**********************"
 
   -- TODO: change `groupedActions.ret_list` to a single element since each do-block can only
   -- have one (final) `return` expression

@@ -56,7 +56,6 @@ def elabMkCheckerHeader : CommandElab := fun stx => do
         | .succ size' => none)
 
     let headerFormat ← liftCoreM (PrettyPrinter.ppCommand funHeader)
-    logInfo m!"Generated function header:\n{headerFormat}"
 
     elabCommand funHeader
 

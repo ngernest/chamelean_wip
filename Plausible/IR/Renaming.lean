@@ -117,12 +117,12 @@ def testSimpleRenaming : MetaM Unit := do
   withLocalDeclD `l (Expr.const `Tree []) fun lExpr => do
 
 
-    logInfo m!"=== TESTING SIMPLE RENAMING ==="
-    logInfo m!"Original nExpr name: {nExpr}"
+    logWarning m!"=== TESTING SIMPLE RENAMING ==="
+    logWarning m!"Original nExpr name: {nExpr}"
 
     -- Create a match case that causes shadowing
     let matchCase := Expr.app (Expr.const `Nat.succ []) nExpr
-    logInfo m!"Match case: {matchCase}"
+    logWarning m!"Match case: {matchCase}"
 
     -- Create expressions that reference the pattern variable
     let auxArbCall := mkApp2 (Expr.const `aux_arb []) sizeExVar nExpr
@@ -143,19 +143,19 @@ def testSimpleRenaming : MetaM Unit := do
       variableEqualities := #[]
     }
 
-    logInfo m!"Before renaming - nExpr name: {nExpr}"
-    logInfo m!"Before renaming - match case: {matchCase}"
-    logInfo m!"Before renaming - aux call: {auxArbCall}"
+    logWarning m!"Before renaming - nExpr name: {nExpr}"
+    logWarning m!"Before renaming - match case: {matchCase}"
+    logWarning m!"Before renaming - aux call: {auxArbCall}"
 
     -- Apply the simple renaming
     let newLCtx ← renameVariablesInSubGeneratorSimple originalSubGen
     withLCtx' newLCtx do
 
-      logInfo m!"After renaming - nFVar name: {nExpr}"
-      logInfo m!"After renaming - match case: {originalSubGen.matchCases[0]!}"
+      logWarning m!"After renaming - nFVar name: {nExpr}"
+      logWarning m!"After renaming - match case: {originalSubGen.matchCases[0]!}"
 
       if let some (Action.genFVar _ renamedAuxCall) := originalSubGen.groupedActions.gen_list[0]? then
-        logInfo m!"After renaming - aux call: {renamedAuxCall}"
+        logWarning m!"After renaming - aux call: {renamedAuxCall}"
 
 
 -- #eval testSimpleRenaming

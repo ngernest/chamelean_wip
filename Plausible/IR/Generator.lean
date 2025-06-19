@@ -38,7 +38,6 @@ def elabGetChecker : CommandElab := fun stx => do
       logInfo s!"input variable names = {relation.input_var_names}"
       let btnum := TSyntax.getNat t3
       let checker ← get_checker relation inpname btnum
-      logInfo m!"{checker}"
   | _ => throwError "Invalid syntax"
 
 -- #gen_checker lookup with_name ["Γ", "x", "τ"] backtrack 100
