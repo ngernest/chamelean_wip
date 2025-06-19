@@ -230,14 +230,8 @@ def isInductiveRelationApplication (e : Expr) : MetaM Bool := do
 /-- Determines whether an expression `e` is a hypothesis of a constructor `ctor`
    for an inductive relation -/
 def isHypothesisOfInductiveConstructor (e : Expr) (ctor : InductiveConstructor) : MetaM Bool := do
-  logInfo m!"hyp = {e}"
-
   let isIndRel ← isInductiveRelation e.getAppFn
   let exprNamespace := e.getAppFn.constName.getRoot
-
-  logInfo m!"exprNamespace = {exprNamespace}"
-  logInfo m!"ctorNamespace = {ctor.name_space}"
-
 
   if isIndRel || exprNamespace == ctor.name_space then
     return true

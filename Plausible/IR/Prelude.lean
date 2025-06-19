@@ -1,6 +1,5 @@
 import Lean
 import Std
-import Plausible.IR.Examples
 import Lean.Elab.Deriving.DecEq
 import Lean.Meta.Tactic.Simp.Main
 
@@ -15,16 +14,16 @@ namespace Plausible.IR
 -- Enhanced debug function
 def debugLocalContext : MetaM Unit := do
   let localCtx ← getLCtx
-  logInfo m!"=== LOCAL CONTEXT DEBUG ==="
-  logInfo m!"Local context size: {localCtx.size}"
-  logInfo m!"Local context is empty: {localCtx.isEmpty}"
+  logWarning m!"=== LOCAL CONTEXT DEBUG ==="
+  logWarning m!"Local context size: {localCtx.size}"
+  logWarning m!"Local context is empty: {localCtx.isEmpty}"
 
   if !localCtx.isEmpty then
     for localDecl in localCtx do
       if !localDecl.isImplementationDetail then
-        logInfo m!"  {repr localDecl.fvarId}: {localDecl.userName} : {localDecl.type}"
+        logWarning m!"  {repr localDecl.fvarId}: {localDecl.userName} : {localDecl.type}"
   else
-    logInfo m!"❌ Local context is completely empty!"
+    logWarning m!"❌ Local context is completely empty!"
 
 def type_of_Name (name : Name) : MetaM Expr := do
   -- Try to get constant info first (for definitions, theorems, etc)
