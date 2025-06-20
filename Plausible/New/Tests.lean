@@ -20,21 +20,18 @@ open GenSizedSuchThat OptionTGen
 -/
 
 -- #derive_generator (fun (t : Tree) => balanced n t)
--- #derive_generator (fun (t : Tree) => bst lo hi t)
+#derive_generator (fun (t : Tree) => bst lo hi t)
 
--- TODO: update derived generator to use this template
--- def aux_arb a1 a2 size :=
---   match size with
---   | .zero => pick from a1
---   | .succ size' => pick from a2
 
--- instance : GenSizedSuchThat Tree (fun t => bst lo hi t) where
---   genSizedST :=
---      fun size => aux_arb [gen_balance_fail, gen_balance_1] [gen_balance_2] size
---       where
---         gen_balance_fail := OptionTGen.thunkGen (fun _ => OptionT.fail)
---         gen_balance_1 := OptionTGen.thunkGen (fun _ => pure Tree.Leaf)
---         gen_balance_2 := ...
+/- Note: the problem w/ this branch is that it indiscriminately freshens all variables:
+
+```
+do
+  let x ← Plausible.SampleableExt.interpSample Nat
+  -- the line below should refer to `x`, not `x_0`
+  let l ← aux_arb initSize size' lo_0 x_0
+```
+-/
 
 
 /-
