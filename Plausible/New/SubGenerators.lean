@@ -135,15 +135,20 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
       -- TODO: check whether `predicateExpr` is a `Prop` or a `Type`
 
       logInfo m!"predicateExpr {predicateExpr} is in type universe {ty}"
+
+      -- Check if the predicate is a `Prop` (i.e. `Sort 0`)
       if ty.isProp then
-        logInfo m!"encountered Prop"
+        -- If yes, add it to our list of hypotheses to check using the `DecOpt` instance
+        -- for that particular `Prop`
+        let predicateTerm ← PrettyPrinter.delab predicateExpr
+        nonInductiveHypothesesToCheck := nonInductiveHypothesesToCheck.push predicateTerm
       else if ty == mkSort levelOne then
+        -- `predicateExpr` is a `Type` (i.e. `Type 0`, the usual universe level for ordinary types)
+        -- TODO: just call the `SampleableExt` instance for the `Type`
         logInfo m!"encountered Type instead of Prop"
-
-      let predicateTerm ← PrettyPrinter.delab predicateExpr
-
-      -- TODO: check if `predicateTerm` is a `Type`
-      nonInductiveHypothesesToCheck := nonInductiveHypothesesToCheck.push predicateTerm
+      else
+        -- `predicateExpr` is `Type u` for some `u >= 1` (some higher universe level)
+        throwError m!"{predicateExpr} has universe level {ty}, which is not supported"
 
   let mut inductiveHypothesesToCheck : TSyntaxArray `term := #[]
   for action in subGenerator.groupedActions.checkInductiveActions do
