@@ -104,14 +104,13 @@ def mkSubGeneratorBody (doBlock : TSyntaxArray `doElem) (argToGenTerm : Term) (n
     }
   }
 
-
-
-
 /-- Constructs an anonymous sub-generator. See the comments in the body of this function
     for details on how this sub-generator is created. -/
 def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term) := do
   let mut doElems := #[]
 
+  -- TODO: if `inputsToMatch` is empty, then we have to rename variable on the RHS of let-bind exprs
+  -- to match the renamed params to `aux_arb` (e.g. `G_0`)
   for action in subGenerator.groupedActions.gen_list do
     match action with
     | .genInputForInductive fvar hyp idx style =>

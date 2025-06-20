@@ -9,9 +9,7 @@
      - These are supposed to be monotonic, in the
        sense that if they ever return `some b` for
        some fuel, they will also do so for higher
-       fuel values.
-
--/
+       fuel values. -/
 class DecOpt (P : Prop) where
   decOpt : Nat → Option Bool
 
