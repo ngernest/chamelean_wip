@@ -60,6 +60,52 @@ def mkVariableEqualityCheckMatchExpr (syntaxKind : SyntaxNodeKind) (variableEqua
   | `term => mkMatchExprWithScrutineeTerm scrutinee cases
   | _ => throwError "Unexpected SyntaxNodeKind: expected either a `doElem or a `term"
 
+/-- Creates the body of the sub-generator consisting of a monadic `do`-block and any extra pattern-matches
+    to check non-inductive hypotheses / variable equalities. The arguments are:
+    - `doBlock`: an ordered list of expressions in the `do`-block that have been created so far
+    - `argToGenTerm`: the term `e` to be `return`-ed at the end of the `do`-block via the term `return e`
+    - `nonInductiveHypothesesToCheck`: hypotheses which are not inductive relations that need to be checked
+       (by invoking their `DecOpt` instance) prior to `return`ing the generated value
+    - `variableEqualitiesToCheck`: equalities between variables `v1, v2` that need to be checked
+      (by invoking the `DecOpt` instance for the proposition `v1 = v2`) prior to `return`ing the generated value -/
+def mkSubGeneratorBody (doBlock : TSyntaxArray `doElem) (argToGenTerm : Term) (nonInductiveHypothesesToCheck : Array Term)
+  (variableEqualitiesToCheck : TSyntaxArray `term) : TermElabM (TSyntax `term) := do
+  let mut doElems := doBlock
+  if !doElems.isEmpty then {
+    let retExpr ← `(doElem| return $argToGenTerm:term)
+
+    -- Check that all hypotheses are satisfied before returning the generated value
+    if !nonInductiveHypothesesToCheck.isEmpty then {
+      let ifExpr ← mkIfExprWithNaryAnd nonInductiveHypothesesToCheck retExpr (← `(doElem| $failFn:term))
+      doElems := doElems.push ifExpr
+    } else {
+      if !variableEqualitiesToCheck.isEmpty then {
+        let matchExpr ← mkVariableEqualityCheckMatchExpr `doElem variableEqualitiesToCheck (← mkDoBlock #[retExpr])
+        doElems := doElems.push matchExpr
+      } else {
+        -- No hypotheses to check, we can just return the generated value directly
+        doElems := doElems.push retExpr
+      }
+    }
+    -- Create a monadic `do`-block containing all the exprs above
+    mkDoBlock doElems
+
+  -- No let-bind expressions have appeared in the do-block,
+  -- so we can just create `pure $argToGenTerm` without needing
+  -- to create a do-block
+  } else {
+    let retExpr ← `($pureIdent $argToGenTerm:term)
+    -- If there are any variable equalities that we need to check,
+    -- create a match expression before doing `pure $argToGenTerm`
+    if !variableEqualitiesToCheck.isEmpty then {
+      mkVariableEqualityCheckMatchExpr `term variableEqualitiesToCheck retExpr
+    } else {
+      pure retExpr
+    }
+  }
+
+
+
 
 /-- Constructs an anonymous sub-generator. See the comments in the body of this function
     for details on how this sub-generator is created. -/
@@ -125,43 +171,9 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
       -- Delaborate `expr` to get a `TSyntax` for the argument we're generating
       let argToGenTerm ← PrettyPrinter.delab expr
 
-      -- If any let-bind expressions have already appeared,
-      -- append `return $argToGenTerm` to the end of the do-block
-      -- TODO: maybe lift the logic for creating `generatorBody` into its own helper function?
-      -- (right now we have to use curly braces to delinate all the nested conditionals)
-      let generatorBody ← do {
-        if !doElems.isEmpty then {
-          let retExpr ← `(doElem| return $argToGenTerm:term)
-          -- Check that all hypotheses are satisfied before returning the generated value
-          if !nonInductiveHypothesesToCheck.isEmpty then {
-            let ifExpr ← mkIfExprWithNaryAnd nonInductiveHypothesesToCheck retExpr (← `(doElem| $failFn:term))
-            doElems := doElems.push ifExpr
-          } else {
-            if !variableEqualitiesToCheck.isEmpty then {
-              let matchExpr ← mkVariableEqualityCheckMatchExpr `doElem variableEqualitiesToCheck (← mkDoBlock #[retExpr])
-              doElems := doElems.push matchExpr
-            } else {
-              -- No hypotheses to check, we can just return the generated value directly
-              doElems := doElems.push retExpr
-            }
-          }
-          -- Create a monadic `do`-block containing all the exprs above
-          mkDoBlock doElems
-
-        -- No let-bind expressions have appeared in the do-block,
-        -- so we can just create `pure $argToGenTerm` without needing
-        -- to create a do-block
-        } else {
-          let retExpr ← `($pureIdent $argToGenTerm:term)
-          -- If there are any variable equalities that we need to check,
-          -- create a match expression before doing `pure $argToGenTerm`
-          if !variableEqualitiesToCheck.isEmpty then {
-            mkVariableEqualityCheckMatchExpr `term variableEqualitiesToCheck retExpr
-          } else {
-            pure retExpr
-          }
-        }
-      }
+      -- Create the body of the sub-generator consisting of a monadic do-block and any extra pattern-matches
+      -- to check non-inductive hypotheses / variable equalities
+      let generatorBody ← mkSubGeneratorBody doElems argToGenTerm nonInductiveHypothesesToCheck variableEqualitiesToCheck
 
       -- TODO: invoke checkers for auxiliary inductive relations (for `checkInductive` actions)
       -- ^^ invoke `DecOpt.decOpt` here somehow
