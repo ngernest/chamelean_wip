@@ -267,7 +267,7 @@ def getLastUninitializedArgIdx (hypothesis : Expr) (fvars : Array FVarId) : Meta
 /-- Returns a triple consisting of:
     1. The index of the last argument in the `hypothesis` that contains an uninitialized free variable from the collection `fvars`
     2. A collection of all uninitialized free variables in the `hypothesis`
-    3. The collection of free variables in the argument that have yet to be intiialize -/
+    3. The collection of free variables in the argument that have yet to be initialized -/
 def getLastUninitializedArgAndFVars
   (hypothesis : Expr) (fvars : Array FVarId) : MetaM (Nat × Array FVarId × Array FVarId) := do
   if !(← isInductiveRelationApplication hypothesis) then
@@ -307,10 +307,20 @@ def Actions_for_hypotheses (ctor : InductiveConstructor) (fvars : Array FVarId) 
       else
         let (uninitializedArgIdx, uninitializedFVars, fVarsToBeInitialized)
           ← getLastUninitializedArgAndFVars hyp initializedFVars
+
+        logInfo m!"hyp = {hyp}"
+        logInfo m!"uninitializedArgIdx = {uninitializedArgIdx}, uninitializedFVars = {repr uninitializedFVars}, fVarsToBeInitialized = {repr fVarsToBeInitialized}"
+
+
         for fid in uninitializedFVars do
           let ty := ctor.bound_var_ctx.get! fid
           result := result.push (.genFVar fid ty)
+          logInfo m!"result = {repr result}"
+
         let argToGenerate := hyp.getAppArgs[uninitializedArgIdx]!
+
+        logInfo m!"argToGenerate = {repr argToGenerate}"
+
         initializedFVars := Array.appendUniqueElements initializedFVars uninitializedFVars
 
         let generationStyle :=
@@ -318,9 +328,13 @@ def Actions_for_hypotheses (ctor : InductiveConstructor) (fvars : Array FVarId) 
           then .RecursiveCall
           else .TypeClassResolution
 
+        logInfo m!"generationStyle = {repr generationStyle}"
+        logInfo "*******************"
+
         if argToGenerate.isFVar then
           let fvarToGenerate := argToGenerate.fvarId!
           result := result.push (.genInputForInductive fvarToGenerate hyp uninitializedArgIdx generationStyle)
+          logInfo m!"result = {repr result}"
         else
           let nameOfFVarToGenerate := Name.mkStr1 ("tcond" ++ toString i)
           let fvarToGenerate := FVarId.mk nameOfFVarToGenerate

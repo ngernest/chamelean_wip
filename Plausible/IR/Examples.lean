@@ -65,9 +65,9 @@ inductive typing: List type → term → type → Prop where
 -- | TAbs: ∀ e τ1 τ2,
 --     typing (τ1::Γ) e τ2 →
 --     typing Γ (.Abs τ1 e) (.Fun τ1 τ2)
-| TVar: ∀ x τ,
-    lookup Γ x τ →
-    typing Γ (.Var x) τ
+-- | TVar: ∀ x τ,
+--     lookup Γ x τ →
+--     typing Γ (.Var x) τ
 | TApp: ∀ e1 e2 τ1 τ2,
     typing Γ e2 τ1 →
     typing Γ e1 (.Fun τ1 τ2) →

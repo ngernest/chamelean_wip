@@ -54,11 +54,13 @@ For example:
 -/
 
 -- def tempSize := 10
--- #eval runSizedGen (genSizedST (fun t => balanced 5 t)) tempSize
+-- #eval runSizedGen (genSizedST (fun t => balanced 5 t))
 
 
 -- Work in progress: extend generator deriver to handle STLC example
 -- TODO: figure out issue with `TApp` in the derived generator for `typing`
 -- TODO: figure out how to handle checkers
 -- #derive_generator (fun (x : Nat) => lookup Γ x τ)
+
+
 -- #derive_generator (fun (e : term) => typing Γ e τ)
