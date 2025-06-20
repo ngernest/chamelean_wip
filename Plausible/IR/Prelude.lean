@@ -195,7 +195,7 @@ elab "#show_constructors" n:ident : command => do
     printConstructorsWithArgs typeName
 
 
-partial def mkFreshName (base : Name) : MetaM Name := do
+private partial def mkFreshNameMetaM (base : Name) : MetaM Name := do
   let ctx ← getLCtx
   let rec go (idx : Nat) := do
     let name := if idx == 0 then base else Name.mkNum base idx
@@ -207,7 +207,7 @@ partial def mkFreshName (base : Name) : MetaM Name := do
 
 /-- Create a fresh FVar with base name -/
 def mkFreshFVar (base : Name) (type : Expr) : MetaM Expr := do
-  let name ← mkFreshName base
+  let name ← mkFreshNameMetaM base
   withLocalDeclD name type fun fvar => do
     return fvar
 

@@ -33,13 +33,6 @@ def deconstructInductiveApplication (body : Term) : CommandElabM (TSyntax `term 
     return (indRel, #[])
   | _ => throwError "Expected inductive type application"
 
-/-- Extracts the name of a parameter from a corresponding `Term`.
-    If this is not possible, a fresh user-facing name is produced. -/
-def extractParamName (arg : Term) : MetaM Name :=
-  match arg with
-  | `($name:ident) => pure name.getId
-  | _ => Core.mkFreshUserName `param
-
 /-- Analyzes the type of the inductive relation and matches each
     argument with its expected type, returning an array of
     (parameter name, type expression) pairs -/
@@ -169,7 +162,7 @@ def mkTopLevelGenerator (baseGenerators : TSyntax `term) (inductiveGenerators : 
 
         -- Each parameter to the inner `aux_arb` function needs to be a fresh name
         -- (so that if we pattern match on the parameter, we avoid pattern variables from shadowing it)
-        let innerParamIdent := mkIdent $ genFreshName (Array.map Prod.fst paramInfo) paramName
+        let innerParamIdent := mkIdent $ mkFreshName (Array.map Prod.fst paramInfo) paramName
 
         let innerParam ← `(Term.letIdBinder| ($innerParamIdent : $paramType))
         innerParams := innerParams.push innerParam

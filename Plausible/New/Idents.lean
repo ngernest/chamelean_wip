@@ -26,6 +26,7 @@ def pureIdent : Ident := mkIdent $ Name.mkStr1 "pure"
 def initSizeIdent : Ident := mkIdent $ Name.mkStr1 "initSize"
 def sizeIdent : Ident := mkIdent $ Name.mkStr1 "size"
 
+
 /-- Produces a fresh user-facing & *accessible* identifier with respect to the local context
     - Note: prefer using this function over `Core.mkFreshUserName`, which is meant
       to create fresh names that are *inaccessible* to the user (i.e. `mkFreshUserName` will
@@ -35,13 +36,21 @@ def sizeIdent : Ident := mkIdent $ Name.mkStr1 "size"
 def mkFreshAccessibleIdent (localCtx : LocalContext) (name : Name) : Ident :=
   mkIdent $ LocalContext.getUnusedName localCtx name
 
-/-- `genFreshName existingNames namePrefix` produces a thunked function
+/-- Extracts the name of a parameter from a corresponding `Term`.
+    If this is not possible, a fresh user-facing name is produced. -/
+def extractParamName (arg : Term) : MetaM Name :=
+  match arg with
+  | `($name:ident) => pure name.getId
+  | _ => do
+    return (LocalContext.getUnusedName (← getLCtx) `param)
+
+/-- `mkFreshName existingNames namePrefix` produces a thunked function
     that produces a fresh name (with prefix `namePrefix`) that are guaranteed to be
     not within the existing set of names
     - Note: the body of this function operates in the identity monad since
       we want local mutable state and access to the syntactic sugar
       provided by `while` loops -/
-def genFreshName (existingNames : Array Name) (namePrefix : Name) : Name :=
+def mkFreshName (existingNames : Array Name) (namePrefix : Name) : Name :=
   Id.run do
     let mut count := 0
     let mut freshName := Name.appendAfter namePrefix s!"_{count}"

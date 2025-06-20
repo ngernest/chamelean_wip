@@ -12,6 +12,35 @@ open GenSizedSuchThat
 -- Some example `OptionT Gen α` generators
 --------------------------------------------------------------------------
 
+-- mutual
+--   def aux_arb (initSize : Nat) (size : Nat) (a1 : List (Nat × OptionT Gen Tree)) (a2 : List (Nat × OptionT Gen Tree)) : OptionT Gen Tree :=
+--     match size with
+--     | .zero => backtrack a1
+--     | .succ size' => backtrack a2
+
+--   def genBSTAttempt (initSize : Nat) (size : Nat) (lo : Nat) (hi : Nat) : OptionT Gen Tree :=
+--     match size with
+--     | .zero => backtrack [(1, gen_balance_fail), (1, gen_balance_leaf)]
+--     | .succ size' => backtrack [(1, gen_balance_leaf), (.succ size', gen_balance_node)]
+--     where
+--       gen_balance_fail := thunkGen (fun _ => OptionT.fail)
+--       gen_balance_leaf := thunkGen (fun _ => pure Tree.Leaf)
+--       gen_balance_node := thunkGen (fun _ => do
+--         let x ← SampleableExt.interpSample Nat
+--         let l ← aux_arb initSize size' lo x
+--         let r ← aux_arb initSize size' x hi
+--         if (lo < x && x < hi) then
+--           pure (.Node x l r)
+--         else OptionT.fail)
+-- end
+
+-- instance : GenSizedSuchThat Tree (fun t => bst lo hi t) where
+--   genSizedST := fun size => genBSTAttempt size size lo hi
+
+
+
+
+
 /- `genSizedST` contains a handwritten generator for BSTs
     (modelled after the automatically derived generator produced by QuickChick).
     Note that:
@@ -31,9 +60,9 @@ def genBST (lo : Nat) (hi : Nat) : Nat → OptionT Gen Tree :=
         (1, thunkGen $ fun _ => pure .Leaf),
         (.succ size', thunkGen $ fun _ => do
           let x ← SampleableExt.interpSample Nat
+          let l ← aux_arb initSize size' lo_0 x
+          let r ← aux_arb initSize size' x hi_0
           if (lo_0 < x && x < hi_0) then
-            let l ← aux_arb initSize size' lo_0 x
-            let r ← aux_arb initSize size' x hi_0
             pure (.Node x l r)
           else OptionT.fail)
       ]

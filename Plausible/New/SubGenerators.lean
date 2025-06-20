@@ -7,6 +7,16 @@ open Plausible.IR
 open Lean Elab Command Meta Term Parser Std
 open Idents
 
+/-- TODO: figure out how to use this, if we even need the renameMap -/
+def renameAppArgs (term : Term) (renameMap : HashMap Name Name) : TermElabM (TSyntax `term) :=
+  match term with
+  | `($f:ident $args:ident*) =>
+    let renamedArgs := Array.map (fun arg =>
+        let name := arg.getId
+        mkIdent (renameMap.getD name name)) args
+    `($f $renamedArgs*)
+  | _ => `($term)
+
 /-- `genInputForInductive fvar hyp idx generationStyle` produces a let-bind expression of the form
     based on the `generationStyle` specified:
     - If `generationStyle = .RecursiveCall`, we produce the term
@@ -18,11 +28,20 @@ open Idents
       we use typeclass resolution to invoke the generator from the
       `GenSuchThat.genST` which produces values satisfying the hypothesis `hyp`
       (note: this requires that such an typeclass instance already exists). -/
-def genInputForInductive (fvar : FVarId) (hyp : Expr) (idx : Nat) (generationStyle : GenerationStyle) : MetaM (TSyntax `doElem) := do
+def genInputForInductive (fvar : FVarId) (hyp : Expr) (idx : Nat) (generationStyle : GenerationStyle) (renamingNeeded : Bool) : MetaM (TSyntax `doElem) := do
   let argExprs := hyp.getAppArgs.eraseIdx! idx
-  let argTerms ← Array.mapM PrettyPrinter.delab argExprs
-  let lhs := mkIdent $ fvar.name
 
+  logInfo m!"argExprs = {repr argExprs}"
+
+  let delaboratedArgs ← Array.mapM PrettyPrinter.delab argExprs
+  let argTerms ←
+    if renamingNeeded then
+      let argNames ← Array.mapM (fun argTerm => extractParamName argTerm) delaboratedArgs
+      Array.mapM (fun arg => `($(mkIdent (mkFreshName argNames arg)))) argNames
+    else
+      pure delaboratedArgs
+
+  let lhs := mkIdent $ fvar.name
   let hypTerm ← PrettyPrinter.delab hyp
   let generatorConstraint ← `((fun $lhs:ident => $hypTerm))
 
@@ -113,10 +132,11 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
   -- to match the renamed params to `aux_arb` (e.g. `G_0`)
   for action in subGenerator.groupedActions.gen_list do
     match action with
-    | .genInputForInductive fvar hyp idx style =>
+    | .genInputForInductive fvar hyp idx generationStyle =>
+      let renamingNeeded := subGenerator.inputsToMatch.isEmpty
       -- Recursively invoke the generator to generate an argument for the hypothesis `hyp` at index `idx`,
       -- then bind the generated value to the free variable `fvar`
-      let bindExpr ← liftMetaM $ genInputForInductive fvar hyp idx style
+      let bindExpr ← liftMetaM $ genInputForInductive fvar hyp idx generationStyle renamingNeeded
       doElems := doElems.push bindExpr
     | .genFVar fvar ty =>
       -- Generate a value of type `ty`, then bind it to `fvar`
@@ -184,7 +204,7 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
         let mut cases := #[]
         -- For now, we assume there is only one scrutinee. We give it a fresh name
         -- so that it doesn't get shadowed by any variables in the match patterns
-        let scrutinee := mkIdent $ genFreshName
+        let scrutinee := mkIdent $ mkFreshName
           (Name.mkStr1 <$> subGenerator.inputsToMatch) (Name.mkStr1 subGenerator.inputsToMatch[0]!)
 
         -- Actually construct the match-expression based on the info in `matchCases`
