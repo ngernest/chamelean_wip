@@ -2,7 +2,7 @@ import Plausible.Gen
 import Plausible.New.GeneratorCombinators
 import Plausible.New.DecOpt
 import Plausible.New.GenSizedSuchThat
-import Plausible.New.GenSized
+import Plausible.New.Arbitrary
 import Plausible.New.DeriveGenerator
 
 open GeneratorCombinators
