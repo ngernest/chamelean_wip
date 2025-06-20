@@ -13,4 +13,33 @@ inductive ShapeConstrVal (nnat : Nat) where
 
 -- TODO: figure out why `Nat` is being classified as a `Action.checkNonInductive`
 
--- #derive_generator (fun (nnat : Nat) => ShapeConstrVal nnat)
+-- instance : GenSizedSuchThat Nat (fun nnat => ShapeConstrVal nnat) where
+--   genSizedST :=
+--     let rec aux_arb (initSize : Nat) (size : Nat) : OptionT Plausible.Gen Nat :=
+--       match size with
+--       | Nat.zero =>
+--         OptionTGen.backtrack
+--           [(1,
+--               OptionTGen.thunkGen
+--                 (fun _ => do
+--                   let nnat ← Plausible.SampleableExt.interpSample Nat
+--                   return nnat)),
+--             (1,
+--               OptionTGen.thunkGen
+--                 (fun _ => do
+--                   let nnat ← Plausible.SampleableExt.interpSample Nat
+--                   return nnat)),
+--             (1, OptionTGen.thunkGen (fun _ => OptionT.fail))]
+--       | Nat.succ size' =>
+--         OptionTGen.backtrack
+--           [(1,
+--               OptionTGen.thunkGen
+--                 (fun _ => do
+--                   let nnat ← Plausible.SampleableExt.interpSample Nat
+--                   return nnat)),
+--             (1,
+--               OptionTGen.thunkGen
+--                 (fun _ => do
+--                   let nnat ← Plausible.SampleableExt.interpSample Nat
+--                   return nnat))]
+--     fun size => aux_arb size size
