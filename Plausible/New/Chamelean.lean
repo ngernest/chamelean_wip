@@ -11,3 +11,4 @@ import Plausible.New.GeneratorCombinators
 import Plausible.New.GenSizedSuchThat
 import Plausible.New.STLC
 import Plausible.New.Trees
+import Plausible.New.NKIExperiments
