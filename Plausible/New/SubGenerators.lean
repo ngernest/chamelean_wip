@@ -130,7 +130,19 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
   let mut nonInductiveHypothesesToCheck := #[]
   for action in subGenerator.groupedActions.checkNonInductiveActions do
     if let .checkNonInductive predicateExpr := action then
+      let ty ← inferType predicateExpr
+
+      -- TODO: check whether `predicateExpr` is a `Prop` or a `Type`
+
+      logInfo m!"predicateExpr {predicateExpr} is in type universe {ty}"
+      if ty.isProp then
+        logInfo m!"encountered Prop"
+      else if ty == mkSort levelOne then
+        logInfo m!"encountered Type instead of Prop"
+
       let predicateTerm ← PrettyPrinter.delab predicateExpr
+
+      -- TODO: check if `predicateTerm` is a `Type`
       nonInductiveHypothesesToCheck := nonInductiveHypothesesToCheck.push predicateTerm
 
   let mut inductiveHypothesesToCheck : TSyntaxArray `term := #[]

@@ -11,4 +11,6 @@ inductive ShapeConstrVal (nnat : Nat) where
   | const : Nat → ShapeConstrVal nnat
   | param : Fin nnat → ShapeConstrVal nnat
 
-#derive_generator (fun (nnat : Nat) => ShapeConstrVal nnat)
+-- TODO: figure out why `Nat` is being classified as a `Action.checkNonInductive`
+
+-- #derive_generator (fun (nnat : Nat) => ShapeConstrVal nnat)
