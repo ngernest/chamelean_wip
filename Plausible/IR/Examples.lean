@@ -1,4 +1,5 @@
 import Plausible.Sampleable
+import Plausible.New.DeriveArbitrary
 open Plausible
 
 
@@ -7,6 +8,8 @@ inductive RGB where
 | Red : RGB
 | Green : RGB
 | Blue : RGB
+
+#derive_arbitrary RGB
 
 /-- A datatype for binary trees -/
 inductive Tree where

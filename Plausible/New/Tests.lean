@@ -9,6 +9,7 @@ import Plausible.New.STLC
 
 open GenSizedSuchThat OptionTGen
 
+
 /- Example usage:
   ```
   #derive_generator (fun (<name of generated value> : <type of generated value>) => <inductive relation applied to all args>)

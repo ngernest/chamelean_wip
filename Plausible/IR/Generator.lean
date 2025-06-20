@@ -71,7 +71,7 @@ def elabGetProducer : CommandElab := fun stx => do
       logWarning producer
   | _ => throwError "Invalid syntax"
 
-#gen_producer typing with_name ["Γ", "e", "τ"] for_arg 1 backtrack 100
+-- #gen_producer typing with_name ["Γ", "e", "τ"] for_arg 1 backtrack 100
 -- #gen_producer lookup with_name ["Γ", "x", "τ"] for_arg 1 backtrack 100
 -- #gen_producer balanced with_name ["n", "T"] for_arg 1 backtrack 100
 
