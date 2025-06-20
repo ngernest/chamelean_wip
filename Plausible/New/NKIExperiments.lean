@@ -1,44 +1,50 @@
 import Plausible.Gen
-import Plausible.New.OptionTGen
+import Plausible.New.GeneratorCombinators
 import Plausible.New.DecOpt
 import Plausible.New.GenSizedSuchThat
+import Plausible.New.GenSized
 import Plausible.New.DeriveGenerator
--- import Plausible.NKI.TypeCheck
 
--- open Plausible.NKI
+open GeneratorCombinators
 
+
+-- inductive SNat (nnat : Nat)
+--   | param (idx : Fin nnat)
+--   | const (n : Nat)
+
+
+-- ShapeConstrVal is a parameterized type -- QuickChick only supports Derive Arbitrary for non-parameterized types
 inductive ShapeConstrVal (nnat : Nat) where
   | const : Nat → ShapeConstrVal nnat
   | param : Fin nnat → ShapeConstrVal nnat
 
--- TODO: figure out why `Nat` is being classified as a `Action.checkNonInductive`
 
--- instance : GenSizedSuchThat Nat (fun nnat => ShapeConstrVal nnat) where
---   genSizedST :=
---     let rec aux_arb (initSize : Nat) (size : Nat) : OptionT Plausible.Gen Nat :=
+
+-- instance : GenSized (ShapeConstrVal nnat) where
+--   genSized :=
+--     let rec aux_arb (initSize : Nat) (size : Nat) : Plausible.Gen (ShapeConstrVal nnat) :=
 --       match size with
 --       | Nat.zero =>
---         OptionTGen.backtrack
+--         frequency ()
 --           [(1,
---               OptionTGen.thunkGen
+--               thunkGen
 --                 (fun _ => do
 --                   let nnat ← Plausible.SampleableExt.interpSample Nat
 --                   return nnat)),
 --             (1,
---               OptionTGen.thunkGen
+--               thunkGen
 --                 (fun _ => do
 --                   let nnat ← Plausible.SampleableExt.interpSample Nat
---                   return nnat)),
---             (1, OptionTGen.thunkGen (fun _ => OptionT.fail))]
+--                   return nnat))]
 --       | Nat.succ size' =>
---         OptionTGen.backtrack
+--         frequency _
 --           [(1,
---               OptionTGen.thunkGen
+--               thunkGen
 --                 (fun _ => do
 --                   let nnat ← Plausible.SampleableExt.interpSample Nat
 --                   return nnat)),
 --             (1,
---               OptionTGen.thunkGen
+--               thunkGen
 --                 (fun _ => do
 --                   let nnat ← Plausible.SampleableExt.interpSample Nat
 --                   return nnat))]

@@ -19,3 +19,5 @@ instance [Repr α] [Shrinkable α] [GenSized α] : SampleableExt α :=
   SampleableExt.mkSelfContained (GeneratorCombinators.sized GenSized.genSized)
 
 -- TODO: figure out how to distinguish between `GenSized` and `GenSizedSuchThat` in Chamelean
+
+-- TODO: just try to implement `Derive` for ordinary types???
