@@ -370,6 +370,7 @@ def mkSubGeneratorInfoFromConstructor (ctor : InductiveConstructor) (inputNames 
   logInfo "*******************************"
   logInfo m!"inputsToMatch = {inputsToMatch}"
   logInfo m!"matchCases = {matchCases}"
+  logInfo "*******************************"
 
   return {
     inputs := (List.eraseIdx inputNamesList idx).toArray

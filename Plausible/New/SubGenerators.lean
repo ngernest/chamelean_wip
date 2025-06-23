@@ -179,6 +179,7 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
   logWarning m!"variableEqualitiesToCheck = {variableEqualitiesToCheck}"
   logWarning m!"doElems = {doElems}"
   logWarning m!"inputsToMatch = {subGenerator.inputsToMatch}"
+  logWarning m!"matchCases = {subGenerator.matchCases}"
 
   -- TODO: change `groupedActions.ret_list` to a single element since each do-block can only
   -- have one (final) `return` expression
@@ -204,8 +205,13 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
         let mut cases := #[]
         -- For now, we assume there is only one scrutinee. We give it a fresh name
         -- so that it doesn't get shadowed by any variables in the match patterns
-        let scrutinee := mkIdent $ genFreshName
-          (Name.mkStr1 <$> subGenerator.inputsToMatch) (Name.mkStr1 subGenerator.inputsToMatch[0]!)
+        -- let scrutinee := mkIdent $ genFreshName
+        --   (Name.mkStr1 <$> subGenerator.inputsToMatch) (Name.mkStr1 subGenerator.inputsToMatch[0]!)
+
+        let existingNames := Name.mkStr1 <$> subGenerator.inputsToMatch
+        let scrutinees := Lean.mkIdent <$> Array.map (fun name => genFreshName existingNames name) existingNames
+
+        -- TODO: figure out how we match on multiple scrutinees
 
         -- Actually construct the match-expression based on the info in `matchCases`
         for patternExpr in subGenerator.matchCases do
@@ -214,7 +220,13 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
           cases := cases.push case
         let catchAllCase ← `(Term.matchAltExpr| | _ => $failFn)
         cases := cases.push catchAllCase
-        mkMatchExpr scrutinee cases
+
+        -- TODO: remove old code below
+        -- mkMatchExpr scrutinee cases
+
+        mkSimultaneousMatch scrutinees cases
+
+
       else
         return generatorBody
 
