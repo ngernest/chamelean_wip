@@ -44,7 +44,17 @@ def elabDeriveArbitrary : CommandElab := fun stx => do
       let ctorIdent := mkIdent inductiveVal.ctors[0]!
       let defaultGenerator ← `($pureIdent $ctorIdent)
 
-      -- TODO: figure out what to do here
+      -- TODO: figure out how to handle generators for non-trivial constructors
+
+      -- Fetch the ambient local context, which we need to produce user-accessible fresh names
+      let localCtx ← liftTermElabM $ getLCtx
+
+      -- Produce a fresh name for the `size` argument for the lambda
+      -- at the end of the generator function, as well as the `aux_arb` inner helper function
+      let freshSizeIdent := mkFreshAccessibleIdent localCtx `size
+      let freshSize' := mkFreshAccessibleIdent localCtx `size'
+      let auxArbIdent := mkFreshAccessibleIdent localCtx `aux_arb
+      let generatorType ← `($genIdent $typeIdent)
 
       -- Create the cases for the pattern-match on the size argument
       -- TODO: fill in the list of generators that is supplied to `frequency`
@@ -52,21 +62,12 @@ def elabDeriveArbitrary : CommandElab := fun stx => do
       let zeroCase ← `(Term.matchAltExpr| | $(mkIdent ``Nat.zero) => $frequencyFn $defaultGenerator [])
       caseExprs := caseExprs.push zeroCase
 
-      let succCase ← `(Term.matchAltExpr| | $(mkIdent ``Nat.succ) $(mkIdent `size') => $frequencyFn $defaultGenerator [])
+      let succCase ← `(Term.matchAltExpr| | $(mkIdent ``Nat.succ) $freshSize' => $frequencyFn $defaultGenerator [])
       caseExprs := caseExprs.push succCase
 
       -- Create function argument for the generator size
       let sizeParam ← `(Term.letIdBinder| ($sizeIdent : $natIdent))
       let matchExpr ← liftTermElabM $ mkMatchExpr sizeIdent caseExprs
-
-      -- Fetch the ambient local context, which we need to produce user-accessible fresh names
-      let localCtx ← liftTermElabM $ getLCtx
-
-      -- Produce a fresh name for the `size` argument for the lambda
-      -- at the end of the generator function
-      let freshSizeIdent := mkFreshAccessibleIdent localCtx `size
-      let auxArbIdent := mkFreshAccessibleIdent localCtx `aux_arb
-      let generatorType ← `($genIdent $typeIdent)
 
       let typeclassInstance ←
         `(instance : $(mkIdent ``ArbitrarySized) $(mkIdent typeName) where

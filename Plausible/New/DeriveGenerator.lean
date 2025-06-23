@@ -137,6 +137,13 @@ def mkTopLevelGenerator (baseGenerators : TSyntax `term) (inductiveGenerators : 
     -- Fetch the ambient local context, which we need to produce user-accessible fresh names
     let localCtx ← liftTermElabM $ getLCtx
 
+    -- Produce a fresh name for the `size` argument for the lambda
+    -- at the end of the generator function, as well as the `aux_arb` inner helper function
+    let freshSizeIdent := mkFreshAccessibleIdent localCtx `size
+    let freshSize' := mkFreshAccessibleIdent localCtx `size'
+    let auxArbIdent := mkFreshAccessibleIdent localCtx `aux_arb
+    let generatorType ← `($optionTIdent $genIdent $targetTypeSyntax)
+
     let inductiveName := inductiveStx.raw.getId
 
     -- Create the cases for the pattern-match on the size argument
@@ -144,7 +151,7 @@ def mkTopLevelGenerator (baseGenerators : TSyntax `term) (inductiveGenerators : 
     let zeroCase ← `(Term.matchAltExpr| | $(mkIdent ``Nat.zero) => $backtrackFn $baseGenerators)
     caseExprs := caseExprs.push zeroCase
 
-    let succCase ← `(Term.matchAltExpr| | $(mkIdent ``Nat.succ) $(mkIdent `size') => $backtrackFn $inductiveGenerators)
+    let succCase ← `(Term.matchAltExpr| | $(mkIdent ``Nat.succ) $freshSize' => $backtrackFn $inductiveGenerators)
     caseExprs := caseExprs.push succCase
 
     -- Create function arguments for the generator's `size` & `initSize` parameters
@@ -174,12 +181,6 @@ def mkTopLevelGenerator (baseGenerators : TSyntax `term) (inductiveGenerators : 
 
         let innerParam ← `(Term.letIdBinder| ($innerParamIdent : $paramType))
         innerParams := innerParams.push innerParam
-
-    -- Produce a fresh name for the `size` argument for the lambda
-    -- at the end of the generator function
-    let freshSizeIdent := mkFreshAccessibleIdent localCtx `size
-    let auxArbIdent := mkFreshAccessibleIdent localCtx `aux_arb
-    let generatorType ← `($optionTIdent $genIdent $targetTypeSyntax)
 
     -- Produces an instance of `ArbitrarySizedSuchThat` typeclass containing the definition for the derived generator
     `(instance : $ArbitrarySizedSuchThatTypeclass $targetTypeSyntax (fun $(mkIdent targetVar) => $inductiveStx $args*) where
