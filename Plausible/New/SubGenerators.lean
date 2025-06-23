@@ -14,9 +14,9 @@ open Idents
       a hypothesis `hyp` for an inductive relation with the argument at index `idx` removed
       (since `fvar` is the argument at index `idx`, and we are generating `fvar`)
     - If `generationStyle = .TypeClassresolution`, we produce the term
-      `let fvar ← ArbitrarySuchThat.genST (fun fvar => hyp)`, i.e.
+      `let fvar ← ArbitrarySuchThat.arbitraryST (fun fvar => hyp)`, i.e.
       we use typeclass resolution to invoke the generator from the
-      `ArbitrarySuchThat.genST` which produces values satisfying the hypothesis `hyp`
+      `ArbitrarySuchThat.arbitraryST` which produces values satisfying the hypothesis `hyp`
       (note: this requires that such an typeclass instance already exists). -/
 def genInputForInductive (fvar : FVarId) (hyp : Expr) (idx : Nat) (generationStyle : GenerationStyle) : MetaM (TSyntax `doElem) := do
   let argExprs := hyp.getAppArgs.eraseIdx! idx
@@ -29,7 +29,7 @@ def genInputForInductive (fvar : FVarId) (hyp : Expr) (idx : Nat) (generationSty
   let rhsTerms :=
     match generationStyle with
     | .RecursiveCall => #[auxArbFn, initSizeIdent, mkIdent `size'] ++ argTerms
-    | .TypeClassResolution => #[qualifiedGenSizedSTIdent, generatorConstraint]
+    | .TypeClassResolution => #[qualifiedarbitrarySizedSTIdent, generatorConstraint]
 
   mkLetBind lhs rhsTerms
 

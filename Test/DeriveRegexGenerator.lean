@@ -67,7 +67,7 @@ def r0 : RegExp :=
 
 /--
 info: Try this generator: instance : ArbitrarySizedSuchThat (List Nat) (fun s => ExpMatch s r0) where
-  genSizedST :=
+  arbitrarySizedST :=
     let rec aux_arb (initSize : Nat) (size : Nat) (r0_0 : RegExp) : OptionT Plausible.Gen (List Nat) :=
       match size with
       | Nat.zero =>
@@ -151,4 +151,4 @@ info: Try this generator: instance : ArbitrarySizedSuchThat (List Nat) (fun s =>
 #derive_generator (fun (s : List Nat) => ExpMatch s r0)
 
 -- To sample from this generator, we can run the following:
--- #eval runSizedGen (genSizedST (fun s => ExpMatch s r0)) 10
+-- #eval runSizedGen (arbitrarySizedST (fun s => ExpMatch s r0)) 10

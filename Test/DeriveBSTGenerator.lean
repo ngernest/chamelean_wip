@@ -27,7 +27,7 @@ inductive BST : Nat → Nat → BinaryTree → Prop where
 
 /--
 info: Try this generator: instance : ArbitrarySizedSuchThat BinaryTree (fun t => BST lo hi t) where
-  genSizedST :=
+  arbitrarySizedST :=
     let rec aux_arb (initSize : Nat) (size : Nat) (lo_0 : Nat) (hi_0 : Nat) : OptionT Plausible.Gen BinaryTree :=
       match size with
       | Nat.zero =>

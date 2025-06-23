@@ -20,8 +20,8 @@ inductive ShapeConstrVal (nnat : Nat) where
 
 
 
--- instance : GenSized (ShapeConstrVal nnat) where
---   genSized :=
+-- instance : arbitrarySized (ShapeConstrVal nnat) where
+--   arbitrarySized :=
 --     let rec aux_arb (initSize : Nat) (size : Nat) : Plausible.Gen (ShapeConstrVal nnat) :=
 --       match size with
 --       | Nat.zero =>

@@ -5,11 +5,16 @@ open Plausible
 
 /-- Dummy inductive relation for testing purposes -/
 inductive RGB where
-| Red : RGB
-| Green : RGB
-| Blue : RGB
+| Red
+| Green
+| Blue
 
-#derive_arbitrary RGB
+inductive Value where
+  | bool (value : Bool)
+  | int (value : Int)
+  | tensor (shape : List Nat) (dtype : String)
+
+-- #derive_arbitrary Value
 
 /-- A datatype for binary trees -/
 inductive Tree where

@@ -399,7 +399,7 @@ instance : ToMessageData Action where
         let remainingArgs := (hyp.getAppArgs.eraseIdx! idx).toList
         m!"let {fvar.name} ← aux_arb size' {remainingArgs}"
       | .TypeClassResolution =>
-        m!"let {fvar.name} ← ArbitrarySuchThat.genST (fun {fvar.name} => {hyp})"
+        m!"let {fvar.name} ← ArbitrarySuchThat.arbitraryST (fun {fvar.name} => {hyp})"
     | .matchFVar fvar hypothesis => m!"if let {hypothesis.newHypothesis} := {fvar.name} then ..."
     | .genFVar fvar ty => m!"let {fvar.name} ← SampleableExt.interpSample {ty}"
     | .ret e => m!"return {e}"

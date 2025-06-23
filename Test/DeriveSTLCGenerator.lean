@@ -10,7 +10,7 @@ set_option guard_msgs.diff true
 
 /--
 info: Try this generator: instance : ArbitrarySizedSuchThat Nat (fun x => lookup Γ x τ) where
-  genSizedST :=
+  arbitrarySizedST :=
     let rec aux_arb (initSize : Nat) (size : Nat) (Γ_0 : List type) (τ_0 : type) : OptionT Plausible.Gen Nat :=
       match size with
       | Nat.zero =>

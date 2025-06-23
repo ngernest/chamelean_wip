@@ -5,14 +5,14 @@ open Plausible
 /-- Sized generators of type `α` such that `P : α -> Prop` holds for all generated values.
     Note that these generators may fail, which is why they have type `OptionT Gen α`. -/
 class ArbitrarySizedSuchThat (α : Type) (P : α → Prop) where
-  genSizedST : Nat → OptionT Gen α
+  arbitrarySizedST : Nat → OptionT Gen α
 
 /-- Generators of type `α` such that `P : α -> Prop` holds for all generated values.
     Note that these generators may fail, which is why they have type `OptionT Gen α`. -/
 class ArbitrarySuchThat (α : Type) (P : α → Prop) where
-  genST : OptionT Gen α
+  arbitraryST : OptionT Gen α
 
 /-- Every `ArbitrarySizedSuchThat` instance can be automatically given a `ArbitrarySuchThat` instance
     using the `OptionTGen.sized` combinator -/
 instance [ArbitrarySizedSuchThat α P] : ArbitrarySuchThat α P where
-  genST := OptionTGen.sized (ArbitrarySizedSuchThat.genSizedST P)
+  arbitraryST := OptionTGen.sized (ArbitrarySizedSuchThat.arbitrarySizedST P)

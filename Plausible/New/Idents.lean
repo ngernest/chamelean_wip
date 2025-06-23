@@ -13,9 +13,9 @@ def auxArbFn : Ident := mkIdent $ Name.mkStr1 "aux_arb"
 
 def ArbitrarySizedSuchThatTypeclass : Ident := mkIdent $ Name.mkStr1 "ArbitrarySizedSuchThat"
 def arbitrarySizedTypeclass : Ident := mkIdent $ Name.mkStr1 "ArbitrarySized"
-def genSizedIdent : Ident := mkIdent $ Name.mkStr1 "genSized"
-def genSizedSTIdent : Ident := mkIdent $ Name.mkStr1 "genSizedST"
-def qualifiedGenSizedSTIdent : Ident := mkIdent $ Name.mkStr2 "ArbitrarySuchThat" "genST"
+def arbitrarySizedIdent : Ident := mkIdent $ Name.mkStr1 "arbitrarySized"
+def arbitrarySizedSTIdent : Ident := mkIdent $ Name.mkStr1 "arbitrarySizedST"
+def qualifiedarbitrarySizedSTIdent : Ident := mkIdent $ Name.mkStr2 "ArbitrarySuchThat" "arbitraryST"
 def qualifiedDecOptIdent : Ident := mkIdent $ Name.mkStr2 "DecOpt" "decOpt"
 
 /-- `Ident` representing `OptionT.fail`-/

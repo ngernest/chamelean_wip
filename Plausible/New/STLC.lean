@@ -135,7 +135,7 @@ def genType : Nat → Gen type :=
     match size with
     | 0 => pure .Nat
     | .succ size' =>
-        frequency (pure .Nat)
+        GeneratorCombinators.frequency (pure type.Nat)
           [(1, thunkGen $ fun _ => pure .Nat),
           (.succ size',
             thunkGen $ fun _ => do
@@ -200,7 +200,7 @@ def gen_lookup (Γ : List type) (τ : type) : Nat → OptionT Plausible.Gen Nat 
 /- `lookup Γ x τ` is an instance of the `ArbitrarySizedSuchThat` typeclass,
     which describes generators for values that satisfy a proposition -/
 instance : ArbitrarySizedSuchThat Nat (fun x => lookup Γ x τ) where
-  genSizedST := gen_lookup Γ τ
+  arbitrarySizedST := gen_lookup Γ τ
 
 /-- Generator which produces well-typed terms `e` such that `typing Γ e τ` holds -/
 def gen_typing (G_ : List type) (t_ : type) : Nat → OptionT Plausible.Gen term :=
@@ -219,7 +219,7 @@ def gen_typing (G_ : List type) (t_ : type) : Nat → OptionT Plausible.Gen term
           (1,
             OptionTGen.thunkGen
               (fun _ => do
-                let x ← ArbitrarySuchThat.genST (fun x => lookup G_0 x t_0)
+                let x ← ArbitrarySuchThat.arbitraryST (fun x => lookup G_0 x t_0)
                 return term.Var x)),
           (1, OptionTGen.thunkGen (fun _ => OptionT.fail))]
     | Nat.succ size' =>
@@ -252,7 +252,7 @@ def gen_typing (G_ : List type) (t_ : type) : Nat → OptionT Plausible.Gen term
           (1,
             OptionTGen.thunkGen
               (fun _ => do
-                let x ← ArbitrarySuchThat.genST (fun x => lookup G_0 x t_0)
+                let x ← ArbitrarySuchThat.arbitraryST (fun x => lookup G_0 x t_0)
                 return term.Var x)),
           (Nat.succ size',
             OptionTGen.thunkGen
@@ -266,4 +266,4 @@ def gen_typing (G_ : List type) (t_ : type) : Nat → OptionT Plausible.Gen term
 /- `typing Γ e τ` is an instance of the `ArbitrarySizedSuchThat` typeclass,
     which describes generators for values that satisfy a proposition -/
 -- instance : ArbitrarySizedSuchThat term (fun e => typing Γ e τ) where
---   genSizedST := gen_typing Γ τ
+--   arbitrarySizedST := gen_typing Γ τ

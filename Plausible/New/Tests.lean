@@ -30,7 +30,7 @@ open ArbitrarySizedSuchThat OptionTGen
 --   | .succ size' => pick from a2
 
 -- instance : ArbitrarySizedSuchThat Tree (fun t => bst lo hi t) where
---   genSizedST :=
+--   arbitrarySizedST :=
 --      fun size => aux_arb [gen_balance_fail, gen_balance_1] [gen_balance_2] size
 --       where
 --         gen_balance_fail := OptionTGen.thunkGen (fun _ => OptionT.fail)
@@ -46,7 +46,7 @@ We can make this generator more efficient using Segev's generator schedules.)
 
 
 /-
-To sample from the derived generator, we apply the `genSizedST` function
+To sample from the derived generator, we apply the `arbitrarySizedST` function
 (from the `ArbitrarySizedSuchThat` typeclass) onto the proposition that constrains
 the generated values (e.g. `fun t => balanced 5 t` for balanced trees of height 5).
 We then invoke `runSizedGen` to display the generated value in the `IO` monad.
@@ -55,7 +55,7 @@ For example:
 -/
 
 -- def tempSize := 10
--- #eval runSizedGen (genSizedST (fun t => balanced 5 t))
+-- #eval runSizedGen (arbitrarySizedST (fun t => balanced 5 t))
 
 
 -- Work in progress: extend generator deriver to handle STLC example
