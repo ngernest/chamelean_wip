@@ -10,11 +10,10 @@ inductive RGB where
 | Blue
 
 inductive Value where
+  | none
   | bool (value : Bool)
   | int (value : Int)
   | tensor (shape : List Nat) (dtype : String)
-
--- #derive_arbitrary Value
 
 /-- A datatype for binary trees -/
 inductive Tree where

@@ -147,7 +147,8 @@ def mkTopLevelGenerator (baseGenerators : TSyntax `term) (inductiveGenerators : 
     let succCase ← `(Term.matchAltExpr| | $(mkIdent ``Nat.succ) $(mkIdent `size') => $backtrackFn $inductiveGenerators)
     caseExprs := caseExprs.push succCase
 
-    -- Create function argument for the generator size
+    -- Create function arguments for the generator's `size` & `initSize` parameters
+    -- (former is the generator size, latter is the size argument with which to invoke other auxiliary generators/checkers)
     let initSizeParam ← `(Term.letIdBinder| ($initSizeIdent : $natIdent))
     let sizeParam ← `(Term.letIdBinder| ($sizeIdent : $natIdent))
     let matchExpr ← liftTermElabM $ mkMatchExpr sizeIdent caseExprs

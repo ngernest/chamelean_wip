@@ -1,5 +1,6 @@
 import Lean
 import Plausible.New.Idents
+import Plausible.New.TSyntaxCombinators
 import Plausible.New.Arbitrary
 
 open Lean Elab Command Meta Term Parser
@@ -33,18 +34,46 @@ def elabDeriveArbitrary : CommandElab := fun stx => do
     if isInductiveType then
       let inductiveVal ← getConstInfoInduct typeName
 
+
       for ctorName in inductiveVal.ctors do
         let ctorVal ← getConstInfoCtor ctorName
-        logInfo m!"ctorVal = {ctorVal}"
+        -- logInfo m!"ctorVal = {ctorVal}"
 
+      -- TODO: find a more intelligent way of determining the default generator
+      -- ^^ just use the first sub-generator branch as the default case for `GeneratorCombinators.frequency`
       let ctorIdent := mkIdent inductiveVal.ctors[0]!
+      let defaultGenerator ← `($pureIdent $ctorIdent)
 
       -- TODO: figure out what to do here
-      -- TODO: just use the first sub-generator branch as the default case for `GeneratorCombinators.frequency`
+
+      -- Create the cases for the pattern-match on the size argument
+      -- TODO: fill in the list of generators that is supplied to `frequency`
+      let mut caseExprs := #[]
+      let zeroCase ← `(Term.matchAltExpr| | $(mkIdent ``Nat.zero) => $frequencyFn $defaultGenerator [])
+      caseExprs := caseExprs.push zeroCase
+
+      let succCase ← `(Term.matchAltExpr| | $(mkIdent ``Nat.succ) $(mkIdent `size') => $frequencyFn $defaultGenerator [])
+      caseExprs := caseExprs.push succCase
+
+      -- Create function argument for the generator size
+      let sizeParam ← `(Term.letIdBinder| ($sizeIdent : $natIdent))
+      let matchExpr ← liftTermElabM $ mkMatchExpr sizeIdent caseExprs
+
+      -- Fetch the ambient local context, which we need to produce user-accessible fresh names
+      let localCtx ← liftTermElabM $ getLCtx
+
+      -- Produce a fresh name for the `size` argument for the lambda
+      -- at the end of the generator function
+      let freshSizeIdent := mkFreshAccessibleIdent localCtx `size
+      let auxArbIdent := mkFreshAccessibleIdent localCtx `aux_arb
+      let generatorType ← `($genIdent $typeIdent)
 
       let typeclassInstance ←
         `(instance : $(mkIdent ``ArbitrarySized) $(mkIdent typeName) where
-            $arbitrarySizedIdent:ident := fun _ => $pureIdent $ctorIdent)
+            $arbitrarySizedIdent:ident :=
+              let rec $auxArbIdent:ident $sizeParam : $generatorType :=
+                $matchExpr
+            fun $freshSizeIdent => $auxArbIdent $freshSizeIdent)
 
       -- Pretty-print the derived generator
       let genFormat ← liftCoreM (PrettyPrinter.ppCommand typeclassInstance)

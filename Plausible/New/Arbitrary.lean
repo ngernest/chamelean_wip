@@ -29,7 +29,7 @@ instance [ArbitrarySized α] : Arbitrary α where
 instance [Repr α] [Shrinkable α] [ArbitrarySized α] : SampleableExt α :=
   SampleableExt.mkSelfContained (GeneratorCombinators.sized ArbitrarySized.arbitrarySized)
 
-/-- Any type which implements Plausible's `SampleableExt` can be given an instance of
-    our `Arbitrary` typeclass -/
+/-- Any type which implements Plausible's `SampleableExt` typeclass
+    can be made an instance of our `Arbitrary` typeclass -/
 instance [SampleableExt α] : Arbitrary α where
   arbitrary := SampleableExt.interp <$> SampleableExt.sample
