@@ -17,4 +17,4 @@ inductive MinEx : Nat → List Nat → List Nat → Prop where
     x ∈ l →
     MinEx (Nat.succ n) l (x::l')
 
-#derive_generator (fun (l: List Nat) => MinEx n l a)
+-- #derive_generator (fun (l: List Nat) => MinEx n l a)

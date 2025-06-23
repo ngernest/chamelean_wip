@@ -112,7 +112,7 @@ def mkSubGeneratorBody (doBlock : TSyntaxArray `doElem) (argToGenTerm : Term) (n
 def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term) := do
   let mut doElems := #[]
 
-  logInfo m!"gen_list = {subGenerator.groupedActions.gen_list}"
+  logWarning m!"gen_list = {subGenerator.groupedActions.gen_list}"
 
   for action in subGenerator.groupedActions.gen_list do
     match action with
@@ -136,7 +136,7 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
 
       -- TODO: check whether `predicateExpr` is a `Prop` or a `Type`
 
-      logInfo m!"predicateExpr {predicateExpr} is in type universe {ty}"
+      logWarning m!"predicateExpr {predicateExpr} is in type universe {ty}"
 
       -- Check if the predicate is a `Prop` (i.e. `Sort 0`)
       if ty.isProp then
@@ -147,7 +147,7 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
       else if ty == mkSort levelOne then
         -- `predicateExpr` is a `Type` (i.e. `Type 0`, the usual universe level for ordinary types)
         -- TODO: just call the `SampleableExt` instance for the `Type`
-        logInfo m!"encountered Type instead of Prop"
+        logWarning m!"encountered Type instead of Prop"
       else
         -- `predicateExpr` is `Type u` for some `u >= 1` (some higher universe level)
         throwError m!"{predicateExpr} has universe level {ty}, which is not supported"
@@ -203,29 +203,25 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
       -- if the match succeeds
       if !subGenerator.inputsToMatch.isEmpty then
         let mut cases := #[]
-        -- For now, we assume there is only one scrutinee. We give it a fresh name
-        -- so that it doesn't get shadowed by any variables in the match patterns
-        -- let scrutinee := mkIdent $ genFreshName
-        --   (Name.mkStr1 <$> subGenerator.inputsToMatch) (Name.mkStr1 subGenerator.inputsToMatch[0]!)
 
+        -- Handle multiple scrutinees by giving all of them fresh names
         let existingNames := Name.mkStr1 <$> subGenerator.inputsToMatch
         let scrutinees := Lean.mkIdent <$> Array.map (fun name => genFreshName existingNames name) existingNames
 
-        -- TODO: figure out how we match on multiple scrutinees
+        -- Construct the match expression based on the info in `matchCases`
+        let patterns ← Array.mapM (fun patternExpr => PrettyPrinter.delab patternExpr) subGenerator.matchCases
+        -- If there are multiple scrutinees, the LHS of each case is a tuple containing the elements in `matchCases`
+        let case ← `(Term.matchAltExpr| | $[$patterns:term],* => $generatorBody:term)
+        cases := cases.push case
 
-        -- Actually construct the match-expression based on the info in `matchCases`
-        for patternExpr in subGenerator.matchCases do
-          let pattern ← PrettyPrinter.delab patternExpr
-          let case ← `(Term.matchAltExpr| | $pattern:term => $generatorBody:term)
-          cases := cases.push case
-        let catchAllCase ← `(Term.matchAltExpr| | _ => $failFn)
+        -- The LHS of the catch-all case contains a tuple consisting entirely of wildcards
+        let numScrutinees := Array.size scrutinees
+        let wildcards := Array.replicate numScrutinees (← `(_))
+        let catchAllCase ← `(Term.matchAltExpr| | $wildcards:term,* => $failFn)
         cases := cases.push catchAllCase
 
-        -- TODO: remove old code below
-        -- mkMatchExpr scrutinee cases
-
+        -- Create a pattern match that simultaneously matches on all the scrutinees
         mkSimultaneousMatch scrutinees cases
-
 
       else
         return generatorBody
