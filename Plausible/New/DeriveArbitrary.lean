@@ -9,7 +9,7 @@ syntax (name := derive_arbitrary) "#derive_arbitrary" ident : command
 
 /-- Derives an instance of the `ArbitrarySized` typeclass -/
 @[command_elab derive_arbitrary]
-def elabDeriveGenerator : CommandElab := fun stx => do
+def elabDeriveArbitrary : CommandElab := fun stx => do
   match stx with
   | `(#derive_arbitrary $typeIdent:ident) => do
     let typeName := typeIdent.getId
