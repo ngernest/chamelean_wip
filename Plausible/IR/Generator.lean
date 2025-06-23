@@ -36,7 +36,7 @@ def elabGetChecker : CommandElab := fun stx => do
       let e ← elabTerm t none
       let inpname ← termToStringList t2
       let relation ← getInductiveInfoWithArgs e inpname.toArray
-      logInfo s!"input variable names = {relation.input_var_names}"
+      logWarning s!"input variable names = {relation.input_var_names}"
       let btnum := TSyntax.getNat t3
       let checker ← get_checker relation inpname btnum
   | _ => throwError "Invalid syntax"
@@ -71,7 +71,7 @@ def elabGetProducer : CommandElab := fun stx => do
       logWarning producer
   | _ => throwError "Invalid syntax"
 
--- #gen_producer typing with_name ["Γ", "e", "τ"] for_arg 2 backtrack 100
+-- #gen_producer typing with_name ["Γ", "e", "τ"] for_arg 1 backtrack 100
 -- #gen_producer lookup with_name ["Γ", "x", "τ"] for_arg 1 backtrack 100
 -- #gen_producer balanced with_name ["n", "T"] for_arg 1 backtrack 100
 

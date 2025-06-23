@@ -6,6 +6,7 @@ Authors: Paul Mure
 import Plausible.NKI.Basic
 import Plausible.NKI.Types
 import Plausible.IR.PlausibleIR
+import Plausible.New.DeriveGenerator
 
 namespace Plausible.NKI
 
@@ -17,7 +18,7 @@ Constraints for SNat variables.
 `some (.const n)` means the given variable must be equal to constant `n`.
 `some (.param idx)` means the given variable must be equal to another parameter `idx`.
 -/
-inductive ShapeConstrVal (nnat : Nat) : Prop where
+inductive ShapeConstrVal (nnat : Nat) where
   | const : Nat → ShapeConstrVal nnat
   | param : Fin nnat → ShapeConstrVal nnat
 

@@ -19,7 +19,7 @@ syntax (name := mk_checker_header) "#mk_checker_header " term : command
 def elabMkCheckerHeader : CommandElab := fun stx => do
   match stx with
   | `(#mk_checker_header ( $inductiveApp:term )) =>
-    logInfo s!"Collected: {inductiveApp}"
+    logWarning s!"Collected: {inductiveApp}"
 
     -- Parse the names of inductive relation + its arguments
     let (inductiveName, args) ← parseInductiveApp inductiveApp

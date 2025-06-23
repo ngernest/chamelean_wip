@@ -367,6 +367,11 @@ def mkSubGeneratorInfoFromConstructor (ctor : InductiveConstructor) (inputNames 
   -- (otherwise, the generator needs to make a recursive call and is thus inductively-defined)
   let generatorSort := if ctor.recursive_hypotheses.isEmpty then .BaseGenerator else .InductiveGenerator
 
+  logWarning "*******************************"
+  logWarning m!"inputsToMatch = {inputsToMatch}"
+  logWarning m!"matchCases = {matchCases}"
+  logWarning "*******************************"
+
   return {
     inputs := (List.eraseIdx inputNamesList idx).toArray
     inputsToMatch := inputsToMatch.toArray
