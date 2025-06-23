@@ -164,7 +164,7 @@ def separateFVarsInHypothesis (hypothesis : Expr) (initialFVars : Array FVarId)
 /-- The `GenerationStyle` datatype describes the "style" in which a generator should be invoked:
     - `RecursiveCall` indicates that we should recursively call the current generator function
     - `TypeClassResolution` indicates that we should call the generator via typeclass resolution
-      (i.e. call the generator from the `GenSizedSuchThat` typeclass) -/
+      (i.e. call the generator from the `ArbitrarySizedSuchThat` typeclass) -/
 inductive GenerationStyle
   | RecursiveCall
   | TypeClassResolution
@@ -308,18 +308,18 @@ def Actions_for_hypotheses (ctor : InductiveConstructor) (fvars : Array FVarId) 
         let (uninitializedArgIdx, uninitializedFVars, fVarsToBeInitialized)
           ← getLastUninitializedArgAndFVars hyp initializedFVars
 
-        logInfo m!"hyp = {hyp}"
-        logInfo m!"uninitializedArgIdx = {uninitializedArgIdx}, uninitializedFVars = {repr uninitializedFVars}, fVarsToBeInitialized = {repr fVarsToBeInitialized}"
+        logWarning m!"hyp = {hyp}"
+        logWarning m!"uninitializedArgIdx = {uninitializedArgIdx}, uninitializedFVars = {repr uninitializedFVars}, fVarsToBeInitialized = {repr fVarsToBeInitialized}"
 
 
         for fid in uninitializedFVars do
           let ty := ctor.bound_var_ctx.get! fid
           result := result.push (.genFVar fid ty)
-          logInfo m!"result = {repr result}"
+          logWarning m!"result = {repr result}"
 
         let argToGenerate := hyp.getAppArgs[uninitializedArgIdx]!
 
-        logInfo m!"argToGenerate = {repr argToGenerate}"
+        logWarning m!"argToGenerate = {repr argToGenerate}"
 
         initializedFVars := Array.appendUniqueElements initializedFVars uninitializedFVars
 
@@ -328,13 +328,13 @@ def Actions_for_hypotheses (ctor : InductiveConstructor) (fvars : Array FVarId) 
           then .RecursiveCall
           else .TypeClassResolution
 
-        logInfo m!"generationStyle = {repr generationStyle}"
-        logInfo "*******************"
+        logWarning m!"generationStyle = {repr generationStyle}"
+        logWarning "*******************"
 
         if argToGenerate.isFVar then
           let fvarToGenerate := argToGenerate.fvarId!
           result := result.push (.genInputForInductive fvarToGenerate hyp uninitializedArgIdx generationStyle)
-          logInfo m!"result = {repr result}"
+          logWarning m!"result = {repr result}"
         else
           let nameOfFVarToGenerate := Name.mkStr1 ("tcond" ++ toString i)
           let fvarToGenerate := FVarId.mk nameOfFVarToGenerate
@@ -399,7 +399,7 @@ instance : ToMessageData Action where
         let remainingArgs := (hyp.getAppArgs.eraseIdx! idx).toList
         m!"let {fvar.name} ← aux_arb size' {remainingArgs}"
       | .TypeClassResolution =>
-        m!"let {fvar.name} ← GenSuchThat.genST (fun {fvar.name} => {hyp})"
+        m!"let {fvar.name} ← ArbitrarySuchThat.genST (fun {fvar.name} => {hyp})"
     | .matchFVar fvar hypothesis => m!"if let {hypothesis.newHypothesis} := {fvar.name} then ..."
     | .genFVar fvar ty => m!"let {fvar.name} ← SampleableExt.interpSample {ty}"
     | .ret e => m!"return {e}"

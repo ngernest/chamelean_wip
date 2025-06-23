@@ -14,9 +14,9 @@ open Idents
       a hypothesis `hyp` for an inductive relation with the argument at index `idx` removed
       (since `fvar` is the argument at index `idx`, and we are generating `fvar`)
     - If `generationStyle = .TypeClassresolution`, we produce the term
-      `let fvar ← GenSuchThat.genST (fun fvar => hyp)`, i.e.
+      `let fvar ← ArbitrarySuchThat.genST (fun fvar => hyp)`, i.e.
       we use typeclass resolution to invoke the generator from the
-      `GenSuchThat.genST` which produces values satisfying the hypothesis `hyp`
+      `ArbitrarySuchThat.genST` which produces values satisfying the hypothesis `hyp`
       (note: this requires that such an typeclass instance already exists). -/
 def genInputForInductive (fvar : FVarId) (hyp : Expr) (idx : Nat) (generationStyle : GenerationStyle) : MetaM (TSyntax `doElem) := do
   let argExprs := hyp.getAppArgs.eraseIdx! idx
@@ -112,7 +112,7 @@ def mkSubGeneratorBody (doBlock : TSyntaxArray `doElem) (argToGenTerm : Term) (n
 def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term) := do
   let mut doElems := #[]
 
-  logInfo m!"gen_list = {subGenerator.groupedActions.gen_list}"
+  logWarning m!"gen_list = {subGenerator.groupedActions.gen_list}"
 
   for action in subGenerator.groupedActions.gen_list do
     match action with
@@ -136,7 +136,7 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
 
       -- TODO: check whether `predicateExpr` is a `Prop` or a `Type`
 
-      logInfo m!"predicateExpr {predicateExpr} is in type universe {ty}"
+      logWarning m!"predicateExpr {predicateExpr} is in type universe {ty}"
 
       -- Check if the predicate is a `Prop` (i.e. `Sort 0`)
       if ty.isProp then
@@ -147,7 +147,7 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
       else if ty == mkSort levelOne then
         -- `predicateExpr` is a `Type` (i.e. `Type 0`, the usual universe level for ordinary types)
         -- TODO: just call the `SampleableExt` instance for the `Type`
-        logInfo m!"encountered Type instead of Prop"
+        logWarning m!"encountered Type instead of Prop"
       else
         -- `predicateExpr` is `Type u` for some `u >= 1` (some higher universe level)
         throwError m!"{predicateExpr} has universe level {ty}, which is not supported"

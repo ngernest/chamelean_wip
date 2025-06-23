@@ -3,18 +3,18 @@ import Plausible.Gen
 
 import Plausible.New.OptionTGen
 import Plausible.New.DecOpt
-import Plausible.New.GenSizedSuchThat
+import Plausible.New.ArbitrarySizedSuchThat
 import Plausible.New.STLC
 
 
-open GenSizedSuchThat OptionTGen
+open ArbitrarySizedSuchThat OptionTGen
 
 
 /- Example usage:
   ```
   #derive_generator (fun (<name of generated value> : <type of generated value>) => <inductive relation applied to all args>)
   ```
-  This produces an instance of the `GenSizedSuchThat` typeclass, which contains a generator for values satisfying the inductive
+  This produces an instance of the `ArbitrarySizedSuchThat` typeclass, which contains a generator for values satisfying the inductive
   relation. See examples below:
 
   (Note: you may need to comment out the typeclass instances in `Trees.lean` if Lean complains about overlapping instances.)
@@ -29,7 +29,7 @@ open GenSizedSuchThat OptionTGen
 --   | .zero => pick from a1
 --   | .succ size' => pick from a2
 
--- instance : GenSizedSuchThat Tree (fun t => bst lo hi t) where
+-- instance : ArbitrarySizedSuchThat Tree (fun t => bst lo hi t) where
 --   genSizedST :=
 --      fun size => aux_arb [gen_balance_fail, gen_balance_1] [gen_balance_2] size
 --       where
@@ -47,7 +47,7 @@ We can make this generator more efficient using Segev's generator schedules.)
 
 /-
 To sample from the derived generator, we apply the `genSizedST` function
-(from the `GenSizedSuchThat` typeclass) onto the proposition that constrains
+(from the `ArbitrarySizedSuchThat` typeclass) onto the proposition that constrains
 the generated values (e.g. `fun t => balanced 5 t` for balanced trees of height 5).
 We then invoke `runSizedGen` to display the generated value in the `IO` monad.
 

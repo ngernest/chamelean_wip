@@ -36,7 +36,7 @@ def elabGetChecker : CommandElab := fun stx => do
       let e ← elabTerm t none
       let inpname ← termToStringList t2
       let relation ← getInductiveInfoWithArgs e inpname.toArray
-      logInfo s!"input variable names = {relation.input_var_names}"
+      logWarning s!"input variable names = {relation.input_var_names}"
       let btnum := TSyntax.getNat t3
       let checker ← get_checker relation inpname btnum
   | _ => throwError "Invalid syntax"

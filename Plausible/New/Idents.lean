@@ -11,11 +11,11 @@ def backtrackFn : Ident := mkIdent $ Name.mkStr2 "OptionTGen" "backtrack"
 def interpSampleFn : Ident := mkIdent $ Name.mkStr3 "Plausible" "SampleableExt" "interpSample"
 def auxArbFn : Ident := mkIdent $ Name.mkStr1 "aux_arb"
 
-def genSizedSuchThatTypeclass : Ident := mkIdent $ Name.mkStr1 "GenSizedSuchThat"
+def ArbitrarySizedSuchThatTypeclass : Ident := mkIdent $ Name.mkStr1 "ArbitrarySizedSuchThat"
 def arbitrarySizedTypeclass : Ident := mkIdent $ Name.mkStr1 "ArbitrarySized"
 def genSizedIdent : Ident := mkIdent $ Name.mkStr1 "genSized"
 def genSizedSTIdent : Ident := mkIdent $ Name.mkStr1 "genSizedST"
-def qualifiedGenSizedSTIdent : Ident := mkIdent $ Name.mkStr2 "GenSuchThat" "genST"
+def qualifiedGenSizedSTIdent : Ident := mkIdent $ Name.mkStr2 "ArbitrarySuchThat" "genST"
 def qualifiedDecOptIdent : Ident := mkIdent $ Name.mkStr2 "DecOpt" "decOpt"
 
 /-- `Ident` representing `OptionT.fail`-/

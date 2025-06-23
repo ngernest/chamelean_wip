@@ -1,12 +1,12 @@
 import Plausible.IR.Examples
 import Plausible.New.OptionTGen
-import Plausible.New.GenSizedSuchThat
+import Plausible.New.ArbitrarySizedSuchThat
 
 import Plausible.Gen
 open Plausible
 open OptionTGen
 
-open GenSizedSuchThat
+open ArbitrarySizedSuchThat
 
 --------------------------------------------------------------------------
 -- Some example `OptionT Gen α` generators
@@ -39,8 +39,8 @@ def genBST (lo : Nat) (hi : Nat) : Nat → OptionT Gen Tree :=
       ]
   fun size => aux_arb size size lo hi
 
-/- Instance of the `GenSizedSuchThat` typeclass for generators of BSTs -/
--- instance : GenSizedSuchThat Tree (fun t => bst lo hi t) where
+/- Instance of the `ArbitrarySizedSuchThat` typeclass for generators of BSTs -/
+-- instance : ArbitrarySizedSuchThat Tree (fun t => bst lo hi t) where
 --   genSizedST := genBST lo hi
 
 /-- A handwritten generator for balanced trees of height `n`
@@ -81,9 +81,9 @@ def genBalancedTree (n : Nat) : Nat → OptionT Gen Tree :=
         ]
   fun size => aux_arb size size n
 
-/- Instance of the `GenSizedSuchThat` typeclass for generators of balanced trees
+/- Instance of the `ArbitrarySizedSuchThat` typeclass for generators of balanced trees
    of height `n` -/
--- instance : GenSizedSuchThat Tree (fun t => balanced n t) where
+-- instance : ArbitrarySizedSuchThat Tree (fun t => balanced n t) where
 --   genSizedST := genBalancedTree n
 
 
@@ -91,7 +91,7 @@ def genBalancedTree (n : Nat) : Nat → OptionT Gen Tree :=
 Example usage:
 
 To sample from the derived generator, we apply the `genSizedST` function
-(from the `GenSizedSuchThat` typeclass) onto the proposition that constrains
+(from the `ArbitrarySizedSuchThat` typeclass) onto the proposition that constrains
 the generated values (e.g. `fun t => balanced 5 t` for balanced trees of height 5).
 We then invoke `runSizedGen` to display the generated value in the `IO` monad.
 

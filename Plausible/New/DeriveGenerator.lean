@@ -124,7 +124,7 @@ def findTargetVarIndex (targetVar : Name) (args : TSyntaxArray `term) : Option N
 
 syntax (name := derive_generator) "#derive_generator" "(" "fun" "(" ident ":" term ")" "=>" term ")" : command
 
-/-- Produces an instance of `GenSizedSuchThat` typeclass containing the definition for the top-level derived generator.
+/-- Produces an instance of `ArbitrarySizedSuchThat` typeclass containing the definition for the top-level derived generator.
     The arguments to this function are:
     - a list of `baseGenerators` (each represented as a Lean term), to be invoked when `size == 0`
     - a list of `inductiveGenerators`, to be invoked when `size > 0`
@@ -180,8 +180,8 @@ def mkTopLevelGenerator (baseGenerators : TSyntax `term) (inductiveGenerators : 
     let auxArbIdent := mkFreshAccessibleIdent localCtx `aux_arb
     let generatorType ← `($optionTIdent $genIdent $targetTypeSyntax)
 
-    -- Produces an instance of `GenSizedSuchThat` typeclass containing the definition for the derived generator
-    `(instance : $genSizedSuchThatTypeclass $targetTypeSyntax (fun $(mkIdent targetVar) => $inductiveStx $args*) where
+    -- Produces an instance of `ArbitrarySizedSuchThat` typeclass containing the definition for the derived generator
+    `(instance : $ArbitrarySizedSuchThatTypeclass $targetTypeSyntax (fun $(mkIdent targetVar) => $inductiveStx $args*) where
         $genSizedSTIdent:ident :=
           let rec $auxArbIdent:ident $innerParams* : $generatorType :=
             $matchExpr

@@ -1,7 +1,7 @@
 import Plausible.Gen
 import Plausible.New.GeneratorCombinators
 import Plausible.New.DecOpt
-import Plausible.New.GenSizedSuchThat
+import Plausible.New.ArbitrarySizedSuchThat
 import Plausible.New.Arbitrary
 import Plausible.New.DeriveGenerator
 

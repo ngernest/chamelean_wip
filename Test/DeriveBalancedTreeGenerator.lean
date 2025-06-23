@@ -2,11 +2,11 @@
 import Plausible.Gen
 import Plausible.New.OptionTGen
 import Plausible.New.DecOpt
-import Plausible.New.GenSizedSuchThat
+import Plausible.New.ArbitrarySizedSuchThat
 import Plausible.New.DeriveGenerator
 import Test.DeriveBSTGenerator
 
-open GenSizedSuchThat OptionTGen
+open ArbitrarySizedSuchThat OptionTGen
 
 set_option guard_msgs.diff true
 
@@ -19,7 +19,7 @@ inductive balancedTree : Nat → BinaryTree → Prop where
     balancedTree (.succ n) (BinaryTree.Node x l r)
 
 /--
-info: Try this generator: instance : GenSizedSuchThat BinaryTree (fun t => balancedTree n t) where
+info: Try this generator: instance : ArbitrarySizedSuchThat BinaryTree (fun t => balancedTree n t) where
   genSizedST :=
     let rec aux_arb (initSize : Nat) (size : Nat) (n_0 : Nat) : OptionT Plausible.Gen BinaryTree :=
       match size with

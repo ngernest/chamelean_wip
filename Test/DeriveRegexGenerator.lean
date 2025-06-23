@@ -1,10 +1,10 @@
 import Plausible.Gen
 import Plausible.New.OptionTGen
 import Plausible.New.DecOpt
-import Plausible.New.GenSizedSuchThat
+import Plausible.New.ArbitrarySizedSuchThat
 import Plausible.New.DeriveGenerator
 
-open GenSizedSuchThat OptionTGen
+open ArbitrarySizedSuchThat OptionTGen
 
 set_option guard_msgs.diff true
 
@@ -66,7 +66,7 @@ def r0 : RegExp :=
 -- Generator for strings that match the regexp `r0`
 
 /--
-info: Try this generator: instance : GenSizedSuchThat (List Nat) (fun s => ExpMatch s r0) where
+info: Try this generator: instance : ArbitrarySizedSuchThat (List Nat) (fun s => ExpMatch s r0) where
   genSizedST :=
     let rec aux_arb (initSize : Nat) (size : Nat) (r0_0 : RegExp) : OptionT Plausible.Gen (List Nat) :=
       match size with
