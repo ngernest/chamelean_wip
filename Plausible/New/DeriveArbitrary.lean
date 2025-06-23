@@ -35,10 +35,14 @@ def elabDeriveArbitrary : CommandElab := fun stx => do
     if isInductiveType then
       let inductiveVal ← getConstInfoInduct typeName
 
-
       for ctorName in inductiveVal.ctors do
         let ctorVal ← getConstInfoCtor ctorName
         -- logInfo m!"ctorVal = {ctorVal}"
+
+      -- TODO: figure out what to do here
+      if not (← List.allM (fun ctorName => liftTermElabM $ isConstructorRecursive typeName ctorName) inductiveVal.ctors) then
+        logInfo "no recursive constructors!"
+
 
       -- TODO: find a more intelligent way of determining the default generator
       -- ^^ just use the first sub-generator branch as the default case for `GeneratorCombinators.frequency`
