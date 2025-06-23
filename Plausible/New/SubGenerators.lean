@@ -7,6 +7,7 @@ open Plausible.IR
 open Lean Elab Command Meta Term Parser Std
 open Idents
 
+
 /-- `genInputForInductive fvar hyp idx generationStyle` produces a let-bind expression of the form
     based on the `generationStyle` specified:
     - If `generationStyle = .RecursiveCall`, we produce the term
