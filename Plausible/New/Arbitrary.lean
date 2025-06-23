@@ -7,7 +7,13 @@ open Plausible
 /-- This is the equivalent of Haskell QuickCheck's `Arbitrary` typeclass.
     (In QuickChick, this typeclass is called `Gen`, but `Gen` is already
     a reserved keyword in Plausible, so we call this typeclass `Arbitrary`
-    following the Haskell QC convention) -/
+    following the Haskell QC convention).
+
+    Naming conventions:
+    - `Arbitrary` is used as a prefix for typeclass names
+      (i.e. `Arbitrary`, `ArbitrarySized`, `ArbitrarySuchThat`, `ArbitrarySizedSuchThat`)
+    - `gen` is used as a prefix for function names in the `Arbitrary` family of typeclasses
+      (see `Arbitrary.gen`, `ArbitrarySized.genSized`, `ArbitrarySuchThat.genST`, `ArbitrarySizedSuchThat.genSizedST`) -/
 class Arbitrary (α : Type) where
   gen : Gen α
 
