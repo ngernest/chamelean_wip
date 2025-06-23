@@ -9,3 +9,4 @@ import Test.DeriveBSTGenerator
 import Test.DeriveBalancedTreeGenerator
 import Test.DeriveRegexGenerator
 import Test.DeriveSTLCGenerator
+import Test.DeriveChaseExampleGenerators
