@@ -9,8 +9,6 @@ inductive RGB where
 | Green : RGB
 | Blue : RGB
 
-#derive_arbitrary RGB
-
 /-- A datatype for binary trees -/
 inductive Tree where
 | Leaf : Tree
