@@ -3,24 +3,11 @@ import Plausible.New.OptionTGen
 import Plausible.New.DecOpt
 import Plausible.New.ArbitrarySizedSuchThat
 import Plausible.New.DeriveGenerator
+import Test.DeriveArbitrary.DeriveRegExpGenerator
 
 open ArbitrarySizedSuchThat OptionTGen
 
 set_option guard_msgs.diff true
-
-/-- An inductive datatype representing regular expressions (where "characters" are `Nat`s).
-   Slightly modified from Software Foundations
-   See https://softwarefoundations.cis.upenn.edu/lf-current/IndProp.html
-   and search for "Case Study: Regular Expressions".
-   The `RegExp`s below are non-polymorphic in the character type. -/
-inductive RegExp : Type where
-| EmptySet : RegExp
-| EmptyStr : RegExp
-| Char : Nat → RegExp -- using Nat instead of Char
-| App : RegExp → RegExp → RegExp
-| Union : RegExp → RegExp → RegExp
-| Star : RegExp → RegExp
-
 
 /-- `ExpMatch s r` holds if `s` is a string contained in the language defined by `RegExp r`,
     i.e., it "matches" `r` (a string is represented here as a `List Nat`) -/
