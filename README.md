@@ -12,7 +12,8 @@ to automatically derive generators/checkers for inductive relations, à la [Para
 - [`Arbitrary.lean`](./Plausible/New/Arbitrary.lean): The `Arbitrary` & `ArbitrarySized` typeclasses for unconstrained generators, adapted from QuickChick
 - [`ArbitrarySizedSuchThat.lean`](./Plausible/New/ArbitrarySizedSuchThat.lean): The `ArbitrarySuchThat` & `ArbitrarySizedSuchThat` typeclasses for constrained generators (generators of values satisfying a proposition), adapted from QuickChick
 - [`GeneratorCombinators.lean`](./Plausible/New/GeneratorCombinators.lean): Extra combinators for Plausible generators (e.g. analogs of the `sized` and `frequency` combinators from Haskell QuickCheck)
-- [`DeriveGenerator.lean`](./Plausible/New/DeriveGenerator.lean): Metaprogramming infrastructure for automatically deriving Plausible generators
+- [`DeriveArbitrary.lean`](./Plausible/New/DeriveArbitrary.lean): Metaprogramming infrastructure for deriving *unconstrained* generators (instances of the `ArbitrarySized` typeclass)
+- [`DeriveGenerator.lean`](./Plausible/New/DeriveGenerator.lean): Metaprogramming infrastructure for deriving *constrained* generators (instances of the `ArbitrarySizedSuchThat` typeclass)
 - [`SubGenerators.lean`](./Plausible/New/SubGenerators.lean): Handles constraints when deriving sub-generators
 - [`TSyntaxCombinators.lean`](./Plausible/New/TSyntaxCombinators.lean): Combinators over `TSyntax` for creating monadic `do`-blocks & other Lean expressions via metaprogramming
 - [`DeriveChecker.lean`](./Plausible/New/DeriveChecker.lean): Metaprogramming infrastructure for automatically deriving checkers
