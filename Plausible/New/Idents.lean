@@ -6,18 +6,24 @@ open Lean Meta
 
 namespace Idents
 
+-- Idents for commonly-called functions
 def thunkGenFn : Ident := mkIdent $ Name.mkStr2 "OptionTGen" "thunkGen"
 def backtrackFn : Ident := mkIdent $ Name.mkStr2 "OptionTGen" "backtrack"
 def frequencyFn : Ident := mkIdent $ Name.mkStr2 "GeneratorCombinators" "frequency"
 def interpSampleFn : Ident := mkIdent $ Name.mkStr3 "Plausible" "SampleableExt" "interpSample"
 def auxArbFn : Ident := mkIdent $ Name.mkStr1 "aux_arb"
 
+-- Idents for typeclasses
 def ArbitrarySizedSuchThatTypeclass : Ident := mkIdent $ Name.mkStr1 "ArbitrarySizedSuchThat"
 def arbitrarySizedTypeclass : Ident := mkIdent $ Name.mkStr1 "ArbitrarySized"
-def arbitrarySizedIdent : Ident := mkIdent $ Name.mkStr1 "arbitrarySized"
-def arbitrarySizedSTIdent : Ident := mkIdent $ Name.mkStr1 "arbitrarySizedST"
-def qualifiedarbitrarySizedSTIdent : Ident := mkIdent $ Name.mkStr2 "ArbitrarySuchThat" "arbitraryST"
-def qualifiedDecOptIdent : Ident := mkIdent $ Name.mkStr2 "DecOpt" "decOpt"
+
+
+-- Idents for typeclass functions
+def arbitraryFn : Ident := mkIdent $ Name.mkStr2 "Arbitrary" "arbitrary"
+def arbitrarySizedFn : Ident := mkIdent $ Name.mkStr2 "ArbitrarySized" "arbitrarySized"
+def arbitrarySTFn : Ident := mkIdent $ Name.mkStr2 "ArbitrarySuchThat" "arbitraryST"
+def arbitrarySizedSTFn : Ident := mkIdent $ Name.mkStr2 "ArbitrarySizedSuchThat" "arbitrarySizedST"
+def decOptFn : Ident := mkIdent $ Name.mkStr2 "DecOpt" "decOpt"
 
 /-- `Ident` representing `OptionT.fail`-/
 def failFn : Ident := mkIdent $ Name.mkStr2 "OptionT" "fail"
@@ -38,9 +44,8 @@ def sizeIdent : Ident := mkIdent $ Name.mkStr1 "size"
 def mkFreshAccessibleIdent (localCtx : LocalContext) (name : Name) : Ident :=
   mkIdent $ LocalContext.getUnusedName localCtx name
 
-/-- `genFreshName existingNames namePrefix` produces a thunked function
-    that produces a fresh name (with prefix `namePrefix`) that are guaranteed to be
-    not within the existing set of names
+/-- `genFreshName existingNames namePrefix` produces a fresh name with the prefix `namePrefix`
+     that is guaranteed to be not within `existingNames`.
     - Note: the body of this function operates in the identity monad since
       we want local mutable state and access to the syntactic sugar
       provided by `while` loops -/
@@ -52,5 +57,12 @@ def genFreshName (existingNames : Array Name) (namePrefix : Name) : Name :=
       count := count + 1
       freshName := Name.appendAfter namePrefix s!"_{count}"
     return freshName
+
+/-- `genFreshNames existingNames namePrefixes` produces an array of fresh names, all of them
+    guaranteed to be not in `existingNames`,
+    where the `i`-th fresh name produced has prefix `namePrefixes[i]` -/
+def genFreshNames (existingNames : Array Name) (namePrefixes : Array Name) : Array Name :=
+  Array.map (fun name => genFreshName existingNames name) namePrefixes
+
 
 end Idents
