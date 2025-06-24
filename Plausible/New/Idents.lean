@@ -36,8 +36,10 @@ def unqualifiedArbitrarySizedSTFn : Ident := mkIdent $ Name.mkStr1 "arbitrarySiz
 def decOptFn : Ident := mkIdent $ Name.mkStr2 "DecOpt" "decOpt"
 
 
--- Idents for commonly-used types
+-- Idents for commonly-used types / constructors
 def natIdent : Ident := mkIdent ``Nat
+def zeroIdent : Ident := mkIdent ``Nat.zero
+def succIdent : Ident := mkIdent ``Nat.succ
 def optionTIdent : Ident := mkIdent ``OptionT
 def genIdent : Ident := mkIdent ``Plausible.Gen
 

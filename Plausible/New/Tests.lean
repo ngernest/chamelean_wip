@@ -23,14 +23,29 @@ inductive Value where
   | tensor (shape : List Nat) (dtype : String)
 
 
-inductive MyList (α : Type) where
+inductive MyList where
   | Nil
-  | Cons (x : α) (xs : MyList α)
+  | Cons (x : Nat) (xs : MyList)
 
-#derive_arbitrary Value
+instance : ArbitrarySized MyList where
+  arbitrarySized :=
+    let rec aux_arb (size : Nat) : Plausible.Gen MyList :=
+      match size with
+      | Nat.zero =>
+        GeneratorCombinators.oneOfWithDefault (pure MyList.Nil)
+          [GeneratorCombinators.thunkGen (fun _ => pure MyList.Nil)]
+      | Nat.succ size' =>
+        GeneratorCombinators.frequency (pure MyList.Nil)
+          [(1, GeneratorCombinators.thunkGen (fun _ => pure MyList.Nil)),
+            (Nat.succ size',
+              GeneratorCombinators.thunkGen
+                (fun _ => do
+                  let x_0 ← Arbitrary.arbitrary
+                  let xs_0 ← aux_arb size'
+                  return MyList.Cons x_0 xs_0))]
+    fun size => aux_arb size
 
-#eval runArbitrary (α := Value) 10
-
+-- #eval runArbitrary (α := MyList) 10
 
 /- Example usage:
   ```
