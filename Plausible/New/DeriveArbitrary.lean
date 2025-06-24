@@ -36,6 +36,7 @@ def elabDeriveArbitrary : CommandElab := fun stx => do
     if isInductiveType then
       let inductiveVal ← getConstInfoInduct typeName
 
+      let mut nonRecursiveGenerators : TSyntaxArray `term := #[]
       for ctorName in inductiveVal.ctors do
         let ctorVal ← getConstInfoCtor ctorName
         let ctorType := ctorVal.type
@@ -50,10 +51,12 @@ def elabDeriveArbitrary : CommandElab := fun stx => do
         let ctorArgTypes := Array.pop decomposedCtorType
         logInfo m!"{ctorVal.name} has argument types {ctorArgTypes}"
 
-      -- TODO: figure out what to do here
-      if not (← List.allM (fun ctorName => liftTermElabM $ isConstructorRecursive typeName ctorName) inductiveVal.ctors) then
-        logInfo "no recursive constructors!"
-
+        let ctorIsRecursive ← liftTermElabM $ isConstructorRecursive typeName ctorName
+        if !ctorIsRecursive then
+          sorry
+        else
+          -- TODO: figure out how to handle recursive constructors
+          sorry
 
       -- TODO: find a more intelligent way of determining the default generator
       -- ^^ just use the first sub-generator branch as the default case for `GeneratorCombinators.frequency`

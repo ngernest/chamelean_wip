@@ -164,7 +164,7 @@ def separateFVarsInHypothesis (hypothesis : Expr) (initialFVars : Array FVarId)
 /-- The `GenerationStyle` datatype describes the "style" in which a generator should be invoked:
     - `RecursiveCall` indicates that we should recursively call the current generator function
     - `TypeClassResolution` indicates that we should call the generator via typeclass resolution
-      (i.e. call the generator from the `ArbitrarySizedSuchThat` typeclass) -/
+      (i.e. call the generator from the `Arbitrary` / `ArbitrarySizedSuchThat` typeclass) -/
 inductive GenerationStyle
   | RecursiveCall
   | TypeClassResolution
