@@ -4,7 +4,7 @@ import Plausible.New.OptionTGen
 import Plausible.New.DecOpt
 import Plausible.New.ArbitrarySizedSuchThat
 import Plausible.New.DeriveGenerator
-import Test.DeriveBSTGenerator
+import Test.DeriveArbitrarySuchThat.DeriveBSTGenerator
 
 open ArbitrarySizedSuchThat OptionTGen
 

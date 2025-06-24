@@ -5,7 +5,7 @@ Authors: Henrik Böving
 -/
 -- import Test.Tactic
 -- import Test.Testable
-import Test.DeriveBSTGenerator
-import Test.DeriveBalancedTreeGenerator
-import Test.DeriveRegexGenerator
-import Test.DeriveSTLCGenerator
+import Test.DeriveArbitrarySuchThat.DeriveBSTGenerator
+import Test.DeriveArbitrarySuchThat.DeriveBalancedTreeGenerator
+import Test.DeriveArbitrarySuchThat.DeriveRegexGenerator
+import Test.DeriveArbitrarySuchThat.DeriveSTLCGenerator
