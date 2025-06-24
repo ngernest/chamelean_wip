@@ -168,7 +168,7 @@ def mkTopLevelGenerator (baseGenerators : TSyntax `term) (inductiveGenerators : 
 
     -- Produces an instance of `ArbitrarySizedSuchThat` typeclass containing the definition for the derived generator
     `(instance : $ArbitrarySizedSuchThatTypeclass $targetTypeSyntax (fun $(mkIdent targetVar) => $inductiveStx $args*) where
-        $arbitrarySizedSTIdent:ident :=
+        $arbitrarySizedSTFn:ident :=
           let rec $auxArbIdent:ident $innerParams* : $generatorType :=
             $matchExpr
           fun $freshSizeIdent => $auxArbIdent $freshSizeIdent $freshSizeIdent $outerParams*)

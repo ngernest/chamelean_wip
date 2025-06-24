@@ -22,27 +22,26 @@ inductive Value where
   | int (i : Int)
   | tensor (shape : List Nat) (dtype : String)
 
-instance : ArbitrarySized Value where
-  arbitrarySized :=
-    let rec aux_arb (size : Nat) : Gen Value :=
-      match size with
-      | .zero => pure .none
-      | .succ size' =>
-        GeneratorCombinators.frequency (pure .none)
-          [(.succ size', GeneratorCombinators.thunkGen $ fun _ => do
-            let b ← Arbitrary.arbitrary
-            pure (Value.bool b)),
-            (.succ size', GeneratorCombinators.thunkGen $ fun _ => do
-               let i ← Arbitrary.arbitrary
-               pure (Value.int i)),
-            (.succ size', GeneratorCombinators.thunkGen $ fun _ => do
-                let shape ← Arbitrary.arbitrary
-                let dtype ← Arbitrary.arbitrary
-                pure (Value.tensor shape dtype))]
-    fun size => aux_arb size
+-- instance : ArbitrarySized Value where
+--   arbitrarySized :=
+--     let rec aux_arb (size : Nat) : Gen Value :=
+--       match size with
+--       | .zero => pure .none
+--       | .succ size' =>
+--         GeneratorCombinators.frequency (pure .none)
+--           [(.succ size', GeneratorCombinators.thunkGen $ fun _ => do
+--             let b ← Arbitrary.arbitrary
+--             pure (Value.bool b)),
+--             (.succ size', GeneratorCombinators.thunkGen $ fun _ => do
+--                let i ← Arbitrary.arbitrary
+--                pure (Value.int i)),
+--             (.succ size', GeneratorCombinators.thunkGen $ fun _ => do
+--                 let shape ← Arbitrary.arbitrary
+--                 let dtype ← Arbitrary.arbitrary
+--                 pure (Value.tensor shape dtype))]
+--     fun size => aux_arb size
 
 
-def tensorValue : Value := .tensor (dtype := "hello") (shape := [0])
 
 inductive MyList (α : Type) where
   | Nil

@@ -12,11 +12,18 @@ def backtrackFn : Ident := mkIdent $ Name.mkStr2 "OptionTGen" "backtrack"
 def frequencyFn : Ident := mkIdent $ Name.mkStr2 "GeneratorCombinators" "frequency"
 def interpSampleFn : Ident := mkIdent $ Name.mkStr3 "Plausible" "SampleableExt" "interpSample"
 def auxArbFn : Ident := mkIdent $ Name.mkStr1 "aux_arb"
+def pureIdent : Ident := mkIdent $ Name.mkStr1 "pure"
+
+-- Idents for size arguments to generators
+def initSizeIdent : Ident := mkIdent $ Name.mkStr1 "initSize"
+def sizeIdent : Ident := mkIdent $ Name.mkStr1 "size"
+
+/-- `Ident` representing `OptionT.fail`-/
+def failFn : Ident := mkIdent $ Name.mkStr2 "OptionT" "fail"
 
 -- Idents for typeclasses
 def ArbitrarySizedSuchThatTypeclass : Ident := mkIdent $ Name.mkStr1 "ArbitrarySizedSuchThat"
 def arbitrarySizedTypeclass : Ident := mkIdent $ Name.mkStr1 "ArbitrarySized"
-
 
 -- Idents for typeclass functions
 def arbitraryFn : Ident := mkIdent $ Name.mkStr2 "Arbitrary" "arbitrary"
@@ -25,15 +32,12 @@ def arbitrarySTFn : Ident := mkIdent $ Name.mkStr2 "ArbitrarySuchThat" "arbitrar
 def arbitrarySizedSTFn : Ident := mkIdent $ Name.mkStr2 "ArbitrarySizedSuchThat" "arbitrarySizedST"
 def decOptFn : Ident := mkIdent $ Name.mkStr2 "DecOpt" "decOpt"
 
-/-- `Ident` representing `OptionT.fail`-/
-def failFn : Ident := mkIdent $ Name.mkStr2 "OptionT" "fail"
 
+-- Idents for commonly-used types
 def natIdent : Ident := mkIdent ``Nat
 def optionTIdent : Ident := mkIdent ``OptionT
 def genIdent : Ident := mkIdent ``Plausible.Gen
-def pureIdent : Ident := mkIdent $ Name.mkStr1 "pure"
-def initSizeIdent : Ident := mkIdent $ Name.mkStr1 "initSize"
-def sizeIdent : Ident := mkIdent $ Name.mkStr1 "size"
+
 
 /-- Produces a fresh user-facing & *accessible* identifier with respect to the local context
     - Note: prefer using this function over `Core.mkFreshUserName`, which is meant

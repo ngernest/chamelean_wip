@@ -70,16 +70,30 @@ def elabDeriveArbitrary : CommandElab := fun stx => do
             let pureGen ← `($pureIdent $ctorIdent)
             nonRecursiveGenerators := nonRecursiveGenerators.push pureGen
           else
-            -- TODO: Call `arbitrary` for each of the arguments
-            sorry
-        else
-          -- TODO: figure out how to handle recursive constructors
-          sorry
+            -- Produce a fresh name for each of the args to the constructor
+            let ctorArgNames := Prod.fst <$> ctorArgNamesTypes
+            let freshArgIdents := Lean.mkIdent <$> genFreshNames (existingNames := ctorArgNames) (namePrefixes := ctorArgNames)
+            let mut doElems := #[]
 
-      -- TODO: find a more intelligent way of determining the default generator
-      -- ^^ just use the first sub-generator branch as the default case for `GeneratorCombinators.frequency`
-      let ctorIdent := mkIdent inductiveVal.ctors[0]!
-      let defaultGenerator ← `($pureIdent $ctorIdent)
+            -- Call `arbitrary` to generate a random value for each of the arguments
+            for freshIdent in freshArgIdents do
+              let bindExpr ← liftTermElabM $ mkLetBind freshIdent #[arbitraryFn]
+              doElems := doElems.push bindExpr
+
+            -- Create an expression `return C x1 ... xn` at the end of the generator, where
+            -- `C` is the constructor name and the `xi` are the genreated values for the args
+            let pureExpr ← `(doElem| return $ctorIdent $freshArgIdents*)
+            doElems := doElems.push pureExpr
+
+            -- Put the body of the generator together
+            let generatorBody ← liftTermElabM $ mkDoBlock doElems
+            nonRecursiveGenerators := nonRecursiveGenerators.push generatorBody
+        -- else
+          -- TODO: figure out how to handle recursive constructors
+          -- sorry
+
+      -- Just use the first non-recursive generator as the default generator
+      let defaultGenerator := nonRecursiveGenerators[0]!
 
       -- TODO: figure out how to handle generators for non-trivial constructors
 
@@ -93,13 +107,19 @@ def elabDeriveArbitrary : CommandElab := fun stx => do
       let auxArbIdent := mkFreshAccessibleIdent localCtx `aux_arb
       let generatorType ← `($genIdent $typeIdent)
 
+      let mut thunkedNonRecursiveGenerators := #[]
+      for generatorBody in nonRecursiveGenerators do
+        let thunkedGen ← `((1, $thunkGenFn (fun _ => $generatorBody)))
+        thunkedNonRecursiveGenerators := thunkedNonRecursiveGenerators.push thunkedGen
+      let mut baseCaseGenerators ← `([$thunkedNonRecursiveGenerators,*])
+
       -- Create the cases for the pattern-match on the size argument
-      -- TODO: fill in the list of generators that is supplied to `frequency`
       let mut caseExprs := #[]
-      let zeroCase ← `(Term.matchAltExpr| | $(mkIdent ``Nat.zero) => $frequencyFn $defaultGenerator [])
+      let zeroCase ← `(Term.matchAltExpr| | $(mkIdent ``Nat.zero) => $frequencyFn $defaultGenerator $baseCaseGenerators)
       caseExprs := caseExprs.push zeroCase
 
-      let succCase ← `(Term.matchAltExpr| | $(mkIdent ``Nat.succ) $freshSize' => $frequencyFn $defaultGenerator [])
+      -- TODO: replace `baseCaseGenerators` with something else
+      let succCase ← `(Term.matchAltExpr| | $(mkIdent ``Nat.succ) $freshSize' => $frequencyFn $defaultGenerator $baseCaseGenerators)
       caseExprs := caseExprs.push succCase
 
       -- Create function argument for the generator size
@@ -108,7 +128,7 @@ def elabDeriveArbitrary : CommandElab := fun stx => do
 
       let typeclassInstance ←
         `(instance : $(mkIdent ``ArbitrarySized) $(mkIdent typeName) where
-            $arbitrarySizedIdent:ident :=
+            $arbitrarySizedFn:ident :=
               let rec $auxArbIdent:ident $sizeParam : $generatorType :=
                 $matchExpr
             fun $freshSizeIdent => $auxArbIdent $freshSizeIdent)

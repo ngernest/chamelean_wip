@@ -30,7 +30,7 @@ def genInputForInductive (fvar : FVarId) (hyp : Expr) (idx : Nat) (generationSty
   let rhsTerms :=
     match generationStyle with
     | .RecursiveCall => #[auxArbFn, initSizeIdent, mkIdent `size'] ++ argTerms
-    | .TypeClassResolution => #[qualifiedarbitrarySizedSTIdent, generatorConstraint]
+    | .TypeClassResolution => #[arbitrarySTFn, generatorConstraint]
 
   mkLetBind lhs rhsTerms
 
@@ -51,7 +51,7 @@ def mkVariableEqualityCheckMatchExpr (syntaxKind : SyntaxNodeKind) (variableEqua
   (retExpr : TSyntax `term) : TermElabM (TSyntax syntaxKind) := do
 
   let equality := variableEqualities[0]!
-  let scrutinee ← `($qualifiedDecOptIdent:ident ($equality) $initSizeIdent)
+  let scrutinee ← `($decOptFn:ident ($equality) $initSizeIdent)
 
   let trueCase ← `(Term.matchAltExpr| | $(mkIdent ``some) $(mkIdent ``true) => $retExpr:term)
   let catchAllCase ← `(Term.matchAltExpr| | _ => $failFn)
