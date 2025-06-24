@@ -47,7 +47,9 @@ inductive MyList (α : Type) where
   | Nil
   | Cons (x : α) (xs : MyList α)
 
--- #derive_arbitrary Value
+#derive_arbitrary Value
+
+#eval runArbitrary (α := Value) 10
 
 
 /- Example usage:

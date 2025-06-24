@@ -33,3 +33,10 @@ instance [Repr α] [Shrinkable α] [ArbitrarySized α] : SampleableExt α :=
     can be made an instance of our `Arbitrary` typeclass -/
 instance [SampleableExt α] : Arbitrary α where
   arbitrary := SampleableExt.interp <$> SampleableExt.sample
+
+/-- Samples from the generator associated with the `Arbitrary` instance for a type,
+    using `size` as the size parameter for the genreator.
+    To invoke this function, you will need to specify what type `α` is,
+    for example by doing `runArbitrary (α := Nat) 10`. -/
+def runArbitrary {α} [Arbitrary α] (size : Nat) : IO α :=
+  Gen.run Arbitrary.arbitrary size
