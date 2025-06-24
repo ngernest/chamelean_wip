@@ -89,10 +89,7 @@ def elabDeriveArbitrary : CommandElab := fun stx => do
       for ctorName in inductiveVal.ctors do
         let ctorIdent := mkIdent ctorName
 
-        -- TODO: figure out how to support ADTs where the args don't have names
         let ctorArgNamesTypes ← liftTermElabM $ getCtorArgsNamesAndTypes ctorName
-
-        logInfo m!"ctor {ctorName} has args {ctorArgNamesTypes}"
 
         if ctorArgNamesTypes.isEmpty then
           -- Constructor is nullary, we can just use a generator of the form `pure ...`

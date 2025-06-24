@@ -308,18 +308,18 @@ def Actions_for_hypotheses (ctor : InductiveConstructor) (fvars : Array FVarId) 
         let (uninitializedArgIdx, uninitializedFVars, fVarsToBeInitialized)
           ← getLastUninitializedArgAndFVars hyp initializedFVars
 
-        logWarning m!"hyp = {hyp}"
-        logWarning m!"uninitializedArgIdx = {uninitializedArgIdx}, uninitializedFVars = {repr uninitializedFVars}, fVarsToBeInitialized = {repr fVarsToBeInitialized}"
+        -- logWarning m!"hyp = {hyp}"
+        -- logWarning m!"uninitializedArgIdx = {uninitializedArgIdx}, uninitializedFVars = {repr uninitializedFVars}, fVarsToBeInitialized = {repr fVarsToBeInitialized}"
 
 
         for fid in uninitializedFVars do
           let ty := ctor.bound_var_ctx.get! fid
           result := result.push (.genFVar fid ty)
-          logWarning m!"result = {repr result}"
+          -- logWarning m!"result = {repr result}"
 
         let argToGenerate := hyp.getAppArgs[uninitializedArgIdx]!
 
-        logWarning m!"argToGenerate = {repr argToGenerate}"
+        -- logWarning m!"argToGenerate = {repr argToGenerate}"
 
         initializedFVars := Array.appendUniqueElements initializedFVars uninitializedFVars
 
@@ -328,13 +328,13 @@ def Actions_for_hypotheses (ctor : InductiveConstructor) (fvars : Array FVarId) 
           then .RecursiveCall
           else .TypeClassResolution
 
-        logWarning m!"generationStyle = {repr generationStyle}"
+        -- logWarning m!"generationStyle = {repr generationStyle}"
         logWarning "*******************"
 
         if argToGenerate.isFVar then
           let fvarToGenerate := argToGenerate.fvarId!
           result := result.push (.genInputForInductive fvarToGenerate hyp uninitializedArgIdx generationStyle)
-          logWarning m!"result = {repr result}"
+          -- logWarning m!"result = {repr result}"
         else
           let nameOfFVarToGenerate := Name.mkStr1 ("tcond" ++ toString i)
           let fvarToGenerate := FVarId.mk nameOfFVarToGenerate

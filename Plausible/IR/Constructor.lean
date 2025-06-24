@@ -382,7 +382,7 @@ def mkSubGeneratorInfoFromConstructor (ctor : InductiveConstructor) (inputNames 
 -/
 def backtrackElem_if_return_producer (subGeneratorInfo : SubGeneratorInfo) (indentation : String) (vars: List String) (monad: String :="IO"): MetaM String := do
   logWarning "inside backtrackElem_if_return_producer"
-  logWarning m!"subGeneratorInfo = {subGeneratorInfo}"
+  -- logWarning m!"subGeneratorInfo = {subGeneratorInfo}"
 
   let mut out := ""
   if subGeneratorInfo.variableEqualities.size + subGeneratorInfo.groupedActions.checkNonInductiveActions.size + subGeneratorInfo.groupedActions.checkInductiveActions.size > 0 then
