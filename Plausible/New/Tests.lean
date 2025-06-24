@@ -9,6 +9,24 @@ import Plausible.New.STLC
 
 open ArbitrarySizedSuchThat OptionTGen
 
+/-- Dummy inductive relation for testing purposes -/
+inductive RGB where
+| Red
+| Green
+| Blue
+
+inductive Value where
+  | none
+  | bool (value : Bool)
+  | int (value : Int)
+  | tensor (shape : List Nat) (dtype : String)
+
+inductive MyList (α : Type) where
+  | Nil
+  | Cons (x : α) (xs : MyList α)
+
+#derive_arbitrary Value
+
 
 /- Example usage:
   ```

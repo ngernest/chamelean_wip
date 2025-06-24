@@ -1,11 +1,12 @@
 import Lean
+import Plausible.IR.Prelude
 import Plausible.New.Idents
 import Plausible.New.TSyntaxCombinators
 import Plausible.New.Arbitrary
 import Plausible.New.Utils
 
 open Lean Elab Command Meta Term Parser
-open Idents
+open Plausible.IR Idents
 
 instance : ToMessageData ConstructorVal where
   toMessageData ctorVal :=
@@ -37,7 +38,17 @@ def elabDeriveArbitrary : CommandElab := fun stx => do
 
       for ctorName in inductiveVal.ctors do
         let ctorVal ← getConstInfoCtor ctorName
-        -- logInfo m!"ctorVal = {ctorVal}"
+        let ctorType := ctorVal.type
+
+        -- We assume that constructor types don't contain any universally-quantified type variables
+        -- `decomposedCtorType` is an array containing each component
+        -- in the arrow type describing the constructor
+        let (_, _, decomposedCtorType) ← liftTermElabM $ decomposeType ctorType
+
+        -- Delete the final element of `decomposedCtorType` to obtain
+        -- an array containing only the argument types
+        let ctorArgTypes := Array.pop decomposedCtorType
+        logInfo m!"{ctorVal.name} has argument types {ctorArgTypes}"
 
       -- TODO: figure out what to do here
       if not (← List.allM (fun ctorName => liftTermElabM $ isConstructorRecursive typeName ctorName) inductiveVal.ctors) then

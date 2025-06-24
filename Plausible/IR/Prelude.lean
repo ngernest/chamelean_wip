@@ -114,7 +114,7 @@ partial def extractForAllBinders (e : Expr) : Array (Name × Expr) × Expr :=
     (i.e. `∀ (x1 : τ1) … (xn : τn), Q1 → … → Qn → P`), and returns a triple of the form
     `(#[(x1, τ1), …, (xn, τn)], Q1 → … → Qn → P, #[Q1, …, Qn, P])`.
     - The 2nd component is the body of the forall-expression
-    - The 3rd componnent is an array containing each subterm of the arrow type -/
+    - The 3rd component is an array containing each subterm of the arrow type -/
 def decomposeType (e : Expr) : MetaM (Array (Name × Expr) × Expr × Array Expr) := do
   let (binder, exp) := extractForAllBinders e
   let tyexp ← getComponentsOfArrowType exp
