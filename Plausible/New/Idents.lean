@@ -31,7 +31,7 @@ def arbitraryFn : Ident := mkIdent $ Name.mkStr2 "Arbitrary" "arbitrary"
 def arbitrarySizedFn : Ident := mkIdent $ Name.mkStr2 "ArbitrarySized" "arbitrarySized"
 def unqualifiedArbitrarySizedFn : Ident := mkIdent $ Name.mkStr1 "arbitrarySized"
 def arbitrarySTFn : Ident := mkIdent $ Name.mkStr2 "ArbitrarySuchThat" "arbitraryST"
-def arbitrarySizedSTFn : Ident := mkIdent $ Name.mkStr2 "ArbitrarySizedSuchThat" "arbitrarySizedST"
+def unqualifiedArbitrarySizedSTFn : Ident := mkIdent $ Name.mkStr1 "arbitrarySizedST"
 def decOptFn : Ident := mkIdent $ Name.mkStr2 "DecOpt" "decOpt"
 
 
