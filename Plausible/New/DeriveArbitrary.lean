@@ -41,13 +41,19 @@ def getCtorArgsNamesAndTypes (ctorName : Name) : MetaM (Array (Name × Expr)) :=
     return argNamesAndTypes
 
 
-syntax (name := derive_arbitrary) "#derive_arbitrary" ident : command
+syntax (name := derive_arbitrary) "#derive_arbitrary" term : command
 
 /-- Derives an instance of the `ArbitrarySized` typeclass -/
 @[command_elab derive_arbitrary]
 def elabDeriveArbitrary : CommandElab := fun stx => do
   match stx with
-  | `(#derive_arbitrary $targetTypeIdent:ident) => do
+  | `(#derive_arbitrary $targetTypeTerm:term) => do
+
+    -- TODO: figure out how to support parameterized types
+    let targetTypeIdent ←
+      match targetTypeTerm with
+      | `($tyIdent:ident) => pure tyIdent
+      | _ => throwErrorAt targetTypeTerm "Parameterized types not supported"
     let targetTypeName := targetTypeIdent.getId
 
     let isInductiveType ← isInductive targetTypeName
@@ -107,7 +113,7 @@ def elabDeriveArbitrary : CommandElab := fun stx => do
               doElems := doElems.push bindExpr
 
           -- Create an expression `return C x1 ... xn` at the end of the generator, where
-          -- `C` is the constructor name and the `xi` are the genreated values for the args
+          -- `C` is the constructor name and the `xi` are the generated values for the args
           let pureExpr ← `(doElem| return $ctorIdent $freshArgIdents*)
           doElems := doElems.push pureExpr
 
