@@ -107,19 +107,22 @@ def elabDeriveArbitrary : CommandElab := fun stx => do
       let auxArbIdent := mkFreshAccessibleIdent localCtx `aux_arb
       let generatorType ← `($genIdent $typeIdent)
 
-      let mut thunkedNonRecursiveGenerators := #[]
-      for generatorBody in nonRecursiveGenerators do
-        let thunkedGen ← `((1, $generatorCombinatorsThunkGenFn (fun _ => $generatorBody)))
-        thunkedNonRecursiveGenerators := thunkedNonRecursiveGenerators.push thunkedGen
-      let mut baseCaseGenerators ← `([$thunkedNonRecursiveGenerators,*])
+      let thunkedNonRecursiveGenerators ←
+        Array.mapM (fun generatorBody => `($generatorCombinatorsThunkGenFn (fun _ => $generatorBody))) nonRecursiveGenerators
+
+      let mut weightedThunkedNonRecursiveGens := #[]
+      for thunkedGen in thunkedNonRecursiveGenerators do
+        let thunkedGen ← `((1, $thunkedGen))
+        weightedThunkedNonRecursiveGens := weightedThunkedNonRecursiveGens.push thunkedGen
+      let mut weightedBaseCaseGenerators ← `([$weightedThunkedNonRecursiveGens,*])
 
       -- Create the cases for the pattern-match on the size argument
       let mut caseExprs := #[]
-      let zeroCase ← `(Term.matchAltExpr| | $(mkIdent ``Nat.zero) => $frequencyFn $defaultGenerator $baseCaseGenerators)
+      let zeroCase ← `(Term.matchAltExpr| | $(mkIdent ``Nat.zero) => $oneOfWithDefaultFn $defaultGenerator [$thunkedNonRecursiveGenerators,*])
       caseExprs := caseExprs.push zeroCase
 
       -- TODO: replace `baseCaseGenerators` with something else
-      let succCase ← `(Term.matchAltExpr| | $(mkIdent ``Nat.succ) $freshSize' => $frequencyFn $defaultGenerator $baseCaseGenerators)
+      let succCase ← `(Term.matchAltExpr| | $(mkIdent ``Nat.succ) $freshSize' => $frequencyFn $defaultGenerator $weightedBaseCaseGenerators)
       caseExprs := caseExprs.push succCase
 
       -- Create function argument for the generator size
