@@ -21,6 +21,8 @@ inductive Value where
   | int (value : Int)
   | tensor (shape : List Nat) (dtype : String)
 
+def tensorValue : Value := .tensor (dtype := "hello") (shape := [0])
+
 inductive MyList (α : Type) where
   | Nil
   | Cons (x : α) (xs : MyList α)

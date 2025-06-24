@@ -8,6 +8,7 @@ import Plausible.New.Utils
 open Lean Elab Command Meta Term Parser
 open Plausible.IR Idents
 
+/-- `ToMessageData` instance for pretty-printing `ConstructorVal`s -/
 instance : ToMessageData ConstructorVal where
   toMessageData ctorVal :=
     let fields := [
@@ -21,6 +22,16 @@ instance : ToMessageData ConstructorVal where
       m!"isUnsafe := {ctorVal.isUnsafe}"
     ]
     .bracket "{" (.ofList fields) "}"
+
+def getConstructorInfo (ctorName : Name) : MetaM (Array (Name × Expr)) := do
+  let ctorInfo ← getConstInfoCtor ctorName
+
+  forallTelescopeReducing ctorInfo.type fun args _ => do
+    let mut argNamesAndTypes := #[]
+    for arg in args.toList do
+      let localDecl ← arg.fvarId!.getDecl
+      argNamesAndTypes := Array.push argNamesAndTypes (localDecl.userName, localDecl.type)
+    return argNamesAndTypes
 
 
 syntax (name := derive_arbitrary) "#derive_arbitrary" ident : command
@@ -39,6 +50,8 @@ def elabDeriveArbitrary : CommandElab := fun stx => do
       let mut nonRecursiveGenerators : TSyntaxArray `term := #[]
       for ctorName in inductiveVal.ctors do
         let ctorVal ← getConstInfoCtor ctorName
+        logInfo m!"ctorVal = {ctorVal}"
+
         let ctorType := ctorVal.type
 
         -- We assume that constructor types don't contain any universally-quantified type variables
@@ -49,14 +62,13 @@ def elabDeriveArbitrary : CommandElab := fun stx => do
         -- Delete the final element of `decomposedCtorType` to obtain
         -- an array containing only the argument types
         let ctorArgTypes := Array.pop decomposedCtorType
-        logInfo m!"{ctorVal.name} has argument types {ctorArgTypes}"
 
         let ctorIsRecursive ← liftTermElabM $ isConstructorRecursive typeName ctorName
-        if !ctorIsRecursive then
-          sorry
-        else
-          -- TODO: figure out how to handle recursive constructors
-          sorry
+        -- if !ctorIsRecursive then
+        --   sorry
+        -- else
+        --   -- TODO: figure out how to handle recursive constructors
+        --   sorry
 
       -- TODO: find a more intelligent way of determining the default generator
       -- ^^ just use the first sub-generator branch as the default case for `GeneratorCombinators.frequency`
