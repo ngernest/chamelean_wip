@@ -26,7 +26,15 @@ inductive MyList where
   | Nil
   | Cons (x : Nat) (xs : MyList)
 
--- #derive_arbitrary MyList
+inductive MyListAnon where
+  | Nil : MyListAnon
+  | Cons : Nat -> MyListAnon -> MyListAnon
+
+-- #derive_arbitrary MyListAnon
+
+-- #derive_arbitrary Tree
+-- #derive_arbitrary type
+-- #derive_arbitrary term
 -- #derive_arbitrary Value
 
 -- #eval runArbitrary (α := MyList) 10

@@ -68,10 +68,11 @@ def genFreshName (existingNames : Array Name) (namePrefix : Name) : Name :=
     return freshName
 
 /-- `genFreshNames existingNames namePrefixes` produces an array of fresh names, all of them
-    guaranteed to be not in `existingNames`,
-    where the `i`-th fresh name produced has prefix `namePrefixes[i]` -/
-def genFreshNames (existingNames : Array Name) (namePrefixes : Array Name) : Array Name :=
-  Array.map (fun name => genFreshName existingNames name) namePrefixes
+    guaranteed to be not in `existingNames`, where the `i`-th fresh name produced has prefix `namePrefixes[i]`.
 
+    This function is implemented using a fold: when producing the `i`-th fresh name,
+    we ensure that it does not clash with `existingNames` *and* the previous `i-1` fresh names produced. -/
+def genFreshNames (existingNames : Array Name) (namePrefixes : Array Name) : Array Name :=
+  Array.foldl (fun acc name => Array.push acc (genFreshName (acc ++ existingNames) name)) #[] namePrefixes
 
 end Idents

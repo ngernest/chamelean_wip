@@ -24,7 +24,20 @@ instance : ToMessageData ConstructorVal where
     .bracket "{" (.ofList fields) "}"
 
 /-- Takes the name of a constructor for an algebraic data type and returns an array
-    containing `(argument_name, argument_type)` pairs  -/
+    containing `(argument_name, argument_type)` pairs.
+
+    If the algebraic data type is defined using anonymous constructor argument syntax, i.e.
+    ```
+    inductive T where
+      C1 : τ1 → … → τn
+      …
+    ```
+    Lean produces macro scopes when we try to access the names for the constructor args.
+    In this case, we remove the macro scopes so that the name is user-accessible.
+    (This will result in constructor argument names being non-unique in the array
+    that is returned -- it is the caller's responsibility to produce fresh names,
+    e.g. using `Idents.genFreshNames`.)
+-/
 def getCtorArgsNamesAndTypes (ctorName : Name) : MetaM (Array (Name × Expr)) := do
   let ctorInfo ← getConstInfoCtor ctorName
 
@@ -32,11 +45,13 @@ def getCtorArgsNamesAndTypes (ctorName : Name) : MetaM (Array (Name × Expr)) :=
     let mut argNamesAndTypes := #[]
     for arg in args.toList do
       let localDecl ← arg.fvarId!.getDecl
-      argNamesAndTypes := Array.push argNamesAndTypes (localDecl.userName, localDecl.type)
-
-    -- Delete the final element of `decomposedCtorType` to obtain
-    -- an array containing only the argument types
-    -- argNamesAndTypes := Array.pop argNamesAndTypes
+      let mut argName := localDecl.userName
+      -- Check if the name has macro scopes
+      -- If so, remove them so that we can produce a user-accessible name
+      -- (macro scopes appear in the name )
+      if argName.hasMacroScopes then
+        argName := Name.eraseMacroScopes argName
+      argNamesAndTypes := Array.push argNamesAndTypes (argName, localDecl.type)
 
     return argNamesAndTypes
 
@@ -74,6 +89,7 @@ def elabDeriveArbitrary : CommandElab := fun stx => do
       for ctorName in inductiveVal.ctors do
         let ctorIdent := mkIdent ctorName
 
+        -- TODO: figure out how to support ADTs where the args don't have names
         let ctorArgNamesTypes ← liftTermElabM $ getCtorArgsNamesAndTypes ctorName
 
         logInfo m!"ctor {ctorName} has args {ctorArgNamesTypes}"
