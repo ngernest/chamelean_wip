@@ -7,8 +7,9 @@ open Lean Meta
 namespace Idents
 
 -- Idents for commonly-called functions
-def thunkGenFn : Ident := mkIdent $ Name.mkStr2 "OptionTGen" "thunkGen"
-def backtrackFn : Ident := mkIdent $ Name.mkStr2 "OptionTGen" "backtrack"
+def OptionTThunkGenFn : Ident := mkIdent $ Name.mkStr2 "OptionTGen" "thunkGen"
+def OptionTBacktrackFn : Ident := mkIdent $ Name.mkStr2 "OptionTGen" "backtrack"
+def generatorCombinatorsThunkGenFn : Ident := mkIdent $ Name.mkStr2 "GeneratorCombinators" "thunkGen"
 def frequencyFn : Ident := mkIdent $ Name.mkStr2 "GeneratorCombinators" "frequency"
 def interpSampleFn : Ident := mkIdent $ Name.mkStr3 "Plausible" "SampleableExt" "interpSample"
 def auxArbFn : Ident := mkIdent $ Name.mkStr1 "aux_arb"
@@ -22,12 +23,13 @@ def sizeIdent : Ident := mkIdent $ Name.mkStr1 "size"
 def failFn : Ident := mkIdent $ Name.mkStr2 "OptionT" "fail"
 
 -- Idents for typeclasses
-def ArbitrarySizedSuchThatTypeclass : Ident := mkIdent $ Name.mkStr1 "ArbitrarySizedSuchThat"
+def arbitrarySizedSuchThatTypeclass : Ident := mkIdent $ Name.mkStr1 "ArbitrarySizedSuchThat"
 def arbitrarySizedTypeclass : Ident := mkIdent $ Name.mkStr1 "ArbitrarySized"
 
 -- Idents for typeclass functions
 def arbitraryFn : Ident := mkIdent $ Name.mkStr2 "Arbitrary" "arbitrary"
 def arbitrarySizedFn : Ident := mkIdent $ Name.mkStr2 "ArbitrarySized" "arbitrarySized"
+def unqualifiedArbitrarySizedFn : Ident := mkIdent $ Name.mkStr1 "arbitrarySized"
 def arbitrarySTFn : Ident := mkIdent $ Name.mkStr2 "ArbitrarySuchThat" "arbitraryST"
 def arbitrarySizedSTFn : Ident := mkIdent $ Name.mkStr2 "ArbitrarySizedSuchThat" "arbitrarySizedST"
 def decOptFn : Ident := mkIdent $ Name.mkStr2 "DecOpt" "decOpt"

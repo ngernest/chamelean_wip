@@ -132,10 +132,10 @@ def mkTopLevelGenerator (baseGenerators : TSyntax `term) (inductiveGenerators : 
 
     -- Create the cases for the pattern-match on the size argument
     let mut caseExprs := #[]
-    let zeroCase ← `(Term.matchAltExpr| | $(mkIdent ``Nat.zero) => $backtrackFn $baseGenerators)
+    let zeroCase ← `(Term.matchAltExpr| | $(mkIdent ``Nat.zero) => $OptionTBacktrackFn $baseGenerators)
     caseExprs := caseExprs.push zeroCase
 
-    let succCase ← `(Term.matchAltExpr| | $(mkIdent ``Nat.succ) $freshSize' => $backtrackFn $inductiveGenerators)
+    let succCase ← `(Term.matchAltExpr| | $(mkIdent ``Nat.succ) $freshSize' => $OptionTBacktrackFn $inductiveGenerators)
     caseExprs := caseExprs.push succCase
 
     -- Create function arguments for the generator's `size` & `initSize` parameters
@@ -167,7 +167,7 @@ def mkTopLevelGenerator (baseGenerators : TSyntax `term) (inductiveGenerators : 
         innerParams := innerParams.push innerParam
 
     -- Produces an instance of `ArbitrarySizedSuchThat` typeclass containing the definition for the derived generator
-    `(instance : $ArbitrarySizedSuchThatTypeclass $targetTypeSyntax (fun $(mkIdent targetVar) => $inductiveStx $args*) where
+    `(instance : $arbitrarySizedSuchThatTypeclass $targetTypeSyntax (fun $(mkIdent targetVar) => $inductiveStx $args*) where
         $arbitrarySizedSTFn:ident :=
           let rec $auxArbIdent:ident $innerParams* : $generatorType :=
             $matchExpr

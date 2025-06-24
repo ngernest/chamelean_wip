@@ -109,7 +109,7 @@ def elabDeriveArbitrary : CommandElab := fun stx => do
 
       let mut thunkedNonRecursiveGenerators := #[]
       for generatorBody in nonRecursiveGenerators do
-        let thunkedGen ← `((1, $thunkGenFn (fun _ => $generatorBody)))
+        let thunkedGen ← `((1, $generatorCombinatorsThunkGenFn (fun _ => $generatorBody)))
         thunkedNonRecursiveGenerators := thunkedNonRecursiveGenerators.push thunkedGen
       let mut baseCaseGenerators ← `([$thunkedNonRecursiveGenerators,*])
 
@@ -127,8 +127,8 @@ def elabDeriveArbitrary : CommandElab := fun stx => do
       let matchExpr ← liftTermElabM $ mkMatchExpr sizeIdent caseExprs
 
       let typeclassInstance ←
-        `(instance : $(mkIdent ``ArbitrarySized) $(mkIdent typeName) where
-            $arbitrarySizedFn:ident :=
+        `(instance : $arbitrarySizedTypeclass $(mkIdent typeName) where
+            $unqualifiedArbitrarySizedFn:ident :=
               let rec $auxArbIdent:ident $sizeParam : $generatorType :=
                 $matchExpr
             fun $freshSizeIdent => $auxArbIdent $freshSizeIdent)

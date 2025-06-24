@@ -241,12 +241,12 @@ def mkWeightedThunkedSubGenerators (subGeneratorInfos : Array SubGeneratorInfo) 
   let mut weightedGenerators := #[]
 
   for (weight, generatorBody) in Array.zip generatorWeights subGenerators do
-    let thunkedGenerator ← `(($weight, $thunkGenFn (fun _ => $generatorBody)))
+    let thunkedGenerator ← `(($weight, $OptionTThunkGenFn (fun _ => $generatorBody)))
     weightedGenerators := weightedGenerators.push thunkedGenerator
 
   -- Add generator that always fails for the case when `size == 0`
   -- (to represent running out of fuel / inability to synthesize a generator)
   if let .BaseGenerator := generatorSort then
-    weightedGenerators := weightedGenerators.push (← `((1, $thunkGenFn (fun _ => $failFn))))
+    weightedGenerators := weightedGenerators.push (← `((1, $OptionTThunkGenFn (fun _ => $failFn))))
 
   `([$weightedGenerators,*])
