@@ -95,7 +95,7 @@ def mkSubGeneratorBody (doBlock : TSyntaxArray `doElem) (argToGenTerm : Term) (n
   -- so we can just create `pure $argToGenTerm` without needing
   -- to create a do-block
   } else {
-    let retExpr ← `($pureIdent $argToGenTerm:term)
+    let retExpr ← `($pureFn $argToGenTerm:term)
     -- If there are any variable equalities that we need to check,
     -- create a match expression before doing `pure $argToGenTerm`
     if !variableEqualitiesToCheck.isEmpty then {

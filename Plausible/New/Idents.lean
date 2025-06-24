@@ -14,7 +14,7 @@ def frequencyFn : Ident := mkIdent $ Name.mkStr2 "GeneratorCombinators" "frequen
 def oneOfWithDefaultFn : Ident := mkIdent $ Name.mkStr2 "GeneratorCombinators" "oneOfWithDefault"
 def interpSampleFn : Ident := mkIdent $ Name.mkStr3 "Plausible" "SampleableExt" "interpSample"
 def auxArbFn : Ident := mkIdent $ Name.mkStr1 "aux_arb"
-def pureIdent : Ident := mkIdent $ Name.mkStr1 "pure"
+def pureFn : Ident := mkIdent $ Name.mkStr1 "pure"
 
 -- Idents for size arguments to generators
 def initSizeIdent : Ident := mkIdent $ Name.mkStr1 "initSize"

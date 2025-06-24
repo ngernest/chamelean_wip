@@ -219,6 +219,7 @@ def elabDeriveGenerator : CommandElab := fun stx => do
     liftTermElabM $ Tactic.TryThis.addSuggestion stx
       (Format.pretty genFormat) (header := "Try this generator: ")
 
+    -- Elaborate the typeclass instance and add it to the local context
     elabCommand typeclassInstance
 
   | _ => throwUnsupportedSyntax

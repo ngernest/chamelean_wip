@@ -72,61 +72,57 @@ def elabDeriveArbitrary : CommandElab := fun stx => do
 
         logInfo m!"ctor {ctorName} has args {ctorArgNamesTypes}"
 
-        let ctorIsRecursive ← liftTermElabM $ isConstructorRecursive targetTypeName ctorName
-        -- Produce non-recursive generators (these correspond to non-recursive constructors)
         if ctorArgNamesTypes.isEmpty then
           -- Constructor is nullary, we can just use a generator of the form `pure ...`
-          let pureGen ← `($pureIdent $ctorIdent)
+          let pureGen ← `($pureFn $ctorIdent)
           nonRecursiveGenerators := nonRecursiveGenerators.push pureGen
         else
           -- Produce a fresh name for each of the args to the constructor
           let ctorArgNames := Prod.fst <$> ctorArgNamesTypes
           let freshArgIdents := Lean.mkIdent <$> genFreshNames (existingNames := ctorArgNames) (namePrefixes := ctorArgNames)
+
           let mut doElems := #[]
+
+          -- Determine whether the constructor has any recursive arguments
+          let ctorIsRecursive ← liftTermElabM $ isConstructorRecursive targetTypeName ctorName
           if !ctorIsRecursive then
             -- Call `arbitrary` to generate a random value for each of the arguments
             for freshIdent in freshArgIdents do
               let bindExpr ← liftTermElabM $ mkLetBind freshIdent #[arbitraryFn]
               doElems := doElems.push bindExpr
-
-            -- Create an expression `return C x1 ... xn` at the end of the generator, where
-            -- `C` is the constructor name and the `xi` are the genreated values for the args
-            let pureExpr ← `(doElem| return $ctorIdent $freshArgIdents*)
-            doElems := doElems.push pureExpr
-
-            -- Put the body of the generator together
-            let generatorBody ← liftTermElabM $ mkDoBlock doElems
-            nonRecursiveGenerators := nonRecursiveGenerators.push generatorBody
           else
             -- For recursive constructors, we need to examine each argument to see which of them require
             -- recursive calls to the generator
             let freshArgIdentsTypes := Array.zip freshArgIdents (Prod.snd <$> ctorArgNamesTypes)
             for (freshIdent, argType) in freshArgIdentsTypes do
-              if argType.getAppFn.constName == targetTypeName then
-                -- Produce a recursive call to `aux_arb`
-                let bindExpr ← liftTermElabM $ mkLetBind freshIdent #[auxArbFn, freshSize']
-                doElems := doElems.push bindExpr
-              else
-                -- Call `arbitrary` to generate a random value
-                let bindExpr ← liftTermElabM $ mkLetBind freshIdent #[arbitraryFn]
-                doElems := doElems.push bindExpr
+              -- If the argument's type is the same as the target type,
+              -- produce a recursive call to the generator using `aux_arb`,
+              -- otherwise generate a value using `arbitrary`
+              let bindExpr ←
+                liftTermElabM $
+                  if argType.getAppFn.constName == targetTypeName then
+                    mkLetBind freshIdent #[auxArbFn, freshSize']
+                  else
+                    mkLetBind freshIdent #[arbitraryFn]
+              doElems := doElems.push bindExpr
 
-            -- Create an expression `return C x1 ... xn` at the end of the generator, where
-            -- `C` is the constructor name and the `xi` are the genreated values for the args
-            let pureExpr ← `(doElem| return $ctorIdent $freshArgIdents*)
-            doElems := doElems.push pureExpr
+          -- Create an expression `return C x1 ... xn` at the end of the generator, where
+          -- `C` is the constructor name and the `xi` are the genreated values for the args
+          let pureExpr ← `(doElem| return $ctorIdent $freshArgIdents*)
+          doElems := doElems.push pureExpr
 
-            -- Put the body of the generator together
-            let generatorBody ← liftTermElabM $ mkDoBlock doElems
+          -- Put the body of the generator together
+          let generatorBody ← liftTermElabM $ mkDoBlock doElems
+          if !ctorIsRecursive then
+            nonRecursiveGenerators := nonRecursiveGenerators.push generatorBody
+          else
             recursiveGenerators := recursiveGenerators.push generatorBody
 
       -- Just use the first non-recursive generator as the default generator
       let defaultGenerator := nonRecursiveGenerators[0]!
 
-      -- TODO: figure out how to handle generators for non-trivial constructors
-
-      let generatorType ← `($genIdent $targetTypeIdent)
-
+      -- Turn each generator into a thunked function and associate each generator with its weight
+      -- (1 for non-recursive generators, `.succ size'` for recursive generators)
       let thunkedNonRecursiveGenerators ←
         Array.mapM (fun generatorBody => `($generatorCombinatorsThunkGenFn (fun _ => $generatorBody))) nonRecursiveGenerators
 
@@ -141,11 +137,12 @@ def elabDeriveArbitrary : CommandElab := fun stx => do
         weightedThunkedRecursiveGens := weightedThunkedRecursiveGens.push thunkedWeightedGen
 
       -- Create the cases for the pattern-match on the size argument
+      -- If `size = 0`, pick one of the thunked non-recursive generators
       let mut caseExprs := #[]
       let zeroCase ← `(Term.matchAltExpr| | $zeroIdent => $oneOfWithDefaultFn $defaultGenerator [$thunkedNonRecursiveGenerators,*])
       caseExprs := caseExprs.push zeroCase
 
-
+      -- If `size = .succ size'`, pick a generator (it can be non-recursive or recursive)
       let mut allThunkedWeightedGenerators ← `([$weightedThunkedNonRecursiveGens,*, $weightedThunkedRecursiveGens,*])
       let succCase ← `(Term.matchAltExpr| | $succIdent $freshSize' => $frequencyFn $defaultGenerator $allThunkedWeightedGenerators)
       caseExprs := caseExprs.push succCase
@@ -154,6 +151,8 @@ def elabDeriveArbitrary : CommandElab := fun stx => do
       let sizeParam ← `(Term.letIdBinder| ($sizeIdent : $natIdent))
       let matchExpr ← liftTermElabM $ mkMatchExpr sizeIdent caseExprs
 
+      -- Create an instance of the `ArbitrarySized` typeclass
+      let generatorType ← `($genIdent $targetTypeIdent)
       let typeclassInstance ←
         `(instance : $arbitrarySizedTypeclass $targetTypeIdent where
             $unqualifiedArbitrarySizedFn:ident :=
@@ -169,6 +168,7 @@ def elabDeriveArbitrary : CommandElab := fun stx => do
       liftTermElabM $ Tactic.TryThis.addSuggestion stx
         (Format.pretty genFormat) (header := "Try this generator: ")
 
+      -- Elaborate the typeclass instance and add it to the local context
       elabCommand typeclassInstance
 
   | _ => throwUnsupportedSyntax
