@@ -3,11 +3,12 @@ import Plausible.Gen
 
 import Plausible.New.OptionTGen
 import Plausible.New.DecOpt
+import Plausible.New.Arbitrary
 import Plausible.New.ArbitrarySizedSuchThat
 import Plausible.New.STLC
 
 
-open ArbitrarySizedSuchThat OptionTGen
+open Plausible ArbitrarySizedSuchThat OptionTGen
 
 /-- Dummy inductive relation for testing purposes -/
 inductive RGB where
@@ -17,9 +18,29 @@ inductive RGB where
 
 inductive Value where
   | none
-  | bool (value : Bool)
-  | int (value : Int)
+  | bool (b : Bool)
+  | int (i : Int)
   | tensor (shape : List Nat) (dtype : String)
+
+instance : ArbitrarySized Value where
+  arbitrarySized :=
+    let rec aux_arb (size : Nat) : Gen Value :=
+      match size with
+      | .zero => pure .none
+      | .succ size' =>
+        GeneratorCombinators.frequency (pure .none)
+          [(.succ size', GeneratorCombinators.thunkGen $ fun _ => do
+            let b ← Arbitrary.arbitrary
+            pure (Value.bool b)),
+            (.succ size', GeneratorCombinators.thunkGen $ fun _ => do
+               let i ← Arbitrary.arbitrary
+               pure (Value.int i)),
+            (.succ size', GeneratorCombinators.thunkGen $ fun _ => do
+                let shape ← Arbitrary.arbitrary
+                let dtype ← Arbitrary.arbitrary
+                pure (Value.tensor shape dtype))]
+    fun size => aux_arb size
+
 
 def tensorValue : Value := .tensor (dtype := "hello") (shape := [0])
 
@@ -27,7 +48,7 @@ inductive MyList (α : Type) where
   | Nil
   | Cons (x : α) (xs : MyList α)
 
-#derive_arbitrary Value
+-- #derive_arbitrary Value
 
 
 /- Example usage:

@@ -23,7 +23,9 @@ instance : ToMessageData ConstructorVal where
     ]
     .bracket "{" (.ofList fields) "}"
 
-def getConstructorInfo (ctorName : Name) : MetaM (Array (Name × Expr)) := do
+/-- Takes the name of a constructor for an algebraic data type and returns an array
+    containing `(argument_name, argument_type)` pairs  -/
+def getCtorArgsNamesAndTypes (ctorName : Name) : MetaM (Array (Name × Expr)) := do
   let ctorInfo ← getConstInfoCtor ctorName
 
   forallTelescopeReducing ctorInfo.type fun args _ => do
@@ -31,6 +33,11 @@ def getConstructorInfo (ctorName : Name) : MetaM (Array (Name × Expr)) := do
     for arg in args.toList do
       let localDecl ← arg.fvarId!.getDecl
       argNamesAndTypes := Array.push argNamesAndTypes (localDecl.userName, localDecl.type)
+
+    -- Delete the final element of `decomposedCtorType` to obtain
+    -- an array containing only the argument types
+    -- argNamesAndTypes := Array.pop argNamesAndTypes
+
     return argNamesAndTypes
 
 
@@ -49,26 +56,25 @@ def elabDeriveArbitrary : CommandElab := fun stx => do
 
       let mut nonRecursiveGenerators : TSyntaxArray `term := #[]
       for ctorName in inductiveVal.ctors do
-        let ctorVal ← getConstInfoCtor ctorName
-        logInfo m!"ctorVal = {ctorVal}"
+        let ctorIdent := mkIdent ctorName
 
-        let ctorType := ctorVal.type
+        let ctorArgNamesTypes ← liftTermElabM $ getCtorArgsNamesAndTypes ctorName
 
-        -- We assume that constructor types don't contain any universally-quantified type variables
-        -- `decomposedCtorType` is an array containing each component
-        -- in the arrow type describing the constructor
-        let (_, _, decomposedCtorType) ← liftTermElabM $ decomposeType ctorType
-
-        -- Delete the final element of `decomposedCtorType` to obtain
-        -- an array containing only the argument types
-        let ctorArgTypes := Array.pop decomposedCtorType
+        logInfo m!"ctor {ctorName} has args {ctorArgNamesTypes}"
 
         let ctorIsRecursive ← liftTermElabM $ isConstructorRecursive typeName ctorName
-        -- if !ctorIsRecursive then
-        --   sorry
-        -- else
-        --   -- TODO: figure out how to handle recursive constructors
-        --   sorry
+        if !ctorIsRecursive then
+          -- Produce non-recursive generators (these correspond to non-recursive constructors)
+          if ctorArgNamesTypes.isEmpty then
+            -- Constructor is nullary, we can just use a generator of the form `pure ...`
+            let pureGen ← `($pureIdent $ctorIdent)
+            nonRecursiveGenerators := nonRecursiveGenerators.push pureGen
+          else
+            -- TODO: Call `arbitrary` for each of the arguments
+            sorry
+        else
+          -- TODO: figure out how to handle recursive constructors
+          sorry
 
       -- TODO: find a more intelligent way of determining the default generator
       -- ^^ just use the first sub-generator branch as the default case for `GeneratorCombinators.frequency`
