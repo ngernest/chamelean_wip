@@ -80,7 +80,7 @@ def fresh : Unify Unknown :=
 -- Unification algorithm (fig. 3)
 ----------------------------------
 mutual
-  /-- Unifies two ranges -/
+  /-- Top-level unification function which unifies the ranges mapped to by two unknowns -/
   partial def unify : Range → Range → Unify Unit
     | .Unknown u1, .Unknown u2 =>
       if u1 == u2 then
@@ -102,14 +102,18 @@ mutual
       unifyRC (u2, r2) c1
     | _, _ => panic! "reached catch-all case in unify"
 
-  /-- Unifies two `(Unknown, Range)` pairs -/
+  /-- Takes two `(Unknown, Range)` pairs & unifies them based on their `Range`s -/
   partial def unifyR : Unknown × Range → Unknown × Range → Unify Unit
+    -- If the range of an unknown (e.g. `u1`) is undefined,
+    -- we update `u1` to point to the range of `u2`
     | (u1, .Undef _), (_, r2) => update u1 r2
     | (_, r1), (u2, .Undef _) => update u2 r1
     | (_, u1'@(.Unknown _)), (_, r2) => unify u1' r2
     | (_, r1), (_, u2'@(.Unknown _)) => unify r1 u2'
     | (_, c1@(.Ctr _ _)), (_, c2@(.Ctr _ _)) => unifyC c1 c2
     | (u1, .Fixed), (u2, .Fixed) => do
+      -- Assert that whatever the values of `u1` and `u2` are, they are equal
+      -- Record this equality check using `equality`, then update `u1`'s range to the other
       equality u1 u2
       update u1 .Fixed
     | (u1, .Fixed), (_, c2@(.Ctr _ _)) => handleMatch u1 c2
@@ -119,6 +123,8 @@ mutual
   partial def unifyC (r1 : Range) (r2 : Range) : Unify Unit :=
     match r1, r2 with
     | .Ctr c1 rs1, .Ctr c2 rs2 =>
+      -- Recursively unify each of the constructor arguments
+      -- Invariant: all ranges that appear as constructor args contain only constructors & unknowns
       if c1 == c2 && rs1.length == rs2.length then
         for (r1, r2) in (List.zip rs1 rs2) do
           unify r1 r2
@@ -126,7 +132,7 @@ mutual
         failure
     | _, _ => panic! "Case not handled in unifyC"
 
-  /-- Unifies an `(Unknown, Range)` pair with a `Range -/
+  /-- Unifies an `(Unknown, Range)` pair with a `Range` -/
   partial def unifyRC : Unknown × Range → Range → Unify Unit
     | (u1, .Undef _), c2@(.Ctr _ _) => update u1 c2
     | (_, .Unknown u'), c2@(.Ctr _ _) => do
@@ -159,10 +165,14 @@ mutual
       | .Undef _ => do
         -- Unknown becomes a pattern variable (bound by the pattern match)
         -- (i.e. the unknown serves as an input at runtime)
+        -- We update `u`'s range to be `fixed`
+        -- (since we're extracting information out of the scrutinee)
         update u .Fixed
         return (.Unknown u)
       | .Fixed => do
-        -- Handles non-linear patterns
+        -- Handles non-linear patterns:
+        -- produce a fresh unknown `u'`, use `u'` as the pattern variable
+        -- & enforce an equality check between `u` and `u'`
         let u' ← fresh
         equality u' u
         update u' r
