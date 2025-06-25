@@ -185,6 +185,18 @@ def elabGetMutualBlockdeps : CommandElab := fun stx => do
       print_m_arr_string mc_blocks
   | _ => throwError "Invalid syntax"
 
+mutual
+  inductive Even : Nat → Prop where
+    | zero_is_even : Even 0
+    | succ_of_odd_is_even : ∀ n : Nat, Odd n → Even (n + 1)
+
+  inductive Odd : Nat → Prop where
+    | succ_of_even_is_odd : ∀ n : Nat, Even n → Odd (n + 1)
+end
+
+#gen_mutual_rec_deps Even backtrack 100 monad "Gen"
+
+
 
 
 syntax (name := derivegeneratordeps) "#derive_generator_with_dependencies" term "backtrack" num: command
