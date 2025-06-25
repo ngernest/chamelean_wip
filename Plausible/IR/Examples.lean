@@ -2,13 +2,6 @@ import Plausible.Sampleable
 import Plausible.New.DeriveArbitrary
 open Plausible
 
-
-/-- Dummy inductive relation for testing purposes -/
-inductive RGB where
-| Red : RGB
-| Green : RGB
-| Blue : RGB
-
 /-- A datatype for binary trees -/
 inductive Tree where
 | Leaf : Tree

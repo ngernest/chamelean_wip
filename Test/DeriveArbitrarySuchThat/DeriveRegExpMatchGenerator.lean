@@ -1,26 +1,13 @@
 import Plausible.Gen
 import Plausible.New.OptionTGen
 import Plausible.New.DecOpt
-import Plausible.New.GenSizedSuchThat
+import Plausible.New.ArbitrarySizedSuchThat
 import Plausible.New.DeriveGenerator
+import Test.DeriveArbitrary.DeriveRegExpGenerator
 
-open GenSizedSuchThat OptionTGen
+open ArbitrarySizedSuchThat OptionTGen
 
 set_option guard_msgs.diff true
-
-/-- An inductive datatype representing regular expressions (where "characters" are `Nat`s).
-   Slightly modified from Software Foundations
-   See https://softwarefoundations.cis.upenn.edu/lf-current/IndProp.html
-   and search for "Case Study: Regular Expressions".
-   The `RegExp`s below are non-polymorphic in the character type. -/
-inductive RegExp : Type where
-| EmptySet : RegExp
-| EmptyStr : RegExp
-| Char : Nat → RegExp -- using Nat instead of Char
-| App : RegExp → RegExp → RegExp
-| Union : RegExp → RegExp → RegExp
-| Star : RegExp → RegExp
-
 
 /-- `ExpMatch s r` holds if `s` is a string contained in the language defined by `RegExp r`,
     i.e., it "matches" `r` (a string is represented here as a `List Nat`) -/
@@ -28,20 +15,20 @@ inductive ExpMatch : List Nat → RegExp → Prop where
 | MEmpty : ExpMatch [] RegExp.EmptyStr
 | MChar : ∀ x, ExpMatch [x] (RegExp.Char x)
 | MApp : ∀ s1 re1 s2 re2,
-           ExpMatch s1 re1 →
-           ExpMatch s2 re2 →
-           ExpMatch (s1 ++ s2) (RegExp.App re1 re2)
+  ExpMatch s1 re1 →
+  ExpMatch s2 re2 →
+  ExpMatch (s1 ++ s2) (RegExp.App re1 re2)
 | MUnionL : ∀ s1 re1 re2,
-              ExpMatch s1 re1 →
-              ExpMatch s1 (RegExp.Union re1 re2)
+  ExpMatch s1 re1 →
+  ExpMatch s1 (RegExp.Union re1 re2)
 | MUnionR : ∀ re1 s2 re2,
-              ExpMatch s2 re2 →
-              ExpMatch s2 (RegExp.Union re1 re2)
+  ExpMatch s2 re2 →
+  ExpMatch s2 (RegExp.Union re1 re2)
 | MStar0 : ∀ re, ExpMatch [] (RegExp.Star re)
 | MStarApp : ∀ s1 s2 re,
-               ExpMatch s1 re →
-               ExpMatch s2 (RegExp.Star re) →
-               ExpMatch (s1 ++ s2) (RegExp.Star re)
+  ExpMatch s1 re →
+  ExpMatch s2 (RegExp.Star re) →
+  ExpMatch (s1 ++ s2) (RegExp.Star re)
 
 -- Creates a string (sequential `App` of `Char`s) -/
 def reStr (l : List Nat) (ign : RegExp) : RegExp :=
@@ -66,8 +53,8 @@ def r0 : RegExp :=
 -- Generator for strings that match the regexp `r0`
 
 /--
-info: Try this generator: instance : GenSizedSuchThat (List Nat) (fun s => ExpMatch s r0) where
-  genSizedST :=
+info: Try this generator: instance : ArbitrarySizedSuchThat (List Nat) (fun s => ExpMatch s r0) where
+  arbitrarySizedST :=
     let rec aux_arb (initSize : Nat) (size : Nat) (r0_0 : RegExp) : OptionT Plausible.Gen (List Nat) :=
       match size with
       | Nat.zero =>
@@ -151,4 +138,4 @@ info: Try this generator: instance : GenSizedSuchThat (List Nat) (fun s => ExpMa
 #derive_generator (fun (s : List Nat) => ExpMatch s r0)
 
 -- To sample from this generator, we can run the following:
--- #eval runSizedGen (genSizedST (fun s => ExpMatch s r0)) 10
+-- #eval runSizedGen (arbitrarySizedST (fun s => ExpMatch s r0)) 10

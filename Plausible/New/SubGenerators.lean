@@ -7,6 +7,7 @@ open Plausible.IR
 open Lean Elab Command Meta Term Parser Std
 open Idents
 
+
 /-- `genInputForInductive fvar hyp idx generationStyle` produces a let-bind expression of the form
     based on the `generationStyle` specified:
     - If `generationStyle = .RecursiveCall`, we produce the term
@@ -14,9 +15,9 @@ open Idents
       a hypothesis `hyp` for an inductive relation with the argument at index `idx` removed
       (since `fvar` is the argument at index `idx`, and we are generating `fvar`)
     - If `generationStyle = .TypeClassresolution`, we produce the term
-      `let fvar ← GenSuchThat.genST (fun fvar => hyp)`, i.e.
+      `let fvar ← ArbitrarySuchThat.arbitraryST (fun fvar => hyp)`, i.e.
       we use typeclass resolution to invoke the generator from the
-      `GenSuchThat.genST` which produces values satisfying the hypothesis `hyp`
+      `ArbitrarySuchThat.arbitraryST` which produces values satisfying the hypothesis `hyp`
       (note: this requires that such an typeclass instance already exists). -/
 def genInputForInductive (fvar : FVarId) (hyp : Expr) (idx : Nat) (generationStyle : GenerationStyle) : MetaM (TSyntax `doElem) := do
   let argExprs := hyp.getAppArgs.eraseIdx! idx
@@ -29,7 +30,7 @@ def genInputForInductive (fvar : FVarId) (hyp : Expr) (idx : Nat) (generationSty
   let rhsTerms :=
     match generationStyle with
     | .RecursiveCall => #[auxArbFn, initSizeIdent, mkIdent `size'] ++ argTerms
-    | .TypeClassResolution => #[qualifiedGenSizedSTIdent, generatorConstraint]
+    | .TypeClassResolution => #[arbitrarySTFn, generatorConstraint]
 
   mkLetBind lhs rhsTerms
 
@@ -50,7 +51,7 @@ def mkVariableEqualityCheckMatchExpr (syntaxKind : SyntaxNodeKind) (variableEqua
   (retExpr : TSyntax `term) : TermElabM (TSyntax syntaxKind) := do
 
   let equality := variableEqualities[0]!
-  let scrutinee ← `($qualifiedDecOptIdent:ident ($equality) $initSizeIdent)
+  let scrutinee ← `($decOptFn:ident ($equality) $initSizeIdent)
 
   let trueCase ← `(Term.matchAltExpr| | $(mkIdent ``some) $(mkIdent ``true) => $retExpr:term)
   let catchAllCase ← `(Term.matchAltExpr| | _ => $failFn)
@@ -94,7 +95,7 @@ def mkSubGeneratorBody (doBlock : TSyntaxArray `doElem) (argToGenTerm : Term) (n
   -- so we can just create `pure $argToGenTerm` without needing
   -- to create a do-block
   } else {
-    let retExpr ← `($pureIdent $argToGenTerm:term)
+    let retExpr ← `($pureFn $argToGenTerm:term)
     -- If there are any variable equalities that we need to check,
     -- create a match expression before doing `pure $argToGenTerm`
     if !variableEqualitiesToCheck.isEmpty then {
@@ -248,12 +249,12 @@ def mkWeightedThunkedSubGenerators (subGeneratorInfos : Array SubGeneratorInfo) 
   let mut weightedGenerators := #[]
 
   for (weight, generatorBody) in Array.zip generatorWeights subGenerators do
-    let thunkedGenerator ← `(($weight, $thunkGenFn (fun _ => $generatorBody)))
+    let thunkedGenerator ← `(($weight, $OptionTThunkGenFn (fun _ => $generatorBody)))
     weightedGenerators := weightedGenerators.push thunkedGenerator
 
   -- Add generator that always fails for the case when `size == 0`
   -- (to represent running out of fuel / inability to synthesize a generator)
   if let .BaseGenerator := generatorSort then
-    weightedGenerators := weightedGenerators.push (← `((1, $thunkGenFn (fun _ => $failFn))))
+    weightedGenerators := weightedGenerators.push (← `((1, $OptionTThunkGenFn (fun _ => $failFn))))
 
   `([$weightedGenerators,*])

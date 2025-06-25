@@ -8,10 +8,10 @@ import Plausible.New.Schedules
 import Plausible.New.TSyntaxCombinators
 import Plausible.New.DecOpt
 import Plausible.New.GeneratorCombinators
-import Plausible.New.GenSizedSuchThat
+import Plausible.New.ArbitrarySizedSuchThat
 import Plausible.New.Arbitrary
 import Plausible.New.STLC
 import Plausible.New.Trees
 import Plausible.New.NKIExperiments
 import Plausible.New.DeriveArbitrary
-import Plausible.New.Chase
+import Plausible.New.Utils

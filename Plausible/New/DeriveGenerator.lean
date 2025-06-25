@@ -7,6 +7,7 @@ import Plausible.Gen
 import Plausible.New.OptionTGen
 import Plausible.New.SubGenerators
 import Plausible.New.Idents
+import Plausible.New.Utils
 
 open Plausible.IR
 open Lean Elab Command Meta Term Parser Std
@@ -79,23 +80,6 @@ def analyzeInductiveArgs (inductiveName : Name) (args : Array Term) :
 
       pure paramInfo)
 
-
-/-- Determines if a constructor for an inductive relation is *recursive*
-    (i.e. the constructor's type mentions the inductive relation)
-    - Note: this function only considers constructors with arrow types -/
-def isConstructorRecursive (inductiveName : Name) (ctorName : Name) : MetaM Bool := do
-  let ctorInfo ← getConstInfo ctorName
-  let ctorType := ctorInfo.type
-
-  let (_, _, type_exprs_in_arrow_type) ← decomposeType ctorType
-  match splitLast? type_exprs_in_arrow_type with
-  | some (hypotheses, _conclusion) =>
-    for hyp in hypotheses do
-      if hyp.getAppFn.constName == inductiveName then
-        return true
-    return false
-  | none => throwError "constructors with non-arrow types are not-considered to be recursive"
-
 /-- Produces the names of all non-recursive constructors of an inductive relation.
     A constructor is considered non-recursive if:
     - It is *not* an arrow type (i.e. it can be used directly to build an inhabitant of the inductive relation)
@@ -124,7 +108,7 @@ def findTargetVarIndex (targetVar : Name) (args : TSyntaxArray `term) : Option N
 
 syntax (name := derive_generator) "#derive_generator" "(" "fun" "(" ident ":" term ")" "=>" term ")" : command
 
-/-- Produces an instance of `GenSizedSuchThat` typeclass containing the definition for the top-level derived generator.
+/-- Produces an instance of `ArbitrarySizedSuchThat` typeclass containing the definition for the top-level derived generator.
     The arguments to this function are:
     - a list of `baseGenerators` (each represented as a Lean term), to be invoked when `size == 0`
     - a list of `inductiveGenerators`, to be invoked when `size > 0`
@@ -137,17 +121,25 @@ def mkTopLevelGenerator (baseGenerators : TSyntax `term) (inductiveGenerators : 
     -- Fetch the ambient local context, which we need to produce user-accessible fresh names
     let localCtx ← liftTermElabM $ getLCtx
 
+    -- Produce a fresh name for the `size` argument for the lambda
+    -- at the end of the generator function, as well as the `aux_arb` inner helper function
+    let freshSizeIdent := mkFreshAccessibleIdent localCtx `size
+    let freshSize' := mkFreshAccessibleIdent localCtx `size'
+    let auxArbIdent := mkFreshAccessibleIdent localCtx `aux_arb
+    let generatorType ← `($optionTIdent $genIdent $targetTypeSyntax)
+
     let inductiveName := inductiveStx.raw.getId
 
     -- Create the cases for the pattern-match on the size argument
     let mut caseExprs := #[]
-    let zeroCase ← `(Term.matchAltExpr| | $(mkIdent ``Nat.zero) => $backtrackFn $baseGenerators)
+    let zeroCase ← `(Term.matchAltExpr| | $(mkIdent ``Nat.zero) => $OptionTBacktrackFn $baseGenerators)
     caseExprs := caseExprs.push zeroCase
 
-    let succCase ← `(Term.matchAltExpr| | $(mkIdent ``Nat.succ) $(mkIdent `size') => $backtrackFn $inductiveGenerators)
+    let succCase ← `(Term.matchAltExpr| | $(mkIdent ``Nat.succ) $freshSize' => $OptionTBacktrackFn $inductiveGenerators)
     caseExprs := caseExprs.push succCase
 
-    -- Create function argument for the generator size
+    -- Create function arguments for the generator's `size` & `initSize` parameters
+    -- (former is the generator size, latter is the size argument with which to invoke other auxiliary generators/checkers)
     let initSizeParam ← `(Term.letIdBinder| ($initSizeIdent : $natIdent))
     let sizeParam ← `(Term.letIdBinder| ($sizeIdent : $natIdent))
     let matchExpr ← liftTermElabM $ mkMatchExpr sizeIdent caseExprs
@@ -174,15 +166,9 @@ def mkTopLevelGenerator (baseGenerators : TSyntax `term) (inductiveGenerators : 
         let innerParam ← `(Term.letIdBinder| ($innerParamIdent : $paramType))
         innerParams := innerParams.push innerParam
 
-    -- Produce a fresh name for the `size` argument for the lambda
-    -- at the end of the generator function
-    let freshSizeIdent := mkFreshAccessibleIdent localCtx `size
-    let auxArbIdent := mkFreshAccessibleIdent localCtx `aux_arb
-    let generatorType ← `($optionTIdent $genIdent $targetTypeSyntax)
-
-    -- Produces an instance of `GenSizedSuchThat` typeclass containing the definition for the derived generator
-    `(instance : $genSizedSuchThatTypeclass $targetTypeSyntax (fun $(mkIdent targetVar) => $inductiveStx $args*) where
-        $genSizedSTIdent:ident :=
+    -- Produces an instance of `ArbitrarySizedSuchThat` typeclass containing the definition for the derived generator
+    `(instance : $arbitrarySizedSuchThatTypeclass $targetTypeSyntax (fun $(mkIdent targetVar) => $inductiveStx $args*) where
+        $unqualifiedArbitrarySizedSTFn:ident :=
           let rec $auxArbIdent:ident $innerParams* : $generatorType :=
             $matchExpr
           fun $freshSizeIdent => $auxArbIdent $freshSizeIdent $freshSizeIdent $outerParams*)
@@ -233,6 +219,7 @@ def elabDeriveGenerator : CommandElab := fun stx => do
     liftTermElabM $ Tactic.TryThis.addSuggestion stx
       (Format.pretty genFormat) (header := "Try this generator: ")
 
+    -- Elaborate the typeclass instance and add it to the local context
     elabCommand typeclassInstance
 
   | _ => throwUnsupportedSyntax

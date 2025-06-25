@@ -3,22 +3,54 @@ import Plausible.Gen
 
 import Plausible.New.OptionTGen
 import Plausible.New.DecOpt
-import Plausible.New.GenSizedSuchThat
+import Plausible.New.Arbitrary
+import Plausible.New.ArbitrarySizedSuchThat
 import Plausible.New.STLC
 
 
-open GenSizedSuchThat OptionTGen
+open Plausible ArbitrarySizedSuchThat OptionTGen
+
+/-- Dummy inductive relation for testing purposes -/
+inductive RGB where
+| Red
+| Green
+| Blue
+
+inductive Value where
+  | none
+  | bool (b : Bool)
+  | int (i : Int)
+  | tensor (shape : List Nat) (dtype : String)
+
+inductive MyList where
+  | Nil
+  | Cons (x : Nat) (xs : MyList)
+
+inductive MyListAnon where
+  | Nil : MyListAnon
+  | Cons : Nat -> MyListAnon -> MyListAnon
+
+-- #derive_arbitrary MyListAnon
+
+-- #derive_arbitrary Tree
+-- #derive_arbitrary type
+-- #derive_arbitrary term
+-- #derive_arbitrary Value
+
+-- #eval runArbitrary (α := MyList) 10
+
 
 
 /- Example usage:
   ```
   #derive_generator (fun (<name of generated value> : <type of generated value>) => <inductive relation applied to all args>)
   ```
-  This produces an instance of the `GenSizedSuchThat` typeclass, which contains a generator for values satisfying the inductive
+  This produces an instance of the `ArbitrarySizedSuchThat` typeclass, which contains a generator for values satisfying the inductive
   relation. See examples below:
 
 
 -/
+
 
 -- #derive_generator (fun (t : Tree) => balanced n t)
 -- #derive_generator (fun (t : Tree) => bst lo hi t)
@@ -31,8 +63,8 @@ We can make this generator more efficient using Segev's generator schedules.)
 
 
 /-
-To sample from the derived generator, we apply the `genSizedST` function
-(from the `GenSizedSuchThat` typeclass) onto the proposition that constrains
+To sample from the derived generator, we apply the `arbitrarySizedST` function
+(from the `ArbitrarySizedSuchThat` typeclass) onto the proposition that constrains
 the generated values (e.g. `fun t => balanced 5 t` for balanced trees of height 5).
 We then invoke `runSizedGen` to display the generated value in the `IO` monad.
 

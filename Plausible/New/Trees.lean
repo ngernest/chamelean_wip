@@ -1,18 +1,18 @@
 import Plausible.IR.Examples
 import Plausible.New.OptionTGen
-import Plausible.New.GenSizedSuchThat
+import Plausible.New.ArbitrarySizedSuchThat
 
 import Plausible.Gen
 open Plausible
 open OptionTGen
 
-open GenSizedSuchThat
+open ArbitrarySizedSuchThat
 
 --------------------------------------------------------------------------
 -- Some example `OptionT Gen α` generators
 --------------------------------------------------------------------------
 
-/- `genSizedST` contains a handwritten generator for BSTs
+/- `arbitrarySizedST` contains a handwritten generator for BSTs
     (modelled after the automatically derived generator produced by QuickChick).
     Note that:
     - We use the `OptionT` monad transformer to add the possibility of failure to the `Gen` monad
@@ -39,9 +39,9 @@ def genBST (lo : Nat) (hi : Nat) : Nat → OptionT Gen Tree :=
       ]
   fun size => aux_arb size size lo hi
 
-/- Instance of the `GenSizedSuchThat` typeclass for generators of BSTs -/
--- instance : GenSizedSuchThat Tree (fun t => bst lo hi t) where
---   genSizedST := genBST lo hi
+/- Instance of the `ArbitrarySizedSuchThat` typeclass for generators of BSTs -/
+-- instance : ArbitrarySizedSuchThat Tree (fun t => bst lo hi t) where
+--   arbitrarySizedST := genBST lo hi
 
 /-- A handwritten generator for balanced trees of height `n`
     (modelled after the automatically derived generator produced by QuickChick) -/
@@ -81,23 +81,23 @@ def genBalancedTree (n : Nat) : Nat → OptionT Gen Tree :=
         ]
   fun size => aux_arb size size n
 
-/- Instance of the `GenSizedSuchThat` typeclass for generators of balanced trees
+/- Instance of the `ArbitrarySizedSuchThat` typeclass for generators of balanced trees
    of height `n` -/
--- instance : GenSizedSuchThat Tree (fun t => balanced n t) where
---   genSizedST := genBalancedTree n
+-- instance : ArbitrarySizedSuchThat Tree (fun t => balanced n t) where
+--   arbitrarySizedST := genBalancedTree n
 
 
 /-
 Example usage:
 
-To sample from the derived generator, we apply the `genSizedST` function
-(from the `GenSizedSuchThat` typeclass) onto the proposition that constrains
+To sample from the derived generator, we apply the `arbitrarySizedST` function
+(from the `ArbitrarySizedSuchThat` typeclass) onto the proposition that constrains
 the generated values (e.g. `fun t => balanced 5 t` for balanced trees of height 5).
 We then invoke `runSizedGen` to display the generated value in the `IO` monad.
 
 For example:
 ```
 def tempSize := 10
-#eval runSizedGen (genSizedST (fun t => balanced 5 t)) tempSize
+#eval runSizedGen (arbitrarySizedST (fun t => balanced 5 t)) tempSize
 ```
 -/

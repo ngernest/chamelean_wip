@@ -3,29 +3,43 @@ A property testing framework for Lean 4 that integrates into the tactic framewor
 
 ## New Metaprogramming Code
 See the [`New`](./Plausible/New/) subdirectory for code that uses Lean's metaprogramming facilities (`TSyntax`) 
-to automatically derive generators/checkers for inductive relations, à la [Paraskevopoulou et al. 2022](https://lemonidas.github.io/pdf/ComputingCorrectly.pdf).
+to automatically derive generators/checkers for inductive relations, à la [Paraskevopoulou et al. 2022](https://lemonidas.github.io/pdf/ComputingCorrectly.pdf). 
+
+We provide two commands which automatically derive generators for Lean inductives:
+```lean
+-- `#derive_arbitrary` derives an unconstrained generator for a `Tree` algebraic data type
+#derive_arbitrary Tree  
+
+-- `#derive_generator` derives a constrained generator for `Tree`s that are balanced at some height `n`,
+-- where `balanced n t` is a user-defined inductive relation
+#derive_generator (fun (t : Tree) => balanced n t) 
+```
 
 **Repo overview**:
 
 - [`OptionTGen.lean`](./Plausible/New/OptionTGen.lean): Generator combinators that work over the `OptionT Gen` monad transformer (representing generators that may fail)
 - [`DecOpt.lean`](./Plausible/New/DecOpt.lean): The `DecOpt` typeclass for partially decidable propositions, adapted from QuickChick
-- [`GenSizedSuchThat.lean`](./Plausible/New/GenSizedSuchThat.lean): The `GenSuchThat` & `GenSizedSuchThat` typeclasses for constrained generators (generators of values satisfying a proposition), adapted from QuickChick
+- [`Arbitrary.lean`](./Plausible/New/Arbitrary.lean): The `Arbitrary` & `ArbitrarySized` typeclasses for unconstrained generators, adapted from QuickChick
+- [`ArbitrarySizedSuchThat.lean`](./Plausible/New/ArbitrarySizedSuchThat.lean): The `ArbitrarySuchThat` & `ArbitrarySizedSuchThat` typeclasses for constrained generators (generators of values satisfying a proposition), adapted from QuickChick
 - [`GeneratorCombinators.lean`](./Plausible/New/GeneratorCombinators.lean): Extra combinators for Plausible generators (e.g. analogs of the `sized` and `frequency` combinators from Haskell QuickCheck)
-- [`DeriveGenerator.lean`](./Plausible/New/DeriveGenerator.lean): Metaprogramming infrastructure for automatically deriving Plausible generators
+- [`DeriveArbitrary.lean`](./Plausible/New/DeriveArbitrary.lean): Metaprogramming infrastructure for deriving *unconstrained* generators (instances of the `ArbitrarySized` typeclass)
+- [`DeriveGenerator.lean`](./Plausible/New/DeriveGenerator.lean): Metaprogramming infrastructure for deriving *constrained* generators (instances of the `ArbitrarySizedSuchThat` typeclass)
 - [`SubGenerators.lean`](./Plausible/New/SubGenerators.lean): Handles constraints when deriving sub-generators
 - [`TSyntaxCombinators.lean`](./Plausible/New/TSyntaxCombinators.lean): Combinators over `TSyntax` for creating monadic `do`-blocks & other Lean expressions via metaprogramming
 - [`DeriveChecker.lean`](./Plausible/New/DeriveChecker.lean): Metaprogramming infrastructure for automatically deriving checkers
 - [`Idents.lean`](./Plausible/New/Idents.lean): Utilities for dealing with identifiers / producing fresh names 
+- [`Utils.lean`](./Plausible/New/Utils.lean): Other miscellaneous utils
 
 **Examples**:
 - [`Examples.lean`](./Plausible/IR/Examples.lean): Some example inductive relations (BSTs, balanced trees, STLC)
 - [`STLC.lean`](./Plausible/New/STLC.lean): Example checkers & generators for well-typed STLC terms
 - [`Trees.lean`](./Plausible/New/Trees.lean): Example generators for balanced trees & BSTs
+- [`DeriveRegExpGenerator.lean`](./Test/DeriveArbitrary/DeriveRegExpGenerator.lean): Example generators for regular expressions
 
 **Tests**:      
-- The [`Test`](./Test/) subdirectory contains [snapshot tests](https://www.cs.cornell.edu/~asampson/blog/turnt.html) (aka [expect tests](https://blog.janestreet.com/the-joy-of-expect-tests/)) for the `#derive_generator` command elaborator. 
+- The [`Test`](./Test/) subdirectory contains [snapshot tests](https://www.cs.cornell.edu/~asampson/blog/turnt.html) (aka [expect tests](https://blog.janestreet.com/the-joy-of-expect-tests/)) for the `#derive_generator` & `#derive_arbitrary` command elaborators. 
 - Run `lake test` to check that the derived generators in [`Test`](./Test/) typecheck, and that the code for the derived generators match the expected output.
-- See [`DeriveBSTGenerator.lean`](./Test/DeriveBSTGenerator.lean) & [`DeriveBalancedTreeGenerator.lean`](./Test/DeriveBalancedTreeGenerator.lean) for examples of snapshot tests. Follow the template in these two files to add new snapshot test file, and remember to import the new test file in [`Test.lean`](./Test.lean) afterwards.
+- See [`DeriveBSTGenerator.lean`](./Test/DeriveArbitrarySuchThat/DeriveBSTGenerator.lean) & [`DeriveBalancedTreeGenerator.lean`](./Test/DeriveArbitrarySuchThat/DeriveBalancedTreeGenerator.lean) for examples of snapshot tests. Follow the template in these two files to add new snapshot test file, and remember to import the new test file in [`Test.lean`](./Test.lean) afterwards.
 
 
 
