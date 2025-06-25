@@ -18,15 +18,26 @@ inductive Range
   | Ctr (ctor : String) (rs : List Range)
   deriving Repr, Inhabited
 
+/-- A `Pattern` is either an unknown or a fully-applied constructor -/
 inductive Pattern
   | Unknown : Unknown -> Pattern
   | Constructor : String -> List Pattern -> Pattern
   deriving Repr, Inhabited
 
+/-- A structure which stores the current state of the unification algorithm -/
 structure UnifyState where
+  /-- `constraints` maps unknowns to ranges -/
   constraints : Std.TreeMap Unknown Range (cmp := compare)
+
+  /-- `equalities` keeps track of equalities between unknowns
+      that need to be checked -/
   equalities : Std.TreeSet (Unknown × Unknown) (cmp := compare)
+
+  /-- `patterns` contains a list of necessary pattern matches that
+      need to be performed -/
   patterns : List (Unknown × Pattern)
+
+  /-- A set of all existing unknowns -/
   unknowns : Std.TreeSet Unknown (cmp := compare)
   deriving Repr
 
