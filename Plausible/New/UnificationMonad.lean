@@ -65,9 +65,9 @@ def fresh : Unify Unknown :=
     let u := fresh_unknown us
     .some (u, { s with unknowns := us.merge {u} })
 
-
 ----------------------------------
 -- Unification algorithm (fig. 3)
+----------------------------------
 mutual
   /-- Unifies two ranges -/
   partial def unify : Range → Range → Unify Unit
@@ -93,10 +93,10 @@ mutual
 
   /-- Unifies two `(Unknown, Range)` pairs -/
   partial def unifyR : Unknown × Range → Unknown × Range → Unify Unit
-    | (u1, .Undef _), (u2, r2) => update u1 r2
-    | (u1, r1), (u2, .Undef _) => update u2 r1
-    | (u1, u1'@(.Unknown _)), (u2, r2) => unify u1' r2
-    | (u1, r1), (u2, u2'@(.Unknown _)) => unify r1 u2'
+    | (u1, .Undef _), (_, r2) => update u1 r2
+    | (_, r1), (u2, .Undef _) => update u2 r1
+    | (_, u1'@(.Unknown _)), (_, r2) => unify u1' r2
+    | (_, r1), (_, u2'@(.Unknown _)) => unify r1 u2'
     | (_, c1@(.Ctr _ _)), (_, c2@(.Ctr _ _)) => unifyC c1 c2
     | (u1, .Fixed), (u2, .Fixed) => do
       equality u1 u2
@@ -116,11 +116,15 @@ mutual
     | _, _ => panic! "Case not handled in unifyC"
 
   /-- Unifies an `(Unknown, Range)` pair with a `Range -/
-  partial def unifyRC (p1 : Unknown × Range) (r2 : Range) : Unify Unit :=
-    let (u1, r1) := p1
-    match r1, r2 with
-    | _, .Ctr c2 rs2 => sorry
-    | _, _ => sorry
+  partial def unifyRC : Unknown × Range → Range → Unify Unit
+    | (u1, .Undef _), c2@(.Ctr _ _) => update u1 c2
+    | (_, .Unknown u'), c2@(.Ctr _ _) => do
+      let k ← UnifyState.constraints <$> get
+      let r := k.get! u'
+      unifyRC (u', r) c2
+    | (u, .Fixed), c2@(.Ctr _ _) => handleMatch u c2
+    | (_, c1@(.Ctr _ _)), c2@(.Ctr _ _) => unifyC c1 c2
+    | _, _ => panic! "reached catch-all case in unifyRC"
 
   /-- Corresponds to `match` in the pseudocode
      (we call this `handleMatch` since `match` is a reserved keyword in Lean) -/
@@ -130,8 +134,11 @@ mutual
       pattern u (Pattern.Constructor c p)
     | _, _ => panic! "reached catch-all case in handleMatch"
 
+  /-- `matchAux` traverses a `Range` and converts it into a
+      pattern which can be used in a `match` expression -/
   partial def matchAux : Range → Unify Pattern
     | .Ctr c rs => do
+      -- Recursively handle ranges
       let ps ← rs.mapM matchAux
       return (.Constructor c ps)
     | .Unknown u => do
@@ -139,9 +146,12 @@ mutual
       let r := k.get! u
       match r with
       | .Undef _ => do
+        -- Unknown becomes a pattern variable (bound by the pattern match)
+        -- (i.e. the unknown serves as an input at runtime)
         update u .Fixed
         return (.Unknown u)
       | .Fixed => do
+        -- Handles non-linear patterns
         let u' ← fresh
         equality u' u
         update u' r
@@ -151,9 +161,5 @@ mutual
         let ps ← rs.mapM matchAux
         return (.Constructor c ps)
     | _ => panic! "reached catch-all case in matchAux"
-
-
-
-
 
 end
