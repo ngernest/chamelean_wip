@@ -102,13 +102,18 @@ mutual
       equality u1 u2
       update u1 .Fixed
     | (u1, .Fixed), (_, c2@(.Ctr _ _)) => handleMatch u1 c2
-    | _, _ => sorry
+    | (_, c1@(.Ctr _ _)), (u2, .Fixed) => handleMatch u2 c1
 
   /-- Unifies two `Range`s that are both constructors -/
   partial def unifyC (r1 : Range) (r2 : Range) : Unify Unit :=
     match r1, r2 with
-    | .Ctr c1 rs1, .Ctr c2 rs2 => sorry
-    | _, _ => sorry
+    | .Ctr c1 rs1, .Ctr c2 rs2 =>
+      if c1 == c2 && rs1.length == rs2.length then
+        for (r1, r2) in (List.zip rs1 rs2) do
+          unify r1 r2
+      else
+        failure
+    | _, _ => panic! "Case not handled in unifyC"
 
   /-- Unifies an `(Unknown, Range)` pair with a `Range -/
   partial def unifyRC (p1 : Unknown × Range) (r2 : Range) : Unify Unit :=
