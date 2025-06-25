@@ -2,10 +2,10 @@
 import Plausible.Gen
 import Plausible.New.OptionTGen
 import Plausible.New.DecOpt
-import Plausible.New.GenSizedSuchThat
+import Plausible.New.ArbitrarySizedSuchThat
 import Plausible.New.DeriveGenerator
 
-open GenSizedSuchThat OptionTGen
+open ArbitrarySizedSuchThat OptionTGen
 
 set_option guard_msgs.diff true
 
@@ -18,8 +18,8 @@ inductive MinOk : List Nat → List Nat → Prop where
     MinOk l (x::l')
 
 /--
-info: Try this generator: instance : GenSizedSuchThat (List Nat) (fun l => MinOk l a) where
-  genSizedST :=
+info: Try this generator: instance : ArbitrarySizedSuchThat (List Nat) (fun l => MinOk l a) where
+  arbitrarySizedST :=
     let rec aux_arb (initSize : Nat) (size : Nat) (a_0 : List Nat) : OptionT Plausible.Gen (List Nat) :=
       match size with
       | Nat.zero =>
@@ -64,8 +64,8 @@ inductive MinEx : Nat → List Nat → List Nat → Prop where
     MinEx (Nat.succ n) l (x::l')
 
 /--
-info: Try this generator: instance : GenSizedSuchThat (List Nat) (fun l => MinEx n l a) where
-  genSizedST :=
+info: Try this generator: instance : ArbitrarySizedSuchThat (List Nat) (fun l => MinEx n l a) where
+  arbitrarySizedST :=
     let rec aux_arb (initSize : Nat) (size : Nat) (n_0 : Nat) (a_0 : List Nat) : OptionT Plausible.Gen (List Nat) :=
       match size with
       | Nat.zero =>
