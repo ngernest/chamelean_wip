@@ -51,3 +51,29 @@ def fresh : Unify Unknown :=
     let us := s.unknowns
     let u := fresh_unknown us
     .some (u, { s with unknowns := us.merge {u} })
+
+
+
+----------------------------------
+-- Unification algorithm (fig. 3)
+mutual
+  def unify (u1 : Unknown) (u2 : Unknown) : Unify Unit :=
+    sorry
+
+  def unifyR (p1 : Unknown × Range) (p2 : Unknown × Range) : Unify Unit :=
+    let (u1, r) := p1
+    let (u2, r) := p2
+    sorry
+
+  def unifyC (r1 : Range) (r2 : Range) : Unify Unit :=
+    match r1, r2 with
+    | .Ctr c1 rs1, .Ctr c2 rs2 => sorry
+    | _, _ => sorry
+
+  def unifyRC (p1 : Unknown × Range) (r2 : Range) : Unify Unit :=
+    let (u1, r1) := p1
+    match r1, r2 with
+    | _, .Ctr c2 rs2 => sorry
+    | _, _ => sorry
+
+end
