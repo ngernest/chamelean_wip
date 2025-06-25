@@ -9,6 +9,7 @@ open Lean Idents
 abbrev Unknown := String
 deriving instance Repr, BEq, Ord for Unknown
 
+
 /-- *Ranges* represent sets of potential values (see section 4.2) -/
 inductive Range
   | Undef (ty : String)
@@ -18,9 +19,9 @@ inductive Range
   deriving Repr, Inhabited
 
 inductive Pattern
-  | Unknown : String -> Pattern
+  | Unknown : Unknown -> Pattern
   | Constructor : String -> List Pattern -> Pattern
-  deriving Repr
+  deriving Repr, Inhabited
 
 structure UnifyState where
   constraints : Std.TreeMap Unknown Range (cmp := compare)
@@ -57,7 +58,7 @@ def fresh_unknown (unknowns : Std.TreeSet Unknown) : Unknown :=
   let existingNames := Name.mkStr1 <$> unknowns.toArray
   toString $ genFreshName existingNames (Name.mkStr1 "unknown")
 
-/-- Generaets and returns a new unknown -/
+/-- Generates and returns a new unknown -/
 def fresh : Unify Unknown :=
   fun s =>
     let us := s.unknowns
@@ -88,14 +89,20 @@ mutual
       let k ← UnifyState.constraints <$> get
       let r2 := k.get! u2
       unifyRC (u2, r2) c1
-    | _, _ => failure
+    | _, _ => panic! "reached catch-all case in unify"
 
   /-- Unifies two `(Unknown, Range)` pairs -/
   partial def unifyR : Unknown × Range → Unknown × Range → Unify Unit
     | (u1, .Undef _), (u2, r2) => update u1 r2
     | (u1, r1), (u2, .Undef _) => update u2 r1
     | (u1, u1'@(.Unknown _)), (u2, r2) => unify u1' r2
-    | (u1, r1), (u2, u2') => unify r1 u2'
+    | (u1, r1), (u2, u2'@(.Unknown _)) => unify r1 u2'
+    | (_, c1@(.Ctr _ _)), (_, c2@(.Ctr _ _)) => unifyC c1 c2
+    | (u1, .Fixed), (u2, .Fixed) => do
+      equality u1 u2
+      update u1 .Fixed
+    | (u1, .Fixed), (_, c2@(.Ctr _ _)) => handleMatch u1 c2
+    | _, _ => sorry
 
   /-- Unifies two `Range`s that are both constructors -/
   partial def unifyC (r1 : Range) (r2 : Range) : Unify Unit :=
@@ -109,5 +116,39 @@ mutual
     match r1, r2 with
     | _, .Ctr c2 rs2 => sorry
     | _, _ => sorry
+
+  /-- Corresponds to `match` in the pseudocode
+     (we call this `handleMatch` since `match` is a reserved keyword in Lean) -/
+  partial def handleMatch : Unknown → Range → Unify Unit
+    | u, .Ctr c rs => do
+      let p ← rs.mapM matchAux
+      pattern u (Pattern.Constructor c p)
+    | _, _ => panic! "reached catch-all case in handleMatch"
+
+  partial def matchAux : Range → Unify Pattern
+    | .Ctr c rs => do
+      let ps ← rs.mapM matchAux
+      return (.Constructor c ps)
+    | .Unknown u => do
+      let k ← UnifyState.constraints <$> get
+      let r := k.get! u
+      match r with
+      | .Undef _ => do
+        update u .Fixed
+        return (.Unknown u)
+      | .Fixed => do
+        let u' ← fresh
+        equality u' u
+        update u' r
+        return (.Unknown u')
+      | u'@(.Unknown _) => matchAux u'
+      | .Ctr c rs => do
+        let ps ← rs.mapM matchAux
+        return (.Constructor c ps)
+    | _ => panic! "reached catch-all case in matchAux"
+
+
+
+
 
 end
