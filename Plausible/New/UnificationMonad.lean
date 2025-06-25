@@ -1,16 +1,21 @@
 
 import Std
+import Lean
+import Plausible.New.Idents
+
+open Lean Idents
+
 
 abbrev Unknown := String
 deriving instance Repr, BEq, Ord for Unknown
 
 /-- *Ranges* represent sets of potential values (see section 4.2) -/
 inductive Range
-  | Undef (ty : Type)
+  | Undef (ty : String)
   | Fixed
   | Unknown (u : Unknown)
   | Ctr (ctor : String) (rs : List Range)
-  deriving Repr
+  deriving Repr, Inhabited
 
 inductive Pattern
   | Unknown : String -> Pattern
@@ -26,7 +31,8 @@ structure UnifyState where
 
 -- Unification monad (fig. 2)
 
-abbrev Unify (α : Type) := UnifyState → Option (α × UnifyState)
+/-- Under the hood, this means `Unify α := UnifyState → Option (α × UnifyState)` -/
+abbrev Unify (α : Type) := StateT UnifyState Option α
 
 def update (u : Unknown) (r : Range) : Unify Unit :=
   fun s =>
@@ -44,7 +50,9 @@ def pattern (u : Unknown) (p : Pattern) : Unify Unit :=
     .some ((), { s with patterns := (u, p) :: ps})
 
 /-- Returns a fresh unknown -/
-def fresh_unknown (us : Std.TreeSet Unknown) : Unknown := sorry
+def fresh_unknown (unknowns : Std.TreeSet Unknown) : Unknown :=
+  let existingNames := Name.mkStr1 <$> unknowns.toArray
+  toString $ genFreshName existingNames (Name.mkStr1 "unknown")
 
 def fresh : Unify Unknown :=
   fun s =>
@@ -53,23 +61,42 @@ def fresh : Unify Unknown :=
     .some (u, { s with unknowns := us.merge {u} })
 
 
-
 ----------------------------------
 -- Unification algorithm (fig. 3)
 mutual
-  def unify (u1 : Unknown) (u2 : Unknown) : Unify Unit :=
-    sorry
+  /-- Unifies two ranges -/
+  def unify : Range → Range → Unify Unit
+    | .Unknown u1, .Unknown u2 =>
+      if u1 == u2 then
+        return ()
+      else do
+        let k ← UnifyState.constraints <$> get
+        let r1 := k.get! u1
+        let r2 := k.get! u2
+        unifyR (u1, r1) (u2, r2)
+    | c1@(.Ctr _ _), c2@(.Ctr _ _) =>
+      unifyC c1 c2
+    | .Unknown u1, c2@(.Ctr _ _) => do
+      let k ← UnifyState.constraints <$> get
+      let r1 := k.get! u1
+      unifyRC (u1, r1) c2
+    | c1@(.Ctr _ _), .Unknown u2 => do
+      let k ← UnifyState.constraints <$> get
+      let r2 := k.get! u2
+      unifyRC (u2, r2) c1
+    | _, _ => failure
 
-  def unifyR (p1 : Unknown × Range) (p2 : Unknown × Range) : Unify Unit :=
-    let (u1, r) := p1
-    let (u2, r) := p2
-    sorry
+  /-- Unifies two `(Unknown, Range)` pairs -/
+  def unifyR : Unknown × Range → Unknown × Range → Unify Unit
+    | (u1, r1), (u2, r2) => sorry
 
+  /-- Unifies two `Range`s that are both constructors -/
   def unifyC (r1 : Range) (r2 : Range) : Unify Unit :=
     match r1, r2 with
     | .Ctr c1 rs1, .Ctr c2 rs2 => sorry
     | _, _ => sorry
 
+  /-- Unifies an `(Unknown, Range)` pair with a `Range -/
   def unifyRC (p1 : Unknown × Range) (r2 : Range) : Unify Unit :=
     let (u1, r1) := p1
     match r1, r2 with
