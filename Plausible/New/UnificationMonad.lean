@@ -48,21 +48,21 @@ abbrev Unify (α : Type) := StateT UnifyState Option α
 
 /-- `update u r` sets the range of the unknown `u` to be `r` -/
 def update (u : Unknown) (r : Range) : Unify Unit :=
-  fun s =>
+  modify $ fun s =>
     let k := s.constraints
-    .some ((), { s with constraints := k.insert u r })
+    { s with constraints := k.insert u r }
 
 /-- Registers a new equality check between unknowns `u1` and `u2` -/
 def equality (u1 : Unknown) (u2 : Unknown) : Unify Unit :=
-  fun s =>
+  modify $ fun s =>
     let eqs := s.equalities
-    .some ((), { s with equalities := eqs.merge {(u1, u2)} })
+    { s with equalities := eqs.merge {(u1, u2)} }
 
 /-- Adds a new pattern match -/
 def pattern (u : Unknown) (p : Pattern) : Unify Unit :=
-  fun s =>
+  modify $ fun s =>
     let ps := s.patterns
-    .some ((), { s with patterns := (u, p) :: ps})
+    { s with patterns := (u, p) :: ps}
 
 /-- Returns a fresh unknown -/
 def fresh_unknown (unknowns : Std.TreeSet Unknown) : Unknown :=
@@ -71,10 +71,10 @@ def fresh_unknown (unknowns : Std.TreeSet Unknown) : Unknown :=
 
 /-- Generates and returns a new unknown -/
 def fresh : Unify Unknown :=
-  fun s =>
+  modifyGet $ fun s =>
     let us := s.unknowns
     let u := fresh_unknown us
-    .some (u, { s with unknowns := us.merge {u} })
+    (u, { s with unknowns := us.merge {u} })
 
 ----------------------------------
 -- Unification algorithm (fig. 3)
