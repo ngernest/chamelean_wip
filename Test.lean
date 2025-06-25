@@ -9,7 +9,7 @@ import Test.DeriveArbitrarySuchThat.DeriveBSTGenerator
 import Test.DeriveArbitrarySuchThat.DeriveBalancedTreeGenerator
 import Test.DeriveArbitrarySuchThat.DeriveRegExpMatchGenerator
 import Test.DeriveArbitrarySuchThat.DeriveSTLCGenerator
-import Test.DeriveArbitrarySuchThat.SimultaneousMatchingTest
+import Test.DeriveArbitrarySuchThat.SimultaneousMatchingTests
 import Test.DeriveArbitrarySuchThat.NonLinearPatternsTest
 import Test.DeriveArbitrary.DeriveTreeGenerator
 import Test.DeriveArbitrary.DeriveSTLCTermTypeGenerators

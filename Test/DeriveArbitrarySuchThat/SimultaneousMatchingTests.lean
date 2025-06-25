@@ -9,6 +9,8 @@ open ArbitrarySizedSuchThat OptionTGen
 
 set_option guard_msgs.diff true
 
+-- Thanks to Chase Johnson for providing the example inductive relations in this file!
+
 /-- Example inductive relation involving pattern-matching on just one input -/
 inductive MinOk : List Nat → List Nat → Prop where
 | MO_empty : MinOk [] []
@@ -100,3 +102,17 @@ info: Try this generator: instance : ArbitrarySizedSuchThat (List Nat) (fun l =>
 -/
 #guard_msgs(info, drop warning) in
 #derive_generator (fun (l: List Nat) => MinEx n l a)
+
+-- TODO: test derived generator on this example
+inductive MinEx2 : Nat → List Nat → List Nat → Prop where
+| ME_empty : MinEx2 0 [] []
+| ME_present : ∀ x l l',
+    MinEx2 x l l' →
+    MinEx2 (Nat.succ x) l ([x] ++ l')
+
+
+-- TODO: test derived generator on this example
+inductive MinEx3 : Nat → List Nat → List Nat → Prop where
+| ME_empty : MinEx3 0 [] []
+| ME_present : ∀ x l,
+    MinEx3 x l ([x] ++ l)
