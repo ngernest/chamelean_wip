@@ -59,7 +59,7 @@ info: Try this generator: instance : ArbitrarySizedSuchThat BinaryTree (fun t =>
                   | Nat.succ n => do
                     let l ← aux_arb initSize size' n
                     let r ← aux_arb initSize size' n
-                    let x ← Plausible.SampleableExt.interpSample Nat
+                    let x ← Arbitrary.arbitrary
                     return BinaryTree.Node x l r
                   | _ => OptionT.fail))]
     fun size => aux_arb size size n

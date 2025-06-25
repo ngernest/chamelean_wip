@@ -122,10 +122,9 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
       -- then bind the generated value to the free variable `fvar`
       let bindExpr ← liftMetaM $ genInputForInductive fvar hyp idx style
       doElems := doElems.push bindExpr
-    | .genFVar fvar ty =>
-      -- Generate a value of type `ty`, then bind it to `fvar`
-      let typeSyntax ← PrettyPrinter.delab ty
-      let bindExpr ← mkLetBind (mkIdent fvar.name) #[interpSampleFn, typeSyntax]
+    | .genFVar fvar _ =>
+      -- Generate a value using `arbitrary`, then bind it to `fvar`
+      let bindExpr ← mkLetBind (mkIdent fvar.name) #[arbitraryFn]
       doElems := doElems.push bindExpr
     | _ => continue
 

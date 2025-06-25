@@ -78,7 +78,6 @@ For example:
 -- Work in progress: extend generator deriver to handle STLC example
 -- TODO: figure out issue with `TApp` in the derived generator for `typing`
 -- TODO: figure out how to handle checkers
--- #derive_generator (fun (x : Nat) => lookup Γ x τ)
 
-
+-- #derive_arbitrary term
 -- #derive_generator (fun (e : term) => typing Γ e τ)

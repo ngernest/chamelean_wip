@@ -39,7 +39,7 @@ info: Try this generator: instance : ArbitrarySizedSuchThat BinaryTree (fun t =>
             (Nat.succ size',
               OptionTGen.thunkGen
                 (fun _ => do
-                  let x ← Plausible.SampleableExt.interpSample Nat
+                  let x ← Arbitrary.arbitrary
                   let l ← aux_arb initSize size' lo x
                   let r ← aux_arb initSize size' x hi
                   if lo < x && x < hi then ⏎
