@@ -15,20 +15,20 @@ inductive ExpMatch : List Nat → RegExp → Prop where
 | MEmpty : ExpMatch [] RegExp.EmptyStr
 | MChar : ∀ x, ExpMatch [x] (RegExp.Char x)
 | MApp : ∀ s1 re1 s2 re2,
-           ExpMatch s1 re1 →
-           ExpMatch s2 re2 →
-           ExpMatch (s1 ++ s2) (RegExp.App re1 re2)
+  ExpMatch s1 re1 →
+  ExpMatch s2 re2 →
+  ExpMatch (s1 ++ s2) (RegExp.App re1 re2)
 | MUnionL : ∀ s1 re1 re2,
-              ExpMatch s1 re1 →
-              ExpMatch s1 (RegExp.Union re1 re2)
+  ExpMatch s1 re1 →
+  ExpMatch s1 (RegExp.Union re1 re2)
 | MUnionR : ∀ re1 s2 re2,
-              ExpMatch s2 re2 →
-              ExpMatch s2 (RegExp.Union re1 re2)
+  ExpMatch s2 re2 →
+  ExpMatch s2 (RegExp.Union re1 re2)
 | MStar0 : ∀ re, ExpMatch [] (RegExp.Star re)
 | MStarApp : ∀ s1 s2 re,
-               ExpMatch s1 re →
-               ExpMatch s2 (RegExp.Star re) →
-               ExpMatch (s1 ++ s2) (RegExp.Star re)
+  ExpMatch s1 re →
+  ExpMatch s2 (RegExp.Star re) →
+  ExpMatch (s1 ++ s2) (RegExp.Star re)
 
 -- Creates a string (sequential `App` of `Char`s) -/
 def reStr (l : List Nat) (ign : RegExp) : RegExp :=

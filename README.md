@@ -3,7 +3,17 @@ A property testing framework for Lean 4 that integrates into the tactic framewor
 
 ## New Metaprogramming Code
 See the [`New`](./Plausible/New/) subdirectory for code that uses Lean's metaprogramming facilities (`TSyntax`) 
-to automatically derive generators/checkers for inductive relations, à la [Paraskevopoulou et al. 2022](https://lemonidas.github.io/pdf/ComputingCorrectly.pdf).
+to automatically derive generators/checkers for inductive relations, à la [Paraskevopoulou et al. 2022](https://lemonidas.github.io/pdf/ComputingCorrectly.pdf). 
+
+We provide two commands which automatically derive generators for Lean inductives:
+```lean
+-- `#derive_arbitrary` derives an unconstrained generator for a `Tree` algebraic data type
+#derive_arbitrary Tree  
+
+-- `#derive_generator` derives a constrained generator for `Tree`s that are balanced at some height `n`,
+-- where `balanced n t` is a user-defined inductive relation
+#derive_generator (fun (t : Tree) => balanced n t) 
+```
 
 **Repo overview**:
 
@@ -24,6 +34,7 @@ to automatically derive generators/checkers for inductive relations, à la [Para
 - [`Examples.lean`](./Plausible/IR/Examples.lean): Some example inductive relations (BSTs, balanced trees, STLC)
 - [`STLC.lean`](./Plausible/New/STLC.lean): Example checkers & generators for well-typed STLC terms
 - [`Trees.lean`](./Plausible/New/Trees.lean): Example generators for balanced trees & BSTs
+- [`DeriveRegExpGenerator.lean`](./Test/DeriveArbitrary/DeriveRegExpGenerator.lean): Example generators for regular expressions
 
 **Tests**:      
 - The [`Test`](./Test/) subdirectory contains [snapshot tests](https://www.cs.cornell.edu/~asampson/blog/turnt.html) (aka [expect tests](https://blog.janestreet.com/the-joy-of-expect-tests/)) for the `#derive_generator` & `#derive_arbitrary` command elaborators. 
