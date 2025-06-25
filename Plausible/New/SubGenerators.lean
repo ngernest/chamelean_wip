@@ -180,6 +180,7 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
   logWarning m!"variableEqualitiesToCheck = {variableEqualitiesToCheck}"
   logWarning m!"doElems = {doElems}"
   logWarning m!"inputsToMatch = {subGenerator.inputsToMatch}"
+  logWarning m!"matchCases = {subGenerator.matchCases}"
 
   -- TODO: change `groupedActions.ret_list` to a single element since each do-block can only
   -- have one (final) `return` expression
@@ -203,19 +204,26 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
       -- if the match succeeds
       if !subGenerator.inputsToMatch.isEmpty then
         let mut cases := #[]
-        -- For now, we assume there is only one scrutinee. We give it a fresh name
-        -- so that it doesn't get shadowed by any variables in the match patterns
-        let scrutinee := mkIdent $ genFreshName
-          (Name.mkStr1 <$> subGenerator.inputsToMatch) (Name.mkStr1 subGenerator.inputsToMatch[0]!)
 
-        -- Actually construct the match-expression based on the info in `matchCases`
-        for patternExpr in subGenerator.matchCases do
-          let pattern ← PrettyPrinter.delab patternExpr
-          let case ← `(Term.matchAltExpr| | $pattern:term => $generatorBody:term)
-          cases := cases.push case
-        let catchAllCase ← `(Term.matchAltExpr| | _ => $failFn)
+        -- Handle multiple scrutinees by giving all of them fresh names
+        let existingNames := Name.mkStr1 <$> subGenerator.inputsToMatch
+        let scrutinees := Lean.mkIdent <$> Array.map (fun name => genFreshName existingNames name) existingNames
+
+        -- Construct the match expression based on the info in `matchCases`
+        let patterns ← Array.mapM (fun patternExpr => PrettyPrinter.delab patternExpr) subGenerator.matchCases
+        -- If there are multiple scrutinees, the LHS of each case is a tuple containing the elements in `matchCases`
+        let case ← `(Term.matchAltExpr| | $[$patterns:term],* => $generatorBody:term)
+        cases := cases.push case
+
+        -- The LHS of the catch-all case contains a tuple consisting entirely of wildcards
+        let numScrutinees := Array.size scrutinees
+        let wildcards := Array.replicate numScrutinees (← `(_))
+        let catchAllCase ← `(Term.matchAltExpr| | $wildcards:term,* => $failFn)
         cases := cases.push catchAllCase
-        mkMatchExpr scrutinee cases
+
+        -- Create a pattern match that simultaneously matches on all the scrutinees
+        mkSimultaneousMatch scrutinees cases
+
       else
         return generatorBody
 

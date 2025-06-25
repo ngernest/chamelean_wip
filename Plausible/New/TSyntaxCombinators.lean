@@ -38,6 +38,15 @@ def mkIfExprWithNaryAnd (predicates : Array Term)
 def mkMatchExpr (scrutinee : Ident) (cases : TSyntaxArray ``Term.matchAlt) : MetaM (TSyntax `term) :=
   `(match $scrutinee:ident with $cases:matchAlt*)
 
+/- Creates a match expression with simultaneous matching on multiple scrutinees.
+    The `scrutinees` are provided as an array of `Ident`s and the `cases` are specified
+    as an array of `matchAlt`s where each alternative should have patterns corresponding
+    to all scrutinees -/
+def mkSimultaneousMatch (scrutineeIdents : Array Ident)
+  (cases : TSyntaxArray ``Term.matchAlt) : MetaM (TSyntax `term) := do
+  let scrutinees ← Array.mapM (fun ident => `(matchDiscr| $ident:ident)) scrutineeIdents
+  `(match $[$scrutinees:matchDiscr],* with $cases:matchAlt*)
+
 /-- Variant of `mkMatchExpr` where the `scrutinee` is a `TSyntax term` rather than an `Ident` -/
 def mkMatchExprWithScrutineeTerm (scrutinee : TSyntax `term) (cases : TSyntaxArray ``Term.matchAlt) : MetaM (TSyntax `term) :=
   `(match $scrutinee:term with $cases:matchAlt*)
