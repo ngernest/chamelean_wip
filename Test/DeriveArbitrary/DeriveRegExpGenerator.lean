@@ -22,6 +22,8 @@ inductive RegExp : Type where
   | Star : RegExp → RegExp
   deriving Repr, Arbitrary
 
+-- Test that we can successfully synthesize instances of `Arbitrary` & `ArbitrarySized`
+
 /-- info: instArbitrarySizedRegExp -/
 #guard_msgs in
 #synth ArbitrarySized RegExp
