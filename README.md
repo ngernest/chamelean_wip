@@ -3,24 +3,74 @@ A property testing framework for Lean 4 that integrates into the tactic framewor
 
 ## New Metaprogramming Code
 See the [`New`](./Plausible/New/) subdirectory for code that uses Lean's metaprogramming facilities (`TSyntax`) 
-to automatically derive generators/checkers for inductive relations, à la [Paraskevopoulou et al. 2022](https://lemonidas.github.io/pdf/ComputingCorrectly.pdf). 
+to automatically derive generators/checkers for inductive relations. 
 
-We provide two commands which automatically derive generators for Lean inductives:
+Our design is heavily inspired by [Coq/Rocq's QuickChick](https://github.com/QuickChick/QuickChick) library and the following papers:
+- [Computing Correctly with Inductive Relation (PLDI 2022)](https://lemonidas.github.io/pdf/ComputingCorrectly.pdf)
+- [Generating Good Generators for Inductive Relations (POPL 2018)](https://lemonidas.github.io/pdf/GeneratingGoodGenerators.pdf)
+
+Like QuickChick & [Haskell QuickChick](https://hackage.haskell.org/package/QuickCheck), we provide the following typeclasses for random generation:
+- `Arbitrary`: random generators for inhabitants of algebraic data types
+- `ArbitrarySuchThat`: generators which only produce random values that satisfy a user-supplied inductive relation
+- `ArbitrarySized`, `ArbitrarySizedSuchThat`: versions of the two typeclasses above where the generator's size parameter is made explicit 
+
+We provide two top-level commands which automatically derive generators for Lean `inductive`s:
+
+**1. Deriving unconstrained generators**              
+An *unconstrained* generator produces random inhabitants of an algebraic data type. 
+We provide two frontends which derive instances of `Arbitrary` & `ArbitrarySuchThat` respectively: 
+
+**1a. Deriving Instance** (for algebraic data types)              
+Users can write `deriving Arbitrary` after an inductive type definition:
+
+```lean 
+inductive Tree where
+  ...
+  deriving Arbitrary 
+```
+
+Alternatively, users can also write `deriving instance Arbitrary for T1, ..., Tn` as a top-level command 
+to derive `Arbitrary` instances for types `T1, ..., Tn` simultaneously.
+
+**1b. Command Elaborator**            
+We provide a command elaborator which elaborates the `#derive_arbitrary` command: 
+
 ```lean
--- `#derive_arbitrary` derives an unconstrained generator for a `Tree` algebraic data type
+-- `#derive_arbitrary` derives an instance of `Arbitrary` for the `Tree` datatype
 #derive_arbitrary Tree  
+```
 
+Regardless of which frontend is used, to sample from the derived generator, users can simply call `runArbitrary` and specify some 
+`Nat` to act as the generator's size parameter (`10` in the example below):
+
+```lean
+#eval runArbitrary (α := Tree) 10
+```
+
+**2. Deriving constrained generators** (for inductive relations)                
+A *constrained* generator only produces random values that satisfy a user-specified inductive relation. 
+We provide a command elaborator which elaborates the `#derive_generator` command:
+
+```lean
 -- `#derive_generator` derives a constrained generator for `Tree`s that are balanced at some height `n`,
 -- where `balanced n t` is a user-defined inductive relation
 #derive_generator (fun (t : Tree) => balanced n t) 
+``
+
+To sample from the derived generator, users invoke `runSizedGen` & specify the right 
+instance of the `ArbitrarySizedSuchThat` typeclass (along with some `Nat` to act as the generator size):
+
+```lean
+#eval runSizedGen (ArbitrarySizedSuchThat.arbitrarySizedST (fun t => balanced 5 t)) 10
 ```
+
 
 **Repo overview**:
 
 - [`OptionTGen.lean`](./Plausible/New/OptionTGen.lean): Generator combinators that work over the `OptionT Gen` monad transformer (representing generators that may fail)
 - [`DecOpt.lean`](./Plausible/New/DecOpt.lean): The `DecOpt` typeclass for partially decidable propositions, adapted from QuickChick
 - [`Arbitrary.lean`](./Plausible/New/Arbitrary.lean): The `Arbitrary` & `ArbitrarySized` typeclasses for unconstrained generators, adapted from QuickChick
-- [`ArbitrarySizedSuchThat.lean`](./Plausible/New/ArbitrarySizedSuchThat.lean): The `ArbitrarySuchThat` & `ArbitrarySizedSuchThat` typeclasses for constrained generators (generators of values satisfying a proposition), adapted from QuickChick
+- [`ArbitrarySizedSuchThat.lean`](./Plausible/New/ArbitrarySizedSuchThat.lean): The `ArbitrarySuchThat` & `ArbitrarySizedSuchThat` typeclasses for constrained generators, adapted from QuickChick
 - [`GeneratorCombinators.lean`](./Plausible/New/GeneratorCombinators.lean): Extra combinators for Plausible generators (e.g. analogs of the `sized` and `frequency` combinators from Haskell QuickCheck)
 - [`DeriveArbitrary.lean`](./Plausible/New/DeriveArbitrary.lean): Metaprogramming infrastructure for deriving *unconstrained* generators (instances of the `ArbitrarySized` typeclass)
 - [`DeriveGenerator.lean`](./Plausible/New/DeriveGenerator.lean): Metaprogramming infrastructure for deriving *constrained* generators (instances of the `ArbitrarySizedSuchThat` typeclass)
