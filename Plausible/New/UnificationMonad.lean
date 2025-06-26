@@ -5,10 +5,9 @@ import Plausible.New.Idents
 
 open Lean Idents
 
-
+/-- For the time being, an unknown is just a string containing the variable name -/
 abbrev Unknown := String
 deriving instance Repr, BEq, Ord for Unknown
-
 
 /-- *Ranges* represent sets of potential values (see section 4.2) -/
 inductive Range
@@ -67,7 +66,7 @@ namespace UnifyM
       { s with patterns := (u, p) :: ps}
 
   /-- Returns a fresh unknown -/
-  def fresh_unknown (unknowns : Std.TreeSet Unknown) : Unknown :=
+  def freshUnknown (unknowns : Std.TreeSet Unknown) : Unknown :=
     let existingNames := Name.mkStr1 <$> unknowns.toArray
     toString $ genFreshName existingNames (Name.mkStr1 "unknown")
 
@@ -75,8 +74,13 @@ namespace UnifyM
   def fresh : Unify Unknown :=
     modifyGet $ fun s =>
       let us := s.unknowns
-      let u := fresh_unknown us
+      let u := freshUnknown us
       (u, { s with unknowns := us.merge {u} })
+
+  def getConstraints : Unify (Std.TreeMap Unknown Range compare) :=
+    UnifyState.constraints <$> get
+
+
 end UnifyM
 ----------------------------------
 -- Unification algorithm (fig. 3)
@@ -88,18 +92,18 @@ mutual
       if u1 == u2 then
         return ()
       else do
-        let k ← UnifyState.constraints <$> get
+        let k ← UnifyM.getConstraints
         let r1 := k.get! u1
         let r2 := k.get! u2
         unifyR (u1, r1) (u2, r2)
     | c1@(.Ctr _ _), c2@(.Ctr _ _) =>
       unifyC c1 c2
     | .Unknown u1, c2@(.Ctr _ _) => do
-      let k ← UnifyState.constraints <$> get
+      let k ← UnifyM.getConstraints
       let r1 := k.get! u1
       unifyRC (u1, r1) c2
     | c1@(.Ctr _ _), .Unknown u2 => do
-      let k ← UnifyState.constraints <$> get
+      let k ← UnifyM.getConstraints
       let r2 := k.get! u2
       unifyRC (u2, r2) c1
     | _, _ => panic! "reached catch-all case in unify"
@@ -138,7 +142,7 @@ mutual
   partial def unifyRC : Unknown × Range → Range → Unify Unit
     | (u1, .Undef _), c2@(.Ctr _ _) => UnifyM.update u1 c2
     | (_, .Unknown u'), c2@(.Ctr _ _) => do
-      let k ← UnifyState.constraints <$> get
+      let k ← UnifyM.getConstraints
       let r := k.get! u'
       unifyRC (u', r) c2
     | (u, .Fixed), c2@(.Ctr _ _) => handleMatch u c2
@@ -161,7 +165,7 @@ mutual
       let ps ← rs.mapM matchAux
       return (.Constructor c ps)
     | .Unknown u => do
-      let k ← UnifyState.constraints <$> get
+      let k ← UnifyM.getConstraints
       let r := k.get! u
       match r with
       | .Undef _ => do
