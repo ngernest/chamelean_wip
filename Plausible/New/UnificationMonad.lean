@@ -43,24 +43,25 @@ structure UnifyState where
 -- Unification monad (fig. 2)
 
 
-/-- Under the hood, this means `Unify α := UnifyState → Option (α × UnifyState)` -/
-abbrev Unify (α : Type) := StateT UnifyState Option α
+/-- Under the hood, this means `UnifyM α := UnifyState → Option (α × UnifyState)` -/
+abbrev UnifyM (α : Type) := StateT UnifyState Option α
 
 namespace UnifyM
+
   /-- `update u r` sets the range of the unknown `u` to be `r` -/
-  def update (u : Unknown) (r : Range) : Unify Unit :=
+  def update (u : Unknown) (r : Range) : UnifyM Unit :=
     modify $ fun s =>
       let k := s.constraints
       { s with constraints := k.insert u r }
 
   /-- Registers a new equality check between unknowns `u1` and `u2` -/
-  def equality (u1 : Unknown) (u2 : Unknown) : Unify Unit :=
+  def equality (u1 : Unknown) (u2 : Unknown) : UnifyM Unit :=
     modify $ fun s =>
       let eqs := s.equalities
       { s with equalities := eqs.merge {(u1, u2)} }
 
   /-- Adds a new pattern match -/
-  def pattern (u : Unknown) (p : Pattern) : Unify Unit :=
+  def pattern (u : Unknown) (p : Pattern) : UnifyM Unit :=
     modify $ fun s =>
       let ps := s.patterns
       { s with patterns := (u, p) :: ps}
@@ -71,15 +72,15 @@ namespace UnifyM
     toString $ genFreshName existingNames (Name.mkStr1 "unknown")
 
   /-- Generates and returns a new unknown -/
-  def fresh : Unify Unknown :=
+  def fresh : UnifyM Unknown :=
     modifyGet $ fun s =>
       let us := s.unknowns
       let u := freshUnknown us
       (u, { s with unknowns := us.merge {u} })
 
-  def getConstraints : Unify (Std.TreeMap Unknown Range compare) :=
+  /-- Fetches the constraint map in `UnifyState`, returning it in the `UnifyM` monad -/
+  def getConstraints : UnifyM (Std.TreeMap Unknown Range compare) :=
     UnifyState.constraints <$> get
-
 
 end UnifyM
 ----------------------------------
@@ -87,7 +88,7 @@ end UnifyM
 ----------------------------------
 mutual
   /-- Top-level unification function which unifies the ranges mapped to by two unknowns -/
-  partial def unify : Range → Range → Unify Unit
+  partial def unify : Range → Range → UnifyM Unit
     | .Unknown u1, .Unknown u2 =>
       if u1 == u2 then
         return ()
@@ -109,7 +110,7 @@ mutual
     | _, _ => panic! "reached catch-all case in unify"
 
   /-- Takes two `(Unknown, Range)` pairs & unifies them based on their `Range`s -/
-  partial def unifyR : Unknown × Range → Unknown × Range → Unify Unit
+  partial def unifyR : Unknown × Range → Unknown × Range → UnifyM Unit
     -- If the range of an unknown (e.g. `u1`) is undefined,
     -- we update `u1` to point to the range of `u2`
     | (u1, .Undef _), (_, r2) => UnifyM.update u1 r2
@@ -126,7 +127,7 @@ mutual
     | (_, c1@(.Ctr _ _)), (u2, .Fixed) => handleMatch u2 c1
 
   /-- Unifies two `Range`s that are both constructors -/
-  partial def unifyC (r1 : Range) (r2 : Range) : Unify Unit :=
+  partial def unifyC (r1 : Range) (r2 : Range) : UnifyM Unit :=
     match r1, r2 with
     | .Ctr c1 rs1, .Ctr c2 rs2 =>
       -- Recursively unify each of the constructor arguments
@@ -139,7 +140,7 @@ mutual
     | _, _ => panic! "Case not handled in unifyC"
 
   /-- Unifies an `(Unknown, Range)` pair with a `Range` -/
-  partial def unifyRC : Unknown × Range → Range → Unify Unit
+  partial def unifyRC : Unknown × Range → Range → UnifyM Unit
     | (u1, .Undef _), c2@(.Ctr _ _) => UnifyM.update u1 c2
     | (_, .Unknown u'), c2@(.Ctr _ _) => do
       let k ← UnifyM.getConstraints
@@ -151,7 +152,7 @@ mutual
 
   /-- Corresponds to `match` in the pseudocode
      (we call this `handleMatch` since `match` is a reserved keyword in Lean) -/
-  partial def handleMatch : Unknown → Range → Unify Unit
+  partial def handleMatch : Unknown → Range → UnifyM Unit
     | u, .Ctr c rs => do
       let p ← rs.mapM matchAux
       UnifyM.pattern u (Pattern.Constructor c p)
@@ -159,7 +160,7 @@ mutual
 
   /-- `matchAux` traverses a `Range` and converts it into a
       pattern which can be used in a `match` expression -/
-  partial def matchAux : Range → Unify Pattern
+  partial def matchAux : Range → UnifyM Pattern
     | .Ctr c rs => do
       -- Recursively handle ranges
       let ps ← rs.mapM matchAux
