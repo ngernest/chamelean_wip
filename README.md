@@ -6,7 +6,7 @@ See the [`New`](./Plausible/New/) subdirectory for code that uses Lean's metapro
 to automatically derive generators/checkers for inductive relations. 
 
 Our design is heavily inspired by [Coq/Rocq's QuickChick](https://github.com/QuickChick/QuickChick) library and the following papers:
-- [Computing Correctly with Inductive Relation (PLDI 2022)](https://lemonidas.github.io/pdf/ComputingCorrectly.pdf)
+- [Computing Correctly with Inductive Relations (PLDI 2022)](https://lemonidas.github.io/pdf/ComputingCorrectly.pdf)
 - [Generating Good Generators for Inductive Relations (POPL 2018)](https://lemonidas.github.io/pdf/GeneratingGoodGenerators.pdf)
 
 Like QuickChick & [Haskell QuickChick](https://hackage.haskell.org/package/QuickCheck), we provide the following typeclasses for random generation:
