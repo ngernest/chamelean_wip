@@ -19,6 +19,8 @@ inductive Value where
   | tensor (shape : List Nat) (dtype : String)
   deriving Repr, Arbitrary
 
+-- Test that we can successfully synthesize instances of `Arbitrary` & `ArbitrarySized`
+
 /-- info: instArbitrarySizedValue -/
 #guard_msgs in
 #synth ArbitrarySized Value
@@ -26,6 +28,9 @@ inductive Value where
 /-- info: instArbitraryOfArbitrarySized -/
 #guard_msgs in
 #synth Arbitrary Value
+
+-- We test the command elaborator frontend in a separate namespace to
+-- avoid overlapping typeclass instances for the same type
 namespace CommandElaboratorTest
 
 /--
