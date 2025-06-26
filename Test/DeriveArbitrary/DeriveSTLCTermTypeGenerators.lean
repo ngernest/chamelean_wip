@@ -11,6 +11,9 @@ set_option guard_msgs.diff true
 -- Invoke deriving instance handler for the `Arbitrary` typeclass on `type` and `term`
 deriving instance Arbitrary for type, term
 
+-- Test that we can successfully synthesize instances of `Arbitrary` & `ArbitrarySized`
+-- for both `type` & `term`
+
 /-- info: instArbitrarySizedType_test -/
 #guard_msgs in
 #synth ArbitrarySized type
