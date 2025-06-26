@@ -28,7 +28,6 @@ inductive Foo where
   | FromBitVec : ∀ (n : Nat), BitVec n → String → Foo
   deriving Arbitrary
 
--- #eval runArbitrary (α := Foo) 10
 
 inductive MyList where
   | Nil
@@ -37,6 +36,12 @@ inductive MyList where
 inductive MyListAnon where
   | Nil : MyListAnon
   | Cons : Nat -> MyListAnon -> MyListAnon
+
+-- deriving instance Arbitrary for MyList, MyListAnon
+
+-- #synth Arbitrary MyList
+-- #synth Arbitrary MyListAnon
+
 
 -- #derive_arbitrary MyListAnon
 

@@ -203,19 +203,14 @@ def elabDeriveArbitrary : CommandElab := fun stx => do
 
   | _ => throwUnsupportedSyntax
 
-/-- Deriving handler which produces an instance of the `ArbitrarySized` typeclass -/
+/-- Deriving handler which produces an instance of the `ArbitrarySized` typeclass for
+    each type specified in `declNames` -/
 def deriveArbitraryInstanceHandler (declNames : Array Name) : CommandElabM Bool := do
   if (← declNames.allM isInductive) then
-    if h : declNames.size = 1 then
-      let targetTypeName := declNames[0]
-
-      -- Create an instance of the `ArbitrarySized` typeclass
+    for targetTypeName in declNames do
       let typeClassInstance ← mkArbitrarySizedInstance targetTypeName
       elabCommand typeClassInstance
-      return true
-    else
-      throwError "Cannot deriving Arbitrary instances for more than one type simultaneously"
-      return false
+    return true
   else
     throwError "Cannot derive instance of Arbitrary typeclass for non-inductive types"
     return false
