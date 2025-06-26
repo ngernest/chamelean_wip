@@ -5,6 +5,11 @@ import Plausible.New.Idents
 
 open Lean Idents
 
+
+--------------------------------------------------------------------------------
+-- Adapted from "Generating Good Generators for Inductive Relations", POPL '18
+--------------------------------------------------------------------------------
+
 /-- For the time being, an unknown is just a string containing the variable name -/
 abbrev Unknown := String
 deriving instance Repr, BEq, Ord for Unknown
@@ -40,8 +45,9 @@ structure UnifyState where
   unknowns : Std.TreeSet Unknown (cmp := compare)
   deriving Repr
 
--- Unification monad (fig. 2)
-
+---------------------------------------------------------------
+-- Unification monad (fig. 2 in Generating Good Generators)
+---------------------------------------------------------------
 
 /-- Under the hood, this means `UnifyM α := UnifyState → Option (α × UnifyState)` -/
 abbrev UnifyM (α : Type) := StateT UnifyState Option α
@@ -64,7 +70,7 @@ namespace UnifyM
   def pattern (u : Unknown) (p : Pattern) : UnifyM Unit :=
     modify $ fun s =>
       let ps := s.patterns
-      { s with patterns := (u, p) :: ps}
+      { s with patterns := (u, p) :: ps }
 
   /-- Returns a fresh unknown -/
   def freshUnknown (unknowns : Std.TreeSet Unknown) : Unknown :=
@@ -83,9 +89,11 @@ namespace UnifyM
     UnifyState.constraints <$> get
 
 end UnifyM
-----------------------------------
--- Unification algorithm (fig. 3)
-----------------------------------
+
+------------------------------------------------------------------
+-- Unification algorithm (fig. 3 of Generating Good Generators)
+------------------------------------------------------------------
+
 mutual
   /-- Top-level unification function which unifies the ranges mapped to by two unknowns -/
   partial def unify : Range → Range → UnifyM Unit
