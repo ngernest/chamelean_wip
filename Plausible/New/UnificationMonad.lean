@@ -43,39 +43,41 @@ structure UnifyState where
 
 -- Unification monad (fig. 2)
 
+
 /-- Under the hood, this means `Unify α := UnifyState → Option (α × UnifyState)` -/
 abbrev Unify (α : Type) := StateT UnifyState Option α
 
-/-- `update u r` sets the range of the unknown `u` to be `r` -/
-def update (u : Unknown) (r : Range) : Unify Unit :=
-  modify $ fun s =>
-    let k := s.constraints
-    { s with constraints := k.insert u r }
+namespace UnifyM
+  /-- `update u r` sets the range of the unknown `u` to be `r` -/
+  def update (u : Unknown) (r : Range) : Unify Unit :=
+    modify $ fun s =>
+      let k := s.constraints
+      { s with constraints := k.insert u r }
 
-/-- Registers a new equality check between unknowns `u1` and `u2` -/
-def equality (u1 : Unknown) (u2 : Unknown) : Unify Unit :=
-  modify $ fun s =>
-    let eqs := s.equalities
-    { s with equalities := eqs.merge {(u1, u2)} }
+  /-- Registers a new equality check between unknowns `u1` and `u2` -/
+  def equality (u1 : Unknown) (u2 : Unknown) : Unify Unit :=
+    modify $ fun s =>
+      let eqs := s.equalities
+      { s with equalities := eqs.merge {(u1, u2)} }
 
-/-- Adds a new pattern match -/
-def pattern (u : Unknown) (p : Pattern) : Unify Unit :=
-  modify $ fun s =>
-    let ps := s.patterns
-    { s with patterns := (u, p) :: ps}
+  /-- Adds a new pattern match -/
+  def pattern (u : Unknown) (p : Pattern) : Unify Unit :=
+    modify $ fun s =>
+      let ps := s.patterns
+      { s with patterns := (u, p) :: ps}
 
-/-- Returns a fresh unknown -/
-def fresh_unknown (unknowns : Std.TreeSet Unknown) : Unknown :=
-  let existingNames := Name.mkStr1 <$> unknowns.toArray
-  toString $ genFreshName existingNames (Name.mkStr1 "unknown")
+  /-- Returns a fresh unknown -/
+  def fresh_unknown (unknowns : Std.TreeSet Unknown) : Unknown :=
+    let existingNames := Name.mkStr1 <$> unknowns.toArray
+    toString $ genFreshName existingNames (Name.mkStr1 "unknown")
 
-/-- Generates and returns a new unknown -/
-def fresh : Unify Unknown :=
-  modifyGet $ fun s =>
-    let us := s.unknowns
-    let u := fresh_unknown us
-    (u, { s with unknowns := us.merge {u} })
-
+  /-- Generates and returns a new unknown -/
+  def fresh : Unify Unknown :=
+    modifyGet $ fun s =>
+      let us := s.unknowns
+      let u := fresh_unknown us
+      (u, { s with unknowns := us.merge {u} })
+end UnifyM
 ----------------------------------
 -- Unification algorithm (fig. 3)
 ----------------------------------
@@ -106,16 +108,16 @@ mutual
   partial def unifyR : Unknown × Range → Unknown × Range → Unify Unit
     -- If the range of an unknown (e.g. `u1`) is undefined,
     -- we update `u1` to point to the range of `u2`
-    | (u1, .Undef _), (_, r2) => update u1 r2
-    | (_, r1), (u2, .Undef _) => update u2 r1
+    | (u1, .Undef _), (_, r2) => UnifyM.update u1 r2
+    | (_, r1), (u2, .Undef _) => UnifyM.update u2 r1
     | (_, u1'@(.Unknown _)), (_, r2) => unify u1' r2
     | (_, r1), (_, u2'@(.Unknown _)) => unify r1 u2'
     | (_, c1@(.Ctr _ _)), (_, c2@(.Ctr _ _)) => unifyC c1 c2
     | (u1, .Fixed), (u2, .Fixed) => do
       -- Assert that whatever the values of `u1` and `u2` are, they are equal
       -- Record this equality check using `equality`, then update `u1`'s range to the other
-      equality u1 u2
-      update u1 .Fixed
+      UnifyM.equality u1 u2
+      UnifyM.update u1 .Fixed
     | (u1, .Fixed), (_, c2@(.Ctr _ _)) => handleMatch u1 c2
     | (_, c1@(.Ctr _ _)), (u2, .Fixed) => handleMatch u2 c1
 
@@ -134,7 +136,7 @@ mutual
 
   /-- Unifies an `(Unknown, Range)` pair with a `Range` -/
   partial def unifyRC : Unknown × Range → Range → Unify Unit
-    | (u1, .Undef _), c2@(.Ctr _ _) => update u1 c2
+    | (u1, .Undef _), c2@(.Ctr _ _) => UnifyM.update u1 c2
     | (_, .Unknown u'), c2@(.Ctr _ _) => do
       let k ← UnifyState.constraints <$> get
       let r := k.get! u'
@@ -148,7 +150,7 @@ mutual
   partial def handleMatch : Unknown → Range → Unify Unit
     | u, .Ctr c rs => do
       let p ← rs.mapM matchAux
-      pattern u (Pattern.Constructor c p)
+      UnifyM.pattern u (Pattern.Constructor c p)
     | _, _ => panic! "reached catch-all case in handleMatch"
 
   /-- `matchAux` traverses a `Range` and converts it into a
@@ -167,15 +169,15 @@ mutual
         -- (i.e. the unknown serves as an input at runtime)
         -- We update `u`'s range to be `fixed`
         -- (since we're extracting information out of the scrutinee)
-        update u .Fixed
+        UnifyM.update u .Fixed
         return (.Unknown u)
       | .Fixed => do
         -- Handles non-linear patterns:
         -- produce a fresh unknown `u'`, use `u'` as the pattern variable
         -- & enforce an equality check between `u` and `u'`
-        let u' ← fresh
-        equality u' u
-        update u' r
+        let u' ← UnifyM.fresh
+        UnifyM.equality u' u
+        UnifyM.update u' r
         return (.Unknown u')
       | u'@(.Unknown _) => matchAux u'
       | .Ctr c rs => do
