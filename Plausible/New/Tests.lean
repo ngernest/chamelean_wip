@@ -12,15 +12,23 @@ open Plausible ArbitrarySizedSuchThat OptionTGen
 
 /-- Dummy inductive relation for testing purposes -/
 inductive RGB where
-| Red
-| Green
-| Blue
+  | Red
+  | Green
+  | Blue
+  deriving Arbitrary
 
 inductive Value where
   | none
   | bool (b : Bool)
   | int (i : Int)
   | tensor (shape : List Nat) (dtype : String)
+  deriving Arbitrary
+
+inductive Foo where
+  | FromBitVec : ∀ (n : Nat), BitVec n → String → Foo
+  deriving Arbitrary
+
+-- #eval runArbitrary (α := Foo) 10
 
 inductive MyList where
   | Nil
