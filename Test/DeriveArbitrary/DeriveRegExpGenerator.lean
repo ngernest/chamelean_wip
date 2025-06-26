@@ -8,19 +8,31 @@ open Arbitrary GeneratorCombinators
 
 set_option guard_msgs.diff true
 
-
 /-- An inductive datatype representing regular expressions (where "characters" are `Nat`s).
    Slightly modified from Software Foundations
    See https://softwarefoundations.cis.upenn.edu/lf-current/IndProp.html
    and search for "Case Study: Regular Expressions".
    The `RegExp`s below are non-polymorphic in the character type. -/
 inductive RegExp : Type where
-| EmptySet : RegExp
-| EmptyStr : RegExp
-| Char : Nat → RegExp -- using Nat instead of Char
-| App : RegExp → RegExp → RegExp
-| Union : RegExp → RegExp → RegExp
-| Star : RegExp → RegExp
+  | EmptySet : RegExp
+  | EmptyStr : RegExp
+  | Char : Nat → RegExp -- using Nat instead of Char
+  | App : RegExp → RegExp → RegExp
+  | Union : RegExp → RegExp → RegExp
+  | Star : RegExp → RegExp
+  deriving Repr, Arbitrary
+
+/-- info: instArbitrarySizedRegExp -/
+#guard_msgs in
+#synth ArbitrarySized RegExp
+
+/-- info: instArbitraryOfArbitrarySized -/
+#guard_msgs in
+#synth Arbitrary RegExp
+
+-- We test the command elaborator frontend in a separate namespace to
+-- avoid overlapping typeclass instances for the same type
+namespace CommandElaboratorTest
 
 /--
 info: Try this generator: instance : ArbitrarySized RegExp where
@@ -65,3 +77,5 @@ info: Try this generator: instance : ArbitrarySized RegExp where
 -/
 #guard_msgs(info, drop warning) in
 #derive_arbitrary RegExp
+
+end CommandElaboratorTest

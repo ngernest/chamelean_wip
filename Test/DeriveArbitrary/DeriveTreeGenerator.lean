@@ -8,6 +8,23 @@ open Arbitrary GeneratorCombinators
 
 set_option guard_msgs.diff true
 
+-- Invoke deriving instance handler for the `Arbitrary` typeclass on `type` and `term`
+deriving instance Arbitrary for Tree
+
+-- Test that we can successfully synthesize instances of `Arbitrary` & `ArbitrarySized`
+
+/-- info: instArbitrarySizedTree_test -/
+#guard_msgs in
+#synth ArbitrarySized Tree
+
+/-- info: instArbitraryOfArbitrarySized -/
+#guard_msgs in
+#synth Arbitrary Tree
+
+-- We test the command elaborator frontend in a separate namespace to
+-- avoid overlapping typeclass instances for the same type
+namespace CommandElaboratorTest
+
 /--
 info: Try this generator: instance : ArbitrarySized Tree where
   arbitrarySized :=
@@ -29,3 +46,5 @@ info: Try this generator: instance : ArbitrarySized Tree where
 -/
 #guard_msgs(info, drop warning) in
 #derive_arbitrary Tree
+
+end CommandElaboratorTest
