@@ -51,32 +51,6 @@ def numMatchingFVars (e : Expr) (id : FVarId) : Nat :=
     c1 + c2
   | _ => 0
 
-/-- Computes the set of all free variables in an expression, returning a `HashSet` of `FVarId`s
-    - This is a non-monadic version of `Lean.CollectFVars`, defined in
-    https://github.com/leanprover/lean4/blob/6741444a63eec253a7eae7a83f1beb3de015023d/src/Lean/Util/CollectFVars.lean#L28 -/
-def getFVarsSet (e : Expr) : HashSet FVarId :=
-  open HashSet in
-  match e with
-  | .proj _ _ e => getFVarsSet e
-  | .forallE _ ty body _ => union (getFVarsSet ty) (getFVarsSet body)
-  | .lam _ ty body _ => union (getFVarsSet ty) (getFVarsSet body)
-  | .letE _ ty val body _ =>
-    union (getFVarsSet ty) (union (getFVarsSet val) (getFVarsSet body))
-  | .app f a => union (getFVarsSet f) (getFVarsSet a)
-  | .mdata _ e => getFVarsSet e
-  | .fvar fvar_id => HashSet.ofArray #[fvar_id]
-  | _ => ∅
-
-/-- Extracts the free variables in an expression, returning an array of `FVarID`s -/
-def extractFVars (e : Expr) : Array FVarId :=
-  HashSet.toArray $ getFVarsSet e
-
-/-- A monadic version of `extractFVars` (which collects the array of `FVarId`s
-    in the `MetaM` monad ) -/
-def extractFVarsMetaM (e : Expr) : MetaM (Array FVarId) := do
-  let (_, fvars_state) ← e.collectFVars.run {}
-  return fvars_state.fvarIds
-
 
 def subst_first_fVar (e: Expr) (old : FVarId) (new : FVarId) : MetaM Expr := do
   if ¬ e.containsFVar old then return e
@@ -92,6 +66,9 @@ def subst_first_fVar (e: Expr) (old : FVarId) (new : FVarId) : MetaM Expr := do
         let anew ← subst_first_fVar a old new
         return Expr.app f anew
     | _ => return e
+
+
+
 
 /-- `DecomposedInductiveHypothesis` represents a hypothesis where the free variables
      in `fVarId`s have equalities on them as stipulated by the `variableEqualities` field,

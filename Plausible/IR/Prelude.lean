@@ -5,9 +5,10 @@ import Lean.Meta.Tactic.Simp.Main
 
 open Lean.Elab.Deriving.DecEq
 open List Nat Array String
-open Lean Elab Command Meta Term
+open Lean Elab Command Meta Term LocalContext
 open Lean.Parser.Term
 open Except
+open Std
 
 namespace Plausible.IR
 
@@ -97,6 +98,26 @@ elab "#get_type" t:term : command => do
     let typeStr ← typeArrayToString types
     IO.println typeStr
 
+/-- Computes the set of all free variables in an expression, returning a `HashSet` of `FVarId`s
+    - This is a non-monadic version of `Lean.CollectFVars`, defined in
+    https://github.com/leanprover/lean4/blob/6741444a63eec253a7eae7a83f1beb3de015023d/src/Lean/Util/CollectFVars.lean#L28 -/
+def getFVarsSet (e : Expr) : HashSet FVarId :=
+  open HashSet in
+  match e with
+  | .proj _ _ e => getFVarsSet e
+  | .forallE _ ty body _ => union (getFVarsSet ty) (getFVarsSet body)
+  | .lam _ ty body _ => union (getFVarsSet ty) (getFVarsSet body)
+  | .letE _ ty val body _ =>
+    union (getFVarsSet ty) (union (getFVarsSet val) (getFVarsSet body))
+  | .app f a => union (getFVarsSet f) (getFVarsSet a)
+  | .mdata _ e => getFVarsSet e
+  | .fvar fvar_id => HashSet.ofArray #[fvar_id]
+  | _ => ∅
+
+/-- Extracts the free variables in an expression, returning an array of `FVarID`s -/
+def extractFVars (e : Expr) : Array FVarId :=
+  HashSet.toArray $ getFVarsSet e
+
 /-- Takes a universally-quantified expression of the form `∀ (x1 : τ1) … (xn : τn), body`
     and returns the pair `(#[(x1, τ1), …, (xn, τn)], body)` -/
 partial def extractForAllBinders (e : Expr) : Array (Name × Expr) × Expr :=
@@ -110,6 +131,12 @@ partial def extractForAllBinders (e : Expr) : Array (Name × Expr) × Expr :=
     | _ => (acc, e)
   go e #[]
 
+/-- A monadic version of `extractFVars` (which collects the array of `FVarId`s
+    in the `MetaM` monad ) -/
+def extractFVarsMetaM (e : Expr) : MetaM (Array FVarId) := do
+  let (_, fvars_state) ← e.collectFVars.run {}
+  return fvars_state.fvarIds
+
 /-- Decomposes a universally-quantified type expression whose body is an arrow type
     (i.e. `∀ (x1 : τ1) … (xn : τn), Q1 → … → Qn → P`), and returns a triple of the form
     `(#[(x1, τ1), …, (xn, τn)], Q1 → … → Qn → P, #[Q1, …, Qn, P])`.
@@ -119,6 +146,34 @@ def decomposeType (e : Expr) : MetaM (Array (Name × Expr) × Expr × Array Expr
   let (binder, exp) := extractForAllBinders e
   let tyexp ← getComponentsOfArrowType exp
   return (binder, exp, tyexp)
+
+
+/-- Decomposes a universally-quantified type expression whose body is an arrow type
+    (i.e. `∀ (x1 : τ1) … (xn : τn), Q1 → … → Qn → P`), and returns a triple of the form
+    `(#[(x1, τ1), …, (xn, τn)], Q1 → … → Qn → P, #[Q1, …, Qn, P])`.
+    - The 2nd component is the body of the forall-expression
+    - The 3rd component is an array containing each subterm of the arrow type -/
+def decomposeType_withLocalContext (e : Expr) (lctx: LocalContext): MetaM (Array (Name × Expr) × Expr × Array Expr × LocalContext) := do
+  let (binder, exp) := extractForAllBinders e
+  let mut new_ctx := lctx
+  for (name, ty) in binder do
+    match new_ctx.findFromUserName? name with
+    | none => {
+      let newfvarid ← mkFreshFVarId
+      new_ctx := new_ctx.mkLocalDecl newfvarid name ty
+      }
+    | some _ => {
+      let newname := new_ctx.getUnusedName name
+      let newfvarid ← mkFreshFVarId
+      new_ctx := new_ctx.mkLocalDecl newfvarid newname ty
+    }
+  let allFvarids :=  extractFVars exp
+  let mut new_exp := exp
+  for fvarid in allFvarids do
+    if let some decl := new_ctx.findFromUserName? fvarid.name then
+      new_exp := new_exp.replaceFVarId fvarid decl.toExpr
+  let tyexp ← getComponentsOfArrowType new_exp
+  return (binder, new_exp, tyexp, new_ctx)
 
 
 def get_recursive_calls (typeName : Name) (e : Expr) : MetaM (Array Expr) := do
