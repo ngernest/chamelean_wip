@@ -17,7 +17,16 @@ inductive Value where
   | string (value : String)
   | ellipsis
   | tensor (shape : List Nat) (dtype : String)
-  deriving Repr
+  deriving Repr, Arbitrary
+
+/-- info: instArbitrarySizedValue -/
+#guard_msgs in
+#synth ArbitrarySized Value
+
+/-- info: instArbitraryOfArbitrarySized -/
+#guard_msgs in
+#synth Arbitrary Value
+namespace CommandElaboratorTest
 
 /--
 info: Try this generator: instance : ArbitrarySized Value where
@@ -75,3 +84,5 @@ info: Try this generator: instance : ArbitrarySized Value where
 -/
 #guard_msgs(info, drop warning) in
 #derive_arbitrary Value
+
+end CommandElaboratorTest

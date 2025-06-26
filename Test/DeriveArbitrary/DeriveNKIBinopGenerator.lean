@@ -17,7 +17,21 @@ inductive BinOp where
   | add | sub | mul | div | mod | pow | floor
   -- bitwise
   | lshift | rshift | or | xor | and
-  deriving Repr
+  deriving Repr, Arbitrary
+
+-- Test that we can successfully synthesize instances of `Arbitrary` & `ArbitrarySized`
+
+/-- info: instArbitrarySizedBinOp -/
+#guard_msgs in
+#synth ArbitrarySized BinOp
+
+/-- info: instArbitraryOfArbitrarySized -/
+#guard_msgs in
+#synth Arbitrary BinOp
+
+-- We test the command elaborator frontend in a separate namespace to
+-- avoid overlapping typeclass instances for the same type
+namespace CommandElaboratorTest
 
 /--
 info: Try this generator: instance : ArbitrarySized BinOp where
@@ -72,3 +86,5 @@ info: Try this generator: instance : ArbitrarySized BinOp where
 -/
 #guard_msgs(info, drop warning) in
 #derive_arbitrary BinOp
+
+end CommandElaboratorTest

@@ -8,6 +8,32 @@ open Arbitrary GeneratorCombinators
 
 set_option guard_msgs.diff true
 
+-- Invoke deriving instance handler for the `Arbitrary` typeclass on `type` and `term`
+deriving instance Arbitrary for type, term
+
+-- Test that we can successfully synthesize instances of `Arbitrary` & `ArbitrarySized`
+-- for both `type` & `term`
+
+/-- info: instArbitrarySizedType_test -/
+#guard_msgs in
+#synth ArbitrarySized type
+
+/-- info: instArbitrarySizedTerm_test -/
+#guard_msgs in
+#synth ArbitrarySized term
+
+/-- info: instArbitraryOfArbitrarySized -/
+#guard_msgs in
+#synth Arbitrary type
+
+/-- info: instArbitraryOfArbitrarySized -/
+#guard_msgs in
+#synth Arbitrary term
+
+-- We test the command elaborator frontend in a separate namespace to
+-- avoid overlapping typeclass instances for the same type
+namespace CommandElaboratorTest
+
 /--
 info: Try this generator: instance : ArbitrarySized type where
   arbitrarySized :=
@@ -84,3 +110,5 @@ info: Try this generator: instance : ArbitrarySized term where
 -/
 #guard_msgs(info, drop warning) in
 #derive_arbitrary term
+
+end CommandElaboratorTest
