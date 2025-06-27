@@ -64,11 +64,9 @@ instance of the `ArbitrarySizedSuchThat` typeclass (along with some `Nat` to act
 #eval runSizedGen (ArbitrarySizedSuchThat.arbitrarySizedST (fun t => balanced 5 t)) 10
 ```
 
-
 **Repo overview**:
 
 - [`OptionTGen.lean`](./Plausible/New/OptionTGen.lean): Generator combinators that work over the `OptionT Gen` monad transformer (representing generators that may fail)
-- [`DecOpt.lean`](./Plausible/New/DecOpt.lean): The `DecOpt` typeclass for partially decidable propositions, adapted from QuickChick
 - [`Arbitrary.lean`](./Plausible/New/Arbitrary.lean): The `Arbitrary` & `ArbitrarySized` typeclasses for unconstrained generators, adapted from QuickChick
 - [`ArbitrarySizedSuchThat.lean`](./Plausible/New/ArbitrarySizedSuchThat.lean): The `ArbitrarySuchThat` & `ArbitrarySizedSuchThat` typeclasses for constrained generators, adapted from QuickChick
 - [`GeneratorCombinators.lean`](./Plausible/New/GeneratorCombinators.lean): Extra combinators for Plausible generators (e.g. analogs of the `sized` and `frequency` combinators from Haskell QuickCheck)
@@ -76,6 +74,9 @@ instance of the `ArbitrarySizedSuchThat` typeclass (along with some `Nat` to act
 - [`DeriveGenerator.lean`](./Plausible/New/DeriveGenerator.lean): Metaprogramming infrastructure for deriving *constrained* generators (instances of the `ArbitrarySizedSuchThat` typeclass)
 - [`SubGenerators.lean`](./Plausible/New/SubGenerators.lean): Handles constraints when deriving sub-generators
 - [`TSyntaxCombinators.lean`](./Plausible/New/TSyntaxCombinators.lean): Combinators over `TSyntax` for creating monadic `do`-blocks & other Lean expressions via metaprogramming
+- [`DecOpt.lean`](./Plausible/New/DecOpt.lean): The `DecOpt` typeclass for partially decidable propositions, adapted from QuickChick
+- [`Enumerators.lean`](./Plausible/New/Enumerators.lean): The `Enum, EnumSized, EnumSuchThat, EnumSizedSuchThat` typeclasses for constrained & unconstrained enumeration
+- [`LazyList.lean`](./Plausible/New/LazyList.lean): Implementation of lazy lists (used for enumerators)
 - [`DeriveChecker.lean`](./Plausible/New/DeriveChecker.lean): Metaprogramming infrastructure for automatically deriving checkers
 - [`Idents.lean`](./Plausible/New/Idents.lean): Utilities for dealing with identifiers / producing fresh names 
 - [`Utils.lean`](./Plausible/New/Utils.lean): Other miscellaneous utils
