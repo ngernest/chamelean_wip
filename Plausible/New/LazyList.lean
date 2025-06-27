@@ -10,6 +10,7 @@ inductive LazyList (α : Type u) where
   | delayed : Thunk (LazyList α) → LazyList α
 deriving Inhabited
 
+
 namespace LazyList
 
 /-- Converts a Lazy List to an ordinary list by forcing all the embedded thunks -/
@@ -17,6 +18,11 @@ def toList : LazyList α → List α
   | .nil => []
   | .cons x xs => x :: xs.toList
   | .delayed xs => xs.get.toList
+
+/-- We pretty-print `LazyList`s by converting them to ordinary lists
+    (forcing all the thunks) & pretty-printing the resultant list. -/
+instance [Repr α] : Repr (LazyList α) where
+  reprPrec l _ := repr l.toList
 
 -- Many operations on lazy lists can be implemented without forcing the embedded thunks,
 -- instead building up further thunks.
@@ -30,8 +36,7 @@ def take : Nat → LazyList α → LazyList α
 
 /-- Creates a `LazyList` from a function `f` -/
 def ofFn (f : Fin n → α) : LazyList α :=
-  Fin.foldr n (init := .nil) (fun i xs =>
-    .delayed $ LazyList.cons (f i) xs)
+  Fin.foldr n (fun i xs => .delayed $ LazyList.cons (f i) xs) (init := .nil)
 
 /-- Appends two `LazyLists` together
     (Note: the body of delayed does not need to be an explicit call to `Thunk.mk` because
@@ -43,6 +48,8 @@ def append (xs ys : LazyList α) : LazyList α :=
     | .cons x xs' => LazyList.cons x (append xs' ys)
     | .delayed xs' => append xs'.get ys
 
+/-- `observe tag i` uses `dbg_trace` to emit a trace of the variable
+    associated with `tag` -/
 def observe (tag : String) (i : Fin n) : Nat :=
   dbg_trace "{tag}: {i.val}"
   i.val
