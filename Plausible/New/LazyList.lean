@@ -6,18 +6,17 @@
     The `delayed` constructor causes part of the list to be computed on demand. -/
 inductive LazyList (α : Type u) where
   | nil
-  | cons : α → LazyList α → LazyList α
-  | delayed : Thunk (LazyList α) → LazyList α
+  | cons : α → Thunk (LazyList α) → LazyList α
+  -- | delayed : Thunk (LazyList α) → LazyList α
 deriving Inhabited
-
 
 namespace LazyList
 
 /-- Converts a Lazy List to an ordinary list by forcing all the embedded thunks -/
 def toList : LazyList α → List α
   | .nil => []
-  | .cons x xs => x :: xs.toList
-  | .delayed xs => xs.get.toList
+  | .cons x xs => x :: xs.get.toList
+  -- | .delayed xs => xs.get.toList
 
 /-- We pretty-print `LazyList`s by converting them to ordinary lists
     (forcing all the thunks) & pretty-printing the resultant list. -/
@@ -28,25 +27,25 @@ instance [Repr α] : Repr (LazyList α) where
 -- instead building up further thunks.
 
 /-- Retrieves a prefix of the `LazyList` (only the thunks in the prefix are evaluated) -/
-def take : Nat → LazyList α → LazyList α
-  | 0, _ => .nil
-  | _, .nil => .nil
-  | n + 1, .cons x xs => .cons x $ .delayed (take n xs)
-  | n + 1, .delayed xs => .delayed $ take (n + 1) xs.get
+def take (n : Nat) (l : LazyList α) : LazyList α :=
+  match n with
+  | .zero => .nil
+  | .succ n' =>
+    match l with
+    | .nil => .nil
+    | .cons x xs => .cons x (take n' xs.get)
 
 /-- Creates a `LazyList` from a function `f` -/
 def ofFn (f : Fin n → α) : LazyList α :=
-  Fin.foldr n (fun i xs => .delayed $ LazyList.cons (f i) xs) (init := .nil)
+  Fin.foldr n (fun i xs => LazyList.cons (f i) xs) (init := .nil)
 
 /-- Appends two `LazyLists` together
     (Note: the body of delayed does not need to be an explicit call to `Thunk.mk` because
     Lean automatically coerces any `e : α` into `Thunk.mk (fun () => e) : Thunk α`.) -/
-def append (xs ys : LazyList α) : LazyList α :=
-  .delayed $
-    match xs with
-    | .nil => ys
-    | .cons x xs' => LazyList.cons x (append xs' ys)
-    | .delayed xs' => append xs'.get ys
+def append (xs : LazyList α) (ys : LazyList α) : LazyList α :=
+  match xs with
+  | .nil => ys
+  | .cons x xs' => .cons x (append xs'.get ys)
 
 /-- `observe tag i` uses `dbg_trace` to emit a trace of the variable
     associated with `tag` -/
@@ -61,8 +60,7 @@ def ys := LazyList.ofFn (n := 3) (observe "ys")
 def mapLazyList (f : α → β) (l : LazyList α) : LazyList β :=
   match l with
   | .nil => .nil
-  | .cons x xs => .cons (f x) (mapLazyList f xs)
-  | .delayed xs => .delayed $ mapLazyList f xs.get
+  | .cons x xs => .cons (f x) (mapLazyList f xs.get)
 
 /-- `Functor` instance for `LazyList` -/
 instance : Functor LazyList where
@@ -70,18 +68,21 @@ instance : Functor LazyList where
 
 /-- Creates a singleton LazyList -/
 def pureLazyList (x : α) : LazyList α :=
-  .cons x .nil
+  LazyList.cons x $ Thunk.mk (fun _ => LazyList.nil)
+
+/-- Alias for `pureLazyList` -/
+def singleton (x : α) : LazyList α :=
+  pureLazyList x
 
 /-- Flattens a `LazyList (LazyList α)` into a `LazyList α`  -/
-def concatLazyList (l : LazyList (LazyList α)) : LazyList α :=
+def concat (l : LazyList (LazyList α)) : LazyList α :=
   match l with
   | .nil => .nil
-  | .cons x l' => append x (concatLazyList l')
-  | .delayed xss => concatLazyList xss.get
+  | .cons x l' => append x (concat l'.get)
 
 /-- Bind for `LazyList`s is just `concatMap` (same as the list monad) -/
 def bindLazyList (l : LazyList α) (f : α → LazyList β) : LazyList β :=
-  concatLazyList (f <$> l)
+  concat (f <$> l)
 
 /-- `Monad` instance for `LazyList` -/
 instance : Monad LazyList where
@@ -91,5 +92,10 @@ instance : Monad LazyList where
 /-- `Applicative` instance for `LazyList` -/
 instance : Applicative LazyList where
   pure := pureLazyList
+
+/-- `Alternative` instance for `LazyList`s, where `xs <|> ys` is just `LazyList` append -/
+instance : Alternative LazyList where
+  failure := .nil
+  orElse xs f := append xs (f ())
 
 end LazyList
