@@ -10,6 +10,8 @@ import Plausible.New.DecOpt
 import Plausible.New.GeneratorCombinators
 import Plausible.New.ArbitrarySizedSuchThat
 import Plausible.New.Arbitrary
+import Plausible.New.Enumerators
+import Plausible.New.LazyList
 import Plausible.New.STLC
 import Plausible.New.Trees
 import Plausible.New.NKIExperiments
