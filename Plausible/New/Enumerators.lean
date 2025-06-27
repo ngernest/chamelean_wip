@@ -70,7 +70,35 @@ instance [EnumSized α] : Enum α where
 instance [EnumSizedSuchThat α P] : EnumSuchThat α P where
   enumST := sizedEnum (EnumSizedSuchThat.enumSizedST P)
 
+-- Some simple `Enum` instances
 
 /-- `Enum` instance for `Bool` -/
 instance : Enum Bool where
   enum := pureEnum false <|> pureEnum true
+
+/-- `Enum` instance for `Nat` -/
+instance : Enum Nat where
+  enum := fun n => lazySeq .succ 0 (n + 1)
+
+/-- `Enum` instances for pairs -/
+instance [Enum α] [Enum β] : Enum (α × β) where
+  enum := fun n => do
+    let a ← Enum.enum n
+    let b ← Enum.enum n
+    pure (a, b)
+
+/-- `Enum` instances for sums -/
+instance [Enum α] [Enum β] : Enum (α ⊕ β) where
+  enum := fun n =>
+    (Enum.enum n >>= pure ∘ Sum.inl) <|> (Enum.enum n >>= pure ∘ Sum.inr)
+
+/-- `Enum` instances for lists -/
+instance [Enum α] : Enum (List α) where
+  enum := sizedEnum $ fun size =>
+    match size with
+    | 0 => pure []
+    | .succ size' =>
+      pure [] <|> (do
+        let hd := Enum.enum size'
+        let tl := Enum.enum (size' - 1)
+        return (LazyList.toList $ LazyList.append hd tl))

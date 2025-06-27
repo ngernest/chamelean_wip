@@ -98,4 +98,10 @@ instance : Alternative LazyList where
   failure := .nil
   orElse xs f := append xs (f ())
 
+/-- Creates a lazy list by repeatedly applying a function `s` to generate a sequence of elements -/
+def lazySeq (s : α → α) (lo : α) (len : Nat) : LazyList α :=
+  match len with
+  | .zero => .nil
+  | .succ len' => .cons lo (lazySeq s (s lo) len')
+
 end LazyList
