@@ -94,16 +94,22 @@ instance [Enum α] [Enum β] : Enum (α ⊕ β) where
   enum := fun n =>
     (Enum.enum n >>= pure ∘ Sum.inl) <|> (Enum.enum n >>= pure ∘ Sum.inr)
 
+/-- Helper function: enumerates lists with a certain `budget` that is
+    divided by 2 during recursive calls -/
+def enumListsWithBudget [Enum α] (budget : Nat) : LazyList (List α) :=
+  let empty := LazyList.singleton []
+  match budget with
+  | 0 => empty
+  | .succ budget' =>
+    let non_empty := do
+      let hd ← Enum.enum budget
+      let tl ← enumListsWithBudget (budget' / 2)
+      pure (hd :: tl)
+    empty <|> non_empty
+
 /-- `Enum` instances for lists -/
 instance [Enum α] : Enum (List α) where
-  enum := sizedEnum $ fun size =>
-    match size with
-    | 0 => pure []
-    | .succ size' =>
-      pure [] <|> (do
-        let hd := Enum.enum size'
-        let tl := Enum.enum (size' - 1)
-        return (LazyList.toList $ LazyList.append hd tl))
+  enum := sizedEnum (fun size => (fun _ => enumListsWithBudget size))
 
 /-- Enumerates all printable ASCII characters (codepoint 32 - 95) -/
 def enumPrintableASCII (size : Nat) : LazyList Char :=
