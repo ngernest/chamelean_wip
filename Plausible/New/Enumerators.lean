@@ -1,4 +1,6 @@
 import Plausible.New.LazyList
+import Plausible.New.Utils
+
 open LazyList
 
 /-- An enumerator is a function from `Nat` to `LazyList α`, where the `Nat`
@@ -102,3 +104,11 @@ instance [Enum α] : Enum (List α) where
         let hd := Enum.enum size'
         let tl := Enum.enum (size' - 1)
         return (LazyList.toList $ LazyList.append hd tl))
+
+/-- Enumerates all printable ASCII characters (codepoint 32 - 95) -/
+def enumPrintableASCII (size : Nat) : LazyList Char :=
+  lazySeq (fun c => Char.ofNat (c.toNat + 1)) (Char.ofNat 32) (min size 95)
+
+/-- `Enum` instance for ASCII-printable `Char`s -/
+instance : Enum Char where
+  enum := enumPrintableASCII
