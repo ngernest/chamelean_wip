@@ -21,6 +21,24 @@ instance : Monad Enumerator where
   pure := pureEnum
   bind := bindEnum
 
+/-- The degenerate enumerator which enumerates nothing (the empty `LazyList`) -/
+def failEnum : Enumerator α :=
+  fun _ => LazyList.nil
+
+/-- `Alternative` instance for `Enumerator`s.
+    Note:
+    - `e1 <|> e2` is not fair and is biased towards `e1`, i.e. all elements of `e1` will
+      appear in the resultant enumeration before the first element of `e2`.
+    - Defining a fair instance of `Alternative` requires defining an interleave operation
+      on the resultant lists (see "A Completely Unique Account of Enumeration", ICFP '22),
+      however it is unclear how to define an interleave operation on *LazyLists* while
+      convincing Lean's termination checker to accept the definition (essentially, the
+      difficulty lies in proving that forcing the thunked tail of a `LazyList` doesn't
+      increase the size of the overall `LazyList`). -/
+instance : Alternative Enumerator where
+  failure := failEnum
+  orElse e1 e2 := fun n => (e1 n) <|> (e2 () n)
+
 /-- `sizedEnum f` constructs an enumerator that depends on `size` parameter -/
 def sizedEnum (f : Nat → Enumerator α) : Enumerator α :=
   fun (n : Nat) => (f n) n
@@ -51,3 +69,8 @@ instance [EnumSized α] : Enum α where
 /-- Every `EnumSizedSuchThat` instance gives rise to an `EnumSuchThat` instance -/
 instance [EnumSizedSuchThat α P] : EnumSuchThat α P where
   enumST := sizedEnum (EnumSizedSuchThat.enumSizedST P)
+
+
+/-- `Enum` instance for `Bool` -/
+instance : Enum Bool where
+  enum := pureEnum false <|> pureEnum true
