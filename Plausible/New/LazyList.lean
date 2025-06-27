@@ -1,13 +1,11 @@
 
--- Adapted from section 18.19.3 of the Lean Language Reference
--- https://lean-lang.org/doc/reference/latest/Basic-Types/Lazy-Computations/#Thunk-coercions
+-- Adapted from QuickChick source code
+-- https://github.com/QuickChick/QuickChick/blob/master/src/LazyList.v
 
-/-- Lazy lists are lists that may contain thunks.
-    The `delayed` constructor causes part of the list to be computed on demand. -/
+/-- Lazy Lists are implemented by thunking the computation for the tail of a cons-cell. -/
 inductive LazyList (α : Type u) where
   | nil
   | cons : α → Thunk (LazyList α) → LazyList α
-  -- | delayed : Thunk (LazyList α) → LazyList α
 deriving Inhabited
 
 namespace LazyList
@@ -16,15 +14,11 @@ namespace LazyList
 def toList : LazyList α → List α
   | .nil => []
   | .cons x xs => x :: xs.get.toList
-  -- | .delayed xs => xs.get.toList
 
 /-- We pretty-print `LazyList`s by converting them to ordinary lists
     (forcing all the thunks) & pretty-printing the resultant list. -/
 instance [Repr α] : Repr (LazyList α) where
   reprPrec l _ := repr l.toList
-
--- Many operations on lazy lists can be implemented without forcing the embedded thunks,
--- instead building up further thunks.
 
 /-- Retrieves a prefix of the `LazyList` (only the thunks in the prefix are evaluated) -/
 def take (n : Nat) (l : LazyList α) : LazyList α :=
@@ -52,9 +46,6 @@ def append (xs : LazyList α) (ys : LazyList α) : LazyList α :=
 def observe (tag : String) (i : Fin n) : Nat :=
   dbg_trace "{tag}: {i.val}"
   i.val
-
-def xs := LazyList.ofFn (n := 3) (observe "xs")
-def ys := LazyList.ofFn (n := 3) (observe "ys")
 
 /-- Maps a function over a LazyList -/
 def mapLazyList (f : α → β) (l : LazyList α) : LazyList β :=
