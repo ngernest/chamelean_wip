@@ -28,7 +28,7 @@ inductive Pattern
   | Constructor : String -> List Pattern -> Pattern
   deriving Repr, Inhabited
 
-/-- A structure which stores the current state of the unification algorithm -/
+/-- `UnifyState` stores the current state of the unification algorithm -/
 structure UnifyState where
   /-- `constraints` maps unknowns to ranges -/
   constraints : Std.TreeMap Unknown Range (cmp := compare)
@@ -43,6 +43,7 @@ structure UnifyState where
 
   /-- A set of all existing unknowns -/
   unknowns : Std.TreeSet Unknown (cmp := compare)
+
   deriving Repr
 
 ---------------------------------------------------------------
