@@ -20,3 +20,12 @@ def isConstructorRecursive (inductiveName : Name) (ctorName : Name) : MetaM Bool
         return true
     return false
   | none => throwError "constructors with non-arrow types are not-considered to be recursive"
+
+/-- `replicateM n act` performs the action `act` for `n` times, returning a list of results. -/
+def replicateM [Monad m] (n : Nat) (action : m α) : m (List α) :=
+  match n with
+  | 0 => pure []
+  | n + 1 => do
+    let x ← action
+    let xs ← replicateM n action
+    pure (x :: xs)
