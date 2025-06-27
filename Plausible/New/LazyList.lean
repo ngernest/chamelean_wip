@@ -18,6 +18,9 @@ def toList : LazyList α → List α
   | .cons x xs => x :: xs.toList
   | .delayed xs => xs.get.toList
 
+-- Many operations on lazy lists can be implemented without forcing the embedded thunks,
+-- instead building up further thunks.
+
 /-- Retrieves a prefix of the `LazyList` (only the thunks in the prefix are evaluated) -/
 def take : Nat → LazyList α → LazyList α
   | 0, _ => .nil
@@ -47,5 +50,39 @@ def observe (tag : String) (i : Fin n) : Nat :=
 def xs := LazyList.ofFn (n := 3) (observe "xs")
 def ys := LazyList.ofFn (n := 3) (observe "ys")
 
+/-- Maps a function over a LazyList -/
+def mapLazyList (f : α → β) (l : LazyList α) : LazyList β :=
+  match l with
+  | .nil => .nil
+  | .cons x xs => .cons (f x) (mapLazyList f xs)
+  | .delayed xs => .delayed $ mapLazyList f xs.get
+
+/-- `Functor` instance for `LazyList` -/
+instance : Functor LazyList where
+  map := mapLazyList
+
+/-- Creates a singleton LazyList -/
+def pureLazyList (x : α) : LazyList α :=
+  .cons x .nil
+
+/-- Flattens a `LazyList (LazyList α)` into a `LazyList α`  -/
+def concatLazyList (l : LazyList (LazyList α)) : LazyList α :=
+  match l with
+  | .nil => .nil
+  | .cons x l' => append x (concatLazyList l')
+  | .delayed xss => concatLazyList xss.get
+
+/-- Bind for `LazyList`s is just `concatMap` (same as the list monad) -/
+def bindLazyList (l : LazyList α) (f : α → LazyList β) : LazyList β :=
+  concatLazyList (f <$> l)
+
+/-- `Monad` instance for `LazyList` -/
+instance : Monad LazyList where
+  pure := pureLazyList
+  bind := bindLazyList
+
+/-- `Applicative` instance for `LazyList` -/
+instance : Applicative LazyList where
+  pure := pureLazyList
 
 end LazyList
