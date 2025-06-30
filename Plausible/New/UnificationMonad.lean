@@ -100,10 +100,6 @@ namespace UnifyM
       let u := freshUnknown us
       (u, { s with unknowns := us.merge {u} })
 
-  /-- Fetches the constraint map in `UnifyState`, returning it in the `UnifyM` monad -/
-  def getConstraints : UnifyM (Std.TreeMap Unknown Range compare) :=
-    UnifyState.constraints <$> get
-
 end UnifyM
 
 ------------------------------------------------------------------
@@ -218,24 +214,18 @@ end
 -- Tests
 -------------
 
-/-- Initial unification state  -/
+/-- Initial (empty) unification state  -/
 def initUnifyState : UnifyState :=
   { constraints := Std.TreeMap.empty,
     equalities := Std.TreeSet.empty,
     patterns := [],
     unknowns := Std.TreeSet.empty }
 
-/-- Helper to run unification and extract results -/
+/-- Runs a `UnifyM unit` action using the empty `UnifyState`,
+    returning the resultant `UnifyState` in an `Option`  -/
 def runUnify (action : UnifyM Unit) : Option UnifyState :=
   Prod.snd <$> StateT.run action initUnifyState
 
-/-- Helper to check if unification succeeded -/
-def unifySucceeds (action : UnifyM Unit) : Bool :=
-  (runUnify action).isSome
-
-/-- Helper to extract constraints from result -/
-def getConstraintsAfterUnify (action : UnifyM Unit) : Option (Std.TreeMap Unknown Range compare) :=
-  (runUnify action).map (·.constraints)
 
 /-- Test the nonempty trees example from Section 3 -/
 def testNonemptyTrees : IO Unit := do
