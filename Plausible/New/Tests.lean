@@ -28,9 +28,7 @@ inductive Value where
 
 inductive Foo where
   | FromBitVec : ∀ (n : Nat), BitVec n → String → Foo
-
-
--- #eval (Enum.enum 5 : LazyList (Value))
+  deriving Repr
 
 
 inductive MyList where
