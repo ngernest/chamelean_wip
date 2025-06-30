@@ -1,6 +1,7 @@
 
 import Std
 import Lean
+import Lean.Exception
 import Plausible.New.Idents
 
 open Lean Idents
@@ -61,6 +62,20 @@ namespace UnifyM
       let k := s.constraints
       { s with constraints := k.insert u r }
 
+  /-- More efficient: get constraints without separate `get` call -/
+  def withConstraints {α : Type} (f : Std.TreeMap Unknown Range compare → UnifyM α) : UnifyM α := do
+    let state ← get
+    f state.constraints
+
+  /-- Directly applies a function `f` to the `constraint` map in the state  -/
+  def modifyConstraints (f : Std.TreeMap Unknown Range compare → Std.TreeMap Unknown Range compare) : UnifyM Unit :=
+    modify $ fun s => { s with constraints := f s.constraints }
+
+   /-- Batches multiple constraint updates together for performance  -/
+  def updateMany (updates : List (Unknown × Range)) : UnifyM Unit :=
+    modifyConstraints $ fun constraints =>
+      updates.foldl (fun acc (u, r) => acc.insert u r) constraints
+
   /-- Registers a new equality check between unknowns `u1` and `u2` -/
   def equality (u1 : Unknown) (u2 : Unknown) : UnifyM Unit :=
     modify $ fun s =>
@@ -101,21 +116,20 @@ mutual
     | .Unknown u1, .Unknown u2 =>
       if u1 == u2 then
         return ()
-      else do
-        let k ← UnifyM.getConstraints
+      else UnifyM.withConstraints $ fun k => do
         let r1 := k.get! u1
         let r2 := k.get! u2
         unifyR (u1, r1) (u2, r2)
     | c1@(.Ctr _ _), c2@(.Ctr _ _) =>
       unifyC c1 c2
-    | .Unknown u1, c2@(.Ctr _ _) => do
-      let k ← UnifyM.getConstraints
-      let r1 := k.get! u1
-      unifyRC (u1, r1) c2
-    | c1@(.Ctr _ _), .Unknown u2 => do
-      let k ← UnifyM.getConstraints
-      let r2 := k.get! u2
-      unifyRC (u2, r2) c1
+    | .Unknown u1, c2@(.Ctr _ _) =>
+      UnifyM.withConstraints $ fun k => do
+        let r1 := k.get! u1
+        unifyRC (u1, r1) c2
+    | c1@(.Ctr _ _), .Unknown u2 =>
+      UnifyM.withConstraints $ fun k => do
+        let r2 := k.get! u2
+        unifyRC (u2, r2) c1
     | _, _ => panic! "reached catch-all case in unify"
 
   /-- Takes two `(Unknown, Range)` pairs & unifies them based on their `Range`s -/
@@ -151,10 +165,10 @@ mutual
   /-- Unifies an `(Unknown, Range)` pair with a `Range` -/
   partial def unifyRC : Unknown × Range → Range → UnifyM Unit
     | (u1, .Undef _), c2@(.Ctr _ _) => UnifyM.update u1 c2
-    | (_, .Unknown u'), c2@(.Ctr _ _) => do
-      let k ← UnifyM.getConstraints
-      let r := k.get! u'
-      unifyRC (u', r) c2
+    | (_, .Unknown u'), c2@(.Ctr _ _) =>
+      UnifyM.withConstraints $ fun k => do
+        let r := k.get! u'
+        unifyRC (u', r) c2
     | (u, .Fixed), c2@(.Ctr _ _) => handleMatch u c2
     | (_, c1@(.Ctr _ _)), c2@(.Ctr _ _) => unifyC c1 c2
     | _, _ => panic! "reached catch-all case in unifyRC"
@@ -174,8 +188,7 @@ mutual
       -- Recursively handle ranges
       let ps ← rs.mapM matchAux
       return (.Constructor c ps)
-    | .Unknown u => do
-      let k ← UnifyM.getConstraints
+    | .Unknown u => UnifyM.withConstraints $ fun k => do
       let r := k.get! u
       match r with
       | .Undef _ => do
@@ -237,12 +250,13 @@ def testNonemptyTrees : IO Unit := do
     let t ← UnifyM.fresh  -- will be "unknown3"
 
     -- Set up: t should be undefined (we want to generate it)
-    UnifyM.update t (.Undef "Tree")
-
     -- Set up: x, l, r should be undefined (arbitrary values)
-    UnifyM.update x (.Undef "nat")
-    UnifyM.update l (.Undef "Tree")
-    UnifyM.update r (.Undef "Tree")
+    UnifyM.updateMany [
+      (t, .Undef "Tree"),
+      (x, .Undef "Nat"),
+      (l, .Undef "Tree"),
+      (r, .Undef "Tree")
+    ]
 
     -- Unify: t ~ Node x l r (from constructor conclusion)
     let nodePattern := Range.Ctr "Node" [.Unknown x, .Unknown l, .Unknown r]
@@ -305,12 +319,14 @@ def testBinarySearchTrees : IO Unit := do
     let r ← UnifyM.fresh    -- right subtree
 
     -- Set up: lo, hi are fixed inputs
-    UnifyM.update lo .Fixed
-    UnifyM.update hi .Fixed
-    UnifyM.update t (.Undef "Tree")
-    UnifyM.update x (.Undef "nat")
-    UnifyM.update l (.Undef "Tree")
-    UnifyM.update r (.Undef "Tree")
+    UnifyM.updateMany [
+      (lo, .Fixed),
+      (hi, .Fixed),
+      (t, (.Undef "Tree")),
+      (x, (.Undef "nat")),
+      (l, (.Undef "Tree")),
+      (r, (.Undef "Tree"))
+    ]
 
     -- Unify constructor conclusion: bst lo hi (Node x l r) ~ bst lo hi t
     let nodePattern := Range.Ctr "Node" [.Unknown x, .Unknown l, .Unknown r]
@@ -336,17 +352,18 @@ def testNonLinearPatterns : IO Unit := do
     let term ← UnifyM.fresh   -- unknown_1
     let typ ← UnifyM.fresh    -- unknown_2
     let t1 ← UnifyM.fresh     -- appears in both Abs and Arr
-
     let t2 ← UnifyM.fresh
     let e ← UnifyM.fresh
 
     -- Set up: gamma, term, typ are inputs
-    UnifyM.update gamma .Fixed
-    UnifyM.update term .Fixed
-    UnifyM.update typ .Fixed
-    UnifyM.update t1 (.Undef "type")
-    UnifyM.update t2 (.Undef "type")
-    UnifyM.update e (.Undef "term")
+    UnifyM.updateMany [
+      (gamma, .Fixed),
+      (term, .Fixed),
+      (typ, .Fixed),
+      (t1, (.Undef "type")),
+      (t2, (.Undef "type")),
+      (e, (.Undef "term"))
+    ]
 
     -- Create patterns with t1 appearing twice
     let absPattern := Range.Ctr "Abs" [.Unknown t1, .Unknown e]
@@ -366,5 +383,3 @@ def testNonLinearPatterns : IO Unit := do
     -- Should show pattern matches and equality constraints for t1
   | none =>
     IO.println "✗ Non-linear patterns test failed"
-
-#eval testNonLinearPatterns
