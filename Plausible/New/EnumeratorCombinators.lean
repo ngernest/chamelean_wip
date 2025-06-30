@@ -38,5 +38,33 @@ def enumerateFuel (fuel : Nat) (total : Nat) (es : List (OptionT Enumerator α))
 def enumerate (es : List (OptionT Enumerator α)) : OptionT Enumerator α :=
   enumerateFuel es.length es.length es
 
+/-- Picks one of the enumerators in `es`, returning the `default` enumerator
+    if `es` is empty. -/
+def oneOfWithDefault (default : Enumerator α) (es : List (Enumerator α)) : Enumerator α :=
+  match es with
+  | [] => default
+  | _ => do
+    let idx ← enumNatRange 0 (es.length - 1)
+    List.getD es idx default
+
+/-- Applies the checker `f` to a `LazyList l` of optional values, returning the resultant `Option Bool`
+    (the parameter `anyNone` is used to indicate whether any of the elements examined previouslyhave been `none`) -/
+def lazyListBacktrackOpt (l : LazyList (Option α)) (f : α → Option Bool) (anyNone : Bool) : Option Bool :=
+  match l with
+  | .lnil => if anyNone then .none else .some false
+  | .lcons mx xs =>
+    match mx with
+    | .some x =>
+      match f x with
+      | .some true => .some true
+      | .some false => lazyListBacktrackOpt xs.get f anyNone
+      | .none => lazyListBacktrackOpt xs.get f true
+    | .none => lazyListBacktrackOpt xs.get f true
+
+/-- Iterates through all the results of the enumerator `e`, applying the checker `f` to them
+    and returns the resultant `Option Bool`
+    - This corresponds to `bind_EC` in the Computing Correctly paper (section 4) -/
+def enumeratingOpt (e : OptionT Enumerator α) (f : α → Option Bool) (size : Nat) : Option Bool :=
+  lazyListBacktrackOpt (e size) f false
 
 end EnumeratorCombinators

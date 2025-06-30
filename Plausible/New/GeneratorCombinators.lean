@@ -22,7 +22,7 @@ def pick (default : Gen α) (xs : List (Nat × Gen α)) (n : Nat) : Nat × Gen �
 def sumFst (gs : List (Nat × α)) : Nat :=
   List.foldl (fun acc p => acc + p.fst) 0 gs
 
-/-- Picks one of the generators in `gs` at random, returning the  `default` generator
+/-- Picks one of the generators in `gs` at random, returning the `default` generator
     if `gs` is empty.
 
     (This is a more ergonomic version of Plausible's `Gen.oneOf` which doesn't
