@@ -4,6 +4,10 @@ import Plausible.New.Enumerators
 #guard_msgs in
 #eval (Enum.enum 15 : LazyList Nat)
 
+/-- info: [0, 1, 2, 3, 4, 5, 6, 7] -/
+#guard_msgs in
+#eval (Enum.enum 7 : LazyList Nat)
+
 /-- info: [false, true] -/
 #guard_msgs in
 #eval (Enum.enum 10 : LazyList Bool)

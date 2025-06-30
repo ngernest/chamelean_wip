@@ -118,3 +118,8 @@ def enumPrintableASCII (size : Nat) : LazyList Char :=
 /-- `Enum` instance for ASCII-printable `Char`s -/
 instance : Enum Char where
   enum := enumPrintableASCII
+
+/-- Enumerates all `Nat`s in-between `lo` and `hi` (inclusive)
+    in ascending order -/
+def enumNatRange (lo : Nat) (hi : Nat) : Enumerator Nat :=
+  fun _ => lazySeq .succ lo (.succ (hi - lo))
