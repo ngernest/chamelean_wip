@@ -9,6 +9,8 @@ import Plausible.New.EnumeratorCombinators
 import Plausible.New.DeriveEnum
 import Plausible.New.STLC
 
+import Lean
+open Lean Meta
 
 open Plausible ArbitrarySizedSuchThat OptionTGen
 
@@ -28,7 +30,7 @@ inductive Value where
 
 inductive Foo where
   | FromBitVec : ∀ (n : Nat), BitVec n → String → Foo
-  deriving Repr
+  deriving Repr, Arbitrary
 
 
 inductive MyList where
