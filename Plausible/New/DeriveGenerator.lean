@@ -126,7 +126,7 @@ def mkTopLevelGenerator (baseGenerators : TSyntax `term) (inductiveGenerators : 
     let freshSizeIdent := mkFreshAccessibleIdent localCtx `size
     let freshSize' := mkFreshAccessibleIdent localCtx `size'
     let auxArbIdent := mkFreshAccessibleIdent localCtx `aux_arb
-    let generatorType ← `($optionTIdent $genIdent $targetTypeSyntax)
+    let generatorType ← `($optionTTypeConstructor $genTypeConstructor $targetTypeSyntax)
 
     let inductiveName := inductiveStx.raw.getId
 

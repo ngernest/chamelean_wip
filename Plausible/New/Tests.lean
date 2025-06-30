@@ -5,6 +5,7 @@ import Plausible.New.OptionTGen
 import Plausible.New.DecOpt
 import Plausible.New.Arbitrary
 import Plausible.New.ArbitrarySizedSuchThat
+import Plausible.New.EnumeratorCombinators
 import Plausible.New.DeriveEnum
 import Plausible.New.STLC
 
@@ -16,18 +17,20 @@ inductive RGB where
   | Red
   | Green
   | Blue
-  deriving Arbitrary
+  deriving Repr
 
 inductive Value where
   | none
   | bool (b : Bool)
   | int (i : Int)
   | tensor (shape : List Nat) (dtype : String)
-  deriving Arbitrary
+  deriving Repr
 
 inductive Foo where
   | FromBitVec : ∀ (n : Nat), BitVec n → String → Foo
-  deriving Arbitrary
+
+
+-- #eval (Enum.enum 5 : LazyList (Value))
 
 
 inductive MyList where
