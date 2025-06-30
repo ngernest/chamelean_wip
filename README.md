@@ -1,14 +1,16 @@
-# Plausible
-A property testing framework for Lean 4 that integrates into the tactic framework.
+# Chamelean 
+An extension of Lean's Plausible property-based testing library which automatically derives
+checkers / enumerators / generators for inductive relations.
 
-## New Metaprogramming Code
-See the [`New`](./Plausible/New/) subdirectory for code that uses Lean's metaprogramming facilities (`TSyntax`) 
-to automatically derive generators/checkers for inductive relations. 
+(See the [`New`](./Plausible/New/) subdirectory for code that uses Lean's metaprogramming facilities (`TSyntax`) 
+to perform this procedure.)
 
 Our design is heavily inspired by [Coq/Rocq's QuickChick](https://github.com/QuickChick/QuickChick) library and the following papers:
 - [Computing Correctly with Inductive Relations (PLDI 2022)](https://lemonidas.github.io/pdf/ComputingCorrectly.pdf)
 - [Generating Good Generators for Inductive Relations (POPL 2018)](https://lemonidas.github.io/pdf/GeneratingGoodGenerators.pdf)
 
+
+## Overview
 Like QuickChick & [Haskell QuickChick](https://hackage.haskell.org/package/QuickCheck), we provide the following typeclasses for random generation:
 - `Arbitrary`: random generators for inhabitants of algebraic data types
 - `ArbitrarySuchThat`: generators which only produce random values that satisfy a user-supplied inductive relation
@@ -64,20 +66,28 @@ instance of the `ArbitrarySizedSuchThat` typeclass (along with some `Nat` to act
 #eval runSizedGen (ArbitrarySizedSuchThat.arbitrarySizedST (fun t => balanced 5 t)) 10
 ```
 
-**Repo overview**:
+## Repo overview
 
-- [`OptionTGen.lean`](./Plausible/New/OptionTGen.lean): Generator combinators that work over the `OptionT Gen` monad transformer (representing generators that may fail)
+**Typeclass definitions**:
 - [`Arbitrary.lean`](./Plausible/New/Arbitrary.lean): The `Arbitrary` & `ArbitrarySized` typeclasses for unconstrained generators, adapted from QuickChick
 - [`ArbitrarySizedSuchThat.lean`](./Plausible/New/ArbitrarySizedSuchThat.lean): The `ArbitrarySuchThat` & `ArbitrarySizedSuchThat` typeclasses for constrained generators, adapted from QuickChick
+- [`DecOpt.lean`](./Plausible/New/DecOpt.lean): The `DecOpt` typeclass for partially decidable propositions, adapted from QuickChick
+- [`Enumerators.lean`](./Plausible/New/Enumerators.lean): The `Enum, EnumSized, EnumSuchThat, EnumSizedSuchThat` typeclasses for constrained & unconstrained enumeration
+
+**Combinators for generators & enumerators**:
 - [`GeneratorCombinators.lean`](./Plausible/New/GeneratorCombinators.lean): Extra combinators for Plausible generators (e.g. analogs of the `sized` and `frequency` combinators from Haskell QuickCheck)
+- [`OptionTGen.lean`](./Plausible/New/OptionTGen.lean): Generator combinators that work over the `OptionT Gen` monad transformer (representing generators that may fail)
+- [`EnumeratorCombinators.lean`](./Plausible/New/EnumeratorCombinators.lean): Combinators over enumators 
+
+**Metaprogramming infrastructure**:
+- [`TSyntaxCombinators.lean`](./Plausible/New/TSyntaxCombinators.lean): Combinators over `TSyntax` for creating monadic `do`-blocks & other Lean expressions via metaprogramming
 - [`DeriveArbitrary.lean`](./Plausible/New/DeriveArbitrary.lean): Metaprogramming infrastructure for deriving *unconstrained* generators (instances of the `ArbitrarySized` typeclass)
 - [`DeriveGenerator.lean`](./Plausible/New/DeriveGenerator.lean): Metaprogramming infrastructure for deriving *constrained* generators (instances of the `ArbitrarySizedSuchThat` typeclass)
 - [`SubGenerators.lean`](./Plausible/New/SubGenerators.lean): Handles constraints when deriving sub-generators
-- [`TSyntaxCombinators.lean`](./Plausible/New/TSyntaxCombinators.lean): Combinators over `TSyntax` for creating monadic `do`-blocks & other Lean expressions via metaprogramming
-- [`DecOpt.lean`](./Plausible/New/DecOpt.lean): The `DecOpt` typeclass for partially decidable propositions, adapted from QuickChick
-- [`Enumerators.lean`](./Plausible/New/Enumerators.lean): The `Enum, EnumSized, EnumSuchThat, EnumSizedSuchThat` typeclasses for constrained & unconstrained enumeration
-- [`LazyList.lean`](./Plausible/New/LazyList.lean): Implementation of lazy lists (used for enumerators)
 - [`DeriveChecker.lean`](./Plausible/New/DeriveChecker.lean): Metaprogramming infrastructure for automatically deriving checkers
+
+**Miscellany**:
+- [`LazyList.lean`](./Plausible/New/LazyList.lean): Implementation of lazy lists (used for enumerators)
 - [`Idents.lean`](./Plausible/New/Idents.lean): Utilities for dealing with identifiers / producing fresh names 
 - [`Utils.lean`](./Plausible/New/Utils.lean): Other miscellaneous utils
 
