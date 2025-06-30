@@ -2,7 +2,7 @@ import Lean
 import Std
 import Plausible.IR.Prelude
 import Plausible.IR.Constructor
-import Plausible.IR.GCCall
+import Plausible.IR.Action
 import Plausible.Gen
 import Plausible.New.OptionTGen
 import Plausible.New.SubGenerators

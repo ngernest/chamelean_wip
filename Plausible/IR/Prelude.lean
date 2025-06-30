@@ -143,7 +143,7 @@ def extractFVarsMetaM (e : Expr) : MetaM (Array FVarId) := do
   return fvars_state.fvarIds
 
 
-def mkNewFVarId_keepold (lctx: LocalContext) (username: Name) (ty: Expr): MetaM (LocalContext × FVarId × Name) := withLCtx' lctx do
+def mkNewFVarId_keepoldnames (lctx: LocalContext) (username: Name) (ty: Expr): MetaM (LocalContext × FVarId × Name) := withLCtx' lctx do
   let fvid ← mkFreshFVarId
   let newname := lctx.getUnusedName username
   let new_lctx := lctx.mkLocalDecl fvid newname ty
@@ -183,7 +183,7 @@ def decomposeType_withLocalContext (e : Expr) (lctx: LocalContext): MetaM (Array
   let mut lctx := lctx
   let mut new_binder := #[]
   for (name, ty) in binder do
-    let (new_lctx, new_fvarid, newname) ←  mkNewFVarId_keepold lctx name ty
+    let (new_lctx, new_fvarid, newname) ←  mkNewFVarId_keepoldnames lctx name ty
     lctx := new_lctx
     let old_fvarid := ⟨name⟩
     let new_fvar := mkFVar new_fvarid
@@ -274,22 +274,6 @@ elab "#show_constructors" n:ident : command => do
   Command.liftTermElabM do
     printConstructorsWithArgs typeName
 
-
-partial def mkFreshName (base : Name) : MetaM Name := do
-  let ctx ← getLCtx
-  let rec go (idx : Nat) := do
-    let name := if idx == 0 then base else Name.mkNum base idx
-    if ctx.findFromUserName? name |>.isNone then
-      return name
-    else
-      go (idx + 1)
-  go 0
-
-/-- Create a fresh FVar with base name -/
-def mkFreshFVar (base : Name) (type : Expr) : MetaM Expr := do
-  let name ← mkFreshName base
-  withLocalDeclD name type fun fvar => do
-    return fvar
 
 partial def getFinalType (type : Expr) : MetaM Expr := do
   let rec go (e : Expr) : MetaM Expr := do
@@ -447,7 +431,7 @@ def afterLastDot (s : String) : String :=
 def makeInputs (s: String) (n : Nat) := makeInputs_aux s n n
 where makeInputs_aux (s: String) (n : Nat) (z: Nat) : List String := match n with
 | 0 => []
-| succ n => [s ++ "_" ++ (toString (z - n) )] ++ (makeInputs_aux s n z)
+| succ n => [s  ++ (toString (z - n) )] ++ (makeInputs_aux s n z)
 
 
 def print_m_string (m: MetaM String) : MetaM Unit := do

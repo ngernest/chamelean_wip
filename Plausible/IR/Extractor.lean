@@ -3,6 +3,7 @@ import Std
 import Plausible.IR.Examples
 import Plausible.IR.Prelude
 import Plausible.New.Idents
+import Plausible.IR.KeyValueStore
 import Lean.Elab.Deriving.DecEq
 import Batteries.Data.List.Basic
 open Lean.Elab.Deriving.DecEq
@@ -139,8 +140,6 @@ def allArgsHaveBaseTypes (e : Expr) : MetaM Bool := do
   pure $ (types.size > 0) ∧ (∀ t ∈ types, isBaseType t)
 
 
-def mkFVars (a : Array Name) : Array Expr := a.map (fun x => mkFVar ⟨x⟩)
-
 /-- The type `DecomposedConstructorType` describes a universally-quantified type expression whose body is an arrow type,
      i.e. types of the form `∀ (x1 : τ1) … (xn : τn), Q1 → … → Qn → P`.
     - `DecomposedConstructorType` is a triple containing three components:
@@ -155,6 +154,9 @@ instance : Repr LocalContext where
 /-- The datatype `InductiveConstructor` bundles together metadata
     for a constructor of an inductive relation -/
 structure InductiveConstructor where
+  /-- The name of the constructor, represented as an `Expr` -/
+  ctorName : Name
+
   /-- The type of the constructor, represented as an `Expr` -/
   ctorType : Expr
 
@@ -162,7 +164,7 @@ structure InductiveConstructor where
   input_vars : Array Expr
 
   /-- Constructor Expr -/
-  con_expr : Expr
+  ctorExpr : Expr
 
   /-- Bound variables in the type of the constructor
       (i.e. universally-quantified variables) -/
@@ -224,7 +226,9 @@ structure InductiveConstructor where
 
   LCtx : LocalContext
 
-  deriving Repr
+--  deriving Repr
+
+
 
 /-- `ToMessageData` instance for polymorphic `HashMap`s
     where the keys implement `Repr` and the values implement `ToMessageData` -/
@@ -236,6 +240,7 @@ instance [Repr k] [BEq k] [Hashable k] [ToMessageData v]
       let vMsg := toMessageData val
       .compose kMsg (.compose " ↦ " vMsg)
     .bracket "{" (.ofList entries) "}"
+
 
 instance : ToMessageData InductiveConstructor where
   toMessageData inductiveCtor :=
@@ -299,14 +304,22 @@ def isInductiveRelationApplication (e : Expr) : MetaM Bool := do
 
 /-- Determines whether an expression `e` is a hypothesis of a constructor `ctor`
    for an inductive relation -/
-def isHypothesisOfInductiveConstructor (e : Expr) (ctor : InductiveConstructor) : MetaM Bool := do
+def isHypothesisOfInductiveConstructor_inNamespace (e : Expr) (namesp : Name) : MetaM Bool := do
   let isIndRel ← isInductiveRelation e.getAppFn
   let exprNamespace := e.getAppFn.constName.getRoot
-
-  if isIndRel || exprNamespace == ctor.name_space then
-    return true
-  else
+  let allbasedtype ← allArgsHaveBaseTypes e
+  if ! isIndRel then
     return false
+  else if allbasedtype && exprNamespace != namesp then
+    return false
+  else return true
+
+
+/-- Determines whether an expression `e` is a hypothesis of a constructor `ctor`
+   for an inductive relation -/
+def isHypothesisOfInductiveConstructor (e : Expr) (ctor : InductiveConstructor) : MetaM Bool :=
+  isHypothesisOfInductiveConstructor_inNamespace e ctor.name_space
+
 
 /-- Determines if a hypothesis `hyp` is a recursive call to the inductive relation for which
     `ctor` is a constructor
@@ -407,14 +420,14 @@ def process_constructor_unify_args (ctor_type: Expr) (input_vars : Array Expr) (
       (throwError "conclusion_args is an unexpected empty list")
 
     for hyp in hypotheses do
-      if ← isDependency hyp.getAppFn inductiveRelationName.getRoot then
+      if ← isHypothesisOfInductiveConstructor_inNamespace hyp inductive_relation_name.getRoot then
+        hypotheses_that_are_inductive_applications := hypotheses_that_are_inductive_applications.push hyp
+      if ← isDependency hyp.getAppFn inductive_relation_name.getRoot then
         dependencies := dependencies.push hyp.getAppFn
       if hyp.getAppFn.constName == inductiveRelationName then
         recursive_hypotheses := recursive_hypotheses.push hyp
       else if ← allArgsHaveBaseTypes hyp then
         hypotheses_with_only_base_type_args := hypotheses_with_only_base_type_args.push hyp
-      else if ← isInductiveRelationApplication hyp then
-        hypotheses_that_are_inductive_applications := hypotheses_that_are_inductive_applications.push hyp
       else
         nonlinear_hypotheses := nonlinear_hypotheses.push hyp
 
@@ -427,6 +440,10 @@ def process_constructor_unify_args (ctor_type: Expr) (input_vars : Array Expr) (
 
     return {
       ctorType := ctorType
+      ctorName := ctor_name
+      ctorType := ctor_type
+      ctorExpr := con_expr
+      input_vars := input_vars,
       bound_vars := bound_vars,
       bound_var_ctx := newCtx,
       all_hypotheses := hypotheses,
@@ -449,22 +466,23 @@ def process_constructor_unify_args (ctor_type: Expr) (input_vars : Array Expr) (
     }
   | none => throwError "Not a match"
 
+def constructor_header (con: InductiveConstructor) : MetaM String := do withLCtx' con.LCtx do
+  return toString (con.ctorName) ++ " : " ++  toString (← Meta.ppExpr con.ctorExpr)
 
 def process_constructor_print (pc: InductiveConstructor) : MetaM Unit := do withLCtx' pc.LCtx do
-  IO.println s!" Constructor Expr : {←  Meta.ppExpr pc.con_expr}"
+  IO.println s!" Constructor Expr : {←  Meta.ppExpr pc.ctorExpr}"
   IO.println s!" Input Vars : {← Array.mapM Meta.ppExpr pc.input_vars}"
   IO.println s!" Bound Vars : {pc.bound_vars}"
   IO.println s!" Input maps : {(← Array.mapM Meta.ppExpr pc.inp_map.unzip.1).zip (← Array.mapM Meta.ppExpr pc.inp_map.unzip.2)}"
-  IO.println s!" Cond prop : {← Array.mapM Meta.ppExpr pc.all_hypotheses}"
-  IO.println s!" Out prop:  {←  Meta.ppExpr pc.conclusion}"
-  IO.println s!" Out args:  {← Array.mapM Meta.ppExpr pc.conclusion_args}"
-  IO.println s!" num_vars : {pc.bound_vars_with_base_types}"
-  IO.println s!" num_conds:  {← Array.mapM Meta.ppExpr pc.hypotheses_with_only_base_type_args}"
-  IO.println s!" notnum_vars : {pc.bound_vars_with_non_base_types}"
-  IO.println s!" nonlinear_conds:  {← Array.mapM Meta.ppExpr pc.nonlinear_hypotheses}"
-  IO.println s!" inductive_conds:  {← Array.mapM Meta.ppExpr pc.hypotheses_that_are_inductive_applications}"
-  IO.println s!" recursive_conds:  {← Array.mapM Meta.ppExpr pc.recursive_hypotheses}"
-  IO.println s!" inp eqs:  {← Array.mapM Meta.ppExpr pc.inputEqs}"
+  IO.println s!" Cond props : {← Array.mapM Meta.ppExpr pc.all_hypotheses}"
+  IO.println s!" Conclusion prop :  {←  Meta.ppExpr pc.conclusion}"
+  IO.println s!" Builtin-typed vars : {pc.bound_vars_with_base_types}"
+  IO.println s!" Non-builtin-typed vars : {pc.bound_vars_with_non_base_types}"
+  IO.println s!" Builtin-typed props :  {← Array.mapM Meta.ppExpr pc.hypotheses_with_only_base_type_args}"
+  --IO.println s!" nonlinear_conds:  {← Array.mapM Meta.ppExpr pc.nonlinear_hypotheses}"
+  IO.println s!" Inductive_conds:  {← Array.mapM Meta.ppExpr pc.hypotheses_that_are_inductive_applications}"
+  IO.println s!" Recursive_conds:  {← Array.mapM Meta.ppExpr pc.recursive_hypotheses}"
+  IO.println s!" Input eqs:  {← Array.mapM Meta.ppExpr pc.inputEqs}"
 
 
 def print_constructors (ctors : Array InductiveConstructor) : MetaM Unit := do
@@ -525,7 +543,7 @@ def getInductiveInfoWithArgs (inputExpr : Expr) (argNames : Array String) : Meta
         let decomposed_ctor_type ← decomposeType ctor.type
         decomposed_ctor_types := decomposed_ctor_types.push decomposed_ctor_type
         let constructor ←
-            process_constructor_unify_args ctor.type input_vars input_types inductive_name IRLCtx
+            process_constructor_unify_args ctorName ctor.type input_vars input_types inductive_name IRLCtx
         ctors := ctors.push constructor
       let constructors_with_arity_zero := ctors.filter (fun ctor => ctor.all_hypotheses.size == 0)
       let constructors_with_args := ctors.filter (fun ctor => ctor.all_hypotheses.size != 0)
@@ -598,9 +616,11 @@ def elabGetIRInfoWithName : CommandElab := fun stx => do
 
 -- #get_InductiveInfo balanced
 --#get_InductiveInfo bst
--- #get_InductiveInfo bst with_name ["lo", "hi", "tree"]
+--#get_InductiveInfo bst with_name ["lo", "hi", "tree"]
 --#get_InductiveInfo typing
 
+--open KeyValueStore
+--#get_InductiveInfo lookup_kv
 
 
 end Plausible.IR
