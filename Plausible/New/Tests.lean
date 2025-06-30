@@ -5,6 +5,7 @@ import Plausible.New.OptionTGen
 import Plausible.New.DecOpt
 import Plausible.New.Arbitrary
 import Plausible.New.ArbitrarySizedSuchThat
+import Plausible.New.DeriveEnum
 import Plausible.New.STLC
 
 
