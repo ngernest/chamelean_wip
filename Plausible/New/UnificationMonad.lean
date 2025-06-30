@@ -200,3 +200,171 @@ mutual
     | _ => panic! "reached catch-all case in matchAux"
 
 end
+
+-------------
+-- Tests
+-------------
+
+/-- Initial unification state  -/
+def initUnifyState : UnifyState :=
+  { constraints := Std.TreeMap.empty,
+    equalities := Std.TreeSet.empty,
+    patterns := [],
+    unknowns := Std.TreeSet.empty }
+
+/-- Helper to run unification and extract results -/
+def runUnify (action : UnifyM Unit) : Option UnifyState :=
+  Prod.snd <$> StateT.run action initUnifyState
+
+/-- Helper to check if unification succeeded -/
+def unifySucceeds (action : UnifyM Unit) : Bool :=
+  (runUnify action).isSome
+
+/-- Helper to extract constraints from result -/
+def getConstraintsAfterUnify (action : UnifyM Unit) : Option (Std.TreeMap Unknown Range compare) :=
+  (runUnify action).map (·.constraints)
+
+/-- Test the nonempty trees example from Section 3 -/
+def testNonemptyTrees : IO Unit := do
+  -- Simulate: nonempty (Node x l r)
+  -- This should unify successfully and bind unknowns
+
+  let testUnify : UnifyM Unit := do
+    -- Create unknowns for x, l, r, and the tree t
+    let x ← UnifyM.fresh  -- will be "unknown0"
+    let l ← UnifyM.fresh  -- will be "unknown1"
+    let r ← UnifyM.fresh  -- will be "unknown2"
+    let t ← UnifyM.fresh  -- will be "unknown3"
+
+    -- Set up: t should be undefined (we want to generate it)
+    UnifyM.update t (.Undef "Tree")
+
+    -- Set up: x, l, r should be undefined (arbitrary values)
+    UnifyM.update x (.Undef "nat")
+    UnifyM.update l (.Undef "Tree")
+    UnifyM.update r (.Undef "Tree")
+
+    -- Unify: t ~ Node x l r (from constructor conclusion)
+    let nodePattern := Range.Ctr "Node" [.Unknown x, .Unknown l, .Unknown r]
+    unify (.Unknown t) nodePattern
+
+  match runUnify testUnify with
+  | some finalState =>
+    IO.println s!"✓ Nonempty trees test passed"
+    IO.println s!"  Final constraints: {repr finalState.constraints.toList}"
+    -- Should show t bound to Node unknown0 unknown1 unknown2
+  | none =>
+    IO.println "✗ Nonempty trees test failed"
+
+/-- Test complete trees example: complete n t -/
+def testCompleteTrees : IO Unit := do
+  -- Simulate: complete in1 t where in1 is input, t is output
+
+  let testUnify : UnifyM Unit := do
+    let in1 ← UnifyM.fresh  -- input parameter
+    let t ← UnifyM.fresh    -- output to generate
+    let n ← UnifyM.fresh    -- universally quantified variable
+    let l ← UnifyM.fresh    -- left subtree
+    let r ← UnifyM.fresh    -- right subtree
+
+    -- Set up modes: in1 is fixed input, t should be generated
+    UnifyM.update in1 .Fixed
+    UnifyM.update t (.Undef "Tree")
+    UnifyM.update n (.Undef "nat")
+    UnifyM.update l (.Undef "Tree")
+    UnifyM.update r (.Undef "Tree")
+
+    -- Unify constructor conclusion: complete (S n) (Node x l r) ~ complete in1 t
+    let sn := Range.Ctr "S" [.Unknown n]
+    let nodePattern := Range.Ctr "Node" [.Unknown "x", .Unknown l, .Unknown r]
+
+    -- This should create pattern match on in1
+    unify (.Unknown in1) sn
+    unify (.Unknown t) nodePattern
+
+  match runUnify testUnify with
+  | some finalState =>
+    IO.println s!"✓ Complete trees test passed"
+    IO.println s!"  Patterns generated: {repr finalState.patterns}"
+    -- Should show pattern match on in1 against S n
+  | none =>
+    IO.println "✗ Complete trees test failed"
+
+
+
+/-- Test binary search trees with bounds -/
+def testBinarySearchTrees : IO Unit := do
+  -- Simulate: bst lo hi (Node x l r) where lo, hi are inputs
+
+  let testUnify : UnifyM Unit := do
+    let lo ← UnifyM.fresh   -- lower bound (input)
+    let hi ← UnifyM.fresh   -- upper bound (input)
+    let t ← UnifyM.fresh    -- tree to generate
+    let x ← UnifyM.fresh    -- node value
+    let l ← UnifyM.fresh    -- left subtree
+    let r ← UnifyM.fresh    -- right subtree
+
+    -- Set up: lo, hi are fixed inputs
+    UnifyM.update lo .Fixed
+    UnifyM.update hi .Fixed
+    UnifyM.update t (.Undef "Tree")
+    UnifyM.update x (.Undef "nat")
+    UnifyM.update l (.Undef "Tree")
+    UnifyM.update r (.Undef "Tree")
+
+    -- Unify constructor conclusion: bst lo hi (Node x l r) ~ bst lo hi t
+    let nodePattern := Range.Ctr "Node" [.Unknown x, .Unknown l, .Unknown r]
+    unify (.Unknown t) nodePattern
+
+    -- Simulate processing premises: lo < x, x < hi, bst lo x l, bst x hi r
+    -- These would create additional constraints in a full implementation
+
+  match runUnify testUnify with
+  | some finalState =>
+    IO.println s!"✓ BST test passed"
+    IO.println s!"  Tree structure unified: {repr finalState.constraints}"
+  | none =>
+    IO.println "✗ BST test failed"
+
+/-- Test non-linear patterns (same variable appears multiple times) -/
+def testNonLinearPatterns : IO Unit := do
+  -- Simulate: typing Γ (Abs t1 e) (Arr t1 t2)
+  -- Note: t1 appears twice (non-linear)
+
+  let testUnify : UnifyM Unit := do
+    let gamma ← UnifyM.fresh  -- unknown_0
+    let term ← UnifyM.fresh   -- unknown_1
+    let typ ← UnifyM.fresh    -- unknown_2
+    let t1 ← UnifyM.fresh     -- appears in both Abs and Arr
+
+    let t2 ← UnifyM.fresh
+    let e ← UnifyM.fresh
+
+    -- Set up: gamma, term, typ are inputs
+    UnifyM.update gamma .Fixed
+    UnifyM.update term .Fixed
+    UnifyM.update typ .Fixed
+    UnifyM.update t1 (.Undef "type")
+    UnifyM.update t2 (.Undef "type")
+    UnifyM.update e (.Undef "term")
+
+    -- Create patterns with t1 appearing twice
+    let absPattern := Range.Ctr "Abs" [.Unknown t1, .Unknown e]
+    let arrPattern := Range.Ctr "Arr" [.Unknown t1, .Unknown t2]
+
+    -- This should trigger pattern matching on term and typ
+    unify (.Unknown term) absPattern
+    unify (.Unknown typ) arrPattern
+
+    -- The non-linearity of t1 should create equality constraints (unknown_3, unknown_6)
+
+  match runUnify testUnify with
+  | some finalState =>
+    IO.println s!"✓ Non-linear patterns test passed"
+    IO.println s!"  Patterns: {repr finalState.patterns}"
+    IO.println s!"  Equalities: {repr finalState.equalities.toList}"
+    -- Should show pattern matches and equality constraints for t1
+  | none =>
+    IO.println "✗ Non-linear patterns test failed"
+
+#eval testNonLinearPatterns
