@@ -17,5 +17,6 @@ import Plausible.New.STLC
 import Plausible.New.Trees
 import Plausible.New.NKIExperiments
 import Plausible.New.DeriveArbitrary
+import Plausible.New.DeriveEnum
 import Plausible.New.Utils
 import Plausible.New.UnificationMonad

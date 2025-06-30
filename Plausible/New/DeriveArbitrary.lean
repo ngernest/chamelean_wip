@@ -8,20 +8,6 @@ import Plausible.New.Utils
 open Lean Elab Command Meta Term Parser
 open Plausible.IR Idents
 
-/-- `ToMessageData` instance for pretty-printing `ConstructorVal`s -/
-instance : ToMessageData ConstructorVal where
-  toMessageData ctorVal :=
-    let fields := [
-      m!"name := {ctorVal.name}",
-      m!"levelParams := {ctorVal.levelParams}",
-      m!"type := {ctorVal.type}",
-      m!"induct := {ctorVal.induct}",
-      m!"cidx := {ctorVal.cidx}",
-      m!"numParams := {ctorVal.numParams}",
-      m!"numFields := {ctorVal.numFields}",
-      m!"isUnsafe := {ctorVal.isUnsafe}"
-    ]
-    .bracket "{" (.ofList fields) "}"
 
 /-- Takes the name of a constructor for an algebraic data type and returns an array
     containing `(argument_name, argument_type)` pairs.
