@@ -282,11 +282,13 @@ def testCompleteTrees : IO Unit := do
     let r ← UnifyM.fresh    -- right subtree
 
     -- Set up modes: in1 is fixed input, t should be generated
-    UnifyM.update in1 .Fixed
-    UnifyM.update t (.Undef "Tree")
-    UnifyM.update n (.Undef "nat")
-    UnifyM.update l (.Undef "Tree")
-    UnifyM.update r (.Undef "Tree")
+    UnifyM.updateMany [
+      (in1, .Fixed),
+      (t, (.Undef "Tree")),
+      (n, (.Undef "nat")),
+      (l, (.Undef "Tree")),
+      (r, (.Undef "Tree"))
+    ]
 
     -- Unify constructor conclusion: complete (S n) (Node x l r) ~ complete in1 t
     let sn := Range.Ctr "S" [.Unknown n]
@@ -303,7 +305,6 @@ def testCompleteTrees : IO Unit := do
     -- Should show pattern match on in1 against S n
   | none =>
     IO.println "✗ Complete trees test failed"
-
 
 
 /-- Test binary search trees with bounds -/
