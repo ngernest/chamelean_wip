@@ -1,7 +1,7 @@
 import Lean
 import Std
 import Plausible
-import Lean.Meta.Eval
+--import Lean.Meta.Eval
 import Plausible.IR.PlausibleIR
 import Plausible.IR.KeyValueStore
 open Nat

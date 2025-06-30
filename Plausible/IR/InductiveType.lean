@@ -5,7 +5,7 @@ import Plausible.IR.Examples
 import Plausible.IR.Extractor
 import Plausible.IR.Prelude
 import Plausible.IR.Prototype
-import Plausible.IR.GCCall
+import Plausible.IR.Action
 import Plausible.IR.Constructor
 import Plausible.IR.Backtrack
 open List Nat Array String
@@ -57,7 +57,7 @@ def extract_IT_info (inpexp : Expr) : MetaM (IT_info) := do
       for ctorName in info.ctors do
         let some ctor := env.find? ctorName
          | throwError "IRConstructor '{ctorName}' not found"
-        let ctys ←  get_types_chain ctor.type
+        let ctys ←  getComponentsOfArrowType ctor.type
         let cargs := ctys.toList.dropLast
         for a in cargs do
           if (¬ (← has_instance a)) ∧ (¬ a.constName = typeName) ∧  (¬ a.constName ∈ noinstance.map Expr.constName)
@@ -92,7 +92,7 @@ def generatorCode_for_IT_constructor (con: IT_constructor): MetaM String :=do
 
 def ind_backtrack_list_for_IT (r: IT_info): MetaM (Array String) := do
   let mut i := 0
-  let name := r.inductive_name.toString
+  let name := r.name.toString
   let mut out : Array String := #[]
   for con in r.constructors do
     i := i + 1
@@ -103,7 +103,7 @@ def ind_backtrack_list_for_IT (r: IT_info): MetaM (Array String) := do
 
 def nonind_backtrack_list_for_IT (r: IT_info): MetaM (Array String) := do
   let mut i := 0
-  let name := r.inductive_name.toString
+  let name := r.name.toString
   let mut out : Array String := #[]
   for con in r.constructors do
     i := i + 1
@@ -135,7 +135,7 @@ def IT_gen (r: IT_info) : MetaM (String) := do
   let prototype := "def gen_"++ toString r.name  ++  " (size : Nat) : Gen "++ toString r.name ++ " := do\n"
   let bt0 ← nonind_backtrack_list_for_IT r
   let mut order := 1
-  let ITname:= r.inductive_name.toString
+  let ITname:= r.name.toString
   let mut body:= ""
   for con in r.constructors do
     let con_prototype := "let gen_"++ ITname ++ "_by_con_" ++ toString order ++  " : Gen "++ ITname ++ " := do\n"
@@ -161,15 +161,15 @@ def IT_gen (r: IT_info) : MetaM (String) := do
 
 def instance_def_code (r: IT_info) (size: Nat): MetaM (String × String × String) :=do
   let gencode ← IT_gen r
-  let instance_def := "instance : SampleableExt " ++ r.inductive_name.toString
-      ++ ":= SampleableExt.mkSelfContained (gen_" ++ r.inductive_name.toString ++ " " ++ toString size ++")"
-  let shrinkable := "instance : Shrinkable " ++ r.inductive_name.toString ++ " where shrink := fun x => [x]"
+  let instance_def := "instance : SampleableExt " ++ r.name.toString
+      ++ ":= SampleableExt.mkSelfContained (gen_" ++ r.name.toString ++ " " ++ toString size ++")"
+  let shrinkable := "instance : Shrinkable " ++ r.name.toString ++ " where shrink := fun x => [x]"
   return (shrinkable, gencode, instance_def)
 
 syntax (name := genIT) "#gen_IT" term : command
 
 @[command_elab genIT]
-def elabGetMutualBlock : CommandElab := fun stx => do
+def elabGetBlock : CommandElab := fun stx => do
   match stx with
   | `(#gen_IT $t:term) =>
     Command.liftTermElabM do
@@ -185,7 +185,7 @@ def elabGetMutualBlock : CommandElab := fun stx => do
 syntax (name := derivesamplable) "#derive_sampleable" term "with_size" num : command
 
 @[command_elab derivesamplable]
-def elabDeriveGenerator : CommandElab := fun stx => do
+def elabDeriveITGenerator : CommandElab := fun stx => do
   match stx with
   | `(#derive_sampleable $t with_size $t2) =>
       let (shrinkable, code, instance_def) ← Command.liftTermElabM do
