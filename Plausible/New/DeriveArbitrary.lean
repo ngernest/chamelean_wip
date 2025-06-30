@@ -8,20 +8,6 @@ import Plausible.New.Utils
 open Lean Elab Command Meta Term Parser
 open Plausible.IR Idents
 
-/-- `ToMessageData` instance for pretty-printing `ConstructorVal`s -/
-instance : ToMessageData ConstructorVal where
-  toMessageData ctorVal :=
-    let fields := [
-      m!"name := {ctorVal.name}",
-      m!"levelParams := {ctorVal.levelParams}",
-      m!"type := {ctorVal.type}",
-      m!"induct := {ctorVal.induct}",
-      m!"cidx := {ctorVal.cidx}",
-      m!"numParams := {ctorVal.numParams}",
-      m!"numFields := {ctorVal.numFields}",
-      m!"isUnsafe := {ctorVal.isUnsafe}"
-    ]
-    .bracket "{" (.ofList fields) "}"
 
 /-- Takes the name of a constructor for an algebraic data type and returns an array
     containing `(argument_name, argument_type)` pairs.
@@ -148,7 +134,7 @@ def mkArbitrarySizedInstance (targetTypeName : Name) : CommandElabM (TSyntax `co
   -- Create the cases for the pattern-match on the size argument
   -- If `size = 0`, pick one of the thunked non-recursive generators
   let mut caseExprs := #[]
-  let zeroCase ← `(Term.matchAltExpr| | $zeroIdent => $oneOfWithDefaultFn $defaultGenerator [$thunkedNonRecursiveGenerators,*])
+  let zeroCase ← `(Term.matchAltExpr| | $zeroIdent => $oneOfWithDefaultGenCombinatorFn $defaultGenerator [$thunkedNonRecursiveGenerators,*])
   caseExprs := caseExprs.push zeroCase
 
   -- If `size = .succ size'`, pick a generator (it can be non-recursive or recursive)
@@ -162,7 +148,7 @@ def mkArbitrarySizedInstance (targetTypeName : Name) : CommandElabM (TSyntax `co
 
   -- Create an instance of the `ArbitrarySized` typeclass
   let targetTypeIdent := mkIdent targetTypeName
-  let generatorType ← `($genIdent $targetTypeIdent)
+  let generatorType ← `($genTypeConstructor $targetTypeIdent)
   `(instance : $arbitrarySizedTypeclass $targetTypeIdent where
       $unqualifiedArbitrarySizedFn:ident :=
         let rec $auxArbIdent:ident $sizeParam : $generatorType :=
