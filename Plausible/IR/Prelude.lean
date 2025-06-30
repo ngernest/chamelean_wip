@@ -76,6 +76,11 @@ def option_to_IO {α : Type} (o : Option α) (errorMsg : String := "Option is no
   | some a => return a
   | none => throw (IO.userError errorMsg)
 
+def option_to_MetaM (o: Option α) (errmsg: String := "Option is none"): MetaM α := do
+  match o with
+  | some v => return v
+  | _ => throwError errmsg
+
 /-- Takes a type expression `tyexpr` representing an arrow type, and returns an array of type-expressions
     where each element is a component of the arrow type.
     For example, `getComponentsOfArrowType (A -> B -> C)` produces `#[A, B, C]`. -/
@@ -115,7 +120,7 @@ def getFVarsSet (e : Expr) : HashSet FVarId :=
   | _ => ∅
 
 /-- Extracts the free variables in an expression, returning an array of `FVarID`s -/
-def extractFVars (e : Expr) : Array FVarId :=
+def extractFVarIds (e : Expr) : Array FVarId :=
   HashSet.toArray $ getFVarsSet e
 
 /-- Takes a universally-quantified expression of the form `∀ (x1 : τ1) … (xn : τn), body`
@@ -131,11 +136,29 @@ partial def extractForAllBinders (e : Expr) : Array (Name × Expr) × Expr :=
     | _ => (acc, e)
   go e #[]
 
-/-- A monadic version of `extractFVars` (which collects the array of `FVarId`s
+/-- A monadic version of `extractFVarIds` (which collects the array of `FVarId`s
     in the `MetaM` monad ) -/
 def extractFVarsMetaM (e : Expr) : MetaM (Array FVarId) := do
   let (_, fvars_state) ← e.collectFVars.run {}
   return fvars_state.fvarIds
+
+
+def mkNewFVarId_keepold (lctx: LocalContext) (username: Name) (ty: Expr): MetaM (LocalContext × FVarId × Name) := withLCtx' lctx do
+  let fvid ← mkFreshFVarId
+  let newname := lctx.getUnusedName username
+  let new_lctx := lctx.mkLocalDecl fvid newname ty
+  return (new_lctx, fvid, newname)
+
+
+def mkNewFVarId (lctx: LocalContext) (username: Name) (ty: Expr): MetaM (LocalContext × FVarId) := withLCtx' lctx do
+  withLocalDeclD username ty fun expr =>
+    return (← getLCtx, expr.fvarId!)
+
+
+def getFVarId_type (fvarid: FVarId) (lctx: LocalContext) : MetaM Expr := withLCtx' lctx do
+  let err := "Cannot find FVarId of " ++ toString fvarid.name ++ " in LocalContext"
+  return (← option_to_MetaM (lctx.find? fvarid) err).type
+
 
 /-- Decomposes a universally-quantified type expression whose body is an arrow type
     (i.e. `∀ (x1 : τ1) … (xn : τn), Q1 → … → Qn → P`), and returns a triple of the form
@@ -153,27 +176,36 @@ def decomposeType (e : Expr) : MetaM (Array (Name × Expr) × Expr × Array Expr
     `(#[(x1, τ1), …, (xn, τn)], Q1 → … → Qn → P, #[Q1, …, Qn, P])`.
     - The 2nd component is the body of the forall-expression
     - The 3rd component is an array containing each subterm of the arrow type -/
-def decomposeType_withLocalContext (e : Expr) (lctx: LocalContext): MetaM (Array (Name × Expr) × Expr × Array Expr × LocalContext) := do
+
+def decomposeType_withLocalContext (e : Expr) (lctx: LocalContext): MetaM (Array (Name × Expr) × Expr × Array Expr × LocalContext) := withLCtx' lctx do
   let (binder, exp) := extractForAllBinders e
-  let mut new_ctx := lctx
-  for (name, ty) in binder do
-    match new_ctx.findFromUserName? name with
-    | none => {
-      let newfvarid ← mkFreshFVarId
-      new_ctx := new_ctx.mkLocalDecl newfvarid name ty
-      }
-    | some _ => {
-      let newname := new_ctx.getUnusedName name
-      let newfvarid ← mkFreshFVarId
-      new_ctx := new_ctx.mkLocalDecl newfvarid newname ty
-    }
-  let allFvarids :=  extractFVars exp
   let mut new_exp := exp
-  for fvarid in allFvarids do
-    if let some decl := new_ctx.findFromUserName? fvarid.name then
-      new_exp := new_exp.replaceFVarId fvarid decl.toExpr
+  let mut lctx := lctx
+  let mut new_binder := #[]
+  for (name, ty) in binder do
+    let (new_lctx, new_fvarid, newname) ←  mkNewFVarId_keepold lctx name ty
+    lctx := new_lctx
+    let old_fvarid := ⟨name⟩
+    let new_fvar := mkFVar new_fvarid
+    new_exp := new_exp.replaceFVarId old_fvarid new_fvar
+    new_binder := new_binder.push (newname, ty)
   let tyexp ← getComponentsOfArrowType new_exp
-  return (binder, new_exp, tyexp, new_ctx)
+  return (new_binder, new_exp, tyexp, lctx)
+
+
+/-
+def decomposeType_withLocalContext (e : Expr) (lctx: LocalContext): MetaM (Array (Name × Expr) × Expr × Array Expr × LocalContext) := withLCtx' lctx do
+  let (binder, exp) := extractForAllBinders e
+  withLocalDeclsDND binder fun _ => do
+    let new_ctx ← getLCtx
+    let allFvarids :=  extractFVarIds exp
+    let mut new_exp := exp
+    for fvarid in allFvarids do
+      if let some decl := new_ctx.findFromUserName? fvarid.name then
+        new_exp := new_exp.replaceFVarId fvarid decl.toExpr
+    let tyexp ← getComponentsOfArrowType new_exp
+    return (binder, new_exp, tyexp, new_ctx)-/
+
 
 
 def get_recursive_calls (typeName : Name) (e : Expr) : MetaM (Array Expr) := do
@@ -193,26 +225,19 @@ def get_recursive_calls (typeName : Name) (e : Expr) : MetaM (Array Expr) := do
     | _ => return acc
   go e #[]
 
-def mk_equations (left right : Array Expr) : MetaM (Array Expr) := do
-  if left.size != right.size then
-    throwError s!"Arrays have different sizes: {left.size} ≠ {right.size}"
-  let mut equations : Array Expr := #[]
-  for i in [:left.size] do
-    let l := left[i]!
-    let r := right[i]!
-    let eq ←   mkEq l r
-    equations := equations.push (← whnf eq)
-  return equations
+def mkEqs (expr_pairs: Array (Expr × Expr)) (lctx: LocalContext): MetaM (Array Expr) := do withLCtx' lctx do
+  let mut eqs := #[]
+  for (l,r) in expr_pairs do
+    let eq ← mkEq l r
+    eqs := eqs.push eq
+  return eqs
 
-def mk_eqs (ee: Array (Expr × Expr)) : MetaM (Array Expr) := do
-  let (left, right) := ee.unzip
-  let mut equations : Array Expr := #[]
-  for i in [:left.size] do
-    let l := left[i]!
-    let r := right[i]!
-    let eq ←   mkEq l r
-    equations := equations.push (← whnf eq)
-  return equations
+def mkEqs_FvarIds (fvarid_pairs: Array (FVarId × FVarId)) (lctx: LocalContext): MetaM (Array Expr) := do withLCtx' lctx do
+  let mut eqs := #[]
+  for (l,r) in fvarid_pairs do
+    let eq ← mkEq (← l.getDecl).toExpr (← r.getDecl).toExpr
+    eqs := eqs.push eq
+  return eqs
 
 /-- Decomposes an array `arr` into a pair `(xs, x)`
    where `xs = arr[0..=n-2]` and `x = arr[n - 1]` (where `n` is the length of `arr`).

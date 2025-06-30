@@ -103,11 +103,11 @@ def elabGetMutualBlock : CommandElab := fun stx => do
       print_m_string mc_block
   | _ => throwError "Invalid syntax"
 
--- #gen_mutual_rec typing with_name ["L", "e", "t"] backtrack 100 monad "IO"
+--#gen_mutual_rec typing with_name ["L", "e", "t"] backtrack 100 monad "IO"
 -- #gen_mutual_rec typing with_name ["L", "e", "t"] backtrack 100 monad "Gen"
 -- #gen_mutual_rec balanced with_name ["h", "T"] backtrack 100 monad "IO"
 -- #gen_mutual_rec bst with_name ["lo", "hi", "T"] backtrack 100 monad "IO"
--- #gen_mutual_rec bst with_name ["lo", "hi", "T"] backtrack 100 monad "Gen"
+--#gen_mutual_rec bst with_name ["lo", "hi", "T"] backtrack 100 monad "Gen"
 
 
 def get_testfile (r: InductiveInfo) (inpname: List String) (btnum: Nat) : MetaM String := do

@@ -16,8 +16,8 @@ open KeyValueStore
 
 
 
--- #get_relation lookup_kv
--- #get_checker_call lookup_kv
+-- #get_InductiveInfo lookup_kv
+-- #get_checker_actions lookup_kv
 
 
 -- #gen_producer lookup_kv with_name ["s", "l", "T"] for_arg 1 backtrack 10
@@ -392,7 +392,7 @@ end
 -----------------------REMOVE KV-----------------------------------------------
 
 
-#get_checker_call remove_kv
+#get_checker_actions remove_kv
 
 #gen_mutual_rec remove_kv with_name ["s", "l1", "l2"] backtrack 10 monad "IO"
 
@@ -601,8 +601,8 @@ end
 
 
 
-#get_relation eval_state_api_call
-#get_checker_call eval_state_api_call
+#get_InductiveInfo eval_state_api_call
+#get_checker_actions eval_state_api_call
 #gen_producer eval_state_api_call with_name ["in1", "in2"] for_arg 0 backtrack 100
 #gen_mutual_rec eval_state_api_call with_name ["s", "l"] backtrack 10 monad "IO"
 
