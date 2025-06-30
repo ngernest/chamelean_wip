@@ -342,6 +342,7 @@ def testBinarySearchTrees : IO Unit := do
   | none =>
     IO.println "✗ BST test failed"
 
+
 /-- Test non-linear patterns (same variable appears multiple times) -/
 def testNonLinearPatterns : IO Unit := do
   -- Simulate: typing Γ (Abs t1 e) (Arr t1 t2)
@@ -383,3 +384,66 @@ def testNonLinearPatterns : IO Unit := do
     -- Should show pattern matches and equality constraints for t1
   | none =>
     IO.println "✗ Non-linear patterns test failed"
+
+/-- Test function calls in constructor conclusions -/
+def testFunctionCalls : IO Unit := do
+  -- Simulate: square_of n (n * n) -> square_of n m
+  -- where (n * n) needs to be converted to fresh variable with equality
+
+  let testUnify : UnifyM Unit := do
+    let n ← UnifyM.fresh
+    let m ← UnifyM.fresh
+    let in1 ← UnifyM.fresh  -- first argument (input)
+    let in2 ← UnifyM.fresh  -- second argument (input)
+
+    -- Set up: inputs are fixed, n, m need to be determined
+    UnifyM.updateMany [
+      (in1, .Fixed),
+      (in2, .Fixed),
+      (n, .Undef "nat"),
+      (m, .Undef "nat")
+    ]
+
+    -- Unify: `square_of n (n * n) ~ square_of in1 in2`
+    -- This should unify `n` with `in1`
+    unify (.Unknown n) (.Unknown in1)
+
+    -- The `(n * n)` part would normally create a fresh variable and equality
+    -- For testing, we'll simulate this by creating an equality constraint
+    let product ← UnifyM.fresh
+    UnifyM.update product (.Undef "nat")
+    UnifyM.equality product in2  -- product should equal in2
+
+    -- Simulate the equality: product = n * n (would be handled by preprocessing)
+
+  match runUnify testUnify with
+  | some finalState =>
+    IO.println s!"✓ Function calls test passed"
+    IO.println s!"  Equalities created: {repr finalState.equalities.toList}"
+  | none =>
+    IO.println "✗ Function calls test failed"
+
+
+/-- Run all test cases -/
+def runAllTests : IO Unit := do
+  IO.println "=== Testing Unification Monad ==="
+  IO.println ""
+
+  testNonemptyTrees
+  IO.println ""
+
+  testCompleteTrees
+  IO.println ""
+
+  testBinarySearchTrees
+  IO.println ""
+
+  testNonLinearPatterns
+  IO.println ""
+
+  testFunctionCalls
+  IO.println ""
+
+  IO.println "=== All tests completed ==="
+
+-- #eval runAllTests
