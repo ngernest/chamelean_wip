@@ -3,6 +3,8 @@ import Plausible.New.OptionTGen
 import Plausible.New.DecOpt
 import Plausible.New.ArbitrarySizedSuchThat
 import Plausible.New.GeneratorCombinators
+import Plausible.New.Enumerators
+import Plausible.New.EnumeratorCombinators
 
 import Plausible.Gen
 import Plausible.Sampleable
@@ -129,7 +131,7 @@ instance : DecOpt (typing Γ e τ) where
 -- Unconstrained generators
 --------------------------------------------------------------------------
 
-/-- A generator for STLC types -/
+/-- A generator for STLC types, parameterized by its size argument -/
 def genType : Nat → Gen type :=
   let rec arb_aux (size : Nat) : Gen type :=
     match size with
@@ -143,6 +145,22 @@ def genType : Nat → Gen type :=
               let p1 ← arb_aux size'
               pure (.Fun p0 p1))]
   fun n => arb_aux n
+
+/-- An enumerator for STLC types, parameterized by its size argument -/
+def enumType : Nat → Enumerator type :=
+  let rec enum_aux (size : Nat) : Enumerator type :=
+    match size with
+    | .zero => pure .Nat
+    | .succ size' =>
+      EnumeratorCombinators.oneOfWithDefault (pure .Nat)
+        [
+          pure .Nat,
+          do
+            let p0 ← enum_aux size'
+            let p1 ← enum_aux size'
+            pure (.Fun p0 p1)
+        ]
+  fun n => enum_aux n
 
 instance : Shrinkable type where
   shrink := fun ty =>
