@@ -25,7 +25,7 @@ instance : Monad Enumerator where
 
 /-- The degenerate enumerator which enumerates nothing (the empty `LazyList`) -/
 def failEnum : Enumerator α :=
-  fun _ => LazyList.nil
+  fun _ => .lnil
 
 /-- `Alternative` instance for `Enumerator`s.
     Note:

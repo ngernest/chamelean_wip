@@ -12,7 +12,7 @@ namespace LazyList
 
 /-- Converts a Lazy List to an ordinary list by forcing all the embedded thunks -/
 def toList : LazyList α → List α
-  | lnil => []
+  | .lnil => []
   | .lcons x xs => x :: xs.get.toList
 
 /-- We pretty-print `LazyList`s by converting them to ordinary lists
@@ -26,7 +26,7 @@ def take (n : Nat) (l : LazyList α) : LazyList α :=
   | .zero => lnil
   | .succ n' =>
     match l with
-    | lnil => lnil
+    | .lnil => lnil
     | .lcons x xs => .lcons x (take n' xs.get)
 
 /-- Appends two `LazyLists` together
@@ -34,7 +34,7 @@ def take (n : Nat) (l : LazyList α) : LazyList α :=
     Lean automatically coerces any `e : α` into `Thunk.mk (fun () => e) : Thunk α`.) -/
 def append (xs : LazyList α) (ys : LazyList α) : LazyList α :=
   match xs with
-  | lnil => ys
+  | .lnil => ys
   | .lcons x xs' => .lcons x (append xs'.get ys)
 
 /-- `observe tag i` uses `dbg_trace` to emit a trace of the variable
@@ -46,7 +46,7 @@ def observe (tag : String) (i : Fin n) : Nat :=
 /-- Maps a function over a LazyList -/
 def mapLazyList (f : α → β) (l : LazyList α) : LazyList β :=
   match l with
-  | lnil => lnil
+  | .lnil => .lnil
   | .lcons x xs => .lcons (f x) (mapLazyList f xs.get)
 
 /-- `Functor` instance for `LazyList` -/
@@ -55,7 +55,7 @@ instance : Functor LazyList where
 
 /-- Creates a singleton LazyList -/
 def pureLazyList (x : α) : LazyList α :=
-  LazyList.lcons x $ Thunk.mk (fun _ => lnil)
+  LazyList.lcons x $ Thunk.mk (fun _ => .lnil)
 
 /-- Alias for `pureLazyList` -/
 def singleton (x : α) : LazyList α :=
@@ -64,7 +64,7 @@ def singleton (x : α) : LazyList α :=
 /-- Flattens a `LazyList (LazyList α)` into a `LazyList α`  -/
 def concat (l : LazyList (LazyList α)) : LazyList α :=
   match l with
-  | lnil => lnil
+  | .lnil => .lnil
   | .lcons x l' => append x (concat l'.get)
 
 /-- Bind for `LazyList`s is just `concatMap` (same as the list monad) -/
@@ -82,13 +82,13 @@ instance : Applicative LazyList where
 
 /-- `Alternative` instance for `LazyList`s, where `xs <|> ys` is just `LazyList` append -/
 instance : Alternative LazyList where
-  failure := lnil
+  failure := .lnil
   orElse xs f := append xs (f ())
 
 /-- Creates a lazy list by repeatedly applying a function `s` to generate a sequence of elements -/
 def lazySeq (s : α → α) (lo : α) (len : Nat) : LazyList α :=
   match len with
-  | .zero => lnil
+  | .zero => .lnil
   | .succ len' => .lcons lo (lazySeq s (s lo) len')
 
 end LazyList
