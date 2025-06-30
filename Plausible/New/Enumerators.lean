@@ -95,7 +95,7 @@ instance [Enum α] [Enum β] : Enum (α ⊕ β) where
     (Enum.enum n >>= pure ∘ Sum.inl) <|> (Enum.enum n >>= pure ∘ Sum.inr)
 
 /-- Helper function: enumerates lists with a certain `budget` that is
-    divided by 2 during recursive calls -/
+    halved during each recursive calls -/
 def enumListsWithBudget [Enum α] (budget : Nat) : LazyList (List α) :=
   let empty := LazyList.singleton []
   match budget with
@@ -119,7 +119,22 @@ def enumPrintableASCII (size : Nat) : LazyList Char :=
 instance : Enum Char where
   enum := enumPrintableASCII
 
+/-- `Enum` instance for `String`s containing ASCII-printable characters -/
+instance : Enum String where
+  enum := List.asString <$> (Enum.enum : Enumerator (List Char))
+
 /-- Enumerates all `Nat`s in-between `lo` and `hi` (inclusive)
     in ascending order -/
 def enumNatRange (lo : Nat) (hi : Nat) : Enumerator Nat :=
   fun _ => lazySeq .succ lo (.succ (hi - lo))
+
+/-- Produces a `LazyList` containing all `Int`s in-between
+    `lo` and `hi` (inclusive) in ascending order -/
+def lazyListIntRange (lo : Int) (hi : Int) : LazyList Int :=
+  lazySeq (. + 1) lo (Int.toNat (hi - lo + 1))
+
+/-- `Enum` instance for `Int` (enumerates all `int`s between `-size` and `size` inclusive) -/
+instance : Enum Int where
+  enum := fun size =>
+    let n := Int.ofNat size
+    lazyListIntRange (-n) n
