@@ -29,3 +29,18 @@ def replicateM [Monad m] (n : Nat) (action : m α) : m (List α) :=
     let x ← action
     let xs ← replicateM n action
     pure (x :: xs)
+
+/-- `ToMessageData` instance for pretty-printing `ConstructorVal`s -/
+instance : ToMessageData ConstructorVal where
+  toMessageData ctorVal :=
+    let fields := [
+      m!"name := {ctorVal.name}",
+      m!"levelParams := {ctorVal.levelParams}",
+      m!"type := {ctorVal.type}",
+      m!"induct := {ctorVal.induct}",
+      m!"cidx := {ctorVal.cidx}",
+      m!"numParams := {ctorVal.numParams}",
+      m!"numFields := {ctorVal.numFields}",
+      m!"isUnsafe := {ctorVal.isUnsafe}"
+    ]
+    .bracket "{" (.ofList fields) "}"
