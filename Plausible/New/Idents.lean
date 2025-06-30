@@ -11,9 +11,11 @@ def OptionTThunkGenFn : Ident := mkIdent $ Name.mkStr2 "OptionTGen" "thunkGen"
 def OptionTBacktrackFn : Ident := mkIdent $ Name.mkStr2 "OptionTGen" "backtrack"
 def generatorCombinatorsThunkGenFn : Ident := mkIdent $ Name.mkStr2 "GeneratorCombinators" "thunkGen"
 def frequencyFn : Ident := mkIdent $ Name.mkStr2 "GeneratorCombinators" "frequency"
-def oneOfWithDefaultFn : Ident := mkIdent $ Name.mkStr2 "GeneratorCombinators" "oneOfWithDefault"
+def oneOfWithDefaultGenCombinatorFn : Ident := mkIdent $ Name.mkStr2 "GeneratorCombinators" "oneOfWithDefault"
+def oneOfWithDefaultEnumCombinatorFn : Ident := mkIdent $ Name.mkStr2 "EnumeratorCombinators" "oneOfWithDefault"
 def interpSampleFn : Ident := mkIdent $ Name.mkStr3 "Plausible" "SampleableExt" "interpSample"
 def auxArbFn : Ident := mkIdent $ Name.mkStr1 "aux_arb"
+def auxEnumFn : Ident := mkIdent $ Name.mkStr1 "aux_enum"
 def pureFn : Ident := mkIdent $ Name.mkStr1 "pure"
 
 -- Idents for size arguments to generators
@@ -26,13 +28,17 @@ def failFn : Ident := mkIdent $ Name.mkStr2 "OptionT" "fail"
 -- Idents for typeclasses
 def arbitrarySizedSuchThatTypeclass : Ident := mkIdent $ Name.mkStr1 "ArbitrarySizedSuchThat"
 def arbitrarySizedTypeclass : Ident := mkIdent $ Name.mkStr1 "ArbitrarySized"
+def enumSizedTypeclass : Ident := mkIdent $ Name.mkStr1 "EnumSized"
 
 -- Idents for typeclass functions
 def arbitraryFn : Ident := mkIdent $ Name.mkStr2 "Arbitrary" "arbitrary"
+def enumFn : Ident := mkIdent $ Name.mkStr2 "Enum" "enum"
 def arbitrarySizedFn : Ident := mkIdent $ Name.mkStr2 "ArbitrarySized" "arbitrarySized"
 def unqualifiedArbitrarySizedFn : Ident := mkIdent $ Name.mkStr1 "arbitrarySized"
+def unqualifiedEnumSizedFn : Ident := mkIdent $ Name.mkStr1 "enumSized"
 def arbitrarySTFn : Ident := mkIdent $ Name.mkStr2 "ArbitrarySuchThat" "arbitraryST"
 def unqualifiedArbitrarySizedSTFn : Ident := mkIdent $ Name.mkStr1 "arbitrarySizedST"
+def unqualifiedEnumSizedSTFn : Ident := mkIdent $ Name.mkStr1 "enumSizedST"
 def decOptFn : Ident := mkIdent $ Name.mkStr2 "DecOpt" "decOpt"
 
 
@@ -40,8 +46,9 @@ def decOptFn : Ident := mkIdent $ Name.mkStr2 "DecOpt" "decOpt"
 def natIdent : Ident := mkIdent ``Nat
 def zeroIdent : Ident := mkIdent ``Nat.zero
 def succIdent : Ident := mkIdent ``Nat.succ
-def optionTIdent : Ident := mkIdent ``OptionT
-def genIdent : Ident := mkIdent ``Plausible.Gen
+def optionTTypeConstructor : Ident := mkIdent ``OptionT
+def genTypeConstructor : Ident := mkIdent ``Plausible.Gen
+def enumTypeConstructor : Ident := mkIdent $ Name.mkStr1 "Enumerator"
 
 
 /-- Produces a fresh user-facing & *accessible* identifier with respect to the local context

@@ -134,7 +134,7 @@ def mkArbitrarySizedInstance (targetTypeName : Name) : CommandElabM (TSyntax `co
   -- Create the cases for the pattern-match on the size argument
   -- If `size = 0`, pick one of the thunked non-recursive generators
   let mut caseExprs := #[]
-  let zeroCase ← `(Term.matchAltExpr| | $zeroIdent => $oneOfWithDefaultFn $defaultGenerator [$thunkedNonRecursiveGenerators,*])
+  let zeroCase ← `(Term.matchAltExpr| | $zeroIdent => $oneOfWithDefaultGenCombinatorFn $defaultGenerator [$thunkedNonRecursiveGenerators,*])
   caseExprs := caseExprs.push zeroCase
 
   -- If `size = .succ size'`, pick a generator (it can be non-recursive or recursive)
@@ -148,7 +148,7 @@ def mkArbitrarySizedInstance (targetTypeName : Name) : CommandElabM (TSyntax `co
 
   -- Create an instance of the `ArbitrarySized` typeclass
   let targetTypeIdent := mkIdent targetTypeName
-  let generatorType ← `($genIdent $targetTypeIdent)
+  let generatorType ← `($genTypeConstructor $targetTypeIdent)
   `(instance : $arbitrarySizedTypeclass $targetTypeIdent where
       $unqualifiedArbitrarySizedFn:ident :=
         let rec $auxArbIdent:ident $sizeParam : $generatorType :=
