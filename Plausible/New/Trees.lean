@@ -1,6 +1,7 @@
 import Plausible.IR.Examples
 import Plausible.New.OptionTGen
 import Plausible.New.ArbitrarySizedSuchThat
+import Plausible.New.DecOpt
 
 import Plausible.Gen
 open Plausible
@@ -101,3 +102,40 @@ def tempSize := 10
 #eval runSizedGen (arbitrarySizedST (fun t => balanced 5 t)) tempSize
 ```
 -/
+
+
+-- Handwritten `DecOpt` instance for the proposition `bst lo hi t`
+instance : DecOpt (bst lo hi t) where
+  decOpt :=
+    let rec aux_arb (init_size : Nat) (size : Nat) (lo_0 : Nat) (hi_0 : Nat) (t_0 : Tree) : Option Bool :=
+      match size with
+      | .zero =>
+        checkerBacktrack [
+          fun _ =>
+            match t_0 with
+            | .Leaf => some true
+            | .Node _ _ _ => some false,
+          fun _ => none
+        ]
+      | .succ size' =>
+        checkerBacktrack [
+          fun _ =>
+            match t_0 with
+            | .Leaf => some true
+            | .Node _ _ _ => some false,
+          fun _ =>
+            match t_0 with
+            | .Leaf => some false
+            | .Node x l r =>
+              match DecOpt.decOpt (lo_0 < x && x < hi_0) init_size with
+              | some true => match aux_arb init_size size' lo_0 x l with
+                             | some true => match aux_arb init_size size' x hi_0 r with
+                                            | some true => some true
+                                            | some false => some false
+                                            | none => none
+                             | some false => some false
+                             | none => none
+              | some false => some false
+              | none => none
+        ]
+    fun size => aux_arb size size lo hi t
