@@ -40,11 +40,7 @@ def elabDeriveChecker : CommandElab := fun stx => do
     let inductiveCheckerInfos := allSubCheckerInfos
 
     let _ ← Array.mapM (fun chk => liftTermElabM $ mkSubChecker chk) baseCheckerInfos
-
-
-
-
-
+    let _ ← Array.mapM (fun chk => liftTermElabM $ mkSubChecker chk) inductiveCheckerInfos
 
   | _ => throwUnsupportedSyntax
 
@@ -52,6 +48,7 @@ def elabDeriveChecker : CommandElab := fun stx => do
 -- `deriving instance DecOpt for (bst lo hi t)` syntax
 
 -- #derive_checker (bst lo hi t)
+-- #derive_checker (balanced n t)
 
 /-
 

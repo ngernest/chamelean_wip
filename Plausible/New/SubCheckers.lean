@@ -7,9 +7,16 @@ open Plausible.IR
 open Idents
 open Lean Elab Command Meta Term Parser Std
 
-def mkSubCheckerBody : Unit → TermElabM (TSyntax `term) :=
-  -- TODO: fill in this body
-  sorry
+/-- Constructs terms which constitute calls to checkers corresponding
+    to the hypotheses in `inductiveHypothesesToCheck`
+    (these are either recursive calls to the current checker function, or invocations of
+    the `DecOpt` typeclass instance for the hypotheses) -/
+def mkSubCheckerBody (inductiveHypothesesToCheck : Array Action) : TermElabM (TSyntax `term) :=
+  if inductiveHypothesesToCheck.isEmpty then
+    `($someFn:ident $trueIdent:ident)
+  else
+    -- TODO: fill in the list with sub-checker calls
+    `($andOptListFn:ident [])
 
 /-- Constructs an anonymous sub-checker. See the comments in the body of this function
     for details on how this sub-checker is created. -/
@@ -18,9 +25,11 @@ def mkSubChecker (subChecker : SubCheckerInfo) : TermElabM (TSyntax `term) := do
 
   -- TODO: use `hypothesisRecursivelyCallsCurrentInductive` to determine if
   -- checker call should be recursive or performed via typeclass resolution
-  -- let checkerBody ← mkSubCheckerBody ()
-  let checkerBody ← `($someFn:ident $falseIdent:ident) -- TODO: replace
 
+  logInfo m!"subChecker = {subChecker}"
+
+  let inductiveHypothesesToCheck := subChecker.groupedActions.checkInductiveActions
+  let checkerBody ← mkSubCheckerBody inductiveHypothesesToCheck
 
   -- If there are inputs on which we need to perform a pattern-match,
       -- create a pattern-match expr which only returns the checker body
