@@ -16,15 +16,14 @@ def mkSubCheckerBody (inductiveHypothesesToCheck : Array Action) : TermElabM (TS
     `($someFn:ident $trueIdent:ident)
   else
     -- TODO: fill in the list with sub-checker calls
+    -- ^^ loop through `inductiveHypothesesToCheck` and use `hypothesisRecursivelyCallsCurrentInductive` to determine if
+    -- checker call should be recursive or performed via typeclass resolution
     `($andOptListFn:ident [])
 
 /-- Constructs an anonymous sub-checker. See the comments in the body of this function
     for details on how this sub-checker is created. -/
 def mkSubChecker (subChecker : SubCheckerInfo) : TermElabM (TSyntax `term) := do
   -- TODO: we only need to iterate through check_IR & check_non_IR
-
-  -- TODO: use `hypothesisRecursivelyCallsCurrentInductive` to determine if
-  -- checker call should be recursive or performed via typeclass resolution
 
   logInfo m!"subChecker = {subChecker}"
 
