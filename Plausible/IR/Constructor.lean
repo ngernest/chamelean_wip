@@ -127,12 +127,18 @@ instance : ToMessageData HandlerInfo where
 -- Pretty printer for `SubGeneratorInfo`
 instance : ToMessageData SubGeneratorInfo where
   toMessageData subGen : MessageData :=
-    toMessageData subGen.toHandlerInfo ++ m!"generatorSort := {repr subGen.generatorSort}"
+    .joinSep [
+      toMessageData subGen.toHandlerInfo,
+      m!"generatorSort := {repr subGen.generatorSort}"
+    ] "¬"
 
 -- Pretty printer for `SubCheckerInfo`
 instance : ToMessageData SubCheckerInfo where
   toMessageData subChecker : MessageData :=
-    toMessageData subChecker.toHandlerInfo ++ m!"checkerSort := {repr subChecker.checkerSort}"
+    .joinSep [
+      toMessageData subChecker.toHandlerInfo,
+      m!"checkerSort := {repr subChecker.checkerSort}"
+    ] "\n"
 
 
 /-- Converts an array of `Action`s into a `GroupedActions` -/
@@ -304,17 +310,17 @@ def backtrackElem_return_checker (backtrackElem : HandlerInfo) (indentation : St
 /-- Assembles all the components of a sub-checker (a `BacktrackElem`) together, returning a string
     containing the Lean code for the sub-checker -/
 def backtrack_elem_toString_checker (subChecker: SubCheckerInfo) (monad: String :="IO") : MetaM String := do
-  let backtrackElem := subChecker.toHandlerInfo
+  let handlerInfo := subChecker.toHandlerInfo
 
   IO.println "********************"
   IO.println s!"entered `backtrack_elem_toString_checker`:"
-  IO.println (← MessageData.toString (toMessageData backtrackElem))
+  IO.println (← MessageData.toString (toMessageData handlerInfo))
 
   let mut out := ""
-  let matchblock ← backtrackElem_match_block backtrackElem
-  let (genblock, iden) ← backtrackElem_gen_block backtrackElem monad
-  let (checkIRblock, vars) ← backtrackElem_gen_check_IR_block backtrackElem iden monad
-  let returnblock ← backtrackElem_return_checker backtrackElem iden vars monad
+  let matchblock ← backtrackElem_match_block handlerInfo
+  let (genblock, iden) ← backtrackElem_gen_block handlerInfo monad
+  let (checkIRblock, vars) ← backtrackElem_gen_check_IR_block handlerInfo iden monad
+  let returnblock ← backtrackElem_return_checker handlerInfo iden vars monad
   out := out ++ matchblock
   if genblock.length > 0 ∧ out.length > 0 then
     out := out ++ "\n"
