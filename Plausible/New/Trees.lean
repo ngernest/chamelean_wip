@@ -127,7 +127,10 @@ instance : DecOpt (bst lo hi t) where
             match t_0 with
             | .Leaf => some false
             | .Node x l r =>
-              DecOpt.andBind (DecOpt.decOpt (lo_0 < x && x < hi_0) init_size) $
-                DecOpt.andBind (aux_arb init_size size' lo_0 x l) (aux_arb init_size size' x hi_0 r)
+              DecOpt.andOptList [
+                DecOpt.decOpt (lo_0 < x && x < hi_0) init_size,
+                aux_arb init_size size' lo_0 x l,
+                aux_arb init_size size' x hi_0 r
+              ]
         ]
     fun size => aux_arb size size lo hi t
