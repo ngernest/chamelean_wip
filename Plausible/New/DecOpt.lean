@@ -45,9 +45,14 @@ def checkerBacktrack (checkers : List (Unit → Option Bool)) : Option Bool :=
 
 /-- Conjunction lifted to work over `Option Bool`
     (corresponds to the `.&&` infix operator in section 2 of "Computing Correctly with Inductive Relations") -/
-def andBind (a : Option Bool) (b : Option Bool) : Option Bool :=
+def andOpt (a : Option Bool) (b : Option Bool) : Option Bool :=
   match a with
   | some true => b
   | _ => a
+
+/-- Folds an optional conjunction operation `andOpt` over a list of `Option Bool`s,
+    returning the resultant `Option Bool` -/
+def andOptList (bs : List (Option Bool)) : Option Bool :=
+  List.foldl andOpt (some true) bs
 
 end DecOpt
