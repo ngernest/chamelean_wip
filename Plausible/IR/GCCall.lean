@@ -314,14 +314,12 @@ def Actions_for_hypotheses (ctor : InductiveConstructor) (fvars : Array FVarId) 
 
         let argToGenerate := hyp.getAppArgs[uninitializedArgIdx]!
 
-
         initializedFVars := Array.appendUniqueElements initializedFVars uninitializedFVars
 
         let generationStyle :=
           if hypothesisRecursivelyCallsCurrentInductive hyp ctor
           then .RecursiveCall
           else .TypeClassResolution
-
 
         if argToGenerate.isFVar then
           let fvarToGenerate := argToGenerate.fvarId!

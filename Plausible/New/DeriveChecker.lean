@@ -1,68 +1,44 @@
 import Lean
-import Plausible.New.Tests
+import Plausible.IR.Prelude
+import Plausible.New.DeriveGenerator
 
 open Lean Elab Command Meta Term Parser
-
-/-- Uses the name of the inductive relation to produce the checker's name -/
-def makeCheckerName (inductiveName : Name) : Name :=
-  Name.mkStr1 s!"check_{inductiveName}"
-
+open Plausible.IR
 
 ----------------------------------------------------------------------
--- Command elaborator for producing the function header for checkers
+-- Command elaborator for deriving checkers
 -----------------------------------------------------------------------
 
-syntax (name := mk_checker_header) "#mk_checker_header " term : command
+syntax (name := derive_checker) "#derive_checker" "(" term ")" : command
 
 /-- Command elaborator that produces the function header for the checker -/
-@[command_elab mk_checker_header]
-def elabMkCheckerHeader : CommandElab := fun stx => do
+@[command_elab derive_checker]
+def elabDeriveChecker : CommandElab := fun stx => do
   match stx with
-  | `(#mk_checker_header ( $inductiveApp:term )) =>
-    logWarning s!"Collected: {inductiveApp}"
+  | `(#derive_checker ( $body:term )) => do
+    -- Parse the body of the lambda for an application of the inductive relation
+    let (inductiveName, args) ← deconstructInductiveApplication body
 
-    -- Parse the names of inductive relation + its arguments
-    let (inductiveName, args) ← parseInductiveApp inductiveApp
+    logInfo m!"inductiveName = {inductiveName}, args = {args}"
 
-    if !(← isInductive inductiveName) then
-      throwErrorAt stx "{inductiveName} is not an inductive, expected an inductive relation"
+    -- Elaborate the name of the inductive relation and the type
+    -- of the value to be generated
+    let inductiveExpr ← liftTermElabM $ elabTerm inductiveName none
 
-    -- Associate each argument with an appropriate type expression
-    let paramInfo ← analyzeInductiveArgs inductiveName args
+    let argNameStrings := convertIdentsToStrings args
 
-    -- Compute the name for the checker function
-    let checkerName := makeCheckerName inductiveName
-    let checkerIdent := mkIdent checkerName
+    -- Create an auxiliary `SubGeneratorInfo` structure that
+    -- stores the metadata for each derived sub-generator
+    let allSubCheckerInfos ← liftTermElabM $ getSubCheckerInfos inductiveExpr argNameStrings
 
-    -- Extract parameter names and types from the arguments
-    let mut params := #[]
+    -- Every generator is an inductive generator
+    -- (they can all be invoked in the inductive case of the top-level generator),
+    -- but only certain generators qualify as `BaseGenerator`s
+    let _baseCheckerInfo := Array.filter (fun checker => checker.checkerSort == .BaseChecker) allSubCheckerInfos
+    let _inductiveCheckerInfo := allSubCheckerInfos
 
-    -- Produce size arguments for the checker
-    let sizeParam ← `(bracketedBinder| (size : Nat))
-    let topSizeParam ← `(bracketedBinder| (top_size : Nat))
-    params := params.push sizeParam
-    params := params.push topSizeParam
 
-    -- Process each argument from the inductive application
-    for (paramName, paramType) in paramInfo do
-      let paramIdent := mkIdent paramName
-      let param ← `(bracketedBinder| ($paramIdent : $paramType))
-      params := params.push param
 
-    let funHeader : TSyntax `command ←
-      `(def $checkerIdent $params* : Option Bool :=
-        match size with
-        | .zero => none
-        | .succ size' => none)
 
-    let _headerFormat ← liftCoreM (PrettyPrinter.ppCommand funHeader)
-
-    elabCommand funHeader
 
   | _ => throwUnsupportedSyntax
-
------------
--- Testing
------------
-
--- #mk_checker_header (bst lo hi t)
