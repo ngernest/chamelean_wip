@@ -23,7 +23,7 @@ def checkLookup (Γ : List type) (x : Nat) (τ : type) : Nat → Option Bool :=
   let rec aux_arb (initSize : Nat) (size : Nat) (Γ : List type) (x : Nat) (τ : type) : Option Bool :=
     match size with
     | .zero =>
-      checkerBacktrack [
+      DecOpt.checkerBacktrack [
         (fun _ =>
           match x with
           | .zero =>
@@ -38,7 +38,7 @@ def checkLookup (Γ : List type) (x : Nat) (τ : type) : Nat → Option Bool :=
         fun _ => none
       ]
     | .succ size' =>
-      checkerBacktrack [
+      DecOpt.checkerBacktrack [
         (fun _ =>
           match Γ with
           | [] => some false
@@ -72,7 +72,7 @@ def checkTyping (Γ : List type) (e : term) (τ : type) : Nat → Option Bool :=
   let rec aux_arb (initSize : Nat) (size : Nat) (Γ : List type) (e : term) (τ : type) : Option Bool :=
     match size with
     | .zero =>
-      checkerBacktrack [
+      DecOpt.checkerBacktrack [
         fun _ =>
           match e with
           | .Var x =>
@@ -91,7 +91,7 @@ def checkTyping (Γ : List type) (e : term) (τ : type) : Nat → Option Bool :=
         fun _ => none
       ]
     | .succ size' =>
-      checkerBacktrack [
+      DecOpt.checkerBacktrack [
         fun _ =>
           match e with
           | .Var x =>
