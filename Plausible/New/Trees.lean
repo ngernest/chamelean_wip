@@ -110,7 +110,7 @@ instance : DecOpt (bst lo hi t) where
     let rec aux_arb (init_size : Nat) (size : Nat) (lo_0 : Nat) (hi_0 : Nat) (t_0 : Tree) : Option Bool :=
       match size with
       | .zero =>
-        checkerBacktrack [
+        DecOpt.checkerBacktrack [
           fun _ =>
             match t_0 with
             | .Leaf => some true
@@ -118,7 +118,7 @@ instance : DecOpt (bst lo hi t) where
           fun _ => none
         ]
       | .succ size' =>
-        checkerBacktrack [
+        DecOpt.checkerBacktrack [
           fun _ =>
             match t_0 with
             | .Leaf => some true
@@ -127,15 +127,7 @@ instance : DecOpt (bst lo hi t) where
             match t_0 with
             | .Leaf => some false
             | .Node x l r =>
-              match DecOpt.decOpt (lo_0 < x && x < hi_0) init_size with
-              | some true => match aux_arb init_size size' lo_0 x l with
-                             | some true => match aux_arb init_size size' x hi_0 r with
-                                            | some true => some true
-                                            | some false => some false
-                                            | none => none
-                             | some false => some false
-                             | none => none
-              | some false => some false
-              | none => none
+              DecOpt.andBind (DecOpt.decOpt (lo_0 < x && x < hi_0) init_size) $
+                DecOpt.andBind (aux_arb init_size size' lo_0 x l) (aux_arb init_size size' x hi_0 r)
         ]
     fun size => aux_arb size size lo hi t

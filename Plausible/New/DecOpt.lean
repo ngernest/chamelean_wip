@@ -25,6 +25,8 @@ instance [Decidable P] : DecOpt P where
 -- https://github.com/QuickChick/QuickChick/blob/master/src/Decidability.v
 ----------------------------------------------------------------------------------
 
+namespace DecOpt
+
 /-- `checkerBacktrack` takes a list of checker handlers and returns:
     - `some true` if *any* handler does so
     - `some false` if *all* handlers do so
@@ -47,3 +49,5 @@ def andBind (a : Option Bool) (b : Option Bool) : Option Bool :=
   match a with
   | some true => b
   | _ => a
+
+end DecOpt
