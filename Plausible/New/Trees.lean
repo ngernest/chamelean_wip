@@ -104,7 +104,7 @@ def tempSize := 10
 -/
 
 
--- Handwritten `DecOpt` instance for the proposition `bst lo hi t`
+/-- Handwritten `DecOpt` instance for the proposition `bst lo hi t` -/
 instance : DecOpt (bst lo hi t) where
   decOpt :=
     let rec aux_arb (init_size : Nat) (size : Nat) (lo_0 : Nat) (hi_0 : Nat) (t_0 : Tree) : Option Bool :=
@@ -134,3 +134,52 @@ instance : DecOpt (bst lo hi t) where
               ]
         ]
     fun size => aux_arb size size lo hi t
+
+/-- Handwritten `DecOpt` instance for the proposition `balanced n t` -/
+instance : DecOpt (balanced n t) where
+  decOpt :=
+    let rec aux_arb (initSize : Nat) (size : Nat) (n_0 : Nat) (t_0 : Tree) : Option Bool :=
+      match size with
+      | .zero =>
+        DecOpt.checkerBacktrack [
+          (fun _ =>
+            match t_0 with
+            | .Leaf => match n_0 with
+                      | 0 => some true
+                      | _ => some false
+            | _ => some false),
+          (fun _ =>
+            match t_0 with
+            | .Leaf => match n_0 with
+                      | 1 => some true
+                      | _ => some false
+            | _ => some false),
+          (fun _ => none)
+        ]
+      | .succ size' =>
+        DecOpt.checkerBacktrack [
+          (fun _ =>
+            match t_0 with
+            | .Leaf => match n_0 with
+                      | 0 => some true
+                      | _ => some false
+            | _ => some false),
+          (fun _ =>
+            match t_0 with
+            | .Leaf => match n_0 with
+                      | 1 => some true
+                      | _ => some false
+            | _ => some false),
+          (fun _ =>
+            match t_0 with
+            | .Leaf => some false
+            | .Node _ l r =>
+              match n_0 with
+              | .succ n =>
+                DecOpt.andOptList [
+                  aux_arb initSize size' n l,
+                  aux_arb initSize size' n r
+                ]
+              | _ => some false)
+        ]
+    fun size => aux_arb size size n t
