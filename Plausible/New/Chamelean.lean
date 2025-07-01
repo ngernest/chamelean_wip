@@ -1,5 +1,6 @@
 import Plausible.New.DeriveChecker
 import Plausible.New.SubGenerators
+import Plausible.New.SubCheckers
 import Plausible.New.DeriveGenerator
 import Plausible.New.Tests
 import Plausible.New.OptionTGen

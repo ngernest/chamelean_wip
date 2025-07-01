@@ -17,6 +17,8 @@ def interpSampleFn : Ident := mkIdent $ Name.mkStr3 "Plausible" "SampleableExt" 
 def auxArbFn : Ident := mkIdent $ Name.mkStr1 "aux_arb"
 def auxEnumFn : Ident := mkIdent $ Name.mkStr1 "aux_enum"
 def pureFn : Ident := mkIdent $ Name.mkStr1 "pure"
+def someFn : Ident := mkIdent $ Name.mkStr1 "some"
+def falseIdent : Ident := mkIdent ``false
 
 -- Idents for size arguments to generators
 def initSizeIdent : Ident := mkIdent $ Name.mkStr1 "initSize"

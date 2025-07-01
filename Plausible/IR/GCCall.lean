@@ -183,7 +183,8 @@ inductive Action where
   | checkInductive (hyp : Expr)
 
   /-- The hypothesis `hyp` is not an inductive relation, but a function that returns
-      `Prop`, so we invoke a checker that determines whether the `Prop` is true -/
+      `Prop`, so we invoke a checker that determines whether the `Prop` is true
+      (this checker is provided via the `DecOpt` instance for the `Prop`) -/
   | checkNonInductive (hyp : Expr)
 
   /-- Generate an input at the given position `pos` for an inductive relation
