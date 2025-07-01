@@ -16,8 +16,10 @@ def oneOfWithDefaultEnumCombinatorFn : Ident := mkIdent $ Name.mkStr2 "Enumerato
 def interpSampleFn : Ident := mkIdent $ Name.mkStr3 "Plausible" "SampleableExt" "interpSample"
 def auxArbFn : Ident := mkIdent $ Name.mkStr1 "aux_arb"
 def auxEnumFn : Ident := mkIdent $ Name.mkStr1 "aux_enum"
+def andOptListFn : Ident := mkIdent $ Name.mkStr2 "DecOpt" "andOptList"
 def pureFn : Ident := mkIdent $ Name.mkStr1 "pure"
-def someFn : Ident := mkIdent $ Name.mkStr1 "some"
+def someFn : Ident := mkIdent ``some
+def trueIdent : Ident := mkIdent ``true
 def falseIdent : Ident := mkIdent ``false
 
 -- Idents for size arguments to generators
