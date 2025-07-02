@@ -62,7 +62,7 @@ instance : EnumSizedSuchThat type (fun τ => typing Γ e τ) where
 /-- A handwritten checker which checks `typing Γ e τ`, ignoring the case for `App`
     (based on the auto-derived checker produced by QuickChick) -/
 def checkTyping (Γ : List type) (e : term) (τ : type) : Nat → Option Bool :=
-  let rec aux_arb (initSize : Nat) (size : Nat) (Γ : List type) (e : term) (τ : type) : OptionT Id Bool :=
+  let rec aux_arb (initSize : Nat) (size : Nat) (Γ : List type) (e : term) (τ : type) : Option Bool :=
     match size with
     | .zero =>
       DecOpt.checkerBacktrack [

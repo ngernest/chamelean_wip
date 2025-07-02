@@ -15,26 +15,11 @@ open Lean Meta
 
 open Plausible ArbitrarySizedSuchThat OptionTGen
 
--- TODO: figure out how to write functions
+-- TODO: figure out how to rewrite function calls
 -- #derive_checker (typing Γ e τ)
 
-/- A handwritten checker which checks `typing Γ e τ`, ignoring the case for `App`
-    (based on the auto-derived checker produced by QuickChick) -/
--- def checkTypingAlt (Γ : List type) (e : term) (τ : type) : Nat → OptionT Id Bool :=
---   let rec aux_dec (initSize : Nat) (size : Nat) (Γ : List type) (e : term) (τ : type) : OptionT Id Bool :=
---     match size with
---     | .zero => DecOpt.checkerBacktrack []
---     | .succ size' =>
---       DecOpt.checkerBacktrackAlt [
---         fun _ =>
---           match e with
---           | .App e1 e2 => do
---             let t1 ← EnumSuchThat.enumST (fun τ => typing Γ e2 τ)
---             let _ ← aux_dec initSize size' Γ e1 (.Fun t1 τ)
---             return true
---           | _ => some false
---       ]
---   fun size => aux_dec size size Γ e τ
+
+---
 
 
 /- Example usage:
