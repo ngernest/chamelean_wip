@@ -15,49 +15,26 @@ open Lean Meta
 
 open Plausible ArbitrarySizedSuchThat OptionTGen
 
-/-- Dummy inductive relation for testing purposes -/
-inductive RGB where
-  | Red
-  | Green
-  | Blue
-  deriving Repr
-
-inductive Value where
-  | none
-  | bool (b : Bool)
-  | int (i : Int)
-  | tensor (shape : List Nat) (dtype : String)
-  deriving Repr
-
-inductive Foo where
-  | FromBitVec : ∀ (n : Nat), BitVec n → String → Foo
-  deriving Repr, Arbitrary
-
-
-inductive MyList where
-  | Nil
-  | Cons (x : Nat) (xs : MyList)
-
-inductive MyListAnon where
-  | Nil : MyListAnon
-  | Cons : Nat -> MyListAnon -> MyListAnon
-
--- deriving instance Arbitrary for MyList, MyListAnon
-
--- #synth Arbitrary MyList
--- #synth Arbitrary MyListAnon
-
-
--- #derive_arbitrary MyListAnon
-
--- #derive_arbitrary Tree
--- #derive_arbitrary type
--- #derive_arbitrary term
--- #derive_arbitrary Value
-
+-- TODO: figure out how to write functions
 -- #derive_checker (typing Γ e τ)
 
--- #eval runArbitrary (α := MyList) 10
+/- A handwritten checker which checks `typing Γ e τ`, ignoring the case for `App`
+    (based on the auto-derived checker produced by QuickChick) -/
+-- def checkTypingAlt (Γ : List type) (e : term) (τ : type) : Nat → OptionT Id Bool :=
+--   let rec aux_dec (initSize : Nat) (size : Nat) (Γ : List type) (e : term) (τ : type) : OptionT Id Bool :=
+--     match size with
+--     | .zero => DecOpt.checkerBacktrack []
+--     | .succ size' =>
+--       DecOpt.checkerBacktrackAlt [
+--         fun _ =>
+--           match e with
+--           | .App e1 e2 => do
+--             let t1 ← EnumSuchThat.enumST (fun τ => typing Γ e2 τ)
+--             let _ ← aux_dec initSize size' Γ e1 (.Fun t1 τ)
+--             return true
+--           | _ => some false
+--       ]
+--   fun size => aux_dec size size Γ e τ
 
 
 /- Example usage:

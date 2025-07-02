@@ -69,7 +69,7 @@ partial def analyzeRangeMode (r : Range) (constraints : Std.TreeMap Unknown Rang
   | .Ctr c rs => analyzePartiallyDefined "temp" (.Ctr c rs) constraints
   | .Undef ty => .ModeUndefUnknown "temp" ty
 
-/-- Compatibility scores (from mode_score in ML) -/
+/-- Compatibility scores (corresponds to `mode_score` in the OCaml code) -/
 structure CompatibilityScores where
   numCompatible : Nat
   numInstCompatible : Nat
@@ -77,6 +77,7 @@ structure CompatibilityScores where
   numPartCompatible : Nat
   deriving Repr
 
+-- corresponds to `mode_score` in the OCaml code
 def modeScore (bs : List Bool) (ms : List RangeMode) : CompatibilityScores :=
   let compatibilityResults := List.map (fun (b, m) => compatible b m) (List.zip bs ms)
   { numCompatible := List.count .Compatible compatibilityResults,

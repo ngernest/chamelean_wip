@@ -43,6 +43,17 @@ def checkerBacktrack (checkers : List (Unit → Option Bool)) : Option Bool :=
     | [] => if b then none else some false
   aux checkers false
 
+def checkerBacktrackAlt (checkers : List (Unit → OptionT Id Bool)) : OptionT Id Bool :=
+  let rec aux (l : List (Unit → Option Bool)) (b : Bool) : OptionT Id Bool :=
+    match l with
+    | c :: cs =>
+      match c () with
+      | some true => some true
+      | some false => aux cs b
+      | none => aux cs true
+    | [] => if b then none else some false
+  aux checkers false
+
 /-- Conjunction lifted to work over `Option Bool`
     (corresponds to the `.&&` infix operator in section 2 of "Computing Correctly with Inductive Relations") -/
 def andOpt (a : Option Bool) (b : Option Bool) : Option Bool :=

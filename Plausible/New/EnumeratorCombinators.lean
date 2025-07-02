@@ -48,17 +48,17 @@ def oneOfWithDefault (default : Enumerator α) (es : List (Enumerator α)) : Enu
     List.getD es idx default
 
 /-- Applies the checker `f` to a `LazyList l` of optional values, returning the resultant `Option Bool`
-    (the parameter `anyNone` is used to indicate whether any of the elements examined previouslyhave been `none`) -/
+    (the parameter `anyNone` is used to indicate whether any of the elements examined previously have been `none`) -/
 def lazyListBacktrackOpt (l : LazyList (Option α)) (f : α → Option Bool) (anyNone : Bool) : Option Bool :=
   match l with
-  | .lnil => if anyNone then .none else .some false
+  | .lnil => if anyNone then none else some false
   | .lcons mx xs =>
     match mx with
-    | .some x =>
+    | some x =>
       match f x with
-      | .some true => .some true
-      | .some false => lazyListBacktrackOpt xs.get f anyNone
-      | .none => lazyListBacktrackOpt xs.get f true
+      | some true => some true
+      | some false => lazyListBacktrackOpt xs.get f anyNone
+      | none => lazyListBacktrackOpt xs.get f true
     | .none => lazyListBacktrackOpt xs.get f true
 
 /-- Iterates through all the results of the enumerator `e`, applies the checker `f` to them,

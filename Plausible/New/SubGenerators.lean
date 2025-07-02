@@ -8,6 +8,11 @@ open Lean Elab Command Meta Term Parser Std
 open Idents
 
 
+def mkProducerConstraint (fvar : FVarId) (hyp : Expr) : MetaM (TSyntax `term) := do
+  let lhs := mkIdent $ fvar.name
+  let hypTerm ← PrettyPrinter.delab hyp
+  `((fun $lhs:ident => $hypTerm))
+
 /-- `genInputForInductive fvar hyp idx generationStyle` produces a let-bind expression of the form
     based on the `generationStyle` specified:
     - If `generationStyle = .RecursiveCall`, we produce the term

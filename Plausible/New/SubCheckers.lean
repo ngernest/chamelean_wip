@@ -37,38 +37,49 @@ def mkAuxiliaryCheckerCall (hyp : Expr) (checkerStyle : CheckerStyle) : MetaM (T
   | .TypeClassResolution => `($decOptFn ($hypTerm $argTerms*) $initSizeIdent)
 
 /-- Constructs terms which constitute calls to checkers corresponding
-    to the hypotheses in `inductiveHypothesesToCheck`
+    to the hypotheses in `hypothesesToCheck`
     (these are either recursive calls to the current checker function, or invocations of
     the `DecOpt` typeclass instance for the hypotheses)
     - The `ctor` argument is the constructor of the inductive relation corresponding to
       the sub-checker being built -/
-def mkSubCheckerBody (inductiveHypothesesToCheck : Array Action) (ctor : InductiveConstructor) : TermElabM (TSyntax `term) :=
-  if inductiveHypothesesToCheck.isEmpty then
+partial def mkSubCheckerBody (hypothesesToCheck : Array Action) (ctor : InductiveConstructor) (producerActions : Array Action) : TermElabM (TSyntax `term) :=
+  if hypothesesToCheck.isEmpty then
     `($someFn:ident $trueIdent:ident)
   else do
-    let mut callsToOtherCheckers := #[]
-    for hypothesis in inductiveHypothesesToCheck do
-      match hypothesis with
-      | .checkInductive hyp | .checkNonInductive hyp =>
-        -- Check if the hypothesis mentions the current inductive relation
-        -- If yes, perform a recursive call to the parent checker
-        -- Otherwise, perform typeclass resolution & invoke the checker provided by the `DecOpt` instance for the proposition
-        let checkerStyle := if hypothesisRecursivelyCallsCurrentInductive hyp ctor then .RecursiveCall else .TypeClassResolution
-        let checkerCall ← mkAuxiliaryCheckerCall hyp checkerStyle
-        callsToOtherCheckers := callsToOtherCheckers.push checkerCall
-      | .(_) => throwError "Unreachable pattern match"
+    if producerActions.isEmpty then
+      let mut callsToOtherCheckers := #[]
+      for hypothesis in hypothesesToCheck do
+        match hypothesis with
+        | .checkInductive hyp | .checkNonInductive hyp =>
+          -- Check if the hypothesis mentions the current inductive relation
+          -- If yes, perform a recursive call to the parent checker
+          -- Otherwise, perform typeclass resolution & invoke the checker provided by the `DecOpt` instance for the proposition
+          let checkerStyle := if hypothesisRecursivelyCallsCurrentInductive hyp ctor then .RecursiveCall else .TypeClassResolution
+          let checkerCall ← mkAuxiliaryCheckerCall hyp checkerStyle
+          callsToOtherCheckers := callsToOtherCheckers.push checkerCall
+        | .(_) => throwError "Unreachable pattern match"
 
-    `($andOptListFn:ident [$callsToOtherCheckers,*])
+      `($andOptListFn:ident [$callsToOtherCheckers,*])
+    else
+      -- TODO: we assume producerActions only has one element right now
+      let producerAction := producerActions[0]!
+      match producerAction with
+      | .genInputForInductive fvar hyp _ _ =>
+        let lhs := mkIdent fvar.name
+        let hypTerm ← PrettyPrinter.delab hyp
+        let enumSuchThatCall ← `($enumSTFn (fun $lhs:ident => $hypTerm))
+        let checkerContinuation ← mkSubCheckerBody hypothesesToCheck ctor #[]
+        `($enumeratingOptFn:ident $enumSuchThatCall $checkerContinuation $initSizeIdent)
+      | .(_) => throwError "Unreachable pattern match"
 
 /-- Constructs an anonymous sub-checker. See the comments in the body of this function
     for details on how this sub-checker is created. -/
 def mkSubChecker (subChecker : SubCheckerInfo) : TermElabM (TSyntax `term) := do
-  -- TODO: handle cases where we need to call `enumST` (e.g. STLC)
-
-  -- logInfo m!"subChecker = {subChecker}"
+  logInfo m!"subChecker = {subChecker}"
 
   let hypothesesToCheck := subChecker.groupedActions.checkNonInductiveActions ++ subChecker.groupedActions.checkInductiveActions
-  let checkerBody ← mkSubCheckerBody hypothesesToCheck subChecker.ctor
+  let producerActions := subChecker.groupedActions.gen_list
+  let checkerBody ← mkSubCheckerBody hypothesesToCheck subChecker.ctor producerActions
 
   -- If there are inputs on which we need to perform a pattern-match,
       -- create a pattern-match expr which only returns the checker body
