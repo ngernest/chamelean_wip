@@ -9,44 +9,57 @@ Our design is heavily inspired by [Coq/Rocq's QuickChick](https://github.com/Qui
 - [Computing Correctly with Inductive Relations (PLDI 2022)](https://lemonidas.github.io/pdf/ComputingCorrectly.pdf)
 - [Generating Good Generators for Inductive Relations (POPL 2018)](https://lemonidas.github.io/pdf/GeneratingGoodGenerators.pdf)
 
-
 ## Overview
-Like QuickChick & [Haskell QuickCheck](https://hackage.haskell.org/package/QuickCheck), we provide the following typeclasses for random generation:
-- `Arbitrary`: random generators for inhabitants of algebraic data types
-- `ArbitrarySuchThat`: generators which only produce random values that satisfy a user-supplied inductive relation
+Like QuickChick, we provide the following typeclasses:
+- `Arbitrary`: unconstrained random generators for inhabitants of algebraic data types
+- `ArbitrarySuchThat`: constrained generators which only produce random values that satisfy a user-supplied inductive relation
 - `ArbitrarySized`, `ArbitrarySizedSuchThat`: versions of the two typeclasses above where the generator's size parameter is made explicit 
+- `Enum, EnumSuchThat, EnumSized, EnumSizedSuchThat`: Like their `Arbitrary` counterparts but for deterministic enumerators instead
+- `DecOpt`: Checkers (partial decision procedures that return `Option Bool`) for inductive propositions
 
-We provide two top-level commands which automatically derive generators for Lean `inductive`s:
+We provide various top-level commands which automatically derive generators for Lean `inductive`s:
 
-**1. Deriving unconstrained generators**              
-An *unconstrained* generator produces random inhabitants of an algebraic data type. 
-We provide two frontends which derive instances of `Arbitrary` & `ArbitrarySuchThat` respectively: 
+**1. Deriving unconstrained generators/enumerators**              
+An *unconstrained* generator produces random inhabitants of an algebraic data type, while an unconstrained enumerator *enumerates* (deterministically) said inhabitants. 
 
-**1a. Deriving Instance** (for algebraic data types)              
-Users can write `deriving Arbitrary` after an inductive type definition:
+We provide two frontends which derive instances of `Arbitrary` & `ArbitrarySuchThat` (resp. `Enum` & `EnumSuchThat`) respectively: 
 
+**1a. Deriving Instances** (for algebraic data types)              
+Users can write `deriving Arbitrary` and/or `deriving Enum` after an inductive type definition, i.e.
 ```lean 
-inductive Tree where
+inductive Foo where
   ...
-  deriving Arbitrary 
+  deriving Arbitrary
 ```
+or 
+```lean 
+inductive Foo where 
+  ...
+  deriving Foo
+```
+Alternatively, users can also write `deriving instance Arbitrary for T1, ..., Tn` or `deriving instance Enum for T1, ...` as a top-level command to derive `Arbitrary` / `Enum` instances for types `T1, ..., Tn` simultaneously.
 
-Alternatively, users can also write `deriving instance Arbitrary for T1, ..., Tn` as a top-level command 
-to derive `Arbitrary` instances for types `T1, ..., Tn` simultaneously.
-
-**1b. Command Elaborator**            
-We provide a command elaborator which elaborates the `#derive_arbitrary` command: 
+**1b. Command Elaborators**            
+We provide command elaborators which elaborate the `#derive_arbitrary` & `#derive_enum` commands respectively: 
 
 ```lean
 -- `#derive_arbitrary` derives an instance of `Arbitrary` for the `Tree` datatype
 #derive_arbitrary Tree  
+
+-- `#derive_enum` derives an instance of `Enum` for the `Tree` datatype
+#derive_enum Tree
 ```
 
-Regardless of which frontend is used, to sample from the derived generator, users can simply call `runArbitrary` and specify some 
-`Nat` to act as the generator's size parameter (`10` in the example below):
+To sample from a derived generator, users can simply call `runArbitrary`, specify the type 
+for the desired generated values and provide some `Nat` to act as the generator's size parameter (`10` in the example below):
 
 ```lean
 #eval runArbitrary (α := Tree) 10
+```
+
+Similarly, to return the elements produced form a derived enumerator, users can call `runEnum` like so:
+```lean
+#eval runEnum (α := Tree) 10
 ```
 
 **2. Deriving constrained generators** (for inductive relations)                
@@ -64,6 +77,18 @@ instance of the `ArbitrarySizedSuchThat` typeclass (along with some `Nat` to act
 
 ```lean
 #eval runSizedGen (ArbitrarySizedSuchThat.arbitrarySizedST (fun t => balanced 5 t)) 10
+```
+
+**3. Deriving checkers (partial decision procedures)** (for inductively-defined propositions)
+A checker for an inductively-defined `Prop` is a `Nat -> Option Bool` function, which 
+takes a `Nat` argument as fuel and returns `none` if it can't decide whether the `Prop` holds (e.g. it runs out of fuel),
+and otherwise returns `some true/some false` depending on whether the `Prop` holds.
+
+We provide a command elaborator which elaborates the `#derive_checker` command:
+
+```lean
+-- `#derive_checker` derives a checker which determines whether `Tree`s `t` satisfy the `balanced` inductive proposition mentioned above 
+#derive_checker (balanced n t)
 ```
 
 ## Repo overview
