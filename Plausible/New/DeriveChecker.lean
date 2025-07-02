@@ -102,8 +102,8 @@ def elabDeriveChecker : CommandElab := fun stx => do
     let baseCheckerInfos := Array.filter (fun checker => checker.checkerSort == .BaseChecker) allSubCheckerInfos
     let inductiveCheckerInfos := allSubCheckerInfos
 
-    let baseCheckers ← liftTermElabM $ mkSubCheckers baseCheckerInfos
-    let inductiveCheckers ← liftTermElabM $ mkSubCheckers inductiveCheckerInfos
+    let baseCheckers ← liftTermElabM $ mkThunkedSubCheckers baseCheckerInfos
+    let inductiveCheckers ← liftTermElabM $ mkThunkedSubCheckers inductiveCheckerInfos
 
     -- Produce an instance of the `DecOpt` typeclass
     let typeclassInstance ← mkTopLevelChecker baseCheckers inductiveCheckers inductiveName args

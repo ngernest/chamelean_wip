@@ -100,8 +100,11 @@ def mkSubChecker (subChecker : SubCheckerInfo) : TermElabM (TSyntax `term) := do
     return checkerBody
 
 /-- Takes an array of `SubCheckerInfo`s and creates a Lean term representing a
-    list of derived sub-checkers -/
-def mkSubCheckers (subCheckers : Array SubCheckerInfo) : TermElabM (TSyntax `term) := do
-  -- TODO: need to make each of the `subCheckerTerm`s below thunked
-  let subCheckerTerms ← Array.mapM mkSubChecker subCheckers
-  `([$subCheckerTerms,*])
+    list of thunked derived sub-checkers -/
+def mkThunkedSubCheckers (subCheckerInfos : Array SubCheckerInfo) : TermElabM (TSyntax `term) := do
+  let mut thunkedSubCheckers := #[]
+  for subChecker in subCheckerInfos do
+    let subCheckerBody ← mkSubChecker subChecker
+    thunkedSubCheckers := thunkedSubCheckers.push (← `(fun _ => $subCheckerBody))
+
+  `([$thunkedSubCheckers,*])
