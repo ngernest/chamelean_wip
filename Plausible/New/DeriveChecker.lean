@@ -3,6 +3,7 @@ import Plausible.IR.Prelude
 import Plausible.New.DeriveGenerator
 import Plausible.New.SubCheckers
 import Plausible.New.Idents
+import Plausible.New.DecOpt
 
 open Lean Elab Command Meta Term Parser
 open Idents
@@ -64,7 +65,7 @@ def mkTopLevelChecker (baseCheckers : TSyntax `term) (inductiveCheckers : TSynta
     innerParams := innerParams.push innerParam
 
   -- Produces an instance of the `DecOpt` typeclass containing the definition for the derived generator
-  `(instance : $decOptTypeclass (inductiveStx $args*) where
+  `(instance : $decOptTypeclass ($inductiveStx $args*) where
       $unqualifiedDecOptFn:ident :=
         let rec $auxDecIdent:ident $innerParams* : $checkerType :=
           $matchExpr
@@ -101,15 +102,29 @@ def elabDeriveChecker : CommandElab := fun stx => do
     let baseCheckerInfos := Array.filter (fun checker => checker.checkerSort == .BaseChecker) allSubCheckerInfos
     let inductiveCheckerInfos := allSubCheckerInfos
 
-    let baseCheckers ← Array.mapM (fun chk => liftTermElabM $ mkSubChecker chk) baseCheckerInfos
-    let inductiveCheckers ← Array.mapM (fun chk => liftTermElabM $ mkSubChecker chk) inductiveCheckerInfos
+    let baseCheckers ← liftTermElabM $ mkSubCheckers baseCheckerInfos
+    let inductiveCheckers ← liftTermElabM $ mkSubCheckers inductiveCheckerInfos
+
+    -- Produce an instance of the `DecOpt` typeclass
+    let typeclassInstance ← mkTopLevelChecker baseCheckers inductiveCheckers inductiveName args
+
+    -- Pretty-print the derived checker
+    let genFormat ← liftCoreM (PrettyPrinter.ppCommand typeclassInstance)
+
+    -- Display the code for the derived checker to the user
+    -- & prompt the user to accept it in the VS Code side panel
+    liftTermElabM $ Tactic.TryThis.addSuggestion stx
+      (Format.pretty genFormat) (header := "Try this generator: ")
+
+    -- Elaborate the typeclass instance and add it to the local context
+    elabCommand typeclassInstance
 
   | _ => throwUnsupportedSyntax
 
 -- TODO: see if we can implement a deriving handler to support
 -- `deriving instance DecOpt for (bst lo hi t)` syntax
 
-#derive_checker (bst lo hi t)
+-- #derive_checker (bst lo hi t)
 -- #derive_checker (balanced n t)
 -- #derive_checker (lookup Γ x τ)
 -- #derive_checker (typing Γ e τ)
