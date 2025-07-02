@@ -4,7 +4,7 @@
 
 /-- The `DecOpt` class encodes partial decidability:
      - It takes a `nat` argument as fuel
-     - It returns `none`, if it can't decide.
+     - It returns `none`, if it can't decide (e.g. because it runs out of fuel)
      - It returns `some true/some false` if it can.
      - These are supposed to be monotonic, in the
        sense that if they ever return `some b` for
