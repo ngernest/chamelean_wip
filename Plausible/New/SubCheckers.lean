@@ -8,6 +8,21 @@ open Plausible.IR
 open Idents
 open Lean Elab Command Meta Term Parser Std
 
+
+/-- The `CheckerStyle` datatype describes the "style" in which a style should be invoked:
+    - `RecursiveCall` indicates that we should recursively call the current checker function
+    - `TypeClassResolution` indicates that we should call the generator via typeclass resolution
+      (i.e. call the checker provided by the `DecOpt` instance for the proposition) -/
+inductive CheckerStyle
+  | RecursiveCall
+  | TypeClassResolution
+  deriving Repr
+
+-- TODO: Checker equivalent of `genInputForInductive` in `SubGenerators.lean`
+def mkAuxiliaryCheckerCall (hyp : Expr) (checkerStyle : CheckerStyle) : TermElabM (TSyntax `term) :=
+  sorry
+
+
 /-- Constructs terms which constitute calls to checkers corresponding
     to the hypotheses in `inductiveHypothesesToCheck`
     (these are either recursive calls to the current checker function, or invocations of
@@ -17,14 +32,20 @@ open Lean Elab Command Meta Term Parser Std
 def mkSubCheckerBody (inductiveHypothesesToCheck : Array Action) (ctor : InductiveConstructor) : TermElabM (TSyntax `term) :=
   if inductiveHypothesesToCheck.isEmpty then
     `($someFn:ident $trueIdent:ident)
-  else
-    -- for hypothesis in inductiveHypothesesToCheck do
-    --   if let .checkInductive hyp := hypothesis then
-    --     if hypothesisRecursivelyCallsCurrentInductive hyp _ then
-    --       sorry
+  else do
+    let mut checkerExprs := #[]
+    for hypothesis in inductiveHypothesesToCheck do
+      match hypothesis with
+      | .checkInductive hyp =>
+        -- Check if the hypothesis mentions the current inductive relation
+        -- If yes, perform a recursive call to the parent checker
+        -- Otherwise, perform typeclass resolution & invoke the checker provided by the `DecOpt` instance for the proposition
+        let checkerStyle := if hypothesisRecursivelyCallsCurrentInductive hyp ctor then CheckerStyle.RecursiveCall else .TypeClassResolution
+        let checkerCall ← mkAuxiliaryCheckerCall hyp checkerStyle
+        checkerExprs := checkerExprs.push checkerCall
+      | .(_) => throwError "Unreachable pattern match"
 
-
-    -- TODO: fill in the list with sub-checker calls
+    -- TODO: populate the list with sub-checker calls
     -- ^^ loop through `inductiveHypothesesToCheck` and use `hypothesisRecursivelyCallsCurrentInductive` to determine if
     -- checker call should be recursive or performed via typeclass resolution
     `($andOptListFn:ident [])
