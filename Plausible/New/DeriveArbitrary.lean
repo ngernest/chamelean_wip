@@ -41,7 +41,7 @@ def getCtorArgsNamesAndTypes (ctorName : Name) : MetaM (Array (Name × Expr)) :=
 
     return argNamesAndTypes
 
-/-- Creates an instance of the `ArbitrarySized` typeclass for an inductive type
+/-- Produces an instance of the `ArbitrarySized` typeclass for an inductive type
     whose name is given by `targetTypeName`.
 
     (Note: the main logic for determining the structure of the derived generator
