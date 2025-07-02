@@ -11,7 +11,7 @@ Our design is heavily inspired by [Coq/Rocq's QuickChick](https://github.com/Qui
 
 
 ## Overview
-Like QuickChick & [Haskell QuickChick](https://hackage.haskell.org/package/QuickCheck), we provide the following typeclasses for random generation:
+Like QuickChick & [Haskell QuickCheck](https://hackage.haskell.org/package/QuickCheck), we provide the following typeclasses for random generation:
 - `Arbitrary`: random generators for inhabitants of algebraic data types
 - `ArbitrarySuchThat`: generators which only produce random values that satisfy a user-supplied inductive relation
 - `ArbitrarySized`, `ArbitrarySizedSuchThat`: versions of the two typeclasses above where the generator's size parameter is made explicit 
