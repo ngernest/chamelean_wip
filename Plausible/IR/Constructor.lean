@@ -100,15 +100,25 @@ structure HandlerInfo where
     that is invoked from the main generator function
     - Note: this type was previously called `BacktrackElem` -/
 structure SubGeneratorInfo extends HandlerInfo where
-  /-- `generatorSort` determines if the generator is a base generator
-      or is inductively defined -/
+  /-- `generatorSort` determines if the sub-generator is to be invoked
+       when `size == 0` (i.e. it is a `BaseGenerator`), or if it is to be invoked
+       when `size > 0` (i.e. the sub-generator is inductively defined and makes
+       recursive calls) -/
   generatorSort : GeneratorSort
   deriving Repr
 
 /-- Datatype containing metadata needed to derive a sub-checker
     that is invoked from the main checker function -/
 structure SubCheckerInfo extends HandlerInfo where
+  /-- `checkerSort` determines if the sub-generator is to be invoked
+      when `size == 0` (i.e. it is a `BaseChecker`), or if it is to be invoked
+      when `size > 0` (i.e. the sub-checker is inductively defined and makes
+      recursive calls) -/
   checkerSort : CheckerSort
+
+  /-- The constructor of an inductive relation corresponding to this sub-checker -/
+  ctor : InductiveConstructor
+
   deriving Repr
 
 -- Pretty print using the `MessageData` typeclass
@@ -176,8 +186,7 @@ def mkGroupedActions (gccs: Array Action) : MetaM GroupedActions := do
 
 /-- Takes a constructor for an inductive relation and a list of argument names,
     and returns a corresponding `SubCheckerInfo` for a checker -/
-def mkSubCheckerInfoFromConstructor (ctor : InductiveConstructor)
-  (inputNames : Array String) : MetaM SubCheckerInfo := do
+def mkSubCheckerInfoFromConstructor (ctor : InductiveConstructor) (inputNames : Array String) : MetaM SubCheckerInfo := do
   let conclusion ← separateFVars ctor.conclusion
   let args := conclusion.newHypothesis.getAppArgs
   let inputNamesAndArgs := inputNames.zip args
@@ -187,6 +196,7 @@ def mkSubCheckerInfoFromConstructor (ctor : InductiveConstructor)
   let groupedActions ← mkGroupedActions actions
   let checkerSort := if ctor.recursive_hypotheses.isEmpty then .BaseChecker else .InductiveChecker
   return {
+    ctor := ctor
     inputs := inputNames
     inputsToMatch := inputsToMatch
     matchCases := matchCases
