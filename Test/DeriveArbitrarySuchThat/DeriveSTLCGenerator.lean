@@ -8,6 +8,8 @@ open ArbitrarySizedSuchThat OptionTGen
 
 set_option guard_msgs.diff true
 
+-- TODO: investigate why `τ'` and not `τ` is appearing as the head of the list in the final pattern-match
+
 /--
 info: Try this generator: instance : ArbitrarySizedSuchThat Nat (fun x => lookup Γ x τ) where
   arbitrarySizedST :=
