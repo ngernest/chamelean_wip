@@ -7,6 +7,7 @@ import Plausible.New.Arbitrary
 import Plausible.New.ArbitrarySizedSuchThat
 import Plausible.New.EnumeratorCombinators
 import Plausible.New.DeriveEnum
+import Plausible.New.DeriveChecker
 import Plausible.New.STLC
 
 import Lean
@@ -55,7 +56,6 @@ inductive MyListAnon where
 -- #derive_arbitrary Value
 
 -- #eval runArbitrary (α := MyList) 10
-
 
 
 /- Example usage:
