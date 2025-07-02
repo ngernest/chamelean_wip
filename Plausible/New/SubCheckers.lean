@@ -93,9 +93,7 @@ def mkSubChecker (subChecker : SubCheckerInfo) : TermElabM (TSyntax `term) := do
     cases := cases.push catchAllCase
 
     -- Create a pattern match that simultaneously matches on all the scrutinees
-    let matchExpr ← mkSimultaneousMatch scrutinees cases
-    logInfo m!"{matchExpr}"
-    return matchExpr
+    mkSimultaneousMatch scrutinees cases
   else
     return checkerBody
 
