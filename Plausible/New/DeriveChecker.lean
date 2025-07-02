@@ -128,9 +128,3 @@ def elabDeriveChecker : CommandElab := fun stx => do
     elabCommand typeclassInstance
 
   | _ => throwUnsupportedSyntax
-
-
--- #derive_checker (bst lo hi t)
--- #derive_checker (balanced n t)
--- #derive_checker (lookup Γ x τ)
--- #derive_checker (typing Γ e τ)
