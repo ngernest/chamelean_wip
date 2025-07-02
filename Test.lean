@@ -6,7 +6,7 @@ Authors: Henrik Böving
 -- import Test.Tactic
 -- import Test.Testable
 
--- Tests for `#derive_generator` (`derives ArbitrarySuchThat`)
+-- Tests for `#derive_generator` (derives `ArbitrarySuchThat`)
 import Test.DeriveArbitrarySuchThat.DeriveBSTGenerator
 import Test.DeriveArbitrarySuchThat.DeriveBalancedTreeGenerator
 import Test.DeriveArbitrarySuchThat.DeriveRegExpMatchGenerator
@@ -34,3 +34,11 @@ import Test.DeriveEnum.DeriveNKIBinopEnumerator
 import Test.DeriveEnum.DeriveRegExpEnumerator
 import Test.DeriveEnum.StructureTest
 import Test.DeriveEnum.BitVecStructureTest
+
+-- Tests for `#derive_checker` (derives `DecOpt`)
+import Test.DeriveDecOpt.DeriveBSTChecker
+import Test.DeriveDecOpt.DeriveBalancedTreeChecker
+import Test.DeriveDecOpt.DeriveRegExpMatchChecker
+import Test.DeriveDecOpt.NonLinearPatternsTest
+import Test.DeriveDecOpt.SimultaneousMatchingTests
+import Test.DeriveDecOpt.DeriveSTLCChecker

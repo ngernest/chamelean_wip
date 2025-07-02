@@ -1,6 +1,7 @@
 import Plausible.IR.Examples
 import Plausible.New.OptionTGen
 import Plausible.New.ArbitrarySizedSuchThat
+import Plausible.New.DecOpt
 
 import Plausible.Gen
 open Plausible
@@ -101,3 +102,84 @@ def tempSize := 10
 #eval runSizedGen (arbitrarySizedST (fun t => balanced 5 t)) tempSize
 ```
 -/
+
+
+/-- Handwritten `DecOpt` instance for the proposition `bst lo hi t` -/
+instance : DecOpt (bst lo hi t) where
+  decOpt :=
+    let rec aux_arb (initSize : Nat) (size : Nat) (lo_0 : Nat) (hi_0 : Nat) (t_0 : Tree) : Option Bool :=
+      match size with
+      | .zero =>
+        DecOpt.checkerBacktrack [
+          fun _ =>
+            match t_0 with
+            | .Leaf => some true
+            | .Node _ _ _ => some false,
+          fun _ => none
+        ]
+      | .succ size' =>
+        DecOpt.checkerBacktrack [
+          fun _ =>
+            match t_0 with
+            | .Leaf => some true
+            | .Node _ _ _ => some false,
+          fun _ =>
+            match t_0 with
+            | .Leaf => some false
+            | .Node x l r =>
+              DecOpt.andOptList [
+                DecOpt.decOpt (lo_0 < x && x < hi_0) initSize,
+                aux_arb initSize size' lo_0 x l,
+                aux_arb initSize size' x hi_0 r
+              ]
+        ]
+    fun size => aux_arb size size lo hi t
+
+/-- Handwritten `DecOpt` instance for the proposition `balanced n t` -/
+instance : DecOpt (balanced n t) where
+  decOpt :=
+    let rec aux_arb (initSize : Nat) (size : Nat) (n_0 : Nat) (t_0 : Tree) : Option Bool :=
+      match size with
+      | .zero =>
+        DecOpt.checkerBacktrack [
+          (fun _ =>
+            match t_0 with
+            | .Leaf => match n_0 with
+                      | 0 => some true
+                      | _ => some false
+            | _ => some false),
+          (fun _ =>
+            match t_0 with
+            | .Leaf => match n_0 with
+                      | 1 => some true
+                      | _ => some false
+            | _ => some false),
+          (fun _ => none)
+        ]
+      | .succ size' =>
+        DecOpt.checkerBacktrack [
+          (fun _ =>
+            match t_0 with
+            | .Leaf => match n_0 with
+                      | 0 => some true
+                      | _ => some false
+            | _ => some false),
+          (fun _ =>
+            match t_0 with
+            | .Leaf => match n_0 with
+                      | 1 => some true
+                      | _ => some false
+            | _ => some false),
+          (fun _ =>
+            match t_0 with
+            | .Leaf => some false
+            | .Node _ l r =>
+              match n_0 with
+              | .succ n =>
+                DecOpt.andOptList [
+                  aux_arb initSize size' n l,
+                  aux_arb initSize size' n r
+                ]
+              | _ => some false)
+        ]
+    fun size => aux_arb size size n t

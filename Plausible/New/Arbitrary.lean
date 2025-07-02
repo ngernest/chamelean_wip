@@ -35,7 +35,7 @@ instance [SampleableExt α] : Arbitrary α where
   arbitrary := SampleableExt.interp <$> SampleableExt.sample
 
 /-- Samples from the generator associated with the `Arbitrary` instance for a type,
-    using `size` as the size parameter for the genreator.
+    using `size` as the size parameter for the generator.
     To invoke this function, you will need to specify what type `α` is,
     for example by doing `runArbitrary (α := Nat) 10`. -/
 def runArbitrary {α} [Arbitrary α] (size : Nat) : IO α :=

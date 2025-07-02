@@ -60,10 +60,19 @@ inductive GeneratorSort where
   | InductiveGenerator
   deriving Repr, BEq
 
-/-- Datatype containing metadata needed to derive a sub-generator
-    that is invoked from the main generator function
-    - Note: this type was previously called `BacktrackElem` -/
-structure SubGeneratorInfo where
+/-- Determines whether a checker is to be invoked during the base case when `size == 0` (`BaseChecker`),
+    or if it is inductively-defined (`InductiveChecker`) and to be invoked when `size > 0`
+    - We define `CheckerSort` as a separate datatype to avoid confusing it with `GeneratorSort` -/
+inductive CheckerSort where
+  | BaseChecker
+  | InductiveChecker
+  deriving Repr, BEq
+
+/-- Datatype containing metadata needed to derive a handler
+    (handlers are a generalization of sub-generators/sub-checkers)
+    - See the `SubGeneratorInfo` & `SubCheckerInfo` types, which extend this type
+      with extra fields -/
+structure HandlerInfo where
   /-- Argument names for each sub-generator / sub-checker -/
   inputs : Array String
 
@@ -85,30 +94,61 @@ structure SubGeneratorInfo where
   /-- A list of equalities that must hold between free variables
       (used when rewriting free variabels in patterns) -/
   variableEqualities : Array (FVarId × FVarId)
+  deriving Repr
 
-  /-- `generatorSort` determines if the generator is a base generator
-      or is inductively defined -/
+/-- Datatype containing metadata needed to derive a sub-generator
+    that is invoked from the main generator function
+    - Note: this type was previously called `BacktrackElem` -/
+structure SubGeneratorInfo extends HandlerInfo where
+  /-- `generatorSort` determines if the sub-generator is to be invoked
+       when `size == 0` (i.e. it is a `BaseGenerator`), or if it is to be invoked
+       when `size > 0` (i.e. the sub-generator is inductively defined and makes
+       recursive calls) -/
   generatorSort : GeneratorSort
-
   deriving Repr
 
 /-- Datatype containing metadata needed to derive a sub-checker
-    that is invoked from the main checker function
-    - `SubCheckerInfo` is an alias for `SubGeneratorInfo`
-      (we create two separate types to distinguish functions that handle checker/producers) -/
-abbrev SubCheckerInfo := SubGeneratorInfo
+    that is invoked from the main checker function -/
+structure SubCheckerInfo extends HandlerInfo where
+  /-- `checkerSort` determines if the sub-generator is to be invoked
+      when `size == 0` (i.e. it is a `BaseChecker`), or if it is to be invoked
+      when `size > 0` (i.e. the sub-checker is inductively defined and makes
+      recursive calls) -/
+  checkerSort : CheckerSort
+
+  /-- The constructor of an inductive relation corresponding to this sub-checker -/
+  ctor : InductiveConstructor
+
+  deriving Repr
 
 -- Pretty print using the `MessageData` typeclass
-instance : ToMessageData SubGeneratorInfo where
-  toMessageData backtrackElem : MessageData :=
+instance : ToMessageData HandlerInfo where
+  toMessageData handlerInfo : MessageData :=
     let fields := [
-      m!"inputs := {toMessageData backtrackElem.inputs}",
-      m!"inputsToMatch := {toMessageData backtrackElem.inputsToMatch}",
-      m!"matchCases := {indentD $ toMessageData backtrackElem.matchCases}",
-      m!"actions := {indentD $ toMessageData backtrackElem.groupedActions}",
-      m!"variableEqualities := {repr backtrackElem.variableEqualities}",
+      m!"inputs := {toMessageData handlerInfo.inputs}",
+      m!"inputsToMatch := {toMessageData handlerInfo.inputsToMatch}",
+      m!"matchCases := {indentD $ toMessageData handlerInfo.matchCases}",
+      m!"actions := {indentD $ toMessageData handlerInfo.groupedActions}",
+      m!"variableEqualities := {repr handlerInfo.variableEqualities}",
     ]
     .bracket "{" (.ofList fields) "}"
+
+
+-- Pretty printer for `SubGeneratorInfo`
+instance : ToMessageData SubGeneratorInfo where
+  toMessageData subGen : MessageData :=
+    .joinSep [
+      toMessageData subGen.toHandlerInfo,
+      m!"generatorSort := {repr subGen.generatorSort}"
+    ] "¬"
+
+-- Pretty printer for `SubCheckerInfo`
+instance : ToMessageData SubCheckerInfo where
+  toMessageData subChecker : MessageData :=
+    .joinSep [
+      toMessageData subChecker.toHandlerInfo,
+      m!"checkerSort := {repr subChecker.checkerSort}"
+    ] "\n"
 
 
 /-- Converts an array of `Action`s into a `GroupedActions` -/
@@ -144,25 +184,25 @@ def mkGroupedActions (gccs: Array Action) : MetaM GroupedActions := do
     variableEqualities := variableEqualities
   }
 
-/-- Takes a constructor for an inductive relation, a list of argument names, the index of the argument we wish to generate (`genpos`),
+/-- Takes a constructor for an inductive relation and a list of argument names,
     and returns a corresponding `SubCheckerInfo` for a checker -/
-def mkSubCheckerInfoFromConstructor (ctor : InductiveConstructor)
-  (inputNames : Array String) : MetaM SubCheckerInfo := do
+def mkSubCheckerInfoFromConstructor (ctor : InductiveConstructor) (inputNames : Array String) : MetaM SubCheckerInfo := do
   let conclusion ← separateFVars ctor.conclusion
-  let args := (conclusion.newHypothesis.getAppArgs)
+  let args := conclusion.newHypothesis.getAppArgs
   let inputNamesAndArgs := inputNames.zip args
   let inputPairsThatNeedMatching := inputNamesAndArgs.filter (fun (_, arg) => !arg.isFVar)
   let (inputsToMatch, matchCases) := inputPairsThatNeedMatching.unzip
   let actions ← Actions_for_checker ctor
   let groupedActions ← mkGroupedActions actions
-  let generatorSort := if ctor.recursive_hypotheses.isEmpty then .BaseGenerator else .InductiveGenerator
+  let checkerSort := if ctor.recursive_hypotheses.isEmpty then .BaseChecker else .InductiveChecker
   return {
+    ctor := ctor
     inputs := inputNames
     inputsToMatch := inputsToMatch
     matchCases := matchCases
     groupedActions := groupedActions
     variableEqualities := conclusion.variableEqualities ++ groupedActions.variableEqualities
-    generatorSort := generatorSort
+    checkerSort := checkerSort
   }
 
 -- The functions below create strings containing Lean code based on the information
@@ -209,7 +249,7 @@ def actionToCode (Action : Action) (monad: String := "IO") : MetaM String := do
 
 /-- Produces the outer-most pattern-match block in a sub-generator
     based on the info in a `BacktrackElem` -/
-def backtrackElem_match_block (backtrackElem : SubGeneratorInfo) : MetaM String := do
+def backtrackElem_match_block (backtrackElem : HandlerInfo) : MetaM String := do
   let mut out := ""
   if backtrackElem.inputsToMatch.size > 0 then
     out := out ++ "match "
@@ -226,7 +266,7 @@ def backtrackElem_match_block (backtrackElem : SubGeneratorInfo) : MetaM String 
   - `iden` (indentation) is a string containing whitespace to make the indentation right
   - Note: this subsumes both `gen_IR` and `gen_nonIR`
 -/
-def backtrackElem_gen_block (backtrackElem : SubGeneratorInfo) (monad: String :="IO"): MetaM (String × String) := do
+def backtrackElem_gen_block (backtrackElem : HandlerInfo) (monad: String :="IO"): MetaM (String × String) := do
   let mut out := ""
   let mut indentation := ""
   for action in backtrackElem.groupedActions.gen_list do
@@ -245,7 +285,7 @@ def backtrackElem_gen_block (backtrackElem : SubGeneratorInfo) (monad: String :=
     let check1 <- check bst lo x
     ```
  -/
-def backtrackElem_gen_check_IR_block (backtrackElem : SubGeneratorInfo) (indentation : String) (monad: String :="IO"): MetaM (String × (List String)) := do
+def backtrackElem_gen_check_IR_block (backtrackElem : HandlerInfo) (indentation : String) (monad: String :="IO"): MetaM (String × (List String)) := do
   let mut out := ""
   let mut vars : List String := []
   let mut checkcount := 1
@@ -257,7 +297,7 @@ def backtrackElem_gen_check_IR_block (backtrackElem : SubGeneratorInfo) (indenta
     out := ⟨out.data.dropLast.dropLast⟩
   return (out, vars)
 
-def backtrackElem_return_checker (backtrackElem : SubGeneratorInfo) (indentation : String) (vars : List String) (monad: String :="IO"): MetaM String := do
+def backtrackElem_return_checker (backtrackElem : HandlerInfo) (indentation : String) (vars : List String) (monad: String :="IO"): MetaM String := do
   let mut out := ""
   if backtrackElem.variableEqualities.size + backtrackElem.groupedActions.checkNonInductiveActions.size + backtrackElem.groupedActions.checkInductiveActions.size > 0 then
     out := out ++ indentation ++ "return "
@@ -279,16 +319,18 @@ def backtrackElem_return_checker (backtrackElem : SubGeneratorInfo) (indentation
 
 /-- Assembles all the components of a sub-checker (a `BacktrackElem`) together, returning a string
     containing the Lean code for the sub-checker -/
-def backtrack_elem_toString_checker (backtrackElem: SubGeneratorInfo) (monad: String :="IO") : MetaM String := do
+def backtrack_elem_toString_checker (subChecker: SubCheckerInfo) (monad: String :="IO") : MetaM String := do
+  let handlerInfo := subChecker.toHandlerInfo
+
   IO.println "********************"
   IO.println s!"entered `backtrack_elem_toString_checker`:"
-  IO.println (← MessageData.toString (toMessageData backtrackElem))
+  IO.println (← MessageData.toString (toMessageData handlerInfo))
 
   let mut out := ""
-  let matchblock ← backtrackElem_match_block backtrackElem
-  let (genblock, iden) ← backtrackElem_gen_block backtrackElem monad
-  let (checkIRblock, vars) ← backtrackElem_gen_check_IR_block backtrackElem iden monad
-  let returnblock ← backtrackElem_return_checker backtrackElem iden vars monad
+  let matchblock ← backtrackElem_match_block handlerInfo
+  let (genblock, iden) ← backtrackElem_gen_block handlerInfo monad
+  let (checkIRblock, vars) ← backtrackElem_gen_check_IR_block handlerInfo iden monad
+  let returnblock ← backtrackElem_return_checker handlerInfo iden vars monad
   out := out ++ matchblock
   if genblock.length > 0 ∧ out.length > 0 then
     out := out ++ "\n"
@@ -413,12 +455,14 @@ def backtrackElem_if_return_producer (subGeneratorInfo : SubGeneratorInfo) (inde
 
 /-- Assembles all the components of a sub-generator (a `BacktrackElem`) together, returning a string
     containing the Lean code for the sub-generator -/
-def subGeneratorInfoToString (subGeneratorInfo : SubGeneratorInfo) (monad: String :="IO"): MetaM String := do
+def subGeneratorInfoToString (subGen : SubGeneratorInfo) (monad: String :="IO"): MetaM String := do
+  let handlerInfo := subGen.toHandlerInfo
+
   let mut out := ""
-  let matchblock ← backtrackElem_match_block subGeneratorInfo
-  let (genblock, iden) ← backtrackElem_gen_block subGeneratorInfo monad
-  let (checkIRblock, vars) ← backtrackElem_gen_check_IR_block subGeneratorInfo iden monad
-  let returnblock ← backtrackElem_if_return_producer subGeneratorInfo iden vars monad
+  let matchblock ← backtrackElem_match_block handlerInfo
+  let (genblock, iden) ← backtrackElem_gen_block handlerInfo monad
+  let (checkIRblock, vars) ← backtrackElem_gen_check_IR_block handlerInfo iden monad
+  let returnblock ← backtrackElem_if_return_producer subGen iden vars monad
   out := out ++ matchblock
   if genblock.length + checkIRblock.length + returnblock.length > 0 ∧ out.length > 0 then
     out := out ++ "\n"

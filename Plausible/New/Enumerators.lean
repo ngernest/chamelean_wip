@@ -72,6 +72,14 @@ instance [EnumSized α] : Enum α where
 instance [EnumSizedSuchThat α P] : EnumSuchThat α P where
   enumST := sizedEnum (EnumSizedSuchThat.enumSizedST P)
 
+/-- Returns the list of elements produced by the enumerator
+    associated with the `Enum` instance for a type,
+    using `size` as the size parameter for the enumerator.
+    To invoke this function, you will need to specify what type `α` is,
+    for example by doing `runEnum (α := Nat) 10`. -/
+def runEnum [Enum α] (size : Nat) : IO (List α) :=
+  return (LazyList.toList $ Enum.enum size)
+
 -- Some simple `Enum` instances
 
 /-- `Enum` instance for `Bool` -/

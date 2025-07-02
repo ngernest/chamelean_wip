@@ -183,7 +183,8 @@ inductive Action where
   | checkInductive (hyp : Expr)
 
   /-- The hypothesis `hyp` is not an inductive relation, but a function that returns
-      `Prop`, so we invoke a checker that determines whether the `Prop` is true -/
+      `Prop`, so we invoke a checker that determines whether the `Prop` is true
+      (this checker is provided via the `DecOpt` instance for the `Prop`) -/
   | checkNonInductive (hyp : Expr)
 
   /-- Generate an input at the given position `pos` for an inductive relation
@@ -314,14 +315,12 @@ def Actions_for_hypotheses (ctor : InductiveConstructor) (fvars : Array FVarId) 
 
         let argToGenerate := hyp.getAppArgs[uninitializedArgIdx]!
 
-
         initializedFVars := Array.appendUniqueElements initializedFVars uninitializedFVars
 
         let generationStyle :=
           if hypothesisRecursivelyCallsCurrentInductive hyp ctor
           then .RecursiveCall
           else .TypeClassResolution
-
 
         if argToGenerate.isFVar then
           let fvarToGenerate := argToGenerate.fvarId!
@@ -434,10 +433,6 @@ def elabCheckerCall : CommandElab := fun stx => do
   | _ => throwError "Invalid syntax"
 
 
--- #get_checker_call typing
--- #get_checker_call balanced
--- #get_checker_call bst
-
 syntax (name := geGenCall) "#get_producer_call" term "for_arg" num : command
 
 @[command_elab geGenCall]
@@ -457,9 +452,5 @@ def elabGenCall : CommandElab := fun stx => do
           IO.println (← Actions_toRawCode Action)
   | _ => throwError "Invalid syntax"
 
-
--- #get_producer_call typing for_arg 2
--- #get_producer_call balanced for_arg 1
--- #get_producer_call bst for_arg 2
 
 end Plausible.IR

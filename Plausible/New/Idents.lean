@@ -14,9 +14,26 @@ def frequencyFn : Ident := mkIdent $ Name.mkStr2 "GeneratorCombinators" "frequen
 def oneOfWithDefaultGenCombinatorFn : Ident := mkIdent $ Name.mkStr2 "GeneratorCombinators" "oneOfWithDefault"
 def oneOfWithDefaultEnumCombinatorFn : Ident := mkIdent $ Name.mkStr2 "EnumeratorCombinators" "oneOfWithDefault"
 def interpSampleFn : Ident := mkIdent $ Name.mkStr3 "Plausible" "SampleableExt" "interpSample"
+
+/-- Ident for the inner `aux_arb` function that appears in derived generators -/
 def auxArbFn : Ident := mkIdent $ Name.mkStr1 "aux_arb"
+
+/-- Ident for the inner `aux_enum` function that appears in derived enumerators -/
 def auxEnumFn : Ident := mkIdent $ Name.mkStr1 "aux_enum"
+
+/-- Ident for the inner `aux_dec` function that appears in derived checkers -/
+def auxDecFn : Ident := mkIdent $ Name.mkStr1 "aux_dec"
+
+/-- Ident for the `DecOpt.andOptList` checker combinator (see `DecOpt.lean`) -/
+def andOptListFn : Ident := mkIdent $ Name.mkStr2 "DecOpt" "andOptList"
+
+/-- Ident for the `DecOpt.checkerBacktrack` checker combinator (see `DecOpt.lean`) -/
+def checkerBacktrackFn : Ident := mkIdent $ Name.mkStr2 "DecOpt" "checkerBacktrack"
+
 def pureFn : Ident := mkIdent $ Name.mkStr1 "pure"
+def someFn : Ident := mkIdent ``some
+def trueIdent : Ident := mkIdent ``true
+def falseIdent : Ident := mkIdent ``false
 
 -- Idents for size arguments to generators
 def initSizeIdent : Ident := mkIdent $ Name.mkStr1 "initSize"
@@ -29,6 +46,7 @@ def failFn : Ident := mkIdent $ Name.mkStr2 "OptionT" "fail"
 def arbitrarySizedSuchThatTypeclass : Ident := mkIdent $ Name.mkStr1 "ArbitrarySizedSuchThat"
 def arbitrarySizedTypeclass : Ident := mkIdent $ Name.mkStr1 "ArbitrarySized"
 def enumSizedTypeclass : Ident := mkIdent $ Name.mkStr1 "EnumSized"
+def decOptTypeclass : Ident := mkIdent $ Name.mkStr1 "DecOpt"
 
 -- Idents for typeclass functions
 def arbitraryFn : Ident := mkIdent $ Name.mkStr2 "Arbitrary" "arbitrary"
@@ -39,13 +57,16 @@ def unqualifiedEnumSizedFn : Ident := mkIdent $ Name.mkStr1 "enumSized"
 def arbitrarySTFn : Ident := mkIdent $ Name.mkStr2 "ArbitrarySuchThat" "arbitraryST"
 def unqualifiedArbitrarySizedSTFn : Ident := mkIdent $ Name.mkStr1 "arbitrarySizedST"
 def unqualifiedEnumSizedSTFn : Ident := mkIdent $ Name.mkStr1 "enumSizedST"
+def unqualifiedDecOptFn : Ident := mkIdent $ Name.mkStr1 "decOpt"
 def decOptFn : Ident := mkIdent $ Name.mkStr2 "DecOpt" "decOpt"
 
 
--- Idents for commonly-used types / constructors
+-- Idents for commonly-used types / constructors / type constructors
+def boolIdent : Ident := mkIdent ``Bool
 def natIdent : Ident := mkIdent ``Nat
 def zeroIdent : Ident := mkIdent ``Nat.zero
 def succIdent : Ident := mkIdent ``Nat.succ
+def optionTypeConstructor : Ident := mkIdent `Option
 def optionTTypeConstructor : Ident := mkIdent ``OptionT
 def genTypeConstructor : Ident := mkIdent ``Plausible.Gen
 def enumTypeConstructor : Ident := mkIdent $ Name.mkStr1 "Enumerator"

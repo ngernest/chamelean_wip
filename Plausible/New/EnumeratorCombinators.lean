@@ -61,7 +61,7 @@ def lazyListBacktrackOpt (l : LazyList (Option α)) (f : α → Option Bool) (an
       | .none => lazyListBacktrackOpt xs.get f true
     | .none => lazyListBacktrackOpt xs.get f true
 
-/-- Iterates through all the results of the enumerator `e`, applying the checker `f` to them
+/-- Iterates through all the results of the enumerator `e`, applies the checker `f` to them,
     and returns the resultant `Option Bool`
     - This corresponds to `bind_EC` in the Computing Correctly paper (section 4) -/
 def enumeratingOpt (e : OptionT Enumerator α) (f : α → Option Bool) (size : Nat) : Option Bool :=

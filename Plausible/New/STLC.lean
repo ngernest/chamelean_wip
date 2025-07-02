@@ -23,41 +23,29 @@ def checkLookup (Γ : List type) (x : Nat) (τ : type) : Nat → Option Bool :=
   let rec aux_arb (initSize : Nat) (size : Nat) (Γ : List type) (x : Nat) (τ : type) : Option Bool :=
     match size with
     | .zero =>
-      checkerBacktrack [
+      DecOpt.checkerBacktrack [
         (fun _ =>
           match x with
           | .zero =>
             match Γ with
             | [] => some false
-            | t :: _ =>
-              match DecOpt.decOpt (τ = t) initSize with
-              | some true => some true
-              | some false => some false
-              | none => none
+            | t :: _ => DecOpt.andOptList [DecOpt.decOpt (τ = t) initSize]
           | .succ _ => some false),
         fun _ => none
       ]
     | .succ size' =>
-      checkerBacktrack [
+      DecOpt.checkerBacktrack [
         (fun _ =>
           match Γ with
           | [] => some false
-          | t :: _ =>
-            match DecOpt.decOpt (τ = t) initSize with
-            | some true => some true
-            | some false => some false
-            | none => none),
+          | t :: _ => DecOpt.andOptList [DecOpt.decOpt (τ = t) initSize]),
         (fun _ =>
           match x with
           | .zero => some false
           | .succ x' =>
             match Γ with
             | [] => some false
-            | _ :: Γ' =>
-              match aux_arb initSize size' Γ' x' τ with
-              | some true => some true
-              | some false => some false
-              | none => none)
+            | _ :: Γ' => DecOpt.andOptList [aux_arb initSize size' Γ' x' τ])
       ]
   fun size => aux_arb size size Γ x τ
 
@@ -72,14 +60,10 @@ def checkTyping (Γ : List type) (e : term) (τ : type) : Nat → Option Bool :=
   let rec aux_arb (initSize : Nat) (size : Nat) (Γ : List type) (e : term) (τ : type) : Option Bool :=
     match size with
     | .zero =>
-      checkerBacktrack [
+      DecOpt.checkerBacktrack [
         fun _ =>
           match e with
-          | .Var x =>
-            match DecOpt.decOpt (lookup Γ x τ) initSize with
-            | some true => some true
-            | some false => some false
-            | none => none
+          | .Var x => DecOpt.andOptList [DecOpt.decOpt (lookup Γ x τ) initSize]
           | _ => some false,
         fun _ =>
           match τ with
@@ -91,15 +75,22 @@ def checkTyping (Γ : List type) (e : term) (τ : type) : Nat → Option Bool :=
         fun _ => none
       ]
     | .succ size' =>
-      checkerBacktrack [
+      DecOpt.checkerBacktrack [
         fun _ =>
           match e with
-          | .Var x =>
-            match DecOpt.decOpt (lookup Γ x τ) initSize with
-            | some true => some true
-            | some false => some false
-            | none => none
+          | .Var x => DecOpt.andOptList [DecOpt.decOpt (lookup Γ x τ) initSize]
           | _ => some false,
+        fun _ =>
+          match τ with
+          | .Nat =>
+            match e with
+            | .Add e1 e2 =>
+              DecOpt.andOptList [
+                aux_arb initSize size' Γ e1 .Nat,
+                aux_arb initSize size' Γ e2 .Nat
+              ]
+            | _ => some false
+          | _ => none,
         fun _ =>
           match τ with
           | .Nat =>
@@ -113,10 +104,10 @@ def checkTyping (Γ : List type) (e : term) (τ : type) : Nat → Option Bool :=
           | .Fun unkn_17_ τ2 =>
             match e with
             | .Abs τ1 e =>
-              match DecOpt.decOpt (τ1 = unkn_17_) initSize with
-              | some true => aux_arb initSize size' (τ1 :: Γ) e τ2
-              | some false => some false
-              | none => none
+              DecOpt.andOptList [
+                  DecOpt.decOpt (τ1 = unkn_17_) initSize,
+                  aux_arb initSize size' (τ1 :: Γ) e τ2
+              ]
             | _ => none,
         -- TODO: handle App case
       ]
