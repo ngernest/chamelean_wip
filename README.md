@@ -106,10 +106,13 @@ We provide a command elaborator which elaborates the `#derive_checker` command:
 
 **Metaprogramming infrastructure**:
 - [`TSyntaxCombinators.lean`](./Plausible/New/TSyntaxCombinators.lean): Combinators over `TSyntax` for creating monadic `do`-blocks & other Lean expressions via metaprogramming
-- [`DeriveArbitrary.lean`](./Plausible/New/DeriveArbitrary.lean): Metaprogramming infrastructure for deriving *unconstrained* generators (instances of the `ArbitrarySized` typeclass)
+- [`DeriveArbitrary.lean`](./Plausible/New/DeriveArbitrary.lean): Metaprogramming infrastructure for deriving unconstrained generators (instances of the `Arbitrary` / `ArbitrarySized` typeclasses)
+- [`DeriveEnum.lean`](./Plausible/New/DeriveEnum.lean): Metaprogramming infrastructure for deriving unconstrainted enumerators 
+(instances of the `Enum` / `EnumSized` typeclasses) 
 - [`DeriveGenerator.lean`](./Plausible/New/DeriveGenerator.lean): Metaprogramming infrastructure for deriving *constrained* generators (instances of the `ArbitrarySizedSuchThat` typeclass)
-- [`SubGenerators.lean`](./Plausible/New/SubGenerators.lean): Handles constraints when deriving sub-generators
-- [`DeriveChecker.lean`](./Plausible/New/DeriveChecker.lean): Metaprogramming infrastructure for automatically deriving checkers
+- [`DeriveChecker.lean`](./Plausible/New/DeriveChecker.lean): Metaprogramming infrastructure for automatically deriving checkers (instances of the `DecOpt` typeclass)
+- [`SubGenerators.lean`](./Plausible/New/SubGenerators.lean): Handles constraints when deriving sub-generators (handlers invoked by top-level derived generators)
+- [`SubCheckers.lean`](./Plausible/New/SubCheckers.lean): Handles constraints when deriving sub-checkers (handlers invoked by top-level derived checkers)
 
 **Miscellany**:
 - [`LazyList.lean`](./Plausible/New/LazyList.lean): Implementation of lazy lists (used for enumerators)
