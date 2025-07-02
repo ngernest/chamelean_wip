@@ -26,11 +26,15 @@ inductive CheckerStyle
     - If `checkerStyle = .TypeClassResolution`, we produce the term
     `DecOpt.decOpt (<hyp>) initSize`, i.e. we  use typeclass resolution to invoke the checker from the typeclass function
     `DecOpt.decOpt` which determines whether `hyp` holds -/
-def mkAuxiliaryCheckerCall (hyp : Expr) (checkerStyle : CheckerStyle) : TermElabM (TSyntax `term) := do
-  let hypTerm ← PrettyPrinter.delab hyp
+def mkAuxiliaryCheckerCall (hyp : Expr) (checkerStyle : CheckerStyle) : MetaM (TSyntax `term) := do
+  let hypTerm ← PrettyPrinter.delab hyp.getAppFn
+
+  let argExprs := hyp.getAppArgs
+  let argTerms ← Array.mapM PrettyPrinter.delab argExprs
+
   match checkerStyle with
-  | .RecursiveCall => `($auxDecFn $initSizeIdent $(mkIdent `size') $hypTerm)
-  | .TypeClassResolution => `($decOptFn ($hypTerm) $initSizeIdent)
+  | .RecursiveCall => `($auxDecFn $initSizeIdent $(mkIdent `size') $argTerms*)
+  | .TypeClassResolution => `($decOptFn ($hypTerm $argTerms*) $initSizeIdent)
 
 /-- Constructs terms which constitute calls to checkers corresponding
     to the hypotheses in `inductiveHypothesesToCheck`
@@ -59,9 +63,9 @@ def mkSubCheckerBody (inductiveHypothesesToCheck : Array Action) (ctor : Inducti
 /-- Constructs an anonymous sub-checker. See the comments in the body of this function
     for details on how this sub-checker is created. -/
 def mkSubChecker (subChecker : SubCheckerInfo) : TermElabM (TSyntax `term) := do
-  -- TODO: we only need to iterate through check_IR & check_non_IR
+  -- TODO: handle cases where we need to call `enumST` (e.g. STLC)
 
-  logInfo m!"subChecker = {subChecker}"
+  -- logInfo m!"subChecker = {subChecker}"
 
   let hypothesesToCheck := subChecker.groupedActions.checkNonInductiveActions ++ subChecker.groupedActions.checkInductiveActions
   let checkerBody ← mkSubCheckerBody hypothesesToCheck subChecker.ctor
@@ -89,8 +93,8 @@ def mkSubChecker (subChecker : SubCheckerInfo) : TermElabM (TSyntax `term) := do
     cases := cases.push catchAllCase
 
     -- Create a pattern match that simultaneously matches on all the scrutinees
-    let foo ← mkSimultaneousMatch scrutinees cases
-    logInfo m!"{foo}"
-    return foo
+    let matchExpr ← mkSimultaneousMatch scrutinees cases
+    logInfo m!"{matchExpr}"
+    return matchExpr
   else
     return checkerBody
