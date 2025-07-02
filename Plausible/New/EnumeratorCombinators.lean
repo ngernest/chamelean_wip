@@ -47,8 +47,18 @@ def oneOfWithDefault (default : Enumerator α) (es : List (Enumerator α)) : Enu
     let idx ← enumNatRange 0 (es.length - 1)
     List.getD es idx default
 
-/-- Applies the checker `f` to a `LazyList l` of optional values, returning the resultant `Option Bool`
+/-- Applies the checker `f` to a `LazyList l` of values, returning the resultant `Option Bool`
     (the parameter `anyNone` is used to indicate whether any of the elements examined previously have been `none`) -/
+def lazyListBacktrack (l : LazyList α) (f : α → Option Bool) (anyNone : Bool) : Option Bool :=
+  match l with
+  | .lnil => if anyNone then none else some false
+  | .lcons x xs =>
+    match f x with
+    | some true => some true
+    | some false => lazyListBacktrack xs.get f anyNone
+    | none => lazyListBacktrack xs.get f true
+
+/-- Variant of `lazyListBacktrack` where the input `LazyList` contains `Option α` values instead of `α` -/
 def lazyListBacktrackOpt (l : LazyList (Option α)) (f : α → Option Bool) (anyNone : Bool) : Option Bool :=
   match l with
   | .lnil => if anyNone then none else some false
@@ -62,7 +72,11 @@ def lazyListBacktrackOpt (l : LazyList (Option α)) (f : α → Option Bool) (an
     | .none => lazyListBacktrackOpt xs.get f true
 
 /-- Iterates through all the results of the enumerator `e`, applies the checker `f` to them,
-    and returns the resultant `Option Bool`
+    and returns the resultant `Option Bool`. -/
+def enumerating (e : Enumerator α) (f : α → Option Bool) (size : Nat) : Option Bool :=
+  lazyListBacktrack (e size) f false
+
+/-- Variant of `enumerating`, except the input enumerator `e` may fail and has type `OptionT Enumerator α`
     - This corresponds to `bind_EC` in the Computing Correctly paper (section 4) -/
 def enumeratingOpt (e : OptionT Enumerator α) (f : α → Option Bool) (size : Nat) : Option Bool :=
   lazyListBacktrackOpt (e size) f false
