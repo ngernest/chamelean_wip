@@ -102,13 +102,8 @@ def findNonRecursiveConstructors (inductiveName : Name) : MetaM (Array Name) := 
 def findTargetVarIndex (targetVar : Name) (args : TSyntaxArray `term) : Option Nat :=
   Array.findIdx? (fun arg => arg.getId == targetVar) (TSyntaxArray.raw args)
 
-----------------------------------------------------------------------
--- Command elaborator for producing the Plausible generator
------------------------------------------------------------------------
 
-syntax (name := derive_generator) "#derive_generator" "(" "fun" "(" ident ":" term ")" "=>" term ")" : command
-
-/-- Produces an instance of `ArbitrarySizedSuchThat` typeclass containing the definition for the top-level derived generator.
+/-- Produces an instance of the `ArbitrarySizedSuchThat` typeclass containing the definition for the top-level derived generator.
     The arguments to this function are:
     - a list of `baseGenerators` (each represented as a Lean term), to be invoked when `size == 0`
     - a list of `inductiveGenerators`, to be invoked when `size > 0`
@@ -144,7 +139,8 @@ def mkTopLevelGenerator (baseGenerators : TSyntax `term) (inductiveGenerators : 
     let sizeParam ← `(Term.letIdBinder| ($sizeIdent : $natIdent))
     let matchExpr ← liftTermElabM $ mkMatchExpr sizeIdent caseExprs
 
-    -- Add parameters for each argument to the inductive relation (except the target)
+    -- Add parameters for each argument to the inductive relation
+    -- (except the target variable, which we'll filter out later)
     let paramInfo ← analyzeInductiveArgs inductiveName args
 
     -- Inner params are for the inner `aux_arb` function
@@ -155,6 +151,8 @@ def mkTopLevelGenerator (baseGenerators : TSyntax `term) (inductiveGenerators : 
     -- Outer params are for the top-level lambda function which invokes `aux_arb`
     let mut outerParams := #[]
     for (paramName, paramType) in paramInfo do
+      -- Only add a function parameter is the argument to the inductive relation is not the target variable
+      -- (We skip the target variable since that's the value we wish to generate)
       if paramName != targetVar then
         let outerParamIdent := mkIdent paramName
         outerParams := outerParams.push outerParamIdent
@@ -166,13 +164,15 @@ def mkTopLevelGenerator (baseGenerators : TSyntax `term) (inductiveGenerators : 
         let innerParam ← `(Term.letIdBinder| ($innerParamIdent : $paramType))
         innerParams := innerParams.push innerParam
 
-    -- Produces an instance of `ArbitrarySizedSuchThat` typeclass containing the definition for the derived generator
+    -- Produces an instance of the `ArbitrarySizedSuchThat` typeclass containing the definition for the derived generator
     `(instance : $arbitrarySizedSuchThatTypeclass $targetTypeSyntax (fun $(mkIdent targetVar) => $inductiveStx $args*) where
         $unqualifiedArbitrarySizedSTFn:ident :=
           let rec $auxArbIdent:ident $innerParams* : $generatorType :=
             $matchExpr
           fun $freshSizeIdent => $auxArbIdent $freshSizeIdent $freshSizeIdent $outerParams*)
 
+
+syntax (name := derive_generator) "#derive_generator" "(" "fun" "(" ident ":" term ")" "=>" term ")" : command
 
 @[command_elab derive_generator]
 def elabDeriveGenerator : CommandElab := fun stx => do
