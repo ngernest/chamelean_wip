@@ -30,9 +30,6 @@ def elabDeriveChecker : CommandElab := fun stx => do
     -- stores the metadata for each derived sub-generator
     let allSubCheckerInfos ← liftTermElabM $ getSubCheckerInfos inductiveExpr argNameStrings
 
-    -- for sc in allSubCheckerInfos do
-    --   logInfo m!"subChecker = {sc}"
-
     -- Every generator is an inductive generator
     -- (they can all be invoked in the inductive case of the top-level generator),
     -- but only certain generators qualify as `BaseGenerator`s
@@ -47,7 +44,7 @@ def elabDeriveChecker : CommandElab := fun stx => do
 -- TODO: see if we can implement a deriving handler to support
 -- `deriving instance DecOpt for (bst lo hi t)` syntax
 
--- #derive_checker (bst lo hi t)
+#derive_checker (bst lo hi t)
 -- #derive_checker (balanced n t)
 -- #derive_checker (lookup Γ x τ)
 -- #derive_checker (typing Γ e τ)

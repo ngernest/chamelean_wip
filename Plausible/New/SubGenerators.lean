@@ -14,9 +14,9 @@ open Idents
       `let fvar ← aux_arb size e1 … en`, where `e1, …, en` are the arguments to the
       a hypothesis `hyp` for an inductive relation with the argument at index `idx` removed
       (since `fvar` is the argument at index `idx`, and we are generating `fvar`)
-    - If `generationStyle = .TypeClassresolution`, we produce the term
+    - If `generationStyle = .TypeClassResolution`, we produce the term
       `let fvar ← ArbitrarySuchThat.arbitraryST (fun fvar => hyp)`, i.e.
-      we use typeclass resolution to invoke the generator from the
+      we use typeclass resolution to invoke the generator from the typeclass function
       `ArbitrarySuchThat.arbitraryST` which produces values satisfying the hypothesis `hyp`
       (note: this requires that such an typeclass instance already exists). -/
 def genInputForInductive (fvar : FVarId) (hyp : Expr) (idx : Nat) (generationStyle : GenerationStyle) : MetaM (TSyntax `doElem) := do

@@ -18,10 +18,19 @@ inductive CheckerStyle
   | TypeClassResolution
   deriving Repr
 
--- TODO: Checker equivalent of `genInputForInductive` in `SubGenerators.lean`
-def mkAuxiliaryCheckerCall (hyp : Expr) (checkerStyle : CheckerStyle) : TermElabM (TSyntax `term) :=
-  sorry
-
+/-- `mkAuxiliaryCheckerCall hyp checkerStyle` creates a Lean term representing a call to a
+    checker that determines whether the hypothesis `hyp` holds (note that `hyp` should be fully applied)
+    - The `checkerStyle` argument is used to determine the style in which the checker call should be performed
+    - If `checkerStyle = .RecursiveCall`, we produce the term
+    `aux_dec initSize size' (<hyp>)`, i.e. we perform a recursive call to the parent `aux_dec` function
+    - If `checkerStyle = .TypeClassResolution`, we produce the term
+    `DecOpt.decOpt (<hyp>) initSize`, i.e. we  use typeclass resolution to invoke the checker from the typeclass function
+    `DecOpt.decOpt` which determines whether `hyp` holds -/
+def mkAuxiliaryCheckerCall (hyp : Expr) (checkerStyle : CheckerStyle) : TermElabM (TSyntax `term) := do
+  let hypTerm ← PrettyPrinter.delab hyp
+  match checkerStyle with
+  | .RecursiveCall => `($auxDecFn $initSizeIdent $(mkIdent `size') $hypTerm)
+  | .TypeClassResolution => `($decOptFn ($hypTerm) $initSizeIdent)
 
 /-- Constructs terms which constitute calls to checkers corresponding
     to the hypotheses in `inductiveHypothesesToCheck`
@@ -33,22 +42,19 @@ def mkSubCheckerBody (inductiveHypothesesToCheck : Array Action) (ctor : Inducti
   if inductiveHypothesesToCheck.isEmpty then
     `($someFn:ident $trueIdent:ident)
   else do
-    let mut checkerExprs := #[]
+    let mut callsToOtherCheckers := #[]
     for hypothesis in inductiveHypothesesToCheck do
       match hypothesis with
-      | .checkInductive hyp =>
+      | .checkInductive hyp | .checkNonInductive hyp =>
         -- Check if the hypothesis mentions the current inductive relation
         -- If yes, perform a recursive call to the parent checker
         -- Otherwise, perform typeclass resolution & invoke the checker provided by the `DecOpt` instance for the proposition
-        let checkerStyle := if hypothesisRecursivelyCallsCurrentInductive hyp ctor then CheckerStyle.RecursiveCall else .TypeClassResolution
+        let checkerStyle := if hypothesisRecursivelyCallsCurrentInductive hyp ctor then .RecursiveCall else .TypeClassResolution
         let checkerCall ← mkAuxiliaryCheckerCall hyp checkerStyle
-        checkerExprs := checkerExprs.push checkerCall
+        callsToOtherCheckers := callsToOtherCheckers.push checkerCall
       | .(_) => throwError "Unreachable pattern match"
 
-    -- TODO: populate the list with sub-checker calls
-    -- ^^ loop through `inductiveHypothesesToCheck` and use `hypothesisRecursivelyCallsCurrentInductive` to determine if
-    -- checker call should be recursive or performed via typeclass resolution
-    `($andOptListFn:ident [])
+    `($andOptListFn:ident [$callsToOtherCheckers,*])
 
 /-- Constructs an anonymous sub-checker. See the comments in the body of this function
     for details on how this sub-checker is created. -/
@@ -57,8 +63,8 @@ def mkSubChecker (subChecker : SubCheckerInfo) : TermElabM (TSyntax `term) := do
 
   logInfo m!"subChecker = {subChecker}"
 
-  let inductiveHypothesesToCheck := subChecker.groupedActions.checkInductiveActions
-  let checkerBody ← mkSubCheckerBody inductiveHypothesesToCheck subChecker.ctor
+  let hypothesesToCheck := subChecker.groupedActions.checkNonInductiveActions ++ subChecker.groupedActions.checkInductiveActions
+  let checkerBody ← mkSubCheckerBody hypothesesToCheck subChecker.ctor
 
   -- If there are inputs on which we need to perform a pattern-match,
       -- create a pattern-match expr which only returns the checker body
