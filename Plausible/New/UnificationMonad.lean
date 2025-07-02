@@ -77,13 +77,13 @@ namespace UnifyM
       updates.foldl (fun acc (u, r) => acc.insert u r) constraints
 
   /-- Registers a new equality check between unknowns `u1` and `u2` -/
-  def equality (u1 : Unknown) (u2 : Unknown) : UnifyM Unit :=
+  def registerEquality (u1 : Unknown) (u2 : Unknown) : UnifyM Unit :=
     modify $ fun s =>
       let eqs := s.equalities
       { s with equalities := eqs.merge {(u1, u2)} }
 
   /-- Adds a new pattern match -/
-  def pattern (u : Unknown) (p : Pattern) : UnifyM Unit :=
+  def addPattern (u : Unknown) (p : Pattern) : UnifyM Unit :=
     modify $ fun s =>
       let ps := s.patterns
       { s with patterns := (u, p) :: ps }
@@ -93,8 +93,8 @@ namespace UnifyM
     let existingNames := Name.mkStr1 <$> unknowns.toArray
     toString $ genFreshName existingNames (Name.mkStr1 "unknown")
 
-  /-- Generates and returns a new unknown -/
-  def fresh : UnifyM Unknown :=
+  /-- Generates and registers a new unknown in the `UnifyState` -/
+  def registerFreshUnknown : UnifyM Unknown :=
     modifyGet $ fun s =>
       let us := s.unknowns
       let u := freshUnknown us
@@ -140,7 +140,7 @@ mutual
     | (u1, .Fixed), (u2, .Fixed) => do
       -- Assert that whatever the values of `u1` and `u2` are, they are equal
       -- Record this equality check using `equality`, then update `u1`'s range to the other
-      UnifyM.equality u1 u2
+      UnifyM.registerEquality u1 u2
       UnifyM.update u1 .Fixed
     | (u1, .Fixed), (_, c2@(.Ctr _ _)) => handleMatch u1 c2
     | (_, c1@(.Ctr _ _)), (u2, .Fixed) => handleMatch u2 c1
@@ -174,7 +174,7 @@ mutual
   partial def handleMatch : Unknown → Range → UnifyM Unit
     | u, .Ctr c rs => do
       let p ← rs.mapM matchAux
-      UnifyM.pattern u (Pattern.Constructor c p)
+      UnifyM.addPattern u (Pattern.Constructor c p)
     | _, _ => panic! "reached catch-all case in handleMatch"
 
   /-- `matchAux` traverses a `Range` and converts it into a
@@ -198,8 +198,8 @@ mutual
         -- Handles non-linear patterns:
         -- produce a fresh unknown `u'`, use `u'` as the pattern variable
         -- & enforce an equality check between `u` and `u'`
-        let u' ← UnifyM.fresh
-        UnifyM.equality u' u
+        let u' ← UnifyM.registerFreshUnknown
+        UnifyM.registerEquality u' u
         UnifyM.update u' r
         return (.Unknown u')
       | u'@(.Unknown _) => matchAux u'
@@ -234,10 +234,10 @@ def testNonemptyTrees : IO Unit := do
 
   let testUnify : UnifyM Unit := do
     -- Create unknowns for x, l, r, and the tree t
-    let x ← UnifyM.fresh  -- will be "unknown0"
-    let l ← UnifyM.fresh  -- will be "unknown1"
-    let r ← UnifyM.fresh  -- will be "unknown2"
-    let t ← UnifyM.fresh  -- will be "unknown3"
+    let x ← UnifyM.registerFreshUnknown  -- will be "unknown0"
+    let l ← UnifyM.registerFreshUnknown  -- will be "unknown1"
+    let r ← UnifyM.registerFreshUnknown  -- will be "unknown2"
+    let t ← UnifyM.registerFreshUnknown  -- will be "unknown3"
 
     -- Set up: t should be undefined (we want to generate it)
     -- Set up: x, l, r should be undefined (arbitrary values)
@@ -265,11 +265,11 @@ def testCompleteTrees : IO Unit := do
   -- Simulate: complete in1 t where in1 is input, t is output
 
   let testUnify : UnifyM Unit := do
-    let in1 ← UnifyM.fresh  -- input parameter
-    let t ← UnifyM.fresh    -- output to generate
-    let n ← UnifyM.fresh    -- universally quantified variable
-    let l ← UnifyM.fresh    -- left subtree
-    let r ← UnifyM.fresh    -- right subtree
+    let in1 ← UnifyM.registerFreshUnknown  -- input parameter
+    let t ← UnifyM.registerFreshUnknown    -- output to generate
+    let n ← UnifyM.registerFreshUnknown    -- universally quantified variable
+    let l ← UnifyM.registerFreshUnknown    -- left subtree
+    let r ← UnifyM.registerFreshUnknown    -- right subtree
 
     -- Set up modes: in1 is fixed input, t should be generated
     UnifyM.updateMany [
@@ -302,12 +302,12 @@ def testBinarySearchTrees : IO Unit := do
   -- Simulate: bst lo hi (Node x l r) where lo, hi are inputs
 
   let testUnify : UnifyM Unit := do
-    let lo ← UnifyM.fresh   -- lower bound (input)
-    let hi ← UnifyM.fresh   -- upper bound (input)
-    let t ← UnifyM.fresh    -- tree to generate
-    let x ← UnifyM.fresh    -- node value
-    let l ← UnifyM.fresh    -- left subtree
-    let r ← UnifyM.fresh    -- right subtree
+    let lo ← UnifyM.registerFreshUnknown   -- lower bound (input)
+    let hi ← UnifyM.registerFreshUnknown   -- upper bound (input)
+    let t ← UnifyM.registerFreshUnknown    -- tree to generate
+    let x ← UnifyM.registerFreshUnknown    -- node value
+    let l ← UnifyM.registerFreshUnknown    -- left subtree
+    let r ← UnifyM.registerFreshUnknown    -- right subtree
 
     -- Set up: lo, hi are fixed inputs
     UnifyM.updateMany [
@@ -340,12 +340,12 @@ def testNonLinearPatterns : IO Unit := do
   -- Note: t1 appears twice (non-linear)
 
   let testUnify : UnifyM Unit := do
-    let gamma ← UnifyM.fresh  -- unknown_0
-    let term ← UnifyM.fresh   -- unknown_1
-    let typ ← UnifyM.fresh    -- unknown_2
-    let t1 ← UnifyM.fresh     -- appears in both Abs and Arr
-    let t2 ← UnifyM.fresh
-    let e ← UnifyM.fresh
+    let gamma ← UnifyM.registerFreshUnknown  -- unknown_0
+    let term ← UnifyM.registerFreshUnknown   -- unknown_1
+    let typ ← UnifyM.registerFreshUnknown    -- unknown_2
+    let t1 ← UnifyM.registerFreshUnknown     -- appears in both Abs and Arr
+    let t2 ← UnifyM.registerFreshUnknown
+    let e ← UnifyM.registerFreshUnknown
 
     -- Set up: gamma, term, typ are inputs
     UnifyM.updateMany [
@@ -382,10 +382,10 @@ def testFunctionCalls : IO Unit := do
   -- where (n * n) needs to be converted to fresh variable with equality
 
   let testUnify : UnifyM Unit := do
-    let n ← UnifyM.fresh
-    let m ← UnifyM.fresh
-    let in1 ← UnifyM.fresh  -- first argument (input)
-    let in2 ← UnifyM.fresh  -- second argument (input)
+    let n ← UnifyM.registerFreshUnknown
+    let m ← UnifyM.registerFreshUnknown
+    let in1 ← UnifyM.registerFreshUnknown  -- first argument (input)
+    let in2 ← UnifyM.registerFreshUnknown  -- second argument (input)
 
     -- Set up: inputs are fixed, n, m need to be determined
     UnifyM.updateMany [
@@ -401,9 +401,9 @@ def testFunctionCalls : IO Unit := do
 
     -- The `(n * n)` part would normally create a fresh variable and equality
     -- For testing, we'll simulate this by creating an equality constraint
-    let product ← UnifyM.fresh
+    let product ← UnifyM.registerFreshUnknown
     UnifyM.update product (.Undef "nat")
-    UnifyM.equality product in2  -- product should equal in2
+    UnifyM.registerEquality product in2  -- product should equal in2
 
     -- Simulate the equality: product = n * n (would be handled by preprocessing)
 
