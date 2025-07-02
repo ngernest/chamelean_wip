@@ -14,8 +14,16 @@ def frequencyFn : Ident := mkIdent $ Name.mkStr2 "GeneratorCombinators" "frequen
 def oneOfWithDefaultGenCombinatorFn : Ident := mkIdent $ Name.mkStr2 "GeneratorCombinators" "oneOfWithDefault"
 def oneOfWithDefaultEnumCombinatorFn : Ident := mkIdent $ Name.mkStr2 "EnumeratorCombinators" "oneOfWithDefault"
 def interpSampleFn : Ident := mkIdent $ Name.mkStr3 "Plausible" "SampleableExt" "interpSample"
+
+/-- Ident for the inner `aux_arb` function that appears in derived generators -/
 def auxArbFn : Ident := mkIdent $ Name.mkStr1 "aux_arb"
+
+/-- Ident for the inner `aux_enum` function that appears in derived enumerators -/
 def auxEnumFn : Ident := mkIdent $ Name.mkStr1 "aux_enum"
+
+/-- Ident for the inner `aux_dec` function that appears in derived checkers -/
+def auxDecFn : Ident := mkIdent $ Name.mkStr1 "aux_dec"
+
 def andOptListFn : Ident := mkIdent $ Name.mkStr2 "DecOpt" "andOptList"
 def pureFn : Ident := mkIdent $ Name.mkStr1 "pure"
 def someFn : Ident := mkIdent ``some

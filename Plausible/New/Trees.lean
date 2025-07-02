@@ -107,7 +107,7 @@ def tempSize := 10
 /-- Handwritten `DecOpt` instance for the proposition `bst lo hi t` -/
 instance : DecOpt (bst lo hi t) where
   decOpt :=
-    let rec aux_arb (init_size : Nat) (size : Nat) (lo_0 : Nat) (hi_0 : Nat) (t_0 : Tree) : Option Bool :=
+    let rec aux_arb (initSize : Nat) (size : Nat) (lo_0 : Nat) (hi_0 : Nat) (t_0 : Tree) : Option Bool :=
       match size with
       | .zero =>
         DecOpt.checkerBacktrack [
@@ -128,9 +128,9 @@ instance : DecOpt (bst lo hi t) where
             | .Leaf => some false
             | .Node x l r =>
               DecOpt.andOptList [
-                DecOpt.decOpt (lo_0 < x && x < hi_0) init_size,
-                aux_arb init_size size' lo_0 x l,
-                aux_arb init_size size' x hi_0 r
+                DecOpt.decOpt (lo_0 < x && x < hi_0) initSize,
+                aux_arb initSize size' lo_0 x l,
+                aux_arb initSize size' x hi_0 r
               ]
         ]
     fun size => aux_arb size size lo hi t
