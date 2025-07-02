@@ -55,6 +55,8 @@ inductive MyListAnon where
 -- #derive_arbitrary term
 -- #derive_arbitrary Value
 
+-- #derive_checker (typing Γ e τ)
+
 -- #eval runArbitrary (α := MyList) 10
 
 
