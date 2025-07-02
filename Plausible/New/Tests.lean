@@ -15,8 +15,16 @@ open Lean Meta
 
 open Plausible ArbitrarySizedSuchThat OptionTGen
 
+/- `NatChain` there's ascending chain of `Nat`s under the `<` order, where `a` and `b` are
+    the start and end of the chain respectively -/
+inductive NatChain (a b : Nat) : Prop where
+| ChainExists : ∀ (x : Nat),
+    (a < x) →
+    (x < y) ->
+    (y < b) →
+    NatChain a b
+
 -- TODO: figure out how to rewrite function calls
--- #derive_checker (typing Γ e τ)
 
 
 ---

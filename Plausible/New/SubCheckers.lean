@@ -36,18 +36,26 @@ def mkAuxiliaryCheckerCall (hyp : Expr) (checkerStyle : CheckerStyle) : MetaM (T
   | .RecursiveCall => `($auxDecFn $initSizeIdent $(mkIdent `size') $argTerms*)
   | .TypeClassResolution => `($decOptFn ($hypTerm $argTerms*) $initSizeIdent)
 
-/-- Constructs terms which constitute calls to checkers corresponding
-    to the hypotheses in `hypothesesToCheck`
+/-- `mkSubCheckerBody hypothesesToCheck ctor producerActions` constructs terms representing
+    calls to checkers corresponding to the hypotheses in `hypothesesToCheck`
     (these are either recursive calls to the current checker function, or invocations of
     the `DecOpt` typeclass instance for the hypotheses)
-    - The `ctor` argument is the constructor of the inductive relation corresponding to
-      the sub-checker being built -/
-partial def mkSubCheckerBody (hypothesesToCheck : Array Action) (ctor : InductiveConstructor) (producerActions : Array Action) : TermElabM (TSyntax `term) :=
+    - `ctor` is the constructor of the inductive relation corresponding to
+      the sub-checker being built
+    - `producerActions` contains a list of producer actions
+      (to be turned into enumerator calls by resolving instances of the `EnumSuchThat` or `Enum` enumerator typeclasses)
+    - It is the caller's responsibility to ensure that:
+      + `hypothesesToCheck` only contains `Action`s created using the `.checkInductive` or `.checkNonInductive` constructors,
+      + `producerActions` only contains `Action`s created using the `.genInputForInductive` or `.genFVar` constructors
+    - See the comments in the body of this function for further details -/
+def mkSubCheckerBody (hypothesesToCheck : List Action) (ctor : InductiveConstructor) (producerActions : List Action) : TermElabM (TSyntax `term) :=
   if hypothesesToCheck.isEmpty then
     `($someFn:ident $trueIdent:ident)
-  else do
-    if producerActions.isEmpty then
+  else
+    match producerActions with
+    | [] => do
       let mut callsToOtherCheckers := #[]
+
       for hypothesis in hypothesesToCheck do
         match hypothesis with
         | .checkInductive hyp | .checkNonInductive hyp =>
@@ -57,28 +65,36 @@ partial def mkSubCheckerBody (hypothesesToCheck : Array Action) (ctor : Inductiv
           let checkerStyle := if hypothesisRecursivelyCallsCurrentInductive hyp ctor then .RecursiveCall else .TypeClassResolution
           let checkerCall ← mkAuxiliaryCheckerCall hyp checkerStyle
           callsToOtherCheckers := callsToOtherCheckers.push checkerCall
-        | .(_) => throwError "Unreachable pattern match"
+        | _ => throwError "hypothesesToCheck contains Actions that are not checker actions"
 
       `($andOptListFn:ident [$callsToOtherCheckers,*])
-    else
-      -- TODO: we assume producerActions only has one element right now
-      let producerAction := producerActions[0]!
-      match producerAction with
-      | .genInputForInductive fvar hyp _ _ =>
+
+    | prodAction :: remainingProdActions =>
+      match prodAction with
+      | .genInputForInductive fvar hyp _ _ => do
+        -- Produces the code `enumeratingOpt (enumST (fun <fvar> => <hyp>)) <checkerContinuation> initSize`,
+        -- which invokes a constrained enumerator that produces values satisfying `hyp` and pass them to `checkerContinuation`
+        -- (the continuation handles the remaining producer actions in the tail of the `producerActions` list)
         let lhs := mkIdent fvar.name
         let hypTerm ← PrettyPrinter.delab hyp
         let enumSuchThatCall ← `($enumSTFn (fun $lhs:ident => $hypTerm))
-        let checkerContinuation ← mkSubCheckerBody hypothesesToCheck ctor #[]
+        let checkerContinuation ← mkSubCheckerBody hypothesesToCheck ctor remainingProdActions
         `($enumeratingOptFn:ident $enumSuchThatCall $checkerContinuation $initSizeIdent)
-      | .(_) => throwError "Unreachable pattern match"
+      | .genFVar fvar _ => do
+        -- Produces the code `enumerating enum (fun <fvar> => <checkerContinuation>) initSize`
+        -- which invokes an unconstrained enumerator that enumerates values of the given type
+        -- (the type is determined via typeclass resolution), and passes them to `checkerContinuation`
+        let newVar := mkIdent fvar.name
+        let continuationBody ← mkSubCheckerBody hypothesesToCheck ctor remainingProdActions
+        `($enumeratingFn:ident $enumFn (fun $newVar:ident => $continuationBody) $initSizeIdent)
+      | _ => throwError "producerActions contains Actions that are not producer actions"
 
 /-- Constructs an anonymous sub-checker. See the comments in the body of this function
     for details on how this sub-checker is created. -/
 def mkSubChecker (subChecker : SubCheckerInfo) : TermElabM (TSyntax `term) := do
-  logInfo m!"subChecker = {subChecker}"
-
-  let hypothesesToCheck := subChecker.groupedActions.checkNonInductiveActions ++ subChecker.groupedActions.checkInductiveActions
-  let producerActions := subChecker.groupedActions.gen_list
+  let hypothesesToCheck := Array.toList $
+    subChecker.groupedActions.checkNonInductiveActions ++ subChecker.groupedActions.checkInductiveActions
+  let producerActions := Array.toList subChecker.groupedActions.gen_list
   let checkerBody ← mkSubCheckerBody hypothesesToCheck subChecker.ctor producerActions
 
   -- If there are inputs on which we need to perform a pattern-match,
