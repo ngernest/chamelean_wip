@@ -1,5 +1,6 @@
 import Lean
 import Plausible.IR.Constructor
+import Plausible.IR.Extractor
 import Plausible.New.Idents
 import Plausible.New.TSyntaxCombinators
 
@@ -10,11 +11,19 @@ open Lean Elab Command Meta Term Parser Std
 /-- Constructs terms which constitute calls to checkers corresponding
     to the hypotheses in `inductiveHypothesesToCheck`
     (these are either recursive calls to the current checker function, or invocations of
-    the `DecOpt` typeclass instance for the hypotheses) -/
-def mkSubCheckerBody (inductiveHypothesesToCheck : Array Action) : TermElabM (TSyntax `term) :=
+    the `DecOpt` typeclass instance for the hypotheses)
+    - The `ctor` argument is the constructor of the inductive relation corresponding to
+      the sub-checker being built -/
+def mkSubCheckerBody (inductiveHypothesesToCheck : Array Action) (ctor : InductiveConstructor) : TermElabM (TSyntax `term) :=
   if inductiveHypothesesToCheck.isEmpty then
     `($someFn:ident $trueIdent:ident)
   else
+    -- for hypothesis in inductiveHypothesesToCheck do
+    --   if let .checkInductive hyp := hypothesis then
+    --     if hypothesisRecursivelyCallsCurrentInductive hyp _ then
+    --       sorry
+
+
     -- TODO: fill in the list with sub-checker calls
     -- ^^ loop through `inductiveHypothesesToCheck` and use `hypothesisRecursivelyCallsCurrentInductive` to determine if
     -- checker call should be recursive or performed via typeclass resolution
@@ -28,7 +37,7 @@ def mkSubChecker (subChecker : SubCheckerInfo) : TermElabM (TSyntax `term) := do
   logInfo m!"subChecker = {subChecker}"
 
   let inductiveHypothesesToCheck := subChecker.groupedActions.checkInductiveActions
-  let checkerBody ← mkSubCheckerBody inductiveHypothesesToCheck
+  let checkerBody ← mkSubCheckerBody inductiveHypothesesToCheck subChecker.ctor
 
   -- If there are inputs on which we need to perform a pattern-match,
       -- create a pattern-match expr which only returns the checker body
