@@ -15,10 +15,11 @@ inductive Compatibility
   | Incompatible
   | PartCompatible
   | InstCompatible
-  deriving Repr, Inhabited
+  deriving BEq, Repr, Inhabited
 
 /-- Determines whether a `mode` is compatible given a boolean indicating
-    whether a typeclass instance exists for a particular type constructor -/
+    whether a typeclass instance exists for a particular type constructor
+    (corresponds to `compatible` in the OCaml code) -/
 def compatible (b : Bool) (m : RangeMode) : Compatibility :=
   match m, b with
   | .ModeFixed, false => .Compatible
@@ -50,6 +51,7 @@ def analyzePartiallyDefined (_ : Unknown) (r : Range)
     .ModePartlyDef eqs unks pat
   | _ => .ModeFixed
 
+-- Corresponds to `mode_analyze` in the OCaml code
 partial def analyzeRangeMode (r : Range) (constraints : Std.TreeMap Unknown Range compare) : RangeMode :=
   match r with
   | .Unknown u =>
@@ -66,3 +68,18 @@ partial def analyzeRangeMode (r : Range) (constraints : Std.TreeMap Unknown Rang
   | .Fixed => .ModeFixed
   | .Ctr c rs => analyzePartiallyDefined "temp" (.Ctr c rs) constraints
   | .Undef ty => .ModeUndefUnknown "temp" ty
+
+/-- Compatibility scores (from mode_score in ML) -/
+structure CompatibilityScores where
+  numCompatible : Nat
+  numInstCompatible : Nat
+  numIncompatible : Nat
+  numPartCompatible : Nat
+  deriving Repr
+
+def modeScore (bs : List Bool) (ms : List RangeMode) : CompatibilityScores :=
+  let compatibilityResults := List.map (fun (b, m) => compatible b m) (List.zip bs ms)
+  { numCompatible := List.count .Compatible compatibilityResults,
+    numInstCompatible := List.count .InstCompatible compatibilityResults,
+    numIncompatible := List.count .Incompatible compatibilityResults,
+    numPartCompatible := List.count .PartCompatible compatibilityResults }
