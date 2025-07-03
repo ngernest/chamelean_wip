@@ -163,23 +163,21 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
 
       inductiveHypothesesToCheck := inductiveHypothesesToCheck.push typedInductiveTerm
 
-  logWarning "**********************"
-
   -- Add equality checks for any pairs of variables in `variableEqualities`
   let mut variableEqualitiesToCheck := #[]
   for (fvar1, fvar2) in subGenerator.variableEqualities do
     let ident1 := mkIdent fvar1.name
     let ident2 := mkIdent fvar2.name
-    logWarning m!"ident1 = {ident1}, ident2 = {ident2}"
+    -- logWarning m!"ident1 = {ident1}, ident2 = {ident2}"
     let equalityCheck ← `($ident1:ident = $ident2:ident)
     variableEqualitiesToCheck := variableEqualitiesToCheck.push equalityCheck
 
-  logWarning m!"nonInductiveHypothesesToCheck = {nonInductiveHypothesesToCheck}"
-  logWarning m!"inductivesToCheck = {inductiveHypothesesToCheck}"
-  logWarning m!"variableEqualitiesToCheck = {variableEqualitiesToCheck}"
-  logWarning m!"doElems = {doElems}"
-  logWarning m!"inputsToMatch = {subGenerator.inputsToMatch}"
-  logWarning m!"matchCases = {subGenerator.matchCases}"
+  -- logWarning m!"nonInductiveHypothesesToCheck = {nonInductiveHypothesesToCheck}"
+  -- logWarning m!"inductivesToCheck = {inductiveHypothesesToCheck}"
+  -- logWarning m!"variableEqualitiesToCheck = {variableEqualitiesToCheck}"
+  -- logWarning m!"doElems = {doElems}"
+  -- logWarning m!"inputsToMatch = {subGenerator.inputsToMatch}"
+  -- logWarning m!"matchCases = {subGenerator.matchCases}"
 
   -- TODO: change `groupedActions.ret_list` to a single element since each do-block can only
   -- have one (final) `return` expression

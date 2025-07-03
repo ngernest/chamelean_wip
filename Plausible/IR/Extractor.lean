@@ -21,9 +21,42 @@ def Array.traverse [Monad M] (f : α → M β) (arr : Array α) : M (Array β) :
   Array.mapM f arr
 
 /-- `containsNonTrivialFuncApp e inductiveRelationName` determines whether `e` contains a non-trivial function application
-    (i.e. a function application where the function name is *not* the same as `inductiveRelationName`) -/
-def containsNonTrivialFuncApp (e : Expr) (inductiveRelationName : Name) : Bool :=
-  Option.isSome $ Expr.find? (fun subExpr => subExpr.isApp && subExpr.getAppFn.constName != inductiveRelationName) e
+    (i.e. a function application where the function name is *not* the same as `inductiveRelationName`,
+    and where the function is also *not* a constructor of an inductive data type) -/
+def containsNonTrivialFuncApp (e : Expr) (inductiveRelationName : Name) : MetaM Bool := do
+  -- Helper function to check whether a sub-term is a non-trivial function application
+  let rec checkSubTerm (subExpr : Expr) : MetaM Bool :=
+    if subExpr.isApp then
+      let fn := subExpr.getAppFn
+      if fn.isConst then
+        let constName := fn.constName!
+        if constName.getRoot != inductiveRelationName then do
+          let info ← getConstInfo constName
+          return !info.isCtor
+        else
+          return false
+      else
+        return false
+    else
+      return false
+
+  match e with
+  | .app f arg =>
+    if (← checkSubTerm f)
+      then return true
+    else
+      checkSubTerm arg
+  | .lam _ _ body _ => checkSubTerm body
+  | .forallE _ _ body _ => checkSubTerm body
+  | .letE _ _ value body _ => do
+    if (← checkSubTerm value) then
+      return true
+    else
+      checkSubTerm body
+  | .mdata _ expr => checkSubTerm expr
+  | .proj _ _ struct => checkSubTerm struct
+  | _ => return false
+
 
 /-- Determines whether a type expression is an inductive relation -/
 def isInductiveRelation (tyexpr : Expr) : MetaM Bool := do
@@ -43,13 +76,13 @@ def isInductiveRelation (tyexpr : Expr) : MetaM Bool := do
     and add the new variable (along with its type) to `boundVarCtx`.
     The updated hypotheses, conclusion and `boundVarCtx` are subsequently returned.
     - Note: it is the caller's responsibility to check that `conclusion` does indeed contain
-      a function application (e.g. by using `containsFuncApp`) -/
+      a function application (e.g. by using `containsNonTrivialFuncApp`) -/
 def rewriteFuncCallsInConclusion (hypotheses : Array Expr) (conclusion : Expr) (inductiveRelationName : Name)
   (boundVarCtx : HashMap FVarId Expr) : MetaM (Array Expr × Expr × HashMap FVarId Expr) :=
 
   -- Filter out cases where the function being called is the same as the inductive relation's name
   let possibleFuncApp := Expr.find? (fun subExpr =>
-    subExpr.isApp && subExpr.getAppFn.constName != inductiveRelationName) conclusion
+    subExpr.isApp && subExpr.getAppFn.constName.getRoot != inductiveRelationName) conclusion
 
   match possibleFuncApp with
   | none => return (hypotheses, conclusion, boundVarCtx)
@@ -358,7 +391,7 @@ def process_constructor_unify_args (ctorType : Expr) (inputVars : Array Expr) (i
     -- If yes, rewrite the function calls using `rewriteFuncCallsInConclusion`
     -- Then, unify `argNames` with each arg in the conclusion
     let (hypotheses, conclusion, newCtx) ←
-      if containsNonTrivialFuncApp originalConclusion inductiveRelationName then
+      if (← containsNonTrivialFuncApp originalConclusion inductiveRelationName) then
         let (updatedHypotheses, rewrittenConclusion, updatedCtx) ←
           rewriteFuncCallsInConclusion originalHypotheses originalConclusion inductiveRelationName boundVarCtx
         unify_args_with_conclusion updatedHypotheses rewrittenConclusion argNames updatedCtx

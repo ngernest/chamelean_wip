@@ -18,6 +18,8 @@ open Plausible ArbitrarySizedSuchThat OptionTGen
 
 set_option trace.Meta.debug true
 
+-- #derive_generator (fun (t : Tree) => bst lo hi t)
+
 
 ---
 
