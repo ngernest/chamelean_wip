@@ -16,12 +16,9 @@ open Lean Meta
 open Plausible ArbitrarySizedSuchThat OptionTGen
 
 
-
 -- TODO: figure out how to rewrite function calls (see section 3 of Computing Correctly)
 
-
 ---
-
 
 /- Example usage:
   ```
