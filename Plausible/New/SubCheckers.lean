@@ -101,26 +101,30 @@ def mkSubChecker (subChecker : SubCheckerInfo) : TermElabM (TSyntax `term) := do
       -- create a pattern-match expr which only returns the checker body
       -- if the match succeeds
   if !subChecker.inputsToMatch.isEmpty then
-    let mut cases := #[]
 
     -- Handle multiple scrutinees by giving all of them fresh names
     let existingNames := Name.mkStr1 <$> subChecker.inputsToMatch
     let scrutinees := Lean.mkIdent <$> Array.map (fun name => genFreshName existingNames name) existingNames
 
-    -- Construct the match expression based on the info in `matchCases`
-    let patterns ← Array.mapM (fun patternExpr => PrettyPrinter.delab patternExpr) subChecker.matchCases
-    -- If there are multiple scrutinees, the LHS of each case is a tuple containing the elements in `matchCases`
-    let case ← `(Term.matchAltExpr| | $[$patterns:term],* => $checkerBody:term)
-    cases := cases.push case
+    -- Force delaborator to pretty-print pattern cases in prefix position
+    -- (as opposed to using postfix dot-notation, which is not allowed in pattern-matches)
+    withOptions (fun opts => opts.setBool `pp.fieldNotation false) do
+      -- Construct the match expression based on the info in `matchCases`
+      let mut cases := #[]
+      let patterns ← Array.mapM (fun patternExpr => PrettyPrinter.delab patternExpr) subChecker.matchCases
 
-    -- The LHS of the catch-all case contains a tuple consisting entirely of wildcards
-    let numScrutinees := Array.size scrutinees
-    let wildcards := Array.replicate numScrutinees (← `(_))
-    let catchAllCase ← `(Term.matchAltExpr| | $wildcards:term,* => $someFn:ident $falseIdent:ident)
-    cases := cases.push catchAllCase
+      -- If there are multiple scrutinees, the LHS of each case is a tuple containing the elements in `matchCases`
+      let case ← `(Term.matchAltExpr| | $[$patterns:term],* => $checkerBody:term)
+      cases := cases.push case
 
-    -- Create a pattern match that simultaneously matches on all the scrutinees
-    mkSimultaneousMatch scrutinees cases
+      -- The LHS of the catch-all case contains a tuple consisting entirely of wildcards
+      let numScrutinees := Array.size scrutinees
+      let wildcards := Array.replicate numScrutinees (← `(_))
+      let catchAllCase ← `(Term.matchAltExpr| | $wildcards:term,* => $someFn:ident $falseIdent:ident)
+      cases := cases.push catchAllCase
+
+      -- Create a pattern match that simultaneously matches on all the scrutinees
+      mkSimultaneousMatch scrutinees cases
   else
     return checkerBody
 
