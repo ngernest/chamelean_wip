@@ -204,7 +204,7 @@ inductive Action where
   /-- `return` the expression `e` in some ambient monad (e.g. `Gen`) -/
   | ret (e : Expr)
 
-  deriving Repr
+  deriving Repr, Inhabited
 
 
 /-- Extracts all the free variables in the conclusion of a constructor

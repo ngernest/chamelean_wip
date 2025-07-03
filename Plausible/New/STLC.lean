@@ -17,6 +17,7 @@ open GeneratorCombinators
 -- Some example `DecOpt` checkers
 --------------------------------------------------------------------------
 
+
 /-- A handwritten checker which checks `lookup Γ x τ`
   (modelled after the automatically derived checker produced by QuickChick). -/
 def checkLookup (Γ : List type) (x : Nat) (τ : type) : Nat → Option Bool :=
@@ -53,6 +54,10 @@ def checkLookup (Γ : List type) (x : Nat) (τ : type) : Nat → Option Bool :=
      partially decidable propositions -/
 instance : DecOpt (lookup Γ x τ) where
   decOpt := checkLookup Γ x τ
+
+-- TODO: fill in `EnumSizedSuchThat` instance
+instance : EnumSizedSuchThat type (fun τ => typing Γ e τ) where
+  enumSizedST := fun _ => OptionT.fail
 
 /-- A handwritten checker which checks `typing Γ e τ`, ignoring the case for `App`
     (based on the auto-derived checker produced by QuickChick) -/
@@ -109,7 +114,14 @@ def checkTyping (Γ : List type) (e : term) (τ : type) : Nat → Option Bool :=
                   aux_arb initSize size' (τ1 :: Γ) e τ2
               ]
             | _ => none,
-        -- TODO: handle App case
+        fun _ =>
+          match e with
+          | .App e1 e2 =>
+            EnumeratorCombinators.enumeratingOpt
+              (EnumSuchThat.enumST (fun t1 => typing Γ e2 t1))
+              (fun t1 => aux_arb initSize size' Γ e1 (.Fun t1 τ))
+              initSize
+          | _ => some false
       ]
   fun size => aux_arb size size Γ e τ
 

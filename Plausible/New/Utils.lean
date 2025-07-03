@@ -5,6 +5,19 @@ import Plausible.IR.Prelude
 open Lean Meta
 open Plausible.IR
 
+/-- Determines if an instance of the typeclass `className` exists for a particular `type`
+    represented as an `Expr`. Under the hood, this tries to synthesize an instance of the typeclass for the type.
+
+    Example:
+    ```
+    #eval hasInstance `Repr (Expr.const `Nat []) -- returns true
+    ```
+-/
+def hasInstance (className : Name) (type : Expr) : MetaM Bool := do
+  let classType ← mkAppM className #[type]
+  Option.isSome <$> synthInstance? classType
+
+
 /-- Determines if a constructor for an inductive relation is *recursive*
     (i.e. the constructor's type mentions the inductive relation)
     - Note: this function only considers constructors with arrow types -/

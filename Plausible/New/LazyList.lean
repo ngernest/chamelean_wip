@@ -29,9 +29,7 @@ def take (n : Nat) (l : LazyList α) : LazyList α :=
     | .lnil => lnil
     | .lcons x xs => .lcons x (take n' xs.get)
 
-/-- Appends two `LazyLists` together
-    (Note: the body of delayed does not need to be an explicit call to `Thunk.mk` because
-    Lean automatically coerces any `e : α` into `Thunk.mk (fun () => e) : Thunk α`.) -/
+/-- Appends two `LazyLists` together -/
 def append (xs : LazyList α) (ys : LazyList α) : LazyList α :=
   match xs with
   | .lnil => ys

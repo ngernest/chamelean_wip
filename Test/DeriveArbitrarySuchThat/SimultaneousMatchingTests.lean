@@ -104,6 +104,8 @@ info: Try this generator: instance : ArbitrarySizedSuchThat (List Nat) (fun l =>
 #derive_generator (fun (l: List Nat) => MinEx n l a)
 
 -- TODO: test derived generator on this example
+-- (need to introduce a fresh variable and an equality constraint between it & the function call
+-- (Computing Correctly, section 3.1), i.e. introduce a constraint `l'' = [x] + l'`
 inductive MinEx2 : Nat → List Nat → List Nat → Prop where
 | ME_empty : MinEx2 0 [] []
 | ME_present : ∀ x l l',
@@ -112,6 +114,7 @@ inductive MinEx2 : Nat → List Nat → List Nat → Prop where
 
 
 -- TODO: test derived generator on this example
+-- (need to support function calls (Computing Correctly section 3.1))
 inductive MinEx3 : Nat → List Nat → List Nat → Prop where
 | ME_empty : MinEx3 0 [] []
 | ME_present : ∀ x l,

@@ -10,51 +10,15 @@ import Plausible.New.DeriveEnum
 import Plausible.New.DeriveChecker
 import Plausible.New.STLC
 
+import Lean
+open Lean Meta
 
 open Plausible ArbitrarySizedSuchThat OptionTGen
 
-/-- Dummy inductive relation for testing purposes -/
-inductive RGB where
-  | Red
-  | Green
-  | Blue
-  deriving Repr
 
-inductive Value where
-  | none
-  | bool (b : Bool)
-  | int (i : Int)
-  | tensor (shape : List Nat) (dtype : String)
-  deriving Repr
+-- TODO: figure out how to rewrite function calls (see section 3 of Computing Correctly)
 
-inductive Foo where
-  | FromBitVec : ∀ (n : Nat), BitVec n → String → Foo
-  deriving Repr
-
-
-inductive MyList where
-  | Nil
-  | Cons (x : Nat) (xs : MyList)
-
-inductive MyListAnon where
-  | Nil : MyListAnon
-  | Cons : Nat -> MyListAnon -> MyListAnon
-
--- deriving instance Arbitrary for MyList, MyListAnon
-
--- #synth Arbitrary MyList
--- #synth Arbitrary MyListAnon
-
-
--- #derive_arbitrary MyListAnon
-
--- #derive_arbitrary Tree
--- #derive_arbitrary type
--- #derive_arbitrary term
--- #derive_arbitrary Value
-
--- #eval runArbitrary (α := MyList) 10
-
+---
 
 /- Example usage:
   ```

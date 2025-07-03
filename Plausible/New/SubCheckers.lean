@@ -36,39 +36,66 @@ def mkAuxiliaryCheckerCall (hyp : Expr) (checkerStyle : CheckerStyle) : MetaM (T
   | .RecursiveCall => `($auxDecFn $initSizeIdent $(mkIdent `size') $argTerms*)
   | .TypeClassResolution => `($decOptFn ($hypTerm $argTerms*) $initSizeIdent)
 
-/-- Constructs terms which constitute calls to checkers corresponding
-    to the hypotheses in `inductiveHypothesesToCheck`
+/-- `mkSubCheckerBody hypothesesToCheck ctor producerActions` constructs terms representing
+    calls to checkers corresponding to the hypotheses in `hypothesesToCheck`
     (these are either recursive calls to the current checker function, or invocations of
     the `DecOpt` typeclass instance for the hypotheses)
-    - The `ctor` argument is the constructor of the inductive relation corresponding to
-      the sub-checker being built -/
-def mkSubCheckerBody (inductiveHypothesesToCheck : Array Action) (ctor : InductiveConstructor) : TermElabM (TSyntax `term) :=
-  if inductiveHypothesesToCheck.isEmpty then
+    - `ctor` is the constructor of the inductive relation corresponding to
+      the sub-checker being built
+    - `producerActions` contains a list of producer actions
+      (to be turned into enumerator calls by resolving instances of the `EnumSuchThat` or `Enum` enumerator typeclasses)
+    - It is the caller's responsibility to ensure that:
+      + `hypothesesToCheck` only contains `Action`s created using the `.checkInductive` or `.checkNonInductive` constructors,
+      + `producerActions` only contains `Action`s created using the `.genInputForInductive` or `.genFVar` constructors
+    - See the comments in the body of this function for further details -/
+def mkSubCheckerBody (hypothesesToCheck : List Action) (ctor : InductiveConstructor) (producerActions : List Action) : TermElabM (TSyntax `term) :=
+  if hypothesesToCheck.isEmpty then
     `($someFn:ident $trueIdent:ident)
-  else do
-    let mut callsToOtherCheckers := #[]
-    for hypothesis in inductiveHypothesesToCheck do
-      match hypothesis with
-      | .checkInductive hyp | .checkNonInductive hyp =>
-        -- Check if the hypothesis mentions the current inductive relation
-        -- If yes, perform a recursive call to the parent checker
-        -- Otherwise, perform typeclass resolution & invoke the checker provided by the `DecOpt` instance for the proposition
-        let checkerStyle := if hypothesisRecursivelyCallsCurrentInductive hyp ctor then .RecursiveCall else .TypeClassResolution
-        let checkerCall ← mkAuxiliaryCheckerCall hyp checkerStyle
-        callsToOtherCheckers := callsToOtherCheckers.push checkerCall
-      | .(_) => throwError "Unreachable pattern match"
+  else
+    match producerActions with
+    | [] => do
+      let mut callsToOtherCheckers := #[]
 
-    `($andOptListFn:ident [$callsToOtherCheckers,*])
+      for hypothesis in hypothesesToCheck do
+        match hypothesis with
+        | .checkInductive hyp | .checkNonInductive hyp =>
+          -- Check if the hypothesis mentions the current inductive relation
+          -- If yes, perform a recursive call to the parent checker
+          -- Otherwise, perform typeclass resolution & invoke the checker provided by the `DecOpt` instance for the proposition
+          let checkerStyle := if hypothesisRecursivelyCallsCurrentInductive hyp ctor then .RecursiveCall else .TypeClassResolution
+          let checkerCall ← mkAuxiliaryCheckerCall hyp checkerStyle
+          callsToOtherCheckers := callsToOtherCheckers.push checkerCall
+        | _ => throwError "hypothesesToCheck contains Actions that are not checker actions"
+
+      `($andOptListFn:ident [$callsToOtherCheckers,*])
+
+    | prodAction :: remainingProdActions =>
+      match prodAction with
+      | .genInputForInductive fvar hyp _ _ => do
+        -- Produces the code `enumeratingOpt (enumST (fun <fvar> => <hyp>)) <checkerContinuation> initSize`,
+        -- which invokes a constrained enumerator that produces values satisfying `hyp` and pass them to `checkerContinuation`
+        -- (the continuation handles the remaining producer actions in the tail of the `producerActions` list)
+        let lhs := mkIdent fvar.name
+        let hypTerm ← PrettyPrinter.delab hyp
+        let enumSuchThatCall ← `($enumSTFn (fun $lhs:ident => $hypTerm))
+        let checkerContinuation ← mkSubCheckerBody hypothesesToCheck ctor remainingProdActions
+        `($enumeratingOptFn:ident $enumSuchThatCall $checkerContinuation $initSizeIdent)
+      | .genFVar fvar _ => do
+        -- Produces the code `enumerating enum (fun <fvar> => <checkerContinuation>) initSize`
+        -- which invokes an unconstrained enumerator that enumerates values of the given type
+        -- (the type is determined via typeclass resolution), and passes them to `checkerContinuation`
+        let newVar := mkIdent fvar.name
+        let continuationBody ← mkSubCheckerBody hypothesesToCheck ctor remainingProdActions
+        `($enumeratingFn:ident $enumFn (fun $newVar:ident => $continuationBody) $initSizeIdent)
+      | _ => throwError "producerActions contains Actions that are not producer actions"
 
 /-- Constructs an anonymous sub-checker. See the comments in the body of this function
     for details on how this sub-checker is created. -/
 def mkSubChecker (subChecker : SubCheckerInfo) : TermElabM (TSyntax `term) := do
-  -- TODO: handle cases where we need to call `enumST` (e.g. STLC)
-
-  -- logInfo m!"subChecker = {subChecker}"
-
-  let hypothesesToCheck := subChecker.groupedActions.checkNonInductiveActions ++ subChecker.groupedActions.checkInductiveActions
-  let checkerBody ← mkSubCheckerBody hypothesesToCheck subChecker.ctor
+  let hypothesesToCheck := Array.toList $
+    subChecker.groupedActions.checkNonInductiveActions ++ subChecker.groupedActions.checkInductiveActions
+  let producerActions := Array.toList subChecker.groupedActions.gen_list
+  let checkerBody ← mkSubCheckerBody hypothesesToCheck subChecker.ctor producerActions
 
   -- If there are inputs on which we need to perform a pattern-match,
       -- create a pattern-match expr which only returns the checker body

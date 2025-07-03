@@ -30,6 +30,12 @@ def andOptListFn : Ident := mkIdent $ Name.mkStr2 "DecOpt" "andOptList"
 /-- Ident for the `DecOpt.checkerBacktrack` checker combinator (see `DecOpt.lean`) -/
 def checkerBacktrackFn : Ident := mkIdent $ Name.mkStr2 "DecOpt" "checkerBacktrack"
 
+/-- Ident for the `EnumeratorCombinators.enumerating` combinator (see `EnumeratorCombinators.lean`) -/
+def enumeratingFn : Ident := mkIdent $ Name.mkStr2 "EnumeratorCombinators" "enumerating"
+
+/-- Ident for the `EnumeratorCombinators.enumeratingOpt` combinator (see `EnumeratorCombinators.lean`) -/
+def enumeratingOptFn : Ident := mkIdent $ Name.mkStr2 "EnumeratorCombinators" "enumeratingOpt"
+
 def pureFn : Ident := mkIdent $ Name.mkStr1 "pure"
 def someFn : Ident := mkIdent ``some
 def trueIdent : Ident := mkIdent ``true
@@ -51,6 +57,7 @@ def decOptTypeclass : Ident := mkIdent $ Name.mkStr1 "DecOpt"
 -- Idents for typeclass functions
 def arbitraryFn : Ident := mkIdent $ Name.mkStr2 "Arbitrary" "arbitrary"
 def enumFn : Ident := mkIdent $ Name.mkStr2 "Enum" "enum"
+def enumSTFn : Ident := mkIdent $ Name.mkStr2 "EnumSuchThat" "enumST"
 def arbitrarySizedFn : Ident := mkIdent $ Name.mkStr2 "ArbitrarySized" "arbitrarySized"
 def unqualifiedArbitrarySizedFn : Ident := mkIdent $ Name.mkStr1 "arbitrarySized"
 def unqualifiedEnumSizedFn : Ident := mkIdent $ Name.mkStr1 "enumSized"
