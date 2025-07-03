@@ -116,7 +116,7 @@ def checkTyping (Γ : List type) (e : term) (τ : type) : Nat → Option Bool :=
             | _ => none,
         fun _ =>
           match e with
-          | .App e1 e2 =>
+          | .App (.Abs .Nat e1) e2 =>
             EnumeratorCombinators.enumeratingOpt
               (EnumSuchThat.enumST (fun t1 => typing Γ e2 t1))
               (fun t1 => aux_arb initSize size' Γ e1 (.Fun t1 τ))
