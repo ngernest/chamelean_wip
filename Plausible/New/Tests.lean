@@ -16,7 +16,16 @@ open Lean Meta
 open Plausible ArbitrarySizedSuchThat OptionTGen
 
 
+set_option trace.Meta.debug true
+
 -- TODO: figure out how to rewrite function calls (see section 3 of Computing Correctly)
+
+inductive square_of : Nat → Nat → Prop where
+  | sq : forall n, square_of n (n * n)
+
+-- #derive_checker (square_of n m)
+
+
 
 ---
 

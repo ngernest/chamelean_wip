@@ -2,12 +2,14 @@ import Lean
 import Std
 import Plausible.IR.Examples
 import Plausible.IR.Prelude
+import Plausible.New.Idents
 import Lean.Elab.Deriving.DecEq
 import Batteries.Data.List.Basic
 open Lean.Elab.Deriving.DecEq
 open List Nat Array String
 open Lean Elab Command Meta Term
 open Lean.Parser.Term
+open Idents
 
 -- We bring in the `Std` namespace so that we can refer to `HashMap` functions easily
 open Std
@@ -18,10 +20,10 @@ namespace Plausible.IR
 def Array.traverse [Monad M] (f : α → M β) (arr : Array α) : M (Array β) :=
   Array.mapM f arr
 
-
-
-
-/- CODE -/
+/-- `containsFuncApp e` returns a boolean indicating whether `e` contains a subterm
+     that is a function application -/
+def containsFuncApp (e : Expr) : Bool :=
+  Option.isSome $ Expr.find? Expr.isApp e
 
 /-- Determines whether a type expression is an inductive relation -/
 def isInductiveRelation (tyexpr : Expr) : MetaM Bool := do
@@ -298,11 +300,11 @@ def unify_args_with_conclusion (hypotheses : Array Expr) (conclusion : Expr) (ar
 
 /-- Takes in the constructor's type, the input variables & their types and the name of the inductive relation,
     and builds an `IRConstructor` containing metadata for the constructor.
-    During this process, the names of input arguments (`arg_names`) are unified with variables in the
+    During this process, the names of input arguments (`argNames`) are unified with variables in the
     conclusion of the constructor. -/
-def process_constructor_unify_args (ctor_type: Expr) (input_vars : Array Expr) (input_types : Array Expr)
-  (inductive_relation_name: Name) (arg_names : Array String) : MetaM InductiveConstructor := do
-  let (bound_vars_and_types, _ , components_of_arrow_type) ← decomposeType ctor_type
+def process_constructor_unify_args (ctorType : Expr) (inputVars : Array Expr) (inputTypes : Array Expr)
+  (inductiveRelationName : Name) (argNames : Array String) : MetaM InductiveConstructor := do
+  let (bound_vars_and_types, _ , components_of_arrow_type) ← decomposeType ctorType
 
   -- `bound_var_ctx` maps free variables (identified by their `FVarId`) to their types
   let mut bound_var_ctx := HashMap.emptyWithCapacity
@@ -314,12 +316,25 @@ def process_constructor_unify_args (ctor_type: Expr) (input_vars : Array Expr) (
   | some (hypotheses, conclusion) =>
     let (hypotheses, conclusion, new_ctx) ←
 
-      -- TODO: check if `conclusion` contains any subterms that are function calls
-      -- (use `Expr.isApp` and possibly `Expr.forEach`)
+      -- Check if `conclusion` contains any subterms that are function calls
       -- If yes, create a fresh variable & add an extra hypothesis where the fresh var is bound to the result of the function call,
       -- then rewrite the conclusion, replacing occurrences of the function call with the fresh variable
 
-      unify_args_with_conclusion hypotheses conclusion arg_names bound_var_ctx
+      if containsFuncApp conclusion then
+        let funcAppExpr := Option.get! $ Expr.find? Expr.isApp conclusion
+        let localCtx ← getLCtx
+        let newVarIdent := mkFreshAccessibleIdent localCtx (genFreshName (Name.mkStr1 <$> argNames) (Name.mkStr1 "unknown"))
+        let newVarExpr ← Prod.fst <$> TermElabM.run (elabTerm newVarIdent none)
+        let newHyp ← mkEq newVarExpr funcAppExpr
+        let updatedHypotheses := Array.push hypotheses newHyp
+
+        -- Note: since we're doing a purely syntactic rewriting here,
+        -- it suffices to use `==` to compare `subExpr` with `funcAppExpr`
+        -- instead of using `MetaM.isDefEq`
+        let rewrittenConclusion := Expr.replace (fun subExpr => if subExpr == funcAppExpr then some newVarExpr else none) conclusion
+        unify_args_with_conclusion updatedHypotheses rewrittenConclusion argNames bound_var_ctx
+      else
+        unify_args_with_conclusion hypotheses conclusion argNames bound_var_ctx
 
     let (bound_vars, _) := bound_vars_and_types.unzip
     let (bound_vars_with_base_types, _) :=
@@ -338,9 +353,9 @@ def process_constructor_unify_args (ctor_type: Expr) (input_vars : Array Expr) (
       (throwError "conclusion_args is an unexpected empty list")
 
     for hyp in hypotheses do
-      if ← isDependency hyp.getAppFn inductive_relation_name.getRoot then
+      if ← isDependency hyp.getAppFn inductiveRelationName.getRoot then
         dependencies := dependencies.push hyp.getAppFn
-      if hyp.getAppFn.constName == inductive_relation_name then
+      if hyp.getAppFn.constName == inductiveRelationName then
         recursive_hypotheses := recursive_hypotheses.push hyp
       else if ← allArgsHaveBaseTypes hyp then
         hypotheses_with_only_base_type_args := hypotheses_with_only_base_type_args.push hyp
@@ -349,13 +364,13 @@ def process_constructor_unify_args (ctor_type: Expr) (input_vars : Array Expr) (
       else
         nonlinear_hypotheses := nonlinear_hypotheses.push hyp
 
-    let inputEqualities := conclusion_args.zip input_vars
-    let inputEqualitiesWithTypes := inputEqualities.zip input_types
+    let inputEqualities := conclusion_args.zip inputVars
+    let inputEqualitiesWithTypes := inputEqualities.zip inputTypes
     let (baseTypeInputEqualities, _) := (inputEqualitiesWithTypes.filter (fun (_, ty) => isBaseType ty)).unzip
     let (nonBaseTypeInputEqualities, _) := (inputEqualitiesWithTypes.filter (fun (_, ty) => !isBaseType ty)).unzip
 
     return {
-      ctorType := ctor_type
+      ctorType := ctorType
       bound_vars := bound_vars,
       bound_var_ctx := new_ctx,
       all_hypotheses := hypotheses,
@@ -371,7 +386,7 @@ def process_constructor_unify_args (ctor_type: Expr) (input_vars : Array Expr) (
       inputEqualities := inputEqualities
       baseTypeInputEqualities := baseTypeInputEqualities
       nonBaseTypeInputEqualities := nonBaseTypeInputEqualities
-      name_space := inductive_relation_name.getRoot
+      name_space := inductiveRelationName.getRoot
       dependencies := dependencies
     }
   | none => throwError "Not a match"

@@ -17,11 +17,6 @@ def hasInstance (className : Name) (type : Expr) : MetaM Bool := do
   let classType ← mkAppM className #[type]
   Option.isSome <$> synthInstance? classType
 
-/-- `containsFuncApp e` returns a boolean indicating whether `e` contains a subterm
-     that is a function application -/
-def containsFuncApp (e : Expr) : Bool :=
-  Option.isSome $ Expr.find? Expr.isApp e
-
 
 /-- Determines if a constructor for an inductive relation is *recursive*
     (i.e. the constructor's type mentions the inductive relation)
