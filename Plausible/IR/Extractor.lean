@@ -313,28 +313,34 @@ def process_constructor_unify_args (ctorType : Expr) (inputVars : Array Expr) (i
     bound_var_ctx := bound_var_ctx.insert fid ty
 
   match splitLast? components_of_arrow_type with
-  | some (hypotheses, conclusion) =>
+  | some (originalHypotheses, originalConclusion) =>
     let (hypotheses, conclusion, new_ctx) ←
 
       -- Check if `conclusion` contains any subterms that are function calls
       -- If yes, create a fresh variable & add an extra hypothesis where the fresh var is bound to the result of the function call,
       -- then rewrite the conclusion, replacing occurrences of the function call with the fresh variable
+      if containsFuncApp originalConclusion then
+        -- Filter out cases where the `AppFn` is the same as the inductive relation name
+        let funcAppExpr := Option.get! $ Expr.find? (fun subExpr =>
+          subExpr.isApp && subExpr.getAppFn.constName != inductiveRelationName) originalConclusion
 
-      if containsFuncApp conclusion then
-        let funcAppExpr := Option.get! $ Expr.find? Expr.isApp conclusion
-        let localCtx ← getLCtx
-        let newVarIdent := mkFreshAccessibleIdent localCtx (genFreshName (Name.mkStr1 <$> argNames) (Name.mkStr1 "unknown"))
-        let newVarExpr ← Prod.fst <$> TermElabM.run (elabTerm newVarIdent none)
-        let newHyp ← mkEq newVarExpr funcAppExpr
-        let updatedHypotheses := Array.push hypotheses newHyp
+        let funcAppType ← inferType funcAppExpr
+        withLocalDecl `unknown BinderInfo.default funcAppType $ fun newVarExpr => do
+          let newVarType ← inferType newVarExpr
+          let newHyp ← mkEq newVarExpr funcAppExpr
+          let newVarFVarId := newVarExpr.fvarId!
 
-        -- Note: since we're doing a purely syntactic rewriting here,
-        -- it suffices to use `==` to compare `subExpr` with `funcAppExpr`
-        -- instead of using `MetaM.isDefEq`
-        let rewrittenConclusion := Expr.replace (fun subExpr => if subExpr == funcAppExpr then some newVarExpr else none) conclusion
-        unify_args_with_conclusion updatedHypotheses rewrittenConclusion argNames bound_var_ctx
+          let updatedHypotheses := Array.push originalHypotheses newHyp
+
+          -- Note: since we're doing a purely syntactic rewriting operation here,
+          -- it suffices to use `==` to compare `subExpr` with `funcAppExpr` instead of using `MetaM.isDefEq`
+          let rewrittenConclusion := Expr.replace (fun subExpr => if subExpr == funcAppExpr then some newVarExpr else none) originalConclusion
+
+          -- Insert the fresh variable into the bound-variable context
+          let updatedCtx := HashMap.insert bound_var_ctx newVarFVarId newVarType
+          unify_args_with_conclusion updatedHypotheses rewrittenConclusion argNames updatedCtx
       else
-        unify_args_with_conclusion hypotheses conclusion argNames bound_var_ctx
+        unify_args_with_conclusion originalHypotheses originalConclusion argNames bound_var_ctx
 
     let (bound_vars, _) := bound_vars_and_types.unzip
     let (bound_vars_with_base_types, _) :=
