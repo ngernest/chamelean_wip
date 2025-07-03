@@ -42,4 +42,5 @@ import Test.DeriveDecOpt.DeriveRegExpMatchChecker
 import Test.DeriveDecOpt.NonLinearPatternsTest
 import Test.DeriveDecOpt.SimultaneousMatchingTests
 import Test.DeriveDecOpt.ExistentialVariablesTest
+import Test.DeriveDecOpt.FunctionCallsTest
 import Test.DeriveDecOpt.DeriveSTLCChecker
