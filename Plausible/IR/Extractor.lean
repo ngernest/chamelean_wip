@@ -313,6 +313,11 @@ def process_constructor_unify_args (ctor_type: Expr) (input_vars : Array Expr) (
   match splitLast? components_of_arrow_type with
   | some (hypotheses, conclusion) =>
     let (hypotheses, conclusion, new_ctx) ←
+
+      -- TODO: check if `conclusion` contains any subterms that are function calls
+      -- (use `Expr.isApp` and possibly `Expr.forEach`)
+      -- If yes, create a fresh variable & bind it to the result of the function call
+
       unify_args_with_conclusion hypotheses conclusion arg_names bound_var_ctx
 
     let (bound_vars, _) := bound_vars_and_types.unzip
