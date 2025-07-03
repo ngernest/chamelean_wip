@@ -316,7 +316,8 @@ def process_constructor_unify_args (ctor_type: Expr) (input_vars : Array Expr) (
 
       -- TODO: check if `conclusion` contains any subterms that are function calls
       -- (use `Expr.isApp` and possibly `Expr.forEach`)
-      -- If yes, create a fresh variable & bind it to the result of the function call
+      -- If yes, create a fresh variable & add an extra hypothesis where the fresh var is bound to the result of the function call,
+      -- then rewrite the conclusion, replacing occurrences of the function call with the fresh variable
 
       unify_args_with_conclusion hypotheses conclusion arg_names bound_var_ctx
 
