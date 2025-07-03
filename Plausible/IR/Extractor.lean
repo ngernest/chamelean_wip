@@ -76,11 +76,13 @@ def isInductiveRelation (tyexpr : Expr) : MetaM Bool := do
     and add the new variable (along with its type) to `boundVarCtx`.
     The updated hypotheses, conclusion and `boundVarCtx` are subsequently returned.
     - Note: it is the caller's responsibility to check that `conclusion` does indeed contain
-      a function application (e.g. by using `containsNonTrivialFuncApp`) -/
+      a non-trivial function application (e.g. by using `containsNonTrivialFuncApp`) -/
 def rewriteFuncCallsInConclusion (hypotheses : Array Expr) (conclusion : Expr) (inductiveRelationName : Name)
   (boundVarCtx : HashMap FVarId Expr) : MetaM (Array Expr × Expr × HashMap FVarId Expr) :=
 
   -- Filter out cases where the function being called is the same as the inductive relation's name
+  -- Note: this analysis is more simplistic compared to the one performed by `containsNonTrivialFuncApp`,
+  -- which is why callers should have called `containsNonTrivialFuncApp` beforehand
   let possibleFuncApp := Expr.find? (fun subExpr =>
     subExpr.isApp && subExpr.getAppFn.constName.getRoot != inductiveRelationName) conclusion
 
