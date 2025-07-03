@@ -18,12 +18,26 @@ open Plausible ArbitrarySizedSuchThat OptionTGen
 
 set_option trace.Meta.debug true
 
--- TODO: figure out how to rewrite function calls (see section 3 of Computing Correctly)
+
+
+-- TODO: create a snapshot test for the `square_of` inductive relation
 
 inductive square_of : Nat → Nat → Prop where
   | sq : forall n, square_of n (n * n)
 
--- #derive_checker (square_of n m)
+#derive_checker (square_of n m)
+
+/-
+instance : DecOpt (square_of n m) where
+  decOpt :=
+    let rec aux_dec (initSize : Nat) (size : Nat) (n_0 : Nat) (m_0 : Nat) : Option Bool :=
+      match size with
+      | Nat.zero => DecOpt.checkerBacktrack [fun _ => DecOpt.andOptList [DecOpt.decOpt (@Eq Nat m (n * n)) initSize]]
+      | Nat.succ size' =>
+        DecOpt.checkerBacktrack [fun _ => DecOpt.andOptList [DecOpt.decOpt (@Eq Nat m (n * n)) initSize]]
+    fun size => aux_dec size size n m
+
+-/
 
 
 

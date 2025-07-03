@@ -20,10 +20,10 @@ namespace Plausible.IR
 def Array.traverse [Monad M] (f : α → M β) (arr : Array α) : M (Array β) :=
   Array.mapM f arr
 
-/-- `containsFuncApp e` returns a boolean indicating whether `e` contains a subterm
-     that is a function application -/
-def containsFuncApp (e : Expr) : Bool :=
-  Option.isSome $ Expr.find? Expr.isApp e
+/-- `containsNonTrivialFuncApp e inductiveRelationName` determines whether `e` contains a non-trivial function application
+    (i.e. a function application where the function name is *not* the same as `inductiveRelationName`) -/
+def containsNonTrivialFuncApp (e : Expr) (inductiveRelationName : Name) : Bool :=
+  Option.isSome $ Expr.find? (fun subExpr => subExpr.isApp && subExpr.getAppFn.constName != inductiveRelationName) e
 
 /-- Determines whether a type expression is an inductive relation -/
 def isInductiveRelation (tyexpr : Expr) : MetaM Bool := do
@@ -34,6 +34,46 @@ def isInductiveRelation (tyexpr : Expr) : MetaM Bool := do
   -- Return type must be `Prop` in order for `tyexpr` to be an inductive relation
   let return_type := arrow_type_components.toList.getLast!
   return return_type.isProp
+
+/-- `rewriteFuncCallsInConclusion hypotheses conclusion inductiveRelationName boundVarCtx` does the following:
+    1. Checks if the `conclusion` contains a function call where the function is *not* the same as the `inductiveRelationName`.
+       (If no, we just return the triple `(hypotheses, conclusion, boundVarCtx)` as is.)
+    2. If yes, we create a fresh variable & add an extra hypothesis where the fresh var is bound to the result of the function call.
+    3. We then rewrite the conclusion, replacing occurrences of the function call with the fresh variable,
+    and add the new variable (along with its type) to `boundVarCtx`.
+    The updated hypotheses, conclusion and `boundVarCtx` are subsequently returned.
+    - Note: it is the caller's responsibility to check that `conclusion` does indeed contain
+      a function application (e.g. by using `containsFuncApp`) -/
+def rewriteFuncCallsInConclusion (hypotheses : Array Expr) (conclusion : Expr) (inductiveRelationName : Name)
+  (boundVarCtx : HashMap FVarId Expr) : MetaM (Array Expr × Expr × HashMap FVarId Expr) :=
+
+  -- Filter out cases where the function being called is the same as the inductive relation's name
+  let possibleFuncApp := Expr.find? (fun subExpr =>
+    subExpr.isApp && subExpr.getAppFn.constName != inductiveRelationName) conclusion
+
+  match possibleFuncApp with
+  | none => return (hypotheses, conclusion, boundVarCtx)
+  | some funcAppExpr => do
+    let funcAppType ← inferType funcAppExpr
+
+    -- We use `withLocalDecl` to add the fresh variable to the local context
+    withLocalDecl `unknown BinderInfo.default funcAppType (fun newVarExpr => do
+      let newVarType ← inferType newVarExpr
+
+      -- Create a new hypothesis stating that `newVarExpr = funcAppExpr`, then
+      -- add it to the array of `hypotheses`
+      let newHyp ← mkEq newVarExpr funcAppExpr
+      let newVarFVarId := newVarExpr.fvarId!
+      let updatedHypotheses := Array.push hypotheses newHyp
+
+      -- Note: since we're doing a purely syntactic rewriting operation here,
+      -- it suffices to use `==` to compare `subExpr` with `funcAppExpr` instead of using `MetaM.isDefEq`
+      let rewrittenConclusion := Expr.replace
+        (fun subExpr => if subExpr == funcAppExpr then some newVarExpr else none) conclusion
+
+      -- Insert the fresh variable into the bound-variable context
+      let updatedCtx := HashMap.insert boundVarCtx newVarFVarId newVarType
+      return (updatedHypotheses, rewrittenConclusion, updatedCtx))
 
 /-- Determines whether a type expression corresponds to the name of a base type (`Nat, String, Bool`) -/
 def isBaseType (tyexpr : Expr) : Bool :=
@@ -306,41 +346,24 @@ def process_constructor_unify_args (ctorType : Expr) (inputVars : Array Expr) (i
   (inductiveRelationName : Name) (argNames : Array String) : MetaM InductiveConstructor := do
   let (bound_vars_and_types, _ , components_of_arrow_type) ← decomposeType ctorType
 
-  -- `bound_var_ctx` maps free variables (identified by their `FVarId`) to their types
-  let mut bound_var_ctx := HashMap.emptyWithCapacity
-  for (bound_var, ty) in bound_vars_and_types do
-    let fid := FVarId.mk bound_var
-    bound_var_ctx := bound_var_ctx.insert fid ty
+  -- `boundVarCtx` maps free variables (identified by their `FVarId`) to their types
+  let mut boundVarCtx := HashMap.emptyWithCapacity
+  for (boundVar, ty) in bound_vars_and_types do
+    let fid := FVarId.mk boundVar
+    boundVarCtx := boundVarCtx.insert fid ty
 
   match splitLast? components_of_arrow_type with
   | some (originalHypotheses, originalConclusion) =>
-    let (hypotheses, conclusion, new_ctx) ←
-
-      -- Check if `conclusion` contains any subterms that are function calls
-      -- If yes, create a fresh variable & add an extra hypothesis where the fresh var is bound to the result of the function call,
-      -- then rewrite the conclusion, replacing occurrences of the function call with the fresh variable
-      if containsFuncApp originalConclusion then
-        -- Filter out cases where the `AppFn` is the same as the inductive relation name
-        let funcAppExpr := Option.get! $ Expr.find? (fun subExpr =>
-          subExpr.isApp && subExpr.getAppFn.constName != inductiveRelationName) originalConclusion
-
-        let funcAppType ← inferType funcAppExpr
-        withLocalDecl `unknown BinderInfo.default funcAppType $ fun newVarExpr => do
-          let newVarType ← inferType newVarExpr
-          let newHyp ← mkEq newVarExpr funcAppExpr
-          let newVarFVarId := newVarExpr.fvarId!
-
-          let updatedHypotheses := Array.push originalHypotheses newHyp
-
-          -- Note: since we're doing a purely syntactic rewriting operation here,
-          -- it suffices to use `==` to compare `subExpr` with `funcAppExpr` instead of using `MetaM.isDefEq`
-          let rewrittenConclusion := Expr.replace (fun subExpr => if subExpr == funcAppExpr then some newVarExpr else none) originalConclusion
-
-          -- Insert the fresh variable into the bound-variable context
-          let updatedCtx := HashMap.insert bound_var_ctx newVarFVarId newVarType
-          unify_args_with_conclusion updatedHypotheses rewrittenConclusion argNames updatedCtx
+    -- Check if `conclusion` contains any subterms that are function calls
+    -- If yes, rewrite the function calls using `rewriteFuncCallsInConclusion`
+    -- Then, unify `argNames` with each arg in the conclusion
+    let (hypotheses, conclusion, newCtx) ←
+      if containsNonTrivialFuncApp originalConclusion inductiveRelationName then
+        let (updatedHypotheses, rewrittenConclusion, updatedCtx) ←
+          rewriteFuncCallsInConclusion originalHypotheses originalConclusion inductiveRelationName boundVarCtx
+        unify_args_with_conclusion updatedHypotheses rewrittenConclusion argNames updatedCtx
       else
-        unify_args_with_conclusion originalHypotheses originalConclusion argNames bound_var_ctx
+        unify_args_with_conclusion originalHypotheses originalConclusion argNames boundVarCtx
 
     let (bound_vars, _) := bound_vars_and_types.unzip
     let (bound_vars_with_base_types, _) :=
@@ -378,7 +401,7 @@ def process_constructor_unify_args (ctorType : Expr) (inputVars : Array Expr) (i
     return {
       ctorType := ctorType
       bound_vars := bound_vars,
-      bound_var_ctx := new_ctx,
+      bound_var_ctx := newCtx,
       all_hypotheses := hypotheses,
       conclusion := conclusion,
       conclusion_args := conclusion_args,
