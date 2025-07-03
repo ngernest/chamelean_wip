@@ -72,18 +72,18 @@ def mkSubCheckerBody (hypothesesToCheck : List Action) (ctor : InductiveConstruc
     | prodAction :: remainingProdActions =>
       match prodAction with
       | .genInputForInductive fvar hyp _ _ => do
-        -- Produces the code `enumeratingOpt (enumST (fun <fvar> => <hyp>)) <checkerContinuation> initSize`,
+        -- Produces the code `enumeratingOpt (enumST (fun $newVar => $hyp)) (fun $newVar => $continuationBody) initSize`,
         -- which invokes a constrained enumerator that produces values satisfying `hyp` and pass them to `checkerContinuation`
         -- (the continuation handles the remaining producer actions in the tail of the `producerActions` list)
-        let lhs := mkIdent fvar.name
+        let newVar := mkIdent fvar.name
         let hypTerm ← PrettyPrinter.delab hyp
-        let enumSuchThatCall ← `($enumSTFn (fun $lhs:ident => $hypTerm))
-        let checkerContinuation ← mkSubCheckerBody hypothesesToCheck ctor remainingProdActions
-        `($enumeratingOptFn:ident $enumSuchThatCall $checkerContinuation $initSizeIdent)
+        let enumSuchThatCall ← `($enumSTFn (fun $newVar:ident => $hypTerm))
+        let continuationBody ← mkSubCheckerBody hypothesesToCheck ctor remainingProdActions
+        `($enumeratingOptFn:ident $enumSuchThatCall (fun $newVar:ident => $continuationBody) $initSizeIdent)
       | .genFVar fvar _ => do
-        -- Produces the code `enumerating enum (fun <fvar> => <checkerContinuation>) initSize`
+        -- Produces the code `enumerating enum (fun $newVar => $continuationBody) initSize`
         -- which invokes an unconstrained enumerator that enumerates values of the given type
-        -- (the type is determined via typeclass resolution), and passes them to `checkerContinuation`
+        -- (the type is determined via typeclass resolution), and passes them to the `continuationBody`
         let newVar := mkIdent fvar.name
         let continuationBody ← mkSubCheckerBody hypothesesToCheck ctor remainingProdActions
         `($enumeratingFn:ident $enumFn (fun $newVar:ident => $continuationBody) $initSizeIdent)

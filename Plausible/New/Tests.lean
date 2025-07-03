@@ -15,10 +15,7 @@ open Lean Meta
 
 open Plausible ArbitrarySizedSuchThat OptionTGen
 
-
 set_option trace.Meta.debug true
-
--- #derive_checker (typing Γ e τ)
 
 
 ---
