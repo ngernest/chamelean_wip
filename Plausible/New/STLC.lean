@@ -55,7 +55,8 @@ def checkLookup (Γ : List type) (x : Nat) (τ : type) : Nat → Option Bool :=
 instance : DecOpt (lookup Γ x τ) where
   decOpt := checkLookup Γ x τ
 
--- TODO: fill in `EnumSizedSuchThat` instance
+-- Dummy `EnumSizedSuchThat` instance
+-- TODO: implement metaprogramming infrastructure for deriving `EnumSizedSuchThat` instances
 instance : EnumSizedSuchThat type (fun τ => typing Γ e τ) where
   enumSizedST := fun _ => OptionT.fail
 
@@ -116,7 +117,7 @@ def checkTyping (Γ : List type) (e : term) (τ : type) : Nat → Option Bool :=
             | _ => none,
         fun _ =>
           match e with
-          | .App e1 e2 =>
+          | .App (.Abs .Nat e1) e2 =>
             EnumeratorCombinators.enumeratingOpt
               (EnumSuchThat.enumST (fun t1 => typing Γ e2 t1))
               (fun t1 => aux_arb initSize size' Γ e1 (.Fun t1 τ))

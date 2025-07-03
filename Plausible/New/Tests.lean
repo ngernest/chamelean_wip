@@ -15,8 +15,8 @@ open Lean Meta
 
 open Plausible ArbitrarySizedSuchThat OptionTGen
 
+set_option trace.Meta.debug true
 
--- TODO: figure out how to rewrite function calls (see section 3 of Computing Correctly)
 
 ---
 

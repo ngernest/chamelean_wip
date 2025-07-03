@@ -116,13 +116,8 @@ def testSimpleRenaming : MetaM Unit := do
   withLocalDeclD `size' (Expr.const `Nat []) fun sizeExVar => do
   withLocalDeclD `l (Expr.const `Tree []) fun lExpr => do
 
-
-    -- logWarning m!"=== TESTING SIMPLE RENAMING ==="
-    -- logWarning m!"Original nExpr name: {nExpr}"
-
     -- Create a match case that causes shadowing
     let matchCase := Expr.app (Expr.const `Nat.succ []) nExpr
-    -- logWarning m!"Match case: {matchCase}"
 
     -- Create expressions that reference the pattern variable
     let auxArbCall := mkApp2 (Expr.const `aux_arb []) sizeExVar nExpr

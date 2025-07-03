@@ -72,18 +72,18 @@ def mkSubCheckerBody (hypothesesToCheck : List Action) (ctor : InductiveConstruc
     | prodAction :: remainingProdActions =>
       match prodAction with
       | .genInputForInductive fvar hyp _ _ => do
-        -- Produces the code `enumeratingOpt (enumST (fun <fvar> => <hyp>)) <checkerContinuation> initSize`,
+        -- Produces the code `enumeratingOpt (enumST (fun $newVar => $hyp)) (fun $newVar => $continuationBody) initSize`,
         -- which invokes a constrained enumerator that produces values satisfying `hyp` and pass them to `checkerContinuation`
         -- (the continuation handles the remaining producer actions in the tail of the `producerActions` list)
-        let lhs := mkIdent fvar.name
+        let newVar := mkIdent fvar.name
         let hypTerm ← PrettyPrinter.delab hyp
-        let enumSuchThatCall ← `($enumSTFn (fun $lhs:ident => $hypTerm))
-        let checkerContinuation ← mkSubCheckerBody hypothesesToCheck ctor remainingProdActions
-        `($enumeratingOptFn:ident $enumSuchThatCall $checkerContinuation $initSizeIdent)
+        let enumSuchThatCall ← `($enumSTFn (fun $newVar:ident => $hypTerm))
+        let continuationBody ← mkSubCheckerBody hypothesesToCheck ctor remainingProdActions
+        `($enumeratingOptFn:ident $enumSuchThatCall (fun $newVar:ident => $continuationBody) $initSizeIdent)
       | .genFVar fvar _ => do
-        -- Produces the code `enumerating enum (fun <fvar> => <checkerContinuation>) initSize`
+        -- Produces the code `enumerating enum (fun $newVar => $continuationBody) initSize`
         -- which invokes an unconstrained enumerator that enumerates values of the given type
-        -- (the type is determined via typeclass resolution), and passes them to `checkerContinuation`
+        -- (the type is determined via typeclass resolution), and passes them to the `continuationBody`
         let newVar := mkIdent fvar.name
         let continuationBody ← mkSubCheckerBody hypothesesToCheck ctor remainingProdActions
         `($enumeratingFn:ident $enumFn (fun $newVar:ident => $continuationBody) $initSizeIdent)
@@ -101,26 +101,30 @@ def mkSubChecker (subChecker : SubCheckerInfo) : TermElabM (TSyntax `term) := do
       -- create a pattern-match expr which only returns the checker body
       -- if the match succeeds
   if !subChecker.inputsToMatch.isEmpty then
-    let mut cases := #[]
 
     -- Handle multiple scrutinees by giving all of them fresh names
     let existingNames := Name.mkStr1 <$> subChecker.inputsToMatch
     let scrutinees := Lean.mkIdent <$> Array.map (fun name => genFreshName existingNames name) existingNames
 
-    -- Construct the match expression based on the info in `matchCases`
-    let patterns ← Array.mapM (fun patternExpr => PrettyPrinter.delab patternExpr) subChecker.matchCases
-    -- If there are multiple scrutinees, the LHS of each case is a tuple containing the elements in `matchCases`
-    let case ← `(Term.matchAltExpr| | $[$patterns:term],* => $checkerBody:term)
-    cases := cases.push case
+    -- Force delaborator to pretty-print pattern cases in prefix position
+    -- (as opposed to using postfix dot-notation, which is not allowed in pattern-matches)
+    withOptions (fun opts => opts.setBool `pp.fieldNotation false) do
+      -- Construct the match expression based on the info in `matchCases`
+      let mut cases := #[]
+      let patterns ← Array.mapM (fun patternExpr => PrettyPrinter.delab patternExpr) subChecker.matchCases
 
-    -- The LHS of the catch-all case contains a tuple consisting entirely of wildcards
-    let numScrutinees := Array.size scrutinees
-    let wildcards := Array.replicate numScrutinees (← `(_))
-    let catchAllCase ← `(Term.matchAltExpr| | $wildcards:term,* => $someFn:ident $falseIdent:ident)
-    cases := cases.push catchAllCase
+      -- If there are multiple scrutinees, the LHS of each case is a tuple containing the elements in `matchCases`
+      let case ← `(Term.matchAltExpr| | $[$patterns:term],* => $checkerBody:term)
+      cases := cases.push case
 
-    -- Create a pattern match that simultaneously matches on all the scrutinees
-    mkSimultaneousMatch scrutinees cases
+      -- The LHS of the catch-all case contains a tuple consisting entirely of wildcards
+      let numScrutinees := Array.size scrutinees
+      let wildcards := Array.replicate numScrutinees (← `(_))
+      let catchAllCase ← `(Term.matchAltExpr| | $wildcards:term,* => $someFn:ident $falseIdent:ident)
+      cases := cases.push catchAllCase
+
+      -- Create a pattern match that simultaneously matches on all the scrutinees
+      mkSimultaneousMatch scrutinees cases
   else
     return checkerBody
 
