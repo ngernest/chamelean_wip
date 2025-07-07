@@ -16,9 +16,8 @@ info: Try this checker: instance : DecOpt (square_of n m) where
   decOpt :=
     let rec aux_dec (initSize : Nat) (size : Nat) (n_0 : Nat) (m_0 : Nat) : Option Bool :=
       match size with
-      | Nat.zero => DecOpt.checkerBacktrack [fun _ => DecOpt.andOptList [DecOpt.decOpt (@Eq Nat m (n * n)) initSize]]
-      | Nat.succ size' =>
-        DecOpt.checkerBacktrack [fun _ => DecOpt.andOptList [DecOpt.decOpt (@Eq Nat m (n * n)) initSize]]
+      | Nat.zero => DecOpt.checkerBacktrack [fun _ => DecOpt.decOpt (@Eq Nat m (n * n)) initSize]
+      | Nat.succ size' => DecOpt.checkerBacktrack [fun _ => DecOpt.decOpt (@Eq Nat m (n * n)) initSize]
     fun size => aux_dec size size n m
 -/
 #guard_msgs(info, drop warning) in

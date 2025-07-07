@@ -29,7 +29,7 @@ info: Try this checker: instance : DecOpt (lookup Γ x τ) where
             | _, _ => Option.some Bool.false,
             fun _ =>
             match Γ_0, x_0 with
-            | τ' :: Γ, Nat.succ n => DecOpt.andOptList [aux_dec initSize size' Γ n τ]
+            | τ' :: Γ, Nat.succ n => aux_dec initSize size' Γ n τ
             | _, _ => Option.some Bool.false]
     fun size => aux_dec size size Γ x τ
 -/
@@ -54,7 +54,7 @@ info: Try this checker: instance : DecOpt (typing Γ e τ) where
             | _, _ => Option.some Bool.false,
             fun _ =>
             match e_0 with
-            | term.Var x => DecOpt.andOptList [DecOpt.decOpt (lookup Γ x τ) initSize]
+            | term.Var x => DecOpt.decOpt (lookup Γ x τ) initSize
             | _ => Option.some Bool.false]
       | Nat.succ size' =>
         DecOpt.checkerBacktrack
@@ -69,17 +69,17 @@ info: Try this checker: instance : DecOpt (typing Γ e τ) where
             | _, _ => Option.some Bool.false,
             fun _ =>
             match e_0, τ_0 with
-            | term.Abs τ1 e, type.Fun τ1_0 τ2 => DecOpt.andOptList [aux_dec initSize size' (τ1 :: Γ) e τ2]
+            | term.Abs τ1 e, type.Fun τ1_0 τ2 => aux_dec initSize size' (τ1 :: Γ) e τ2
             | _, _ => Option.some Bool.false,
             fun _ =>
             match e_0 with
-            | term.Var x => DecOpt.andOptList [DecOpt.decOpt (lookup Γ x τ) initSize]
+            | term.Var x => DecOpt.decOpt (lookup Γ x τ) initSize
             | _ => Option.some Bool.false,
             fun _ =>
             match e_0 with
             | term.App (term.Abs type.Nat e1) e2 =>
               EnumeratorCombinators.enumeratingOpt (EnumSuchThat.enumST (fun τ1 => typing Γ e2 τ1))
-                (fun τ1 => DecOpt.andOptList [aux_dec initSize size' Γ e1 (type.Fun τ1 τ)]) initSize
+                (fun τ1 => aux_dec initSize size' Γ e1 (type.Fun τ1 τ)) initSize
             | _ => Option.some Bool.false]
     fun size => aux_dec size size Γ e τ
 -/

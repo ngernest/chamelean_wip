@@ -67,7 +67,19 @@ def mkSubCheckerBody (hypothesesToCheck : List Action) (ctor : InductiveConstruc
           callsToOtherCheckers := callsToOtherCheckers.push checkerCall
         | _ => throwError "hypothesesToCheck contains Actions that are not checker actions"
 
-      `($andOptListFn:ident [$callsToOtherCheckers,*])
+      -- If there are no calls to other checkers, the body of the sub-checker is trivial
+      -- i.e. just `some true`
+      if callsToOtherCheckers.isEmpty then
+        `($someFn:ident $trueIdent)
+      -- If there is just one call to a checker, we inline that checker call
+      -- in the body of the sub-checker to avoid the extra indirection
+      -- of calling checker combinator functions
+      else if callsToOtherCheckers.size == 1 then
+        `($(callsToOtherCheckers[0]!))
+      -- Otherwise, if there are multiple checker calls,
+      -- we produce the code `andOptList [$callsToOtherCheckers,*]`
+      else
+        `($andOptListFn:ident [$callsToOtherCheckers,*])
 
     | prodAction :: remainingProdActions =>
       match prodAction with
