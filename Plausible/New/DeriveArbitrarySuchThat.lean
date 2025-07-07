@@ -1,17 +1,17 @@
 import Lean
 import Plausible.New.DeriveConstrainedProducers
-import Plausible.New.SubEnumerators
+import Plausible.New.SubGenerators
 
 open Plausible.IR
 open Lean Elab Command Meta Term Parser Std
 open Idents
 
-syntax (name := derive_enumerator) "#derive_enumerator" "(" "fun" "(" ident ":" term ")" "=>" term ")" : command
+syntax (name := derive_generator) "#derive_generator" "(" "fun" "(" ident ":" term ")" "=>" term ")" : command
 
-@[command_elab derive_enumerator]
-def elabDeriveEnumerator : CommandElab := fun stx => do
+@[command_elab derive_generator]
+def elabDeriveGenerator : CommandElab := fun stx => do
   match stx with
-  | `(#derive_enumerator ( fun ( $var:ident : $targetTypeSyntax:term ) => $body:term )) => do
+  | `(#derive_generator ( fun ( $var:ident : $targetTypeSyntax:term ) => $body:term )) => do
 
     -- Parse the body of the lambda for an application of the inductive relation
     let (inductiveName, args) ← deconstructInductiveApplication body
@@ -32,7 +32,7 @@ def elabDeriveEnumerator : CommandElab := fun stx => do
 
     -- Create an auxiliary `SubGeneratorInfo` structure that
     -- stores the metadata for each derived sub-generator
-    let allSubGeneratorInfos ← liftTermElabM $ getSubGeneratorInfos inductiveExpr argNameStrings targetIdx .Enumerator
+    let allSubGeneratorInfos ← liftTermElabM $ getSubGeneratorInfos inductiveExpr argNameStrings targetIdx .Generator
 
     -- Every generator is an inductive generator
     -- (they can all be invoked in the inductive case of the top-level generator),
@@ -40,11 +40,10 @@ def elabDeriveEnumerator : CommandElab := fun stx => do
     let baseGenInfo := Array.filter (fun gen => gen.generatorSort == .BaseGenerator) allSubGeneratorInfos
     let inductiveGenInfo := allSubGeneratorInfos
 
-    let baseEnumerators ← liftTermElabM $ mkSubEnumeratorList baseGenInfo .BaseGenerator
-    let inductiveEnumerators ← liftTermElabM $ mkSubEnumeratorList inductiveGenInfo .InductiveGenerator
+    let baseGenerators ← liftTermElabM $ mkWeightedThunkedSubGenerators baseGenInfo .BaseGenerator
+    let inductiveGenerators ← liftTermElabM $ mkWeightedThunkedSubGenerators inductiveGenInfo .InductiveGenerator
 
-    let typeclassInstance ←
-      mkProducerTypeClassInstance baseEnumerators inductiveEnumerators inductiveName args targetVar targetTypeSyntax .Enumerator
+    let typeclassInstance ← mkProducerTypeClassInstance baseGenerators inductiveGenerators inductiveName args targetVar targetTypeSyntax .Generator
 
     -- Pretty-print the derived generator
     let genFormat ← liftCoreM (PrettyPrinter.ppCommand typeclassInstance)

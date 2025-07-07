@@ -3,7 +3,7 @@ import Plausible.Gen
 import Plausible.New.OptionTGen
 import Plausible.New.DecOpt
 import Plausible.New.ArbitrarySizedSuchThat
-import Plausible.New.DeriveGenerator
+import Plausible.New.DeriveArbitrarySuchThat
 import Test.DeriveArbitrarySuchThat.DeriveBSTGenerator
 
 open ArbitrarySizedSuchThat OptionTGen

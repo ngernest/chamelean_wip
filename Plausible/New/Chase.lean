@@ -1,4 +1,4 @@
-import Plausible.New.DeriveGenerator
+import Plausible.New.DeriveConstrainedProducers
 import Plausible.New.GenSizedSuchThat
 
 inductive MinOk : List Nat → List Nat → Prop where

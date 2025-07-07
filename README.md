@@ -70,7 +70,7 @@ We provide a command elaborator which elaborates the `#derive_generator` command
 -- `#derive_generator` derives a constrained generator for `Tree`s that are balanced at some height `n`,
 -- where `balanced n t` is a user-defined inductive relation
 #derive_generator (fun (t : Tree) => balanced n t) 
-``
+```
 
 To sample from the derived generator, users invoke `runSizedGen` & specify the right 
 instance of the `ArbitrarySizedSuchThat` typeclass (along with some `Nat` to act as the generator size):
@@ -109,8 +109,9 @@ We provide a command elaborator which elaborates the `#derive_checker` command:
 - [`DeriveArbitrary.lean`](./Plausible/New/DeriveArbitrary.lean): Deriver for unconstrained generators (instances of the `Arbitrary` / `ArbitrarySized` typeclasses)
 - [`DeriveEnum.lean`](./Plausible/New/DeriveEnum.lean): Deriver for unconstrainted enumerators 
 (instances of the `Enum` / `EnumSized` typeclasses) 
-- [`DeriveGenerator.lean`](./Plausible/New/DeriveGenerator.lean): Deriver for *constrained* generators (instances of the `ArbitrarySizedSuchThat` typeclass)
-- [`DeriveEnumSuchThat.lean`](./Plausible/New/DeriveEnumSuchThat.lean): Deriver for *constrained* enumerators (instances of the `EnumSizedSuchThat` typeclass) 
+- [`DeriveConstrainedProducers.lean`](./Plausible/New/DeriveConstrainedProducers.lean): Contains most of the generalized logic for deriving constrained producers (used for both generators & enumerators)
+- [`DeriveGenerator.lean`](./Plausible/New/DeriveGenerator.lean): Top-level command elaborator for deriving for *constrained* generators (instances of the `ArbitrarySizedSuchThat` typeclass)
+- [`DeriveEnumSuchThat.lean`](./Plausible/New/DeriveEnumSuchThat.lean): Top-level command elaborator for deriving *constrained* enumerators (instances of the `EnumSizedSuchThat` typeclass) 
 - [`DeriveChecker.lean`](./Plausible/New/DeriveChecker.lean): Deriver for automatically deriving checkers (instances of the `DecOpt` typeclass)
 
 **Logic for handling constraints when deriving code**:

@@ -1,4 +1,4 @@
-import Plausible.New.DeriveGenerator
+import Plausible.New.DeriveConstrainedProducers
 import Plausible.Gen
 
 import Plausible.New.OptionTGen
