@@ -44,3 +44,11 @@ import Test.DeriveDecOpt.SimultaneousMatchingTests
 import Test.DeriveDecOpt.ExistentialVariablesTest
 import Test.DeriveDecOpt.FunctionCallsTest
 import Test.DeriveDecOpt.DeriveSTLCChecker
+
+-- Tests for `#derive_enumerator` (derives `EnumSuchThat`)
+import Test.DeriveEnumSuchThat.DeriveBSTEnumerator
+import Test.DeriveEnumSuchThat.DeriveBalancedTreeEnumerator
+import Test.DeriveEnumSuchThat.DeriveRegExpMatchEnumerator
+import Test.DeriveEnumSuchThat.DeriveSTLCEnumerator
+import Test.DeriveEnumSuchThat.SimultaneousMatchingTests
+import Test.DeriveEnumSuchThat.NonLinearPatternsTest
