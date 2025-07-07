@@ -148,8 +148,22 @@ def allArgsHaveBaseTypes (e : Expr) : MetaM Bool := do
     - Note: The 3rd component is an array containing each subterm of the arrow type -/
 abbrev DecomposedConstructorType := Array (Name × Expr) × Expr × Array Expr
 
+/-- Simple `Repr` instance for `LocalContext` -/
 instance : Repr LocalContext where
-  reprPrec lctx a := ""
+  reprPrec lctx _ :=
+    let decls := lctx.decls.toList.filterMap id
+    if decls.isEmpty then
+      "⟨⟩"
+    else
+      let declReprs := decls.map fun decl =>
+        let name := decl.userName
+        let type := decl.type
+        match decl.kind with
+        | .default => s!"{name} : {type}"
+        | .auxDecl => s!"{name} : {type} (aux)"
+        | .implDetail => s!"{name} : {type} (impl)"
+      let inner := String.intercalate ", " declReprs
+      Std.Format.bracket "⟨" (Std.Format.text inner) "⟩"
 
 /-- The datatype `InductiveConstructor` bundles together metadata
     for a constructor of an inductive relation -/
@@ -612,14 +626,6 @@ def elabGetIRInfoWithName : CommandElab := fun stx => do
       let inductiveInfo ←  getInductiveInfoWithArgs e inpname.toArray
       print_InductiveInfo inductiveInfo
   | _ => throwError "Invalid syntax"
-
--- #get_InductiveInfo balanced
---#get_InductiveInfo bst
---#get_InductiveInfo bst with_name ["lo", "hi", "tree"]
---#get_InductiveInfo typing
-
---open KeyValueStore
---#get_InductiveInfo lookup_kv
 
 
 end Plausible.IR
