@@ -19,6 +19,7 @@ import Plausible.New.Trees
 import Plausible.New.NKIExperiments
 import Plausible.New.DeriveArbitrary
 import Plausible.New.DeriveEnum
+import Plausible.New.DeriveEnumSuchThat
 import Plausible.New.Utils
 import Plausible.New.UnificationMonad
 import Plausible.New.ModeAnalysis

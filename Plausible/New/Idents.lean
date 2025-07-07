@@ -50,6 +50,7 @@ def failFn : Ident := mkIdent $ Name.mkStr2 "OptionT" "fail"
 
 -- Idents for typeclasses
 def arbitrarySizedSuchThatTypeclass : Ident := mkIdent $ Name.mkStr1 "ArbitrarySizedSuchThat"
+def enumSizedSuchThatTypeclass : Ident := mkIdent $ Name.mkStr1 "EnumSizedSuchThat"
 def arbitrarySizedTypeclass : Ident := mkIdent $ Name.mkStr1 "ArbitrarySized"
 def enumSizedTypeclass : Ident := mkIdent $ Name.mkStr1 "EnumSized"
 def decOptTypeclass : Ident := mkIdent $ Name.mkStr1 "DecOpt"
