@@ -56,9 +56,9 @@ info: Try this generator: instance : ArbitrarySizedSuchThat BinaryTree (fun t =>
               OptionTGen.thunkGen
                 (fun _ =>
                   match n_0 with
-                  | Nat.succ n => do
-                    let l ← aux_arb initSize size' n
-                    let r ← aux_arb initSize size' n
+                  | Nat.succ n_1 => do
+                    let l ← aux_arb initSize size' n_1
+                    let r ← aux_arb initSize size' n_1
                     let x ← Arbitrary.arbitrary
                     return BinaryTree.Node x l r
                   | _ => OptionT.fail))]
