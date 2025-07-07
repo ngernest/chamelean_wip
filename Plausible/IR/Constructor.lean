@@ -102,6 +102,8 @@ structure HandlerInfo where
       (used when rewriting free variabels in patterns) -/
   variableEqualities : Array (FVarId × FVarId)
 
+  LCtx: LocalContext
+
   deriving Repr
 
 /-- Datatype containing metadata needed to derive a sub-generator
@@ -116,8 +118,6 @@ structure SubGeneratorInfo extends HandlerInfo where
 
   /-- Determines whether the producer is a generator or an enumerator -/
   producerType : ProducerType
-
-  LCtx: LocalContext
 
   deriving Repr
 
@@ -210,7 +210,7 @@ def mkSubCheckerInfoFromConstructor (ctor : InductiveConstructor)
   let inputPairsThatNeedMatching := inputNamesAndArgs.filter (fun (_, arg) => !arg.isFVar)
   let (inputsToMatch, matchCases) := inputPairsThatNeedMatching.unzip
   let actions ← Actions_for_checker ctor
-  let groupedActions ← mkGroupedActions actions
+  let groupedActions ← mkGroupedActions actions.actions
   let checkerSort := if ctor.recursive_hypotheses.isEmpty then .BaseChecker else .InductiveChecker
   return {
     ctor := ctor
@@ -227,7 +227,7 @@ def mkSubCheckerInfoFromConstructor (ctor : InductiveConstructor)
     the index of the argument we wish to generate (`idx`),
     and returns a corresponding `SubGeneratorInfo` for a generator -/
 def mkSubGeneratorInfoFromConstructor (ctor : InductiveConstructor) (inputNames : Array String)
-  (idx : Nat) : MetaM SubGeneratorInfo := withLCtx' ctor.LCtx do
+  (idx : Nat) (producerType : ProducerType) : MetaM SubGeneratorInfo := withLCtx' ctor.LCtx do
 
   let inputNamesList := inputNames.toList
   let tempFVar := Expr.fvar (← mkFreshFVarId)
@@ -236,7 +236,7 @@ def mkSubGeneratorInfoFromConstructor (ctor : InductiveConstructor) (inputNames 
 
   let conclusion ← separateFVars new_conclusion ctor.LCtx
 
-  let ctor := {ctor with LCtx:= conclusion.LCtx}
+  let ctor := { ctor with LCtx:= conclusion.LCtx }
   let args := conclusion.newHypothesis.getAppArgs.toList
   let zippedInputsAndArgs := List.zip inputNamesList args
 
@@ -254,11 +254,6 @@ def mkSubGeneratorInfoFromConstructor (ctor : InductiveConstructor) (inputNames 
   -- (otherwise, the generator needs to make a recursive call and is thus inductively-defined)
   let generatorSort := if ctor.recursive_hypotheses.isEmpty then .BaseGenerator else .InductiveGenerator
 
-  logWarning "*******************************"
-  logWarning m!"inputsToMatch = {inputsToMatch}"
-  logWarning m!"matchCases = {matchCases}"
-  logWarning "*******************************"
-
   return {
     inputs := (List.eraseIdx inputNamesList idx).toArray
     inputsToMatch := inputsToMatch.toArray
@@ -267,11 +262,11 @@ def mkSubGeneratorInfoFromConstructor (ctor : InductiveConstructor) (inputNames 
     variableEqualities := conclusion.variableEqualities ++ groupedActions.variableEqualities
     generatorSort := generatorSort
     LCtx := actions.Lctx
+    producerType := producerType
   }
 
 -- The functions below create strings containing Lean code based on the information
 -- in a `BacktrackElement`
--- TODO: rewrite to use `TSyntax`
 
 def add_size_param (hyp : Expr) : MetaM String := do
   let fnname := toString (← Meta.ppExpr hyp.getAppFn)
@@ -313,7 +308,7 @@ def actionToCode (Action : Action) (lctx: LocalContext) (monad: String := "IO") 
 
 /-- Produces the outer-most pattern-match block in a sub-generator
     based on the info in a `BacktrackElem` -/
-def backtrackElem_match_block (backtrackElem : SubGeneratorInfo) : MetaM String := withLCtx' backtrackElem.LCtx do
+def backtrackElem_match_block (backtrackElem : HandlerInfo) : MetaM String := withLCtx' backtrackElem.LCtx do
   let mut out := ""
   if backtrackElem.inputsToMatch.size > 0 then
     out := out ++ "match "
@@ -361,7 +356,7 @@ def backtrackElem_gen_check_IR_block (backtrackElem : HandlerInfo) (indentation 
     out := ⟨out.data.dropLast.dropLast⟩
   return (out, vars)
 
-def backtrackElem_return_checker (backtrackElem : SubGeneratorInfo) (indentation : String) (vars : List String) (monad: String :="IO"): MetaM String := withLCtx' backtrackElem.LCtx do
+def backtrackElem_return_checker (backtrackElem : HandlerInfo) (indentation : String) (vars : List String) (monad: String :="IO"): MetaM String := withLCtx' backtrackElem.LCtx do
   let mut out := ""
   if backtrackElem.variableEqualities.size + backtrackElem.groupedActions.checkNonInductiveActions.size + backtrackElem.groupedActions.checkInductiveActions.size > 0 then
     out := out ++ indentation ++ "return "
@@ -434,46 +429,6 @@ def elabgetBackTrack : CommandElab := fun stx => do
       IO.println where_defs
   | _ => throwError "Invalid syntax"
 
-
-
-
-/-- Takes a constructor `ctor` for an inductive relation, a list of argument names `inputNames`,
-    the index of the argument we wish to produce (`idx`),
-    the desired producer type (`producerType`, either `Enumerator` or `Generator`)
-    and returns a corresponding `SubGeneratorInfo` -/
-def mkSubGeneratorInfoFromConstructor (ctor : InductiveConstructor) (inputNames : Array String)
-  (idx : Nat) (producerType : ProducerType) : MetaM SubGeneratorInfo := do
-  let inputNamesList := inputNames.toList
-  let tempFVar := Expr.fvar (FVarId.mk (Name.mkStr1 "temp000"))
-  let conclusion_args := ctor.conclusion.getAppArgs.set! idx tempFVar
-  let new_conclusion := mkAppN ctor.conclusion.getAppFn conclusion_args
-  let conclusion ← separateFVars new_conclusion
-  let args := conclusion.newHypothesis.getAppArgs.toList
-  let zippedInputsAndArgs := List.zip inputNamesList args
-
-  -- Take all elements of `inputNamesAndArgs`, but omit the element at the `genpos`-th index
-  let inputNamesAndArgs := List.eraseIdx zippedInputsAndArgs idx
-
-  -- Find all pairs where the argument is not a free variable
-  -- (these are the arguments that need matching)
-  let inputPairsThatNeedMatching := inputNamesAndArgs.filter (fun (_, arg) => !arg.isFVar)
-  let (inputsToMatch, matchCases) := inputPairsThatNeedMatching.unzip
-  let actions ← Actions_for_producer ctor idx
-  let groupedActions ← mkGroupedActions actions
-
-  -- Constructors with no hypotheses get `BaseGenerator`s
-  -- (otherwise, the generator needs to make a recursive call and is thus inductively-defined)
-  let generatorSort := if ctor.recursive_hypotheses.isEmpty then .BaseGenerator else .InductiveGenerator
-
-  return {
-    inputs := (List.eraseIdx inputNamesList idx).toArray
-    inputsToMatch := inputsToMatch.toArray
-    matchCases := matchCases.toArray
-    groupedActions := groupedActions
-    variableEqualities := conclusion.variableEqualities ++ groupedActions.variableEqualities
-    generatorSort := generatorSort
-    producerType := producerType
-  }
 
 /-- Produces the final if-statement that checks the conjunction of all the hypotheses
     - `vars` is a list of free variables that were produced during the `check_IR` block

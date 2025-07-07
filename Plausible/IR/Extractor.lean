@@ -226,7 +226,7 @@ structure InductiveConstructor where
 
   LCtx : LocalContext
 
---  deriving Repr
+  deriving Repr
 
 
 
