@@ -6,6 +6,10 @@ import Batteries.Data.List.Basic
 open Lean Meta
 open Plausible.IR
 
+/-- Looks up the user-facing `Name` corresponding to an `FVarId` in a specific `LocalContext` -/
+def getUserNameInContext (lctx : LocalContext) (fvarId : FVarId) : Name :=
+  (lctx.get! fvarId).userName
+
 /-- Determines if an instance of the typeclass `className` exists for a particular `type`
     represented as an `Expr`. Under the hood, this tries to synthesize an instance of the typeclass for the type.
 

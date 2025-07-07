@@ -1,4 +1,5 @@
 import Lean
+import Plausible.New.Utils
 import Plausible.IR.Constructor
 import Plausible.New.Idents
 import Plausible.New.TSyntaxCombinators
@@ -22,10 +23,10 @@ open Idents
       `ArbitrarySuchThat.arbitraryST` which produces values satisfying the hypothesis `hyp`
       (note: this requires that such an typeclass instance already exists)
       + If `producerType = .Enumerator`, we produce a similar term, but we call `EnumSuchThat.enumST` instead -/
-def genInputForInductive (fvar : FVarId) (hyp : Expr) (idx : Nat) (generationStyle : GenerationStyle) (producerType : ProducerType) : MetaM (TSyntax `doElem) := do
+def genInputForInductive (fvar : FVarId) (hyp : Expr) (idx : Nat) (generationStyle : GenerationStyle) (producerType : ProducerType) (localCtx : LocalContext) : MetaM (TSyntax `doElem) := do
   let argExprs := hyp.getAppArgs.eraseIdx! idx
   let argTerms ← Array.mapM PrettyPrinter.delab argExprs
-  let lhs := mkIdent $ fvar.name
+  let lhs := Lean.mkIdent $ getUserNameInContext localCtx fvar
 
   let hypTerm ← PrettyPrinter.delab hyp
   let producerConstraint ← `((fun $lhs:ident => $hypTerm))
@@ -126,7 +127,7 @@ def mkSubGeneratorBody (doBlock : TSyntaxArray `doElem) (argToGenTerm : Term) (n
     `Arbitrary.arbitrary` or `Enum.enum`), or if we should invoke a constrained producer
     by calling the producer associated with the `ArbitrarySuchThat` or `EnumSuchThat` instance
     for the constrianing proposition. -/
-def mkLetBindExprsInDoBlock (actions : Array Action) (producerType : ProducerType) : TermElabM (TSyntaxArray `doElem) := do
+def mkLetBindExprsInDoBlock (actions : Array Action) (producerType : ProducerType) (localCtx : LocalContext) : TermElabM (TSyntaxArray `doElem) := do
   let mut doElems := #[]
 
   for action in actions do
@@ -134,7 +135,7 @@ def mkLetBindExprsInDoBlock (actions : Array Action) (producerType : ProducerTyp
     | .genInputForInductive fvar hyp idx style =>
       -- Recursively invoke the producer to sample an argument for the hypothesis `hyp` at index `idx`,
       -- then bind the produced value to the free variable `fvar`
-      let bindExpr ← liftMetaM $ genInputForInductive fvar hyp idx style producerType
+      let bindExpr ← liftMetaM $ genInputForInductive fvar hyp idx style producerType localCtx
       doElems := doElems.push bindExpr
     | .genFVar fvar _ =>
       -- Sample a value from an unconstrained producer using `arbitrary` / `enum`, then bind it to `fvar`
@@ -142,7 +143,7 @@ def mkLetBindExprsInDoBlock (actions : Array Action) (producerType : ProducerTyp
         match producerType with
         | .Generator => arbitraryFn
         | .Enumerator => enumFn
-      let bindExpr ← mkLetBind (mkIdent fvar.name) #[producerFn]
+      let bindExpr ← mkLetBind (Lean.mkIdent $ getUserNameInContext localCtx fvar) #[producerFn]
       doElems := doElems.push bindExpr
     | _ => continue
 
@@ -154,7 +155,7 @@ def mkLetBindExprsInDoBlock (actions : Array Action) (producerType : ProducerTyp
 def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term) := do
 
   -- Create a monadic do-block containing all the calls to other producers (in the form of let-bind expressions)
-  let doElems ← mkLetBindExprsInDoBlock subGenerator.groupedActions.gen_list subGenerator.producerType
+  let doElems ← mkLetBindExprsInDoBlock subGenerator.groupedActions.gen_list subGenerator.producerType subGenerator.LCtx
 
   -- Check that all hypotheses which are not `inductive`s are upheld when we generate free variables
   let mut nonInductiveHypothesesToCheck := #[]
