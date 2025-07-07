@@ -89,7 +89,7 @@ def mkSubCheckerBody (hypothesesToCheck : List Action) (ctor : InductiveConstruc
         -- Produces the code `enumeratingOpt (enumST (fun $newVar => $hyp)) (fun $newVar => $continuationBody) initSize`,
         -- which invokes a constrained enumerator that produces values satisfying `hyp` and pass them to `checkerContinuation`
         -- (the continuation handles the remaining producer actions in the tail of the `producerActions` list)
-        let newVar := mkIdent fvar.name
+        let newVar := mkIdent $ getUserNameInContext ctor.LCtx fvar
         let hypTerm ← delabExprInLocalContext ctor.LCtx hyp
         let enumSuchThatCall ← `($enumSTFn (fun $newVar:ident => $hypTerm))
         let continuationBody ← mkSubCheckerBody hypothesesToCheck ctor remainingProdActions
@@ -98,7 +98,7 @@ def mkSubCheckerBody (hypothesesToCheck : List Action) (ctor : InductiveConstruc
         -- Produces the code `enumerating enum (fun $newVar => $continuationBody) initSize`
         -- which invokes an unconstrained enumerator that enumerates values of the given type
         -- (the type is determined via typeclass resolution), and passes them to the `continuationBody`
-        let newVar := mkIdent fvar.name
+        let newVar := mkIdent $ getUserNameInContext ctor.LCtx fvar
         let continuationBody ← mkSubCheckerBody hypothesesToCheck ctor remainingProdActions
         `($enumeratingFn:ident $enumFn (fun $newVar:ident => $continuationBody) $initSizeIdent)
       | _ => throwError "producerActions contains Actions that are not producer actions"
