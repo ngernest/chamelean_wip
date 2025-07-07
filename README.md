@@ -70,7 +70,7 @@ We provide a command elaborator which elaborates the `#derive_generator` command
 -- `#derive_generator` derives a constrained generator for `Tree`s that are balanced at some height `n`,
 -- where `balanced n t` is a user-defined inductive relation
 #derive_generator (fun (t : Tree) => balanced n t) 
-``
+```
 
 To sample from the derived generator, users invoke `runSizedGen` & specify the right 
 instance of the `ArbitrarySizedSuchThat` typeclass (along with some `Nat` to act as the generator size):
