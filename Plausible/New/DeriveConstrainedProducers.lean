@@ -6,6 +6,7 @@ import Plausible.IR.GCCall
 import Plausible.Gen
 import Plausible.New.OptionTGen
 import Plausible.New.SubGenerators
+import Plausible.New.SubEnumerators
 import Plausible.New.Idents
 import Plausible.New.Utils
 
@@ -103,16 +104,19 @@ def findTargetVarIndex (targetVar : Name) (args : TSyntaxArray `term) : Option N
   Array.findIdx? (fun arg => arg.getId == targetVar) (TSyntaxArray.raw args)
 
 
-/-- Produces an instance of the `ArbitrarySizedSuchThat` typeclass containing the definition for the top-level derived generator.
+/-- Produces an instance of the `ArbitrarySizedSuchThat` / `EnumSizedSuchThat` typeclass containing the definition for the top-level derived generator.
     The arguments to this function are:
     - a list of `baseGenerators` (each represented as a Lean term), to be invoked when `size == 0`
     - a list of `inductiveGenerators`, to be invoked when `size > 0`
     - the name of the inductive relation (`inductiveStx`)
     - the arguments (`args`) to the inductive relation
-    - the name and type for the value we wish to generate (`targetVar`, `targetTypeSyntax`) -/
-def mkTopLevelGenerator (baseGenerators : TSyntax `term) (inductiveGenerators : TSyntax `term) (inductiveStx : TSyntax `term)
+    - the name and type for the value we wish to generate (`targetVar`, `targetTypeSyntax`)
+    - the `producerType`, which determines what typeclass is to be produced
+      + If `producerType = .Generator`, an `ArbitrarySizedSuchThat` instance is produced
+      + If `producerType = .Enumerator`, an `EnumSizedSuchThat` instance is produced -/
+def mkProducerTypeClassInstance (baseGenerators : TSyntax `term) (inductiveGenerators : TSyntax `term) (inductiveStx : TSyntax `term)
   (args : TSyntaxArray `term) (targetVar : Name)
-  (targetTypeSyntax : TSyntax `term) : CommandElabM (TSyntax `command) := do
+  (targetTypeSyntax : TSyntax `term) (producerType : ProducerType) : CommandElabM (TSyntax `command) := do
     -- Fetch the ambient local context, which we need to produce user-accessible fresh names
     let localCtx ← liftTermElabM $ getLCtx
 
@@ -120,17 +124,22 @@ def mkTopLevelGenerator (baseGenerators : TSyntax `term) (inductiveGenerators : 
     -- at the end of the generator function, as well as the `aux_arb` inner helper function
     let freshSizeIdent := mkFreshAccessibleIdent localCtx `size
     let freshSize' := mkFreshAccessibleIdent localCtx `size'
-    let auxArbIdent := mkFreshAccessibleIdent localCtx `aux_arb
-    let generatorType ← `($optionTTypeConstructor $genTypeConstructor $targetTypeSyntax)
 
     let inductiveName := inductiveStx.raw.getId
 
+    -- The (backtracking) combinator to be invoked
+    -- (`OptionTGen.backtrack` for generators, `EnumeratorCombinators.enumerate` for enumerators)
+    let combinatorFn :=
+      match producerType with
+      | .Generator => OptionTBacktrackFn
+      | .Enumerator => enumerateFn
+
     -- Create the cases for the pattern-match on the size argument
     let mut caseExprs := #[]
-    let zeroCase ← `(Term.matchAltExpr| | $(mkIdent ``Nat.zero) => $OptionTBacktrackFn $baseGenerators)
+    let zeroCase ← `(Term.matchAltExpr| | $(mkIdent ``Nat.zero) => $combinatorFn $baseGenerators)
     caseExprs := caseExprs.push zeroCase
 
-    let succCase ← `(Term.matchAltExpr| | $(mkIdent ``Nat.succ) $freshSize' => $OptionTBacktrackFn $inductiveGenerators)
+    let succCase ← `(Term.matchAltExpr| | $(mkIdent ``Nat.succ) $freshSize' => $combinatorFn $inductiveGenerators)
     caseExprs := caseExprs.push succCase
 
     -- Create function arguments for the generator's `size` & `initSize` parameters
@@ -143,12 +152,12 @@ def mkTopLevelGenerator (baseGenerators : TSyntax `term) (inductiveGenerators : 
     -- (except the target variable, which we'll filter out later)
     let paramInfo ← analyzeInductiveArgs inductiveName args
 
-    -- Inner params are for the inner `aux_arb` function
+    -- Inner params are for the inner `aux_arb` / `aux_enum` function
     let mut innerParams := #[]
     innerParams := innerParams.push initSizeParam
     innerParams := innerParams.push sizeParam
 
-    -- Outer params are for the top-level lambda function which invokes `aux_arb`
+    -- Outer params are for the top-level lambda function which invokes `aux_arb` / `aux_enum`
     let mut outerParams := #[]
     for (paramName, paramType) in paramInfo do
       -- Only add a function parameter is the argument to the inductive relation is not the target variable
@@ -164,62 +173,39 @@ def mkTopLevelGenerator (baseGenerators : TSyntax `term) (inductiveGenerators : 
         let innerParam ← `(Term.letIdBinder| ($innerParamIdent : $paramType))
         innerParams := innerParams.push innerParam
 
-    -- Produces an instance of the `ArbitrarySizedSuchThat` typeclass containing the definition for the derived generator
-    `(instance : $arbitrarySizedSuchThatTypeclass $targetTypeSyntax (fun $(mkIdent targetVar) => $inductiveStx $args*) where
-        $unqualifiedArbitrarySizedSTFn:ident :=
-          let rec $auxArbIdent:ident $innerParams* : $generatorType :=
+    -- Figure out which typeclass should be derived
+    -- (`ArbitrarySizedSuchThat` for generators, `EnumSizedSuchThat` for enumerators)
+    let producerTypeClass :=
+      match producerType with
+      | .Generator => arbitrarySizedSuchThatTypeclass
+      | .Enumerator => enumSizedSuchThatTypeclass
+
+    -- Similarly, figure out the name of the function corresponding to the typeclass above
+    let producerTypeClassFunction :=
+      match producerType with
+      | .Generator => unqualifiedArbitrarySizedSTFn
+      | .Enumerator => unqualifiedEnumSizedSTFn
+
+    -- Generators use `aux_arb` as the inner function, enumerators use `aux_enum`
+    let innerFunctionIdent :=
+      match producerType with
+      | .Generator => mkFreshAccessibleIdent localCtx `aux_arb
+      | .Enumerator => mkFreshAccessibleIdent localCtx `aux_enum
+
+    -- Determine the appropriate type constructor to use as the producer's type
+    -- (either `Gen` or `Enumerator`)
+    let producerTypeConstructor :=
+      match producerType with
+      | .Generator => genTypeConstructor
+      | .Enumerator => enumTypeConstructor
+
+    -- Determine the appropriate type of the final producer
+    -- (either `OptionT Plausible.Gen α` or `OptionT Enum α`)
+    let optionTProducerType ← `($optionTTypeConstructor $producerTypeConstructor $targetTypeSyntax)
+
+    -- Produce an instance of the appropriate typeclass containing the definition for the derived producer
+    `(instance : $producerTypeClass $targetTypeSyntax (fun $(mkIdent targetVar) => $inductiveStx $args*) where
+        $producerTypeClassFunction:ident :=
+          let rec $innerFunctionIdent:ident $innerParams* : $optionTProducerType :=
             $matchExpr
-          fun $freshSizeIdent => $auxArbIdent $freshSizeIdent $freshSizeIdent $outerParams*)
-
-
-syntax (name := derive_generator) "#derive_generator" "(" "fun" "(" ident ":" term ")" "=>" term ")" : command
-
-@[command_elab derive_generator]
-def elabDeriveGenerator : CommandElab := fun stx => do
-  match stx with
-  | `(#derive_generator ( fun ( $var:ident : $targetTypeSyntax:term ) => $body:term )) => do
-
-    -- Parse the body of the lambda for an application of the inductive relation
-    let (inductiveName, args) ← deconstructInductiveApplication body
-    let targetVar := var.getId
-
-    -- Elaborate the name of the inductive relation and the type
-    -- of the value to be generated
-    let inductiveExpr ← liftTermElabM $ elabTerm inductiveName none
-
-    -- Find the index of the argument in the inductive application for the value we wish to generate
-    -- (i.e. find `i` s.t. `args[i] == targetVar`)
-    let targetIdxOpt := findTargetVarIndex targetVar args
-    if let .none := targetIdxOpt then
-      throwError "cannot find index of value to be generated"
-    let targetIdx := Option.get! targetIdxOpt
-
-    let argNameStrings := convertIdentsToStrings args
-
-    -- Create an auxiliary `SubGeneratorInfo` structure that
-    -- stores the metadata for each derived sub-generator
-    let allSubGeneratorInfos ← liftTermElabM $ getSubGeneratorInfos inductiveExpr argNameStrings targetIdx .Generator
-
-    -- Every generator is an inductive generator
-    -- (they can all be invoked in the inductive case of the top-level generator),
-    -- but only certain generators qualify as `BaseGenerator`s
-    let baseGenInfo := Array.filter (fun gen => gen.generatorSort == .BaseGenerator) allSubGeneratorInfos
-    let inductiveGenInfo := allSubGeneratorInfos
-
-    let baseGenerators ← liftTermElabM $ mkWeightedThunkedSubGenerators baseGenInfo .BaseGenerator
-    let inductiveGenerators ← liftTermElabM $ mkWeightedThunkedSubGenerators inductiveGenInfo .InductiveGenerator
-
-    let typeclassInstance ← mkTopLevelGenerator baseGenerators inductiveGenerators inductiveName args targetVar targetTypeSyntax
-
-    -- Pretty-print the derived generator
-    let genFormat ← liftCoreM (PrettyPrinter.ppCommand typeclassInstance)
-
-    -- Display the code for the derived generator to the user
-    -- & prompt the user to accept it in the VS Code side panel
-    liftTermElabM $ Tactic.TryThis.addSuggestion stx
-      (Format.pretty genFormat) (header := "Try this generator: ")
-
-    -- Elaborate the typeclass instance and add it to the local context
-    elabCommand typeclassInstance
-
-  | _ => throwUnsupportedSyntax
+          fun $freshSizeIdent => $innerFunctionIdent $freshSizeIdent $freshSizeIdent $outerParams*)

@@ -3,7 +3,7 @@ import Plausible.New.GeneratorCombinators
 import Plausible.New.DecOpt
 import Plausible.New.ArbitrarySizedSuchThat
 import Plausible.New.Arbitrary
-import Plausible.New.DeriveGenerator
+import Plausible.New.DeriveConstrainedProducers
 
 open GeneratorCombinators
 

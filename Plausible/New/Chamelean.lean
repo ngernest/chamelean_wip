@@ -1,7 +1,7 @@
 import Plausible.New.DeriveChecker
 import Plausible.New.SubGenerators
 import Plausible.New.SubCheckers
-import Plausible.New.DeriveGenerator
+import Plausible.New.DeriveConstrainedProducers
 import Plausible.New.Tests
 import Plausible.New.OptionTGen
 import Plausible.New.Idents
@@ -10,6 +10,7 @@ import Plausible.New.TSyntaxCombinators
 import Plausible.New.DecOpt
 import Plausible.New.GeneratorCombinators
 import Plausible.New.ArbitrarySizedSuchThat
+import Plausible.New.DeriveArbitrarySuchThat
 import Plausible.New.Arbitrary
 import Plausible.New.Enumerators
 import Plausible.New.EnumeratorCombinators

@@ -6,7 +6,7 @@ Authors: Paul Mure
 import Plausible.NKI.Basic
 import Plausible.NKI.Types
 import Plausible.IR.PlausibleIR
-import Plausible.New.DeriveGenerator
+import Plausible.New.DeriveConstrainedProducers
 
 namespace Plausible.NKI
 
