@@ -3,6 +3,7 @@ import Plausible.IR.Constructor
 import Plausible.IR.Extractor
 import Plausible.New.Idents
 import Plausible.New.TSyntaxCombinators
+import Plausible.New.Utils
 
 open Plausible.IR
 open Idents
@@ -18,19 +19,20 @@ inductive CheckerStyle
   | TypeClassResolution
   deriving Repr
 
-/-- `mkAuxiliaryCheckerCall hyp checkerStyle` creates a Lean term representing a call to a
-    checker that determines whether the hypothesis `hyp` holds (note that `hyp` should be fully applied)
+/-- `mkAuxiliaryCheckerCall hyp checkerStyle localCtx` creates a Lean term representing a call to a
+    checker that determines whether the hypothesis `hyp` holds (note that `hyp` should be fully applied).
+    - The `localCtx` argument is used for delaboration purposes (so that free variables are properly associated with their user-facing names).
     - The `checkerStyle` argument is used to determine the style in which the checker call should be performed
     - If `checkerStyle = .RecursiveCall`, we produce the term
     `aux_dec initSize size' (<hyp>)`, i.e. we perform a recursive call to the parent `aux_dec` function
     - If `checkerStyle = .TypeClassResolution`, we produce the term
     `DecOpt.decOpt (<hyp>) initSize`, i.e. we  use typeclass resolution to invoke the checker from the typeclass function
     `DecOpt.decOpt` which determines whether `hyp` holds -/
-def mkAuxiliaryCheckerCall (hyp : Expr) (checkerStyle : CheckerStyle) : MetaM (TSyntax `term) := do
-  let hypTerm ← PrettyPrinter.delab hyp.getAppFn
+def mkAuxiliaryCheckerCall (hyp : Expr) (checkerStyle : CheckerStyle) (localCtx : LocalContext) : MetaM (TSyntax `term) := do
+  let hypTerm ← delabExprInLocalContext localCtx hyp.getAppFn
 
   let argExprs := hyp.getAppArgs
-  let argTerms ← Array.mapM PrettyPrinter.delab argExprs
+  let argTerms ← Array.mapM (delabExprInLocalContext localCtx) argExprs
 
   match checkerStyle with
   | .RecursiveCall => `($auxDecFn $initSizeIdent $(mkIdent `size') $argTerms*)
@@ -63,7 +65,7 @@ def mkSubCheckerBody (hypothesesToCheck : List Action) (ctor : InductiveConstruc
           -- If yes, perform a recursive call to the parent checker
           -- Otherwise, perform typeclass resolution & invoke the checker provided by the `DecOpt` instance for the proposition
           let checkerStyle := if hypothesisRecursivelyCallsCurrentInductive hyp ctor then .RecursiveCall else .TypeClassResolution
-          let checkerCall ← mkAuxiliaryCheckerCall hyp checkerStyle
+          let checkerCall ← mkAuxiliaryCheckerCall hyp checkerStyle ctor.LCtx
           callsToOtherCheckers := callsToOtherCheckers.push checkerCall
         | _ => throwError "hypothesesToCheck contains Actions that are not checker actions"
 
@@ -88,7 +90,7 @@ def mkSubCheckerBody (hypothesesToCheck : List Action) (ctor : InductiveConstruc
         -- which invokes a constrained enumerator that produces values satisfying `hyp` and pass them to `checkerContinuation`
         -- (the continuation handles the remaining producer actions in the tail of the `producerActions` list)
         let newVar := mkIdent fvar.name
-        let hypTerm ← PrettyPrinter.delab hyp
+        let hypTerm ← delabExprInLocalContext ctor.LCtx hyp
         let enumSuchThatCall ← `($enumSTFn (fun $newVar:ident => $hypTerm))
         let continuationBody ← mkSubCheckerBody hypothesesToCheck ctor remainingProdActions
         `($enumeratingOptFn:ident $enumSuchThatCall (fun $newVar:ident => $continuationBody) $initSizeIdent)
