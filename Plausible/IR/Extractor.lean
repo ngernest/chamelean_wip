@@ -378,10 +378,9 @@ def unify_args_with_conclusion (hypotheses : Array Expr) (conclusion : Expr) (in
     and builds an `IRConstructor` containing metadata for the constructor.
     During this process, the names of input arguments (`argNames`) are unified with variables in the
     conclusion of the constructor. -/
-def process_constructor_unify_args (ctor_type: Expr) (input_vars : Array Expr) (input_types : Array Expr)
-  (inductive_relation_name: Name) (input_args : Array FVarId) (IRLCtx: LocalContext): MetaM InductiveConstructor := do
-  --let (bound_vars_and_types, _ , components_of_arrow_type) ← decomposeType ctor_type
-  let (bound_vars_and_types, _ , components_of_arrow_type, ConLCtx) ← decomposeType_withLocalContext ctor_type IRLCtx
+def process_constructor_unify_args (ctorName : Name) (ctorType: Expr) (inputVars : Array Expr) (inputTypes : Array Expr)
+  (inductiveRelationName: Name) (IRLCtx: LocalContext): MetaM InductiveConstructor := do
+  let (bound_vars_and_types, ctorExpr, components_of_arrow_type, ConLCtx) ← decomposeType_withLocalContext ctorType IRLCtx
 
   -- `boundVarCtx` maps free variables (identified by their `FVarId`) to their types
   let mut boundVarCtx := HashMap.emptyWithCapacity
@@ -389,7 +388,7 @@ def process_constructor_unify_args (ctor_type: Expr) (input_vars : Array Expr) (
     let fid := FVarId.mk boundVar
     boundVarCtx := boundVarCtx.insert fid ty
 
-  let input_fvids := input_vars.map Expr.fvarId!
+  let input_fvids := inputVars.map Expr.fvarId!
   match splitLast? components_of_arrow_type with
   | some (originalHypotheses, originalConclusion) =>
     -- Check if `conclusion` contains any subterms that are function calls
@@ -397,11 +396,12 @@ def process_constructor_unify_args (ctor_type: Expr) (input_vars : Array Expr) (
     -- Then, unify `argNames` with each arg in the conclusion
     let (hypotheses, conclusion, newCtx) ←
       if (← containsNonTrivialFuncApp originalConclusion inductiveRelationName) then
+        -- TODO: update `rewriteFuncCallsInConclusion` to use local context
         let (updatedHypotheses, rewrittenConclusion, updatedCtx) ←
           rewriteFuncCallsInConclusion originalHypotheses originalConclusion inductiveRelationName boundVarCtx
-        unify_args_with_conclusion updatedHypotheses rewrittenConclusion argNames updatedCtx
+        unify_args_with_conclusion updatedHypotheses rewrittenConclusion input_fvids
       else
-        unify_args_with_conclusion originalHypotheses originalConclusion argNames boundVarCtx
+        unify_args_with_conclusion originalHypotheses originalConclusion input_fvids
 
     let (bound_vars, _) := bound_vars_and_types.unzip
     let (bound_vars_with_base_types, _) :=
@@ -420,9 +420,9 @@ def process_constructor_unify_args (ctor_type: Expr) (input_vars : Array Expr) (
       (throwError "conclusion_args is an unexpected empty list")
 
     for hyp in hypotheses do
-      if ← isHypothesisOfInductiveConstructor_inNamespace hyp inductive_relation_name.getRoot then
+      if ← isHypothesisOfInductiveConstructor_inNamespace hyp inductiveRelationName.getRoot then
         hypotheses_that_are_inductive_applications := hypotheses_that_are_inductive_applications.push hyp
-      if ← isDependency hyp.getAppFn inductive_relation_name.getRoot then
+      if ← isDependency hyp.getAppFn inductiveRelationName.getRoot then
         dependencies := dependencies.push hyp.getAppFn
       if hyp.getAppFn.constName == inductiveRelationName then
         recursive_hypotheses := recursive_hypotheses.push hyp
@@ -440,12 +440,11 @@ def process_constructor_unify_args (ctor_type: Expr) (input_vars : Array Expr) (
 
     return {
       ctorType := ctorType
-      ctorName := ctor_name
-      ctorType := ctor_type
-      ctorExpr := con_expr
-      input_vars := input_vars,
+      ctorName := ctorName
+      ctorExpr := ctorExpr
+      input_vars := inputVars,
       bound_vars := bound_vars,
-      bound_var_ctx := newCtx,
+      inp_map := newCtx,
       all_hypotheses := hypotheses,
       conclusion := conclusion,
       conclusion_args := conclusion_args,
