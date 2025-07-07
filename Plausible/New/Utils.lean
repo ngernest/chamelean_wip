@@ -10,8 +10,8 @@ open Plausible.IR
 def getUserNameInContext (lctx : LocalContext) (fvarId : FVarId) : Name :=
   (lctx.get! fvarId).userName
 
-/-- Converts an `Expr` in a `LocalContext` to a `TSyntax term` -/
-def exprToTSyntaxTerm (lctx : LocalContext) (e : Expr) : MetaM (TSyntax `term) :=
+/-- Delaborates an `Expr` in a `LocalContext` to a `TSyntax term` -/
+def delabExprInLocalContext (lctx : LocalContext) (e : Expr) : MetaM (TSyntax `term) :=
   withLCtx lctx #[] do
     PrettyPrinter.delab e
 
