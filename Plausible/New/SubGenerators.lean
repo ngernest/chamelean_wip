@@ -167,7 +167,7 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
       if ty.isProp then
         -- If yes, add it to our list of hypotheses to check using the `DecOpt` instance
         -- for that particular `Prop`
-        let predicateTerm ← PrettyPrinter.delab predicateExpr
+        let predicateTerm ← exprToTSyntaxTerm subGenerator.LCtx predicateExpr
         nonInductiveHypothesesToCheck := nonInductiveHypothesesToCheck.push predicateTerm
       else if ty == mkSort levelOne then
         -- `predicateExpr` is a `Type` (i.e. `Type 0`, the usual universe level for ordinary types)
@@ -180,8 +180,8 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
   let mut inductiveHypothesesToCheck : TSyntaxArray `term := #[]
   for action in subGenerator.groupedActions.checkInductiveActions do
     if let .checkInductive inductiveExpr := action then
-      -- Use the delaborator to convert an `Expr` into a `Term`
-      let inductiveTerm ← PrettyPrinter.delab inductiveExpr
+      -- Convert the `Expr` into a `Term` using the info about free variables stored in the current `LocalContext`
+      let inductiveTerm ← exprToTSyntaxTerm subGenerator.LCtx inductiveExpr
 
       -- Conver the `Term` into a `TSyntax term`
       let typedInductiveTerm ← `($inductiveTerm:term)
@@ -204,7 +204,7 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
     match action' with
     | .ret expr =>
       -- Delaborate `expr` to get a `TSyntax` for the argument we're generating
-      let argToGenTerm ← PrettyPrinter.delab expr
+      let argToGenTerm ← exprToTSyntaxTerm subGenerator.LCtx expr
 
       -- Create the body of the sub-generator consisting of a monadic do-block and any extra pattern-matches
       -- to check non-inductive hypotheses / variable equalities
@@ -224,7 +224,7 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
         let scrutinees := Lean.mkIdent <$> Array.map (fun name => genFreshName existingNames name) existingNames
 
         -- Construct the match expression based on the info in `matchCases`
-        let patterns ← Array.mapM (fun patternExpr => PrettyPrinter.delab patternExpr) subGenerator.matchCases
+        let patterns ← Array.mapM (fun patternExpr => exprToTSyntaxTerm subGenerator.LCtx patternExpr) subGenerator.matchCases
         -- If there are multiple scrutinees, the LHS of each case is a tuple containing the elements in `matchCases`
         let case ← `(Term.matchAltExpr| | $[$patterns:term],* => $generatorBody:term)
         cases := cases.push case

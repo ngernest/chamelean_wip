@@ -99,9 +99,10 @@ structure HandlerInfo where
   groupedActions : GroupedActions
 
   /-- A list of equalities that must hold between free variables
-      (used when rewriting free variabels in patterns) -/
+      (used when rewriting free variables in patterns) -/
   variableEqualities : Array (FVarId × FVarId)
 
+  /-- `LocalContext` associated with all the `FVarId`s -/
   LCtx: LocalContext
 
   deriving Repr

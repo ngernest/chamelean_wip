@@ -12,28 +12,8 @@ def getUserNameInContext (lctx : LocalContext) (fvarId : FVarId) : Name :=
 
 /-- Converts an `Expr` in a `LocalContext` to a `TSyntax term` -/
 def exprToTSyntaxTerm (lctx : LocalContext) (e : Expr) : MetaM (TSyntax `term) :=
-  match e with
-  | .fvar fvarId =>
-    return Lean.mkIdent (getUserNameInContext lctx fvarId)
-   | .const name _ =>
-    return mkIdent name
-  | .app f arg => do
-    let fSyntax ← exprToTSyntaxTerm lctx f
-    let argSyntax ← exprToTSyntaxTerm lctx arg
-    return ← `(($fSyntax $argSyntax))
-  | .lam name ty body _ => do
-    let tySyntax ← exprToTSyntaxTerm lctx ty
-    let bodySyntax ← exprToTSyntaxTerm lctx body
-    return ← `(fun $(mkIdent name) : $tySyntax => $bodySyntax)
-  | .forallE name ty body _ => do
-    let tySyntax ← exprToTSyntaxTerm lctx ty
-    let bodySyntax ← exprToTSyntaxTerm lctx body
-    return ← `(∀ $(mkIdent name) : $tySyntax, $bodySyntax)
-  | .lit (.natVal n) => return quote n
-  | .lit (.strVal s) => return quote s
-  | .sort (.zero) => return ← `(Prop)
-  | .sort (.succ .zero) => return ← `(Type)
-  | _ => throwError m!"Encountered unsupported expression when converting Expr {e} to TSyntax `term"
+  withLCtx lctx #[] do
+    PrettyPrinter.delab e
 
 
 
