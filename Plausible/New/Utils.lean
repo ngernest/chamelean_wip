@@ -10,12 +10,13 @@ open Plausible.IR
 def getUserNameInContext (lctx : LocalContext) (fvarId : FVarId) : Name :=
   (lctx.get! fvarId).userName
 
-/-- Delaborates an `Expr` in a `LocalContext` to a `TSyntax term` -/
+/-- Delaborates an `Expr` in a `LocalContext` to a `TSyntax term`
+    (this function forces delaborator to pretty-print pattern cases in prefix position,
+    as opposed to using postfix dot-notation, which is not allowed in pattern-matches) -/
 def delabExprInLocalContext (lctx : LocalContext) (e : Expr) : MetaM (TSyntax `term) :=
-  withLCtx lctx #[] do
-    PrettyPrinter.delab e
-
-
+  withOptions (fun opts => opts.setBool `pp.fieldNotation false) $
+    withLCtx lctx #[] do
+      PrettyPrinter.delab e
 
 /-- Determines if an instance of the typeclass `className` exists for a particular `type`
     represented as an `Expr`. Under the hood, this tries to synthesize an instance of the typeclass for the type.
