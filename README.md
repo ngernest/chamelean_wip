@@ -63,20 +63,28 @@ Similarly, to return the elements produced form a derived enumerator, users can 
 ```
 
 **2. Deriving constrained generators** (for inductive relations)                
-A *constrained* generator only produces random values that satisfy a user-specified inductive relation. 
-We provide a command elaborator which elaborates the `#derive_generator` command:
+A *constrained* producer only produces values that satisfy a user-specified inductive relation. 
+Constrained generators randomly sample values, while constrained enumerators enumerate them.
+
+We provide two command elaborators for deriving constrained generators/enumerators:
 
 ```lean
--- `#derive_generator` derives a constrained generator for `Tree`s that are balanced at some height `n`,
+-- `#derive_generator` & `#derive_enumerator` derive constrained generators/enumerators 
+-- for `Tree`s that are balanced at some height `n`,
 -- where `balanced n t` is a user-defined inductive relation
 #derive_generator (fun (t : Tree) => balanced n t) 
+#derive_enumerator (fun (t : Tree) => balanced n t)
 ```
-
-To sample from the derived generator, users invoke `runSizedGen` & specify the right 
-instance of the `ArbitrarySizedSuchThat` typeclass (along with some `Nat` to act as the generator size):
+To sample from the derived producer, users invoke `runSizedGen` / `runSizedEnum` & specify the right 
+instance of the `ArbitrarySizedSuchThat` / `EnumSizedSuchThat` typeclass (along with some `Nat` to act as the generator size):
 
 ```lean
+-- For generators:
 #eval runSizedGen (ArbitrarySizedSuchThat.arbitrarySizedST (fun t => balanced 5 t)) 10
+
+-- For enumerators:
+-- (we recommend using a smaller `Nat` as the fuel for enumerators to avoid stack overflow)
+#eval runSizedEnum (EnumSizedSuchThat.enumSizedST (fun t => balanced 5 t)) 3
 ```
 
 **3. Deriving checkers (partial decision procedures)** (for inductively-defined propositions)
