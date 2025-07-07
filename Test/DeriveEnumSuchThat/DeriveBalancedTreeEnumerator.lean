@@ -31,9 +31,9 @@ info: Try this generator: instance : EnumSizedSuchThat BinaryTree (fun t => bala
             | 1 => pure BinaryTree.Leaf
             | _ => OptionT.fail,
             match n_0 with
-            | Nat.succ n => do
-              let l ← aux_enum initSize size' n
-              let r ← aux_enum initSize size' n
+            | Nat.succ n_1 => do
+              let l ← aux_enum initSize size' n_1
+              let r ← aux_enum initSize size' n_1
               let x ← Enum.enum
               return BinaryTree.Node x l r
             | _ => OptionT.fail]

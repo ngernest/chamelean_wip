@@ -34,8 +34,8 @@ info: Try this checker: instance : DecOpt (balancedTree n t) where
             | _, _ => Option.some Bool.false,
             fun _ =>
             match n_0, t_0 with
-            | Nat.succ n, BinaryTree.Node x l r =>
-              DecOpt.andOptList [aux_dec initSize size' n l, aux_dec initSize size' n r]
+            | Nat.succ n_1, BinaryTree.Node x l r =>
+              DecOpt.andOptList [aux_dec initSize size' n_1 l, aux_dec initSize size' n_1 r]
             | _, _ => Option.some Bool.false]
     fun size => aux_dec size size n t
 -/
