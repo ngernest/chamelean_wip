@@ -19,17 +19,17 @@ info: Try this checker: instance : DecOpt (lookup Γ x τ) where
         DecOpt.checkerBacktrack
           [fun _ =>
             match Γ_0, x_0 with
-            | τ :: Γ, 0 => Option.some Bool.true
+            | τ :: Γ_1, 0 => Option.some Bool.true
             | _, _ => Option.some Bool.false]
       | Nat.succ size' =>
         DecOpt.checkerBacktrack
           [fun _ =>
             match Γ_0, x_0 with
-            | τ :: Γ, 0 => Option.some Bool.true
+            | τ :: Γ_1, 0 => Option.some Bool.true
             | _, _ => Option.some Bool.false,
             fun _ =>
             match Γ_0, x_0 with
-            | τ' :: Γ, Nat.succ n => aux_dec initSize size' Γ n τ
+            | τ' :: Γ_1, Nat.succ n => aux_dec initSize size' Γ_1 n τ
             | _, _ => Option.some Bool.false]
     fun size => aux_dec size size Γ x τ
 -/
@@ -69,7 +69,7 @@ info: Try this checker: instance : DecOpt (typing Γ e τ) where
             | _, _ => Option.some Bool.false,
             fun _ =>
             match e_0, τ_0 with
-            | term.Abs τ1 e, type.Fun τ1_0 τ2 => aux_dec initSize size' (τ1 :: Γ) e τ2
+            | term.Abs τ1 e_1, type.Fun τ1_0 τ2 => aux_dec initSize size' (τ1 :: Γ) e_1 τ2
             | _, _ => Option.some Bool.false,
             fun _ =>
             match e_0 with

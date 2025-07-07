@@ -16,7 +16,7 @@ info: Try this generator: instance : EnumSizedSuchThat Nat (fun x => lookup Γ x
       | Nat.zero =>
         EnumeratorCombinators.enumerate
           [match Γ_0 with
-            | τ :: Γ =>
+            | τ :: Γ_1 =>
               match DecOpt.decOpt (τ = τ_0) initSize with
               | Option.some Bool.true => pure 0
               | _ => OptionT.fail
@@ -25,14 +25,14 @@ info: Try this generator: instance : EnumSizedSuchThat Nat (fun x => lookup Γ x
       | Nat.succ size' =>
         EnumeratorCombinators.enumerate
           [match Γ_0 with
-            | τ :: Γ =>
+            | τ :: Γ_1 =>
               match DecOpt.decOpt (τ = τ_0) initSize with
               | Option.some Bool.true => pure 0
               | _ => OptionT.fail
             | _ => OptionT.fail,
             match Γ_0 with
-            | τ' :: Γ => do
-              let n ← aux_enum initSize size' Γ τ
+            | τ' :: Γ_1 => do
+              let n ← aux_enum initSize size' Γ_1 τ
               return Nat.succ n
             | _ => OptionT.fail]
     fun size => aux_enum size size Γ τ
