@@ -25,10 +25,10 @@ open Idents
       + If `producerType = .Enumerator`, we produce a similar term, but we call `EnumSuchThat.enumST` instead -/
 def genInputForInductive (fvar : FVarId) (hyp : Expr) (idx : Nat) (generationStyle : GenerationStyle) (producerType : ProducerType) (localCtx : LocalContext) : MetaM (TSyntax `doElem) := do
   let argExprs := hyp.getAppArgs.eraseIdx! idx
-  let argTerms ← Array.mapM PrettyPrinter.delab argExprs
+  let argTerms ← Array.mapM (exprToTSyntaxTerm localCtx) argExprs
   let lhs := Lean.mkIdent $ getUserNameInContext localCtx fvar
 
-  let hypTerm ← PrettyPrinter.delab hyp
+  let hypTerm ← exprToTSyntaxTerm localCtx hyp
   let producerConstraint ← `((fun $lhs:ident => $hypTerm))
 
   let recursiveProducerFn :=
