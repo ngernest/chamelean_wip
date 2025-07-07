@@ -4,6 +4,7 @@ import Plausible.IR.Prelude
 import Plausible.IR.Constructor
 import Plausible.IR.GCCall
 import Plausible.New.DeriveGenerator
+import Plausible.New.SubEnumerators
 import Plausible.New.Idents
 import Plausible.New.Utils
 
@@ -114,6 +115,7 @@ def elabDeriveEnumerator : CommandElab := fun stx => do
     let baseGenInfo := Array.filter (fun gen => gen.generatorSort == .BaseGenerator) allSubGeneratorInfos
     let inductiveGenInfo := allSubGeneratorInfos
 
+    -- TODO: modify `mkWeightedThunkedSubGenerators` (enumerators don't have weights & aren't thunked)
     let baseEnumerators ← liftTermElabM $ mkWeightedThunkedSubGenerators baseGenInfo .BaseGenerator
     let inductiveEnumerators ← liftTermElabM $ mkWeightedThunkedSubGenerators inductiveGenInfo .InductiveGenerator
 

@@ -68,6 +68,13 @@ inductive CheckerSort where
   | InductiveChecker
   deriving Repr, BEq
 
+/-- Determines whether a producer is a `Generator` or an `Enumerator` -/
+inductive ProducerType where
+  | Generator
+  | Enumerator
+  deriving Repr, BEq
+
+
 /-- Datatype containing metadata needed to derive a handler
     (handlers are a generalization of sub-generators/sub-checkers)
     - See the `SubGeneratorInfo` & `SubCheckerInfo` types, which extend this type
@@ -94,6 +101,7 @@ structure HandlerInfo where
   /-- A list of equalities that must hold between free variables
       (used when rewriting free variabels in patterns) -/
   variableEqualities : Array (FVarId × FVarId)
+
   deriving Repr
 
 /-- Datatype containing metadata needed to derive a sub-generator
@@ -105,6 +113,10 @@ structure SubGeneratorInfo extends HandlerInfo where
        when `size > 0` (i.e. the sub-generator is inductively defined and makes
        recursive calls) -/
   generatorSort : GeneratorSort
+
+  /-- Determines whether the producer is a generator or an enumerator -/
+  producerType : ProducerType
+
   deriving Repr
 
 /-- Datatype containing metadata needed to derive a sub-checker
@@ -416,6 +428,7 @@ def mkSubGeneratorInfoFromConstructor (ctor : InductiveConstructor) (inputNames 
     groupedActions := groupedActions
     variableEqualities := conclusion.variableEqualities ++ groupedActions.variableEqualities
     generatorSort := generatorSort
+    producerType := .Generator -- TODO: figure out how to generalize this to handle enumerators
   }
 
 /-- Produces the final if-statement that checks the conjunction of all the hypotheses

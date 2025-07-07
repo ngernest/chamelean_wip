@@ -135,7 +135,8 @@ def testSimpleRenaming : MetaM Unit := do
         variableEqualities := #[]
       },
       generatorSort := .InductiveGenerator,
-      variableEqualities := #[]
+      variableEqualities := #[],
+      producerType := .Generator
     }
 
     logWarning m!"Before renaming - nExpr name: {nExpr}"

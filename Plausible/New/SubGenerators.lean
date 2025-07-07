@@ -8,29 +8,42 @@ open Lean Elab Command Meta Term Parser Std
 open Idents
 
 
-/-- `genInputForInductive fvar hyp idx generationStyle` produces a let-bind expression of the form
-    based on the `generationStyle` specified:
+/-- `genInputForInductive fvar hyp idx generationStyle producerType` produces a let-bind expression of the form
+    based on the specified `generationStyle` and `producerType`:
     - If `generationStyle = .RecursiveCall`, we produce the term
       `let fvar ← aux_arb size e1 … en`, where `e1, …, en` are the arguments to the
       a hypothesis `hyp` for an inductive relation with the argument at index `idx` removed
       (since `fvar` is the argument at index `idx`, and we are generating `fvar`)
-    - If `generationStyle = .TypeClassResolution`, we produce the term
+      + If `producerType = .Generator`, we call `aux_arb` (the inner function in a derived generator)
+      + If `producerType = .Enumerator`, we call `aux_enum` (the inner function in a derived generator)
+    - If `generationStyle = .TypeClassResolution` and `producerType = .Generator`, we produce the term
       `let fvar ← ArbitrarySuchThat.arbitraryST (fun fvar => hyp)`, i.e.
       we use typeclass resolution to invoke the generator from the typeclass function
       `ArbitrarySuchThat.arbitraryST` which produces values satisfying the hypothesis `hyp`
-      (note: this requires that such an typeclass instance already exists). -/
-def genInputForInductive (fvar : FVarId) (hyp : Expr) (idx : Nat) (generationStyle : GenerationStyle) : MetaM (TSyntax `doElem) := do
+      (note: this requires that such an typeclass instance already exists)
+      + If `producerType = .Enumerator`, we produce a similar term, but we call `EnumSuchThat.enumST` instead -/
+def genInputForInductive (fvar : FVarId) (hyp : Expr) (idx : Nat) (generationStyle : GenerationStyle) (producerType : ProducerType) : MetaM (TSyntax `doElem) := do
   let argExprs := hyp.getAppArgs.eraseIdx! idx
   let argTerms ← Array.mapM PrettyPrinter.delab argExprs
   let lhs := mkIdent $ fvar.name
 
   let hypTerm ← PrettyPrinter.delab hyp
-  let generatorConstraint ← `((fun $lhs:ident => $hypTerm))
+  let producerConstraint ← `((fun $lhs:ident => $hypTerm))
+
+  let recursiveProducerFn :=
+    match producerType with
+    | .Generator => auxArbFn
+    | .Enumerator => auxEnumFn
+
+  let producerTypeclassFn :=
+    match producerType with
+    | .Generator => arbitrarySTFn
+    | .Enumerator => enumSTFn
 
   let rhsTerms :=
     match generationStyle with
-    | .RecursiveCall => #[auxArbFn, initSizeIdent, mkIdent `size'] ++ argTerms
-    | .TypeClassResolution => #[arbitrarySTFn, generatorConstraint]
+    | .RecursiveCall => #[recursiveProducerFn, initSizeIdent, mkIdent `size'] ++ argTerms
+    | .TypeClassResolution => #[producerTypeclassFn, producerConstraint]
 
   mkLetBind lhs rhsTerms
 
@@ -81,6 +94,7 @@ def mkSubGeneratorBody (doBlock : TSyntaxArray `doElem) (argToGenTerm : Term) (n
       doElems := doElems.push ifExpr
     } else {
       if !variableEqualitiesToCheck.isEmpty then {
+        -- Check that the equalities in `variableEqualitiesToCheck` hold (via creating a pattern match)
         let matchExpr ← mkVariableEqualityCheckMatchExpr `doElem variableEqualitiesToCheck (← mkDoBlock #[retExpr])
         doElems := doElems.push matchExpr
       } else {
@@ -105,26 +119,42 @@ def mkSubGeneratorBody (doBlock : TSyntaxArray `doElem) (argToGenTerm : Term) (n
     }
   }
 
+/-- Creates let-bind expressions of the form `let x ← ...` inside a monadic do-block, where the RHS
+    of the let-bind expr is a call to some monadic producer (generator or producer).
+    The `producerType` argument determines whether a generator or an enumerator should be invoked,
+    while `actions` is used to determine whether we sample an unconstrained value (e.g. by calling
+    `Arbitrary.arbitrary` or `Enum.enum`), or if we should invoke a constrained producer
+    by calling the producer associated with the `ArbitrarySuchThat` or `EnumSuchThat` instance
+    for the constrianing proposition. -/
+def mkLetBindExprsInDoBlock (actions : Array Action) (producerType : ProducerType) : TermElabM (TSyntaxArray `doElem) := do
+  let mut doElems := #[]
 
+  for action in actions do
+    match action with
+    | .genInputForInductive fvar hyp idx style =>
+      -- Recursively invoke the producer to sample an argument for the hypothesis `hyp` at index `idx`,
+      -- then bind the produced value to the free variable `fvar`
+      let bindExpr ← liftMetaM $ genInputForInductive fvar hyp idx style producerType
+      doElems := doElems.push bindExpr
+    | .genFVar fvar _ =>
+      -- Sample a value from an unconstrained producer using `arbitrary` / `enum`, then bind it to `fvar`
+      let producerFn :=
+        match producerType with
+        | .Generator => arbitraryFn
+        | .Enumerator => enumFn
+      let bindExpr ← mkLetBind (mkIdent fvar.name) #[producerFn]
+      doElems := doElems.push bindExpr
+    | _ => continue
+
+  return doElems
 
 
 /-- Constructs an anonymous sub-generator. See the comments in the body of this function
     for details on how this sub-generator is created. -/
 def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term) := do
-  let mut doElems := #[]
 
-  for action in subGenerator.groupedActions.gen_list do
-    match action with
-    | .genInputForInductive fvar hyp idx style =>
-      -- Recursively invoke the generator to generate an argument for the hypothesis `hyp` at index `idx`,
-      -- then bind the generated value to the free variable `fvar`
-      let bindExpr ← liftMetaM $ genInputForInductive fvar hyp idx style
-      doElems := doElems.push bindExpr
-    | .genFVar fvar _ =>
-      -- Generate a value using `arbitrary`, then bind it to `fvar`
-      let bindExpr ← mkLetBind (mkIdent fvar.name) #[arbitraryFn]
-      doElems := doElems.push bindExpr
-    | _ => continue
+  -- Create a monadic do-block containing all the calls to other producers (in the form of let-bind expressions)
+  let doElems ← mkLetBindExprsInDoBlock subGenerator.groupedActions.gen_list subGenerator.producerType
 
   -- Check that all hypotheses which are not `inductive`s are upheld when we generate free variables
   let mut nonInductiveHypothesesToCheck := #[]
