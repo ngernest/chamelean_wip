@@ -70,7 +70,7 @@ def sized (f : Nat → OptionT Gen α) : OptionT Gen α :=
   Gen.getSize >>= f
 
 /-- Samples from an `OptionT Gen` generator that is parameterized by its `size`,
-    returning the generated `Option α`  in the `IO` monad -/
+    returning the generated `Option α` in the `IO` monad -/
 def runSizedGen {α} (sizedGen : Nat → OptionT Gen α) (size : Nat) : IO (Option α) :=
   Gen.run (OptionT.run $ sizedGen size) size
 
