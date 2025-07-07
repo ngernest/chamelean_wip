@@ -1,6 +1,7 @@
 
 import Lean
 import Plausible.IR.Prelude
+import Batteries.Data.List.Basic
 
 open Lean Meta
 open Plausible.IR
@@ -42,6 +43,11 @@ def replicateM [Monad m] (n : Nat) (action : m α) : m (List α) :=
     let x ← action
     let xs ← replicateM n action
     pure (x :: xs)
+
+/-- Converts a list of options to an optional list
+    (akin to Haskell's `sequence`) -/
+def List.sequence (xs : List (Option α)) : Option (List α) :=
+  List.traverse id xs
 
 /-- `ToMessageData` instance for pretty-printing `ConstructorVal`s -/
 instance : ToMessageData ConstructorVal where
