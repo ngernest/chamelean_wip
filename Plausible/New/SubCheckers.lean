@@ -123,7 +123,7 @@ def mkSubChecker (subChecker : SubCheckerInfo) : TermElabM (TSyntax `term) := do
     withOptions (fun opts => opts.setBool `pp.fieldNotation false) do
       -- Construct the match expression based on the info in `matchCases`
       let mut cases := #[]
-      let patterns ← Array.mapM (fun patternExpr => PrettyPrinter.delab patternExpr) subChecker.matchCases
+      let patterns ← Array.mapM (fun patternExpr => delabExprInLocalContext subChecker.LCtx patternExpr) subChecker.matchCases
 
       -- If there are multiple scrutinees, the LHS of each case is a tuple containing the elements in `matchCases`
       let case ← `(Term.matchAltExpr| | $[$patterns:term],* => $checkerBody:term)

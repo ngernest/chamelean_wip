@@ -154,7 +154,7 @@ def separateFVarsInHypothesis (hypothesis : Expr) (initialFVars : Array FVarId) 
     equalities := equalities.push (fvar, newFVarId)
   let decomposedHypothesis ← separateFVars newHypothesis lctx
   let variableEqualities := equalities ++ decomposedHypothesis.variableEqualities
-  let variableEqs ←  mkEqs_FvarIds variableEqualities lctx
+  let variableEqs ← mkEqs_FvarIds variableEqualities lctx
   return {
     newHypothesis := decomposedHypothesis.newHypothesis
     fVarIds := initializedFVars ++ decomposedHypothesis.fVarIds

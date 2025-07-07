@@ -133,11 +133,13 @@ def testSimpleRenaming : MetaM Unit := do
         checkNonInductiveActions := #[],
         ret_list := #[Action.ret (Expr.const `Tree.leaf [])],
         variableEqualities := #[]
+        variableEqs := #[]
       },
       generatorSort := .InductiveGenerator,
       variableEqualities := #[],
       producerType := .Generator
       LCtx := ← getLCtx
+      variableEqs := #[]
     }
 
     logWarning m!"Before renaming - nExpr name: {nExpr}"

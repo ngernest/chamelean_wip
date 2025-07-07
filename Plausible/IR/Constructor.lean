@@ -38,6 +38,8 @@ structure GroupedActions where
 
   variableEqualities : Array (FVarId × FVarId)
 
+  variableEqs : Array Expr
+
   deriving Repr
 
 -- Pretty print `GroupedActions`s using the `MessageData` typeclass
@@ -98,12 +100,15 @@ structure HandlerInfo where
       in the pattern match -/
   groupedActions : GroupedActions
 
-  /-- A list of equalities that must hold between free variables
+  /-- OUTDATED: A list of equalities that must hold between free variables
       (used when rewriting free variables in patterns) -/
   variableEqualities : Array (FVarId × FVarId)
 
   /-- `LocalContext` associated with all the `FVarId`s -/
   LCtx: LocalContext
+
+  /-- New field (stores a list of equality `Expr`s) -/
+  variableEqs : Array Expr
 
   deriving Repr
 
@@ -174,6 +179,7 @@ def mkGroupedActions (gccs: Array Action) : MetaM GroupedActions := do
   let mut iflet_list := #[]
   let mut ret_list := #[]
   let mut variableEqualities : Array (FVarId × FVarId) := #[]
+  let mut variableEqs := #[]
   for gcc in gccs do
     match gcc with
     | .genFVar _ _
@@ -183,6 +189,7 @@ def mkGroupedActions (gccs: Array Action) : MetaM GroupedActions := do
         iflet_list := iflet_list.push gcc;
         gen_list := gen_list.push gcc;
         variableEqualities := variableEqualities ++ hyp.variableEqualities;
+        variableEqs := variableEqs ++ hyp.variableEqs
       }
     | .ret _ =>
         ret_list := ret_list.push gcc
@@ -197,6 +204,7 @@ def mkGroupedActions (gccs: Array Action) : MetaM GroupedActions := do
     iflet_list := iflet_list
     ret_list := ret_list
     variableEqualities := variableEqualities
+    variableEqs := variableEqs
   }
 
 
@@ -222,6 +230,7 @@ def mkSubCheckerInfoFromConstructor (ctor : InductiveConstructor)
     variableEqualities := conclusion.variableEqualities ++ groupedActions.variableEqualities
     checkerSort := checkerSort
     LCtx := actions.Lctx
+    variableEqs := conclusion.variableEqs ++ groupedActions.variableEqs
   }
 
 /-- Takes a constructor for an inductive relation, a list of argument names,
@@ -264,6 +273,7 @@ def mkSubGeneratorInfoFromConstructor (ctor : InductiveConstructor) (inputNames 
     generatorSort := generatorSort
     LCtx := actions.Lctx
     producerType := producerType
+    variableEqs := conclusion.variableEqs ++ groupedActions.variableEqs
   }
 
 -- The functions below create strings containing Lean code based on the information
