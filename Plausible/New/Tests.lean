@@ -9,6 +9,7 @@ import Plausible.New.ArbitrarySizedSuchThat
 import Plausible.New.EnumeratorCombinators
 import Plausible.New.DeriveEnum
 import Plausible.New.DeriveChecker
+import Plausible.New.DeriveEnumSuchThat
 import Plausible.New.STLC
 
 import Lean
@@ -18,27 +19,7 @@ open Plausible ArbitrarySizedSuchThat OptionTGen
 
 deriving instance Enum for Tree
 
-instance : EnumSizedSuchThat Tree (fun t => bst lo hi t) where
-  enumSizedST :=
-   let rec aux_enum (initSize : Nat) (size : Nat) (lo_0 : Nat) (hi_0 : Nat) : OptionT Enumerator Tree :=
-      match size with
-      | Nat.zero =>
-        EnumeratorCombinators.enumerate
-          [pure .Leaf, OptionT.fail]
-      | Nat.succ size' =>
-        EnumeratorCombinators.enumerate
-          [pure .Leaf,
-            do
-              let x ← Enum.enum
-              let l ← aux_enum initSize size' lo_0 x
-              let r ← aux_enum initSize size' x hi_0
-              if lo < x && x < hi then
-                return Tree.Node x l r
-              else
-                OptionT.fail]
-    fun size => aux_enum size size lo hi
-
-
+-- #derive_enumerator (fun (t : Tree) => bst lo hi t)
 
 
 ---

@@ -162,10 +162,6 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
     if let .checkNonInductive predicateExpr := action then
       let ty ← inferType predicateExpr
 
-      -- TODO: check whether `predicateExpr` is a `Prop` or a `Type`
-
-      logWarning m!"predicateExpr {predicateExpr} is in type universe {ty}"
-
       -- Check if the predicate is a `Prop` (i.e. `Sort 0`)
       if ty.isProp then
         -- If yes, add it to our list of hypotheses to check using the `DecOpt` instance
@@ -259,7 +255,8 @@ def getGeneratorWeight (gen : SubGeneratorInfo) : TermElabM (TSyntax `term) := d
   | .InductiveGenerator => `($(mkIdent ``Nat.succ) $(mkIdent `size'))
 
 /-- Constructs a list of weighted thunked sub-generators as a Lean term -/
-def mkWeightedThunkedSubGenerators (subGeneratorInfos : Array SubGeneratorInfo) (generatorSort : GeneratorSort) : TermElabM (TSyntax `term) := do
+def mkWeightedThunkedSubGenerators (subGeneratorInfos : Array SubGeneratorInfo)
+  (generatorSort : GeneratorSort) : TermElabM (TSyntax `term) := do
   let subGenerators ← Array.mapM mkSubGenerator subGeneratorInfos
   let generatorWeights ← Array.mapM getGeneratorWeight subGeneratorInfos
 

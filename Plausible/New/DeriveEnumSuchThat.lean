@@ -36,10 +36,10 @@ def mkTopLevelEnumerator (baseEnumerators : TSyntax `term) (inductiveEnumerators
 
     -- Create the cases for the pattern-match on the size argument
     let mut caseExprs := #[]
-    let zeroCase ← `(Term.matchAltExpr| | $(mkIdent ``Nat.zero) => $OptionTBacktrackFn $baseEnumerators)
+    let zeroCase ← `(Term.matchAltExpr| | $(mkIdent ``Nat.zero) => $enumerateFn $baseEnumerators)
     caseExprs := caseExprs.push zeroCase
 
-    let succCase ← `(Term.matchAltExpr| | $(mkIdent ``Nat.succ) $freshSize' => $OptionTBacktrackFn $inductiveEnumerators)
+    let succCase ← `(Term.matchAltExpr| | $(mkIdent ``Nat.succ) $freshSize' => $enumerateFn $inductiveEnumerators)
     caseExprs := caseExprs.push succCase
 
     -- Create function arguments for the enumerator's `size` & `initSize` parameters
@@ -52,12 +52,12 @@ def mkTopLevelEnumerator (baseEnumerators : TSyntax `term) (inductiveEnumerators
     -- (except the target variable, which we'll filter out later)
     let paramInfo ← analyzeInductiveArgs inductiveName args
 
-    -- Inner params are for the inner `aux_arb` function
+    -- Inner params are for the inner `aux_enum` function
     let mut innerParams := #[]
     innerParams := innerParams.push initSizeParam
     innerParams := innerParams.push sizeParam
 
-    -- Outer params are for the top-level lambda function which invokes `aux_arb`
+    -- Outer params are for the top-level lambda function which invokes `aux_enum`
     let mut outerParams := #[]
     for (paramName, paramType) in paramInfo do
       -- Only add a function parameter is the argument to the inductive relation is not the target variable
@@ -107,7 +107,7 @@ def elabDeriveEnumerator : CommandElab := fun stx => do
 
     -- Create an auxiliary `SubGeneratorInfo` structure that
     -- stores the metadata for each derived sub-generator
-    let allSubGeneratorInfos ← liftTermElabM $ getSubGeneratorInfos inductiveExpr argNameStrings targetIdx
+    let allSubGeneratorInfos ← liftTermElabM $ getSubGeneratorInfos inductiveExpr argNameStrings targetIdx .Enumerator
 
     -- Every generator is an inductive generator
     -- (they can all be invoked in the inductive case of the top-level generator),
@@ -115,9 +115,8 @@ def elabDeriveEnumerator : CommandElab := fun stx => do
     let baseGenInfo := Array.filter (fun gen => gen.generatorSort == .BaseGenerator) allSubGeneratorInfos
     let inductiveGenInfo := allSubGeneratorInfos
 
-    -- TODO: modify `mkWeightedThunkedSubGenerators` (enumerators don't have weights & aren't thunked)
-    let baseEnumerators ← liftTermElabM $ mkWeightedThunkedSubGenerators baseGenInfo .BaseGenerator
-    let inductiveEnumerators ← liftTermElabM $ mkWeightedThunkedSubGenerators inductiveGenInfo .InductiveGenerator
+    let baseEnumerators ← liftTermElabM $ mkSubEnumeratorList baseGenInfo .BaseGenerator
+    let inductiveEnumerators ← liftTermElabM $ mkSubEnumeratorList inductiveGenInfo .InductiveGenerator
 
     let typeclassInstance ← mkTopLevelEnumerator baseEnumerators inductiveEnumerators inductiveName args targetVar targetTypeSyntax
 

@@ -384,21 +384,15 @@ def elabgetBackTrack : CommandElab := fun stx => do
       IO.println where_defs
   | _ => throwError "Invalid syntax"
 
--- #get_backtrack_checker typing with_name ["L", "e", "t"]
--- #get_backtrack_checker balanced with_name ["h", "T"]
--- #get_backtrack_checker bst with_name ["lo", "hi", "T"]
 
 
 
--- BACKTRACK PRODUCER ---
-
-
-
-/-- Takes a constructor for an inductive relation, a list of argument names,
-    the index of the argument we wish to generate (`idx`),
-    and returns a corresponding `SubGeneratorInfo` for a generator -/
+/-- Takes a constructor `ctor` for an inductive relation, a list of argument names `inputNames`,
+    the index of the argument we wish to produce (`idx`),
+    the desired producer type (`producerType`, either `Enumerator` or `Generator`)
+    and returns a corresponding `SubGeneratorInfo` -/
 def mkSubGeneratorInfoFromConstructor (ctor : InductiveConstructor) (inputNames : Array String)
-  (idx : Nat) : MetaM SubGeneratorInfo := do
+  (idx : Nat) (producerType : ProducerType) : MetaM SubGeneratorInfo := do
   let inputNamesList := inputNames.toList
   let tempFVar := Expr.fvar (FVarId.mk (Name.mkStr1 "temp000"))
   let conclusion_args := ctor.conclusion.getAppArgs.set! idx tempFVar
@@ -428,7 +422,7 @@ def mkSubGeneratorInfoFromConstructor (ctor : InductiveConstructor) (inputNames 
     groupedActions := groupedActions
     variableEqualities := conclusion.variableEqualities ++ groupedActions.variableEqualities
     generatorSort := generatorSort
-    producerType := .Generator -- TODO: figure out how to generalize this to handle enumerators
+    producerType := producerType
   }
 
 /-- Produces the final if-statement that checks the conjunction of all the hypotheses
@@ -491,19 +485,21 @@ def producer_where_defs (relation: InductiveInfo) (inpname: List String) (genpos
     out_str:= out_str ++ "\n-- Constructor: " ++ toString conprops_str
     out_str:= out_str ++ " → " ++ toString (← Meta.ppExpr ctor.conclusion) ++ "\n"
     out_str:= out_str ++ (← prototype_for_producer_by_con relation inpname genpos i monad) ++ ":= do\n"
-    let bt ← mkSubGeneratorInfoFromConstructor ctor inpname.toArray genpos
+    let bt ← mkSubGeneratorInfoFromConstructor ctor inpname.toArray genpos .Generator
     let btStr ← subGeneratorInfoToString bt monad
     out_str:= out_str ++ btStr ++ "\n"
   return out_str
 
-/-- Takes an `Expr` representing an inductive relation, a list of names (arguments to the inductive relation),
-    and the index of the argument we wish to generate (`targetIdx`),
-    and returns a collection of `SubGeneratorInfo`s for a generator -/
-def getSubGeneratorInfos (inductiveRelation : Expr) (argNames : Array String) (targetIdx: Nat) : MetaM (Array SubGeneratorInfo) := do
+/-- Takes an `Expr` representing an inductive relation,
+    a list of names `argNames` (arguments to the inductive relation),
+    the index of the argument we wish to generate (`targetIdx`),
+    and the desired `producerType` (`Generator` or `Enumerator`),
+    and returns a collection of `SubGeneratorInfo`s for a producer -/
+def getSubGeneratorInfos (inductiveRelation : Expr) (argNames : Array String) (targetIdx: Nat) (producerType : ProducerType) : MetaM (Array SubGeneratorInfo) := do
   let inductiveInfo ← getInductiveInfoWithArgs inductiveRelation argNames
   let mut subGenerators := #[]
   for ctor in inductiveInfo.constructors do
-    let subGenerator ← mkSubGeneratorInfoFromConstructor ctor argNames targetIdx
+    let subGenerator ← mkSubGeneratorInfoFromConstructor ctor argNames targetIdx producerType
     subGenerators := subGenerators.push subGenerator
   return subGenerators
 
