@@ -189,6 +189,7 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
       inductiveHypothesesToCheck := inductiveHypothesesToCheck.push typedInductiveTerm
 
   -- Add equality checks for any pairs of variables in `variableEqualities`
+  -- TODO: use `variableEqs` here instead of `variableEqualities`
   let mut variableEqualitiesToCheck := #[]
   for (fvar1, fvar2) in subGenerator.variableEqualities do
     let ident1 := mkIdent fvar1.name
