@@ -30,6 +30,9 @@ def andOptListFn : Ident := mkIdent $ Name.mkStr2 "DecOpt" "andOptList"
 /-- Ident for the `DecOpt.checkerBacktrack` checker combinator (see `DecOpt.lean`) -/
 def checkerBacktrackFn : Ident := mkIdent $ Name.mkStr2 "DecOpt" "checkerBacktrack"
 
+/-- Ident for the `EnumeratorCombinators.enumerate` combinator (see `EnumeratorCombinators.lean`) -/
+def enumerateFn : Ident := mkIdent $ Name.mkStr2 "EnumeratorCombinators" "enumerate"
+
 /-- Ident for the `EnumeratorCombinators.enumerating` combinator (see `EnumeratorCombinators.lean`) -/
 def enumeratingFn : Ident := mkIdent $ Name.mkStr2 "EnumeratorCombinators" "enumerating"
 
@@ -50,6 +53,7 @@ def failFn : Ident := mkIdent $ Name.mkStr2 "OptionT" "fail"
 
 -- Idents for typeclasses
 def arbitrarySizedSuchThatTypeclass : Ident := mkIdent $ Name.mkStr1 "ArbitrarySizedSuchThat"
+def enumSizedSuchThatTypeclass : Ident := mkIdent $ Name.mkStr1 "EnumSizedSuchThat"
 def arbitrarySizedTypeclass : Ident := mkIdent $ Name.mkStr1 "ArbitrarySized"
 def enumSizedTypeclass : Ident := mkIdent $ Name.mkStr1 "EnumSized"
 def decOptTypeclass : Ident := mkIdent $ Name.mkStr1 "DecOpt"

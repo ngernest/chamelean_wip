@@ -1,5 +1,6 @@
 import Plausible.IR.Examples
 import Plausible.New.OptionTGen
+import Plausible.New.Arbitrary
 import Plausible.New.ArbitrarySizedSuchThat
 import Plausible.New.DecOpt
 
@@ -31,7 +32,7 @@ def genBST (lo : Nat) (hi : Nat) : Nat → OptionT Gen Tree :=
       backtrack [
         (1, thunkGen $ fun _ => pure .Leaf),
         (.succ size', thunkGen $ fun _ => do
-          let x ← SampleableExt.interpSample Nat
+          let x ← Arbitrary.arbitrary
           if (lo_0 < x && x < hi_0) then
             let l ← aux_arb initSize size' lo_0 x
             let r ← aux_arb initSize size' x hi_0
@@ -77,7 +78,7 @@ def genBalancedTree (n : Nat) : Nat → OptionT Gen Tree :=
             | .succ n => do
               let l ← aux_arb initSize size' n
               let r ← aux_arb initSize size' n
-              let x ← SampleableExt.interpSample Nat
+              let x ← Arbitrary.arbitrary
               pure (.Node x l r))
         ]
   fun size => aux_arb size size n

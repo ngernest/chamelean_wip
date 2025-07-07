@@ -51,7 +51,7 @@ def mkTopLevelChecker (baseCheckers : TSyntax `term) (inductiveCheckers : TSynta
   innerParams := innerParams.push initSizeParam
   innerParams := innerParams.push sizeParam
 
-  -- Outer params are for the top-level lambda function which invokes `aux_arb`
+  -- Outer params are for the top-level lambda function which invokes `aux_dec`
   let mut outerParams := #[]
   for (paramName, paramType) in paramInfo do
     let outerParamIdent := mkIdent paramName

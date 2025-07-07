@@ -4,10 +4,12 @@ import Plausible.Gen
 import Plausible.New.OptionTGen
 import Plausible.New.DecOpt
 import Plausible.New.Arbitrary
+import Plausible.New.Enumerators
 import Plausible.New.ArbitrarySizedSuchThat
 import Plausible.New.EnumeratorCombinators
 import Plausible.New.DeriveEnum
 import Plausible.New.DeriveChecker
+import Plausible.New.DeriveEnumSuchThat
 import Plausible.New.STLC
 
 import Lean
@@ -15,7 +17,9 @@ open Lean Meta
 
 open Plausible ArbitrarySizedSuchThat OptionTGen
 
-set_option trace.Meta.debug true
+deriving instance Enum for Tree
+
+-- #derive_enumerator (fun (t : Tree) => bst lo hi t)
 
 
 ---

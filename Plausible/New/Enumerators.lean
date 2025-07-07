@@ -72,14 +72,6 @@ instance [EnumSized α] : Enum α where
 instance [EnumSizedSuchThat α P] : EnumSuchThat α P where
   enumST := sizedEnum (EnumSizedSuchThat.enumSizedST P)
 
-/-- Returns the list of elements produced by the enumerator
-    associated with the `Enum` instance for a type,
-    using `size` as the size parameter for the enumerator.
-    To invoke this function, you will need to specify what type `α` is,
-    for example by doing `runEnum (α := Nat) 10`. -/
-def runEnum [Enum α] (size : Nat) : IO (List α) :=
-  return (LazyList.toList $ Enum.enum size)
-
 -- Some simple `Enum` instances
 
 /-- `Enum` instance for `Bool` -/
@@ -89,6 +81,11 @@ instance : Enum Bool where
 /-- `Enum` instance for `Nat` -/
 instance : Enum Nat where
   enum := fun n => lazySeq .succ 0 (n + 1)
+
+/-- `Enum` instance for `Option`s -/
+instance [Enum α] : Enum (Option α) where
+  enum := fun n =>
+    (return none) <|> (some <$> Enum.enum n)
 
 /-- `Enum` instances for pairs -/
 instance [Enum α] [Enum β] : Enum (α × β) where
@@ -163,3 +160,20 @@ instance [NeZero n] : Enum (Fin n) where
     are represented using `Fin (2 ^ w)` under the hood) -/
 instance : Enum (BitVec w) where
   enum := BitVec.ofFin <$> (Enum.enum : Enumerator (Fin (2 ^ w)))
+
+
+-- Sampling from enumerators
+
+/-- Returns the list of elements produced by the enumerator
+    associated with the `Enum` instance for a type,
+    using `size` as the size parameter for the enumerator.
+    To invoke this function, you will need to specify what type `α` is,
+    for example by doing `runEnum (α := Nat) 10`. -/
+def runEnum [Enum α] (size : Nat) : IO (List α) :=
+  return (LazyList.toList $ Enum.enum size)
+
+/-- Samples from an `OptionT Enumerator` enumerator that is parameterized by its `size`,
+    returning the enumerated list of `Option α` values in the `IO` monad
+    - TODO: investigate why there are many duplicate values in the resultant `LazyList` -/
+def runSizedEnum [Enum α] (sizedEnum : Nat → OptionT Enumerator α) (size : Nat) : IO (List (Option α)) :=
+  return (LazyList.toList $ (sizedEnum size) size)
