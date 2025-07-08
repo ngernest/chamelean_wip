@@ -59,10 +59,7 @@ def mkTopLevelChecker (baseCheckers : TSyntax `term) (inductiveCheckers : TSynta
     -- (so that if we pattern match on the parameter, we avoid pattern variables from shadowing it)
 
     -- TODO: replace `genFreshName` with lookup into the local context
-    let innerParamIdent :=
-      match nameMap[paramName]? with
-      | some newName => Lean.mkIdent newName
-      | none => Lean.mkIdent (genFreshName (Array.map Prod.fst paramInfo) paramName)
+    let innerParamIdent := lookupNameInNameMap nameMap (Array.map Prod.fst paramInfo) paramName
 
     let innerParam ← `(Term.letIdBinder| ($innerParamIdent : $paramType))
     innerParams := innerParams.push innerParam
