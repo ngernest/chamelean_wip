@@ -123,5 +123,11 @@ def lookupFreshenedNameInNameMap (nameMap : HashMap Name Name) (existingNames : 
   | some newName => Lean.mkIdent newName
   | none => Lean.mkIdent (genFreshName existingNames name)
 
+/-- Extracts the name of a parameter from a corresponding `Term`.
+    If this is not possible, a fresh user-facing name is produced. -/
+def extractParamName (arg : Term) : MetaM Name :=
+  match arg with
+  | `($name:ident) => return name.getId
+  | _ => return (genFreshName #[] `param)
 
 end Idents

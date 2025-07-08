@@ -330,8 +330,9 @@ def Actions_for_hypotheses (ctor : InductiveConstructor) (fvars : Array FVarId) 
         let argToGenerate := hyp.getAppArgs[uninitializedArgIdx]!
         initializedFVars := Array.appendUniqueElements initializedFVars uninitializedFVars
 
-        IO.println s!"hyp = {hyp}"
-        IO.println s!"uninitializedArgIdx = {uninitializedArgIdx}, argToGenerate = {argToGenerate}, initializedFVars = {repr initializedFVars}"
+        -- TODO: delete print stmts
+        -- IO.println s!"hyp = {hyp}"
+        -- IO.println s!"uninitializedArgIdx = {uninitializedArgIdx}, argToGenerate = {argToGenerate}, initializedFVars = {repr initializedFVars}"
 
         -- Determine whether the generator should be invoked via a recursive call or via the `Arbitrary` typeclass
         let generationStyle :=

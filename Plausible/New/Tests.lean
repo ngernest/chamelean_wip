@@ -35,8 +35,10 @@ deriving instance Enum for Tree
 -/
 
 
--- #derive_generator (fun (t : Tree) => balanced n t)
--- #derive_generator (fun (t : Tree) => bst lo hi t)
+inductive GoodTree : Nat → Nat → Tree → Prop where
+  | GoodLeaf : ∀ n, GoodTree n n .Leaf
+
+#derive_generator (fun (t : Tree) => GoodTree in1 in2 t)
 
 /-
 (Note: this is not the most efficient generator -- ideally we would be able to push the if-expression that checks

@@ -189,8 +189,15 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
       inductiveHypothesesToCheck := inductiveHypothesesToCheck.push typedInductiveTerm
 
   -- Add equality checks for any pairs of variables in `variableEqualities`
-  -- TODO: use `variableEqs` here instead of `variableEqualities`
-  let mut variableEqualitiesToCheck ← Array.mapM (fun e => delabExprInLocalContext subGenerator.localCtx e) subGenerator.variableEqs
+  let mut variableEqualitiesToCheck ← Array.mapM (fun e => do
+    let term ← delabExprInLocalContext subGenerator.localCtx e
+    match term with
+    | `(term| $lhs:ident = $rhs:ident) =>
+      IO.println s!"lhs = {lhs.getId}, rhs = {rhs.getId}, nameMap = {repr subGenerator.nameMap}"
+      let freshLHS := lookupFreshenedNameInNameMap subGenerator.nameMap #[] lhs.getId
+      let freshRHS := lookupFreshenedNameInNameMap subGenerator.nameMap #[lhs.getId] rhs.getId
+      `($freshLHS:ident = $freshRHS:ident)
+    | _ => throwError "encountered an expr that is not an equality in subGenerator.variableEqs") subGenerator.variableEqs
 
   -- TODO: change `groupedActions.ret_list` to a single element since each do-block can only
   -- have one (final) `return` expression

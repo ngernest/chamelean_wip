@@ -35,13 +35,6 @@ def deconstructInductiveApplication (body : Term) : CommandElabM (TSyntax `term 
     return (indRel, #[])
   | _ => throwError "Expected inductive type application"
 
-/-- Extracts the name of a parameter from a corresponding `Term`.
-    If this is not possible, a fresh user-facing name is produced. -/
-def extractParamName (arg : Term) : MetaM Name :=
-  match arg with
-  | `($name:ident) => pure name.getId
-  | _ => Core.mkFreshUserName `param
-
 /-- Analyzes the type of the inductive relation and matches each
     argument with its expected type, returning an array of
     (parameter name, type expression) pairs -/
