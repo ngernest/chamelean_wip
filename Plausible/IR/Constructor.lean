@@ -36,8 +36,8 @@ structure GroupedActions where
   /-- `ret_list` is the `Action`s which are all of the form `return e` -/
   ret_list : Array Action
 
-  deprecatedVariableEqualities : Array (FVarId × FVarId)
-
+  /-- A collection of equations (each represented as an `Expr`) relating variables to each other
+      (e.g. `t = t1`) -/
   variableEqs : Array Expr
 
   deriving Repr
@@ -89,14 +89,11 @@ structure HandlerInfo where
       in the pattern match -/
   groupedActions : GroupedActions
 
-  /-- OUTDATED: A list of equalities that must hold between free variables
-      (used when rewriting free variables in patterns) -/
-  deprecatedVariableEqualities : Array (FVarId × FVarId)
-
   /-- `LocalContext` associated with all the `FVarId`s -/
   localCtx : LocalContext
 
-  /-- New field (stores a list of equality `Expr`s) -/
+  /-- A list of equalities (represented as `Expr`s) that must hold between variables
+      (used when rewriting variables in patterns) -/
   variableEqs : Array Expr
 
   deriving Repr
@@ -134,7 +131,6 @@ def mkGroupedActions (gccs: Array Action) : MetaM GroupedActions := do
   let mut checkNonInductiveActions := #[]
   let mut iflet_list := #[]
   let mut ret_list := #[]
-  let mut variableEqualities : Array (FVarId × FVarId) := #[]
   let mut variableEqs := #[]
   for gcc in gccs do
     match gcc with
@@ -144,7 +140,6 @@ def mkGroupedActions (gccs: Array Action) : MetaM GroupedActions := do
     | .matchFVar _ hyp => {
         iflet_list := iflet_list.push gcc;
         gen_list := gen_list.push gcc;
-        variableEqualities := variableEqualities ++ hyp.deprecatedVariableEqualities;
         variableEqs := variableEqs ++ hyp.variableEqs
       }
     | .ret _ =>
@@ -159,7 +154,6 @@ def mkGroupedActions (gccs: Array Action) : MetaM GroupedActions := do
     checkNonInductiveActions := checkNonInductiveActions
     iflet_list := iflet_list
     ret_list := ret_list
-    deprecatedVariableEqualities := variableEqualities
     variableEqs := variableEqs
   }
 
@@ -183,7 +177,6 @@ def mkSubCheckerInfoFromConstructor (ctor : InductiveConstructor)
     inputsToMatch := inputsToMatch
     matchCases := matchCases
     groupedActions := groupedActions
-    deprecatedVariableEqualities := conclusion.deprecatedVariableEqualities ++ groupedActions.deprecatedVariableEqualities
     checkerSort := checkerSort
     localCtx := actions.localCtx
     variableEqs := conclusion.variableEqs ++ groupedActions.variableEqs
@@ -225,7 +218,6 @@ def mkSubGeneratorInfoFromConstructor (ctor : InductiveConstructor) (inputNames 
     inputsToMatch := inputsToMatch.toArray
     matchCases := matchCases.toArray
     groupedActions := groupedActions
-    deprecatedVariableEqualities := conclusion.deprecatedVariableEqualities ++ groupedActions.deprecatedVariableEqualities
     generatorSort := generatorSort
     localCtx := actions.localCtx
     producerType := producerType

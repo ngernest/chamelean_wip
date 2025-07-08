@@ -83,12 +83,10 @@ structure DecomposedInductiveHypothesis where
      (including the new fvars that were produced) -/
   fVarIds : Array FVarId
 
-  /-- A collection of equations relating pairs of `FVarId`s to each other
-      (e.g. `t = t1`) -/
-  deprecatedVariableEqualities : Array (FVarId × FVarId)
-
   localCtx : LocalContext
 
+  /-- A collection of equations (each represented as an `Expr`) relating variables to each other
+      (e.g. `t = t1`) -/
   variableEqs : Array Expr
 
   deriving Repr
@@ -132,7 +130,6 @@ def separateFVars (hyp : Expr) (lctx: LocalContext): MetaM DecomposedInductiveHy
     return {
       newHypothesis := newHyp
       fVarIds := fVarIds
-      deprecatedVariableEqualities := equations
       localCtx := lctx
       variableEqs := variableEqs
     }
@@ -156,13 +153,11 @@ def separateFVarsInHypothesis (hypothesis : Expr) (initialFVars : Array FVarId) 
       newHypothesis := newHypothesis.replaceFVarId fvar (mkFVar newFVarId)
       equalities := equalities.push (fvar, newFVarId)
     let decomposedHypothesis ← separateFVars newHypothesis lctx
-    let deprecatedVariableEqualities := equalities ++ decomposedHypothesis.deprecatedVariableEqualities
     let variableEqs ← mkFVarEqualities equalities lctx
     let finalVariableEqs := variableEqs ++ decomposedHypothesis.variableEqs
     return {
       newHypothesis := decomposedHypothesis.newHypothesis
       fVarIds := initializedFVars ++ decomposedHypothesis.fVarIds
-      deprecatedVariableEqualities := deprecatedVariableEqualities
       variableEqs := finalVariableEqs
       localCtx := decomposedHypothesis.localCtx
     }
