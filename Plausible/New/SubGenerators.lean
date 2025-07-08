@@ -191,11 +191,6 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
   -- Add equality checks for any pairs of variables in `variableEqualities`
   -- TODO: use `variableEqs` here instead of `variableEqualities`
   let mut variableEqualitiesToCheck ← Array.mapM (fun e => delabExprInLocalContext subGenerator.localCtx e) subGenerator.variableEqs
-  -- for (fvar1, fvar2) in subGenerator.variableEqualities do
-  --   let ident1 := mkIdent fvar1.name
-  --   let ident2 := mkIdent fvar2.name
-  --   let equalityCheck ← `($ident1:ident = $ident2:ident)
-  --   variableEqualitiesToCheck := variableEqualitiesToCheck.push equalityCheck
 
   -- TODO: change `groupedActions.ret_list` to a single element since each do-block can only
   -- have one (final) `return` expression
