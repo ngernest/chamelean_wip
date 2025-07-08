@@ -118,6 +118,10 @@ def separateFVars (hyp : Expr) (lctx: LocalContext): MetaM DecomposedInductiveHy
       let mut currentFV := fv
       while (numMatchingFVars newHyp currentFV > 1) do
         let ty ← getFVarTypeInContext fv lctx
+        -- TODO: this is duplicate variable freshening logic
+        -- pass in `nameMap` as an argument to this function
+        -- maybe figure out how to use `nameMap` instead?
+
         let newName := Name.appendAfter (← fv.getUserName) s!"_{i}"
         let (new_lctx, newFVarId) ← addLocalDecl lctx newName ty
         lctx := new_lctx
