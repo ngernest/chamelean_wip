@@ -176,36 +176,21 @@ def decomposeType (e : Expr) : MetaM (Array (Name × Expr) × Expr × Array Expr
     `(#[(x1, τ1), …, (xn, τn)], Q1 → … → Qn → P, #[Q1, …, Qn, P])`.
     - The 2nd component is the body of the forall-expression
     - The 3rd component is an array containing each subterm of the arrow type -/
-
-def decomposeType_withLocalContext (e : Expr) (lctx: LocalContext): MetaM (Array (Name × Expr) × Expr × Array Expr × LocalContext) := withLCtx' lctx do
-  let (binder, exp) := extractForAllBinders e
-  let mut new_exp := exp
-  let mut lctx := lctx
-  let mut new_binder := #[]
-  for (name, ty) in binder do
-    let (new_lctx, new_fvarid, newname) ←  mkNewFVarId_keepoldnames lctx name ty
-    lctx := new_lctx
-    let old_fvarid := ⟨name⟩
-    let new_fvar := mkFVar new_fvarid
-    new_exp := new_exp.replaceFVarId old_fvarid new_fvar
-    new_binder := new_binder.push (newname, ty)
-  let tyexp ← getComponentsOfArrowType new_exp
-  return (new_binder, new_exp, tyexp, lctx)
-
-
-/-
-def decomposeType_withLocalContext (e : Expr) (lctx: LocalContext): MetaM (Array (Name × Expr) × Expr × Array Expr × LocalContext) := withLCtx' lctx do
-  let (binder, exp) := extractForAllBinders e
-  withLocalDeclsDND binder fun _ => do
-    let new_ctx ← getLCtx
-    let allFvarids :=  extractFVarIds exp
+def decomposeType_withLocalContext (e : Expr) (lctx: LocalContext): MetaM (Array (Name × Expr) × Expr × Array Expr × LocalContext) :=
+  withLCtx' lctx do
+    let (binder, exp) := extractForAllBinders e
     let mut new_exp := exp
-    for fvarid in allFvarids do
-      if let some decl := new_ctx.findFromUserName? fvarid.name then
-        new_exp := new_exp.replaceFVarId fvarid decl.toExpr
+    let mut lctx := lctx
+    let mut new_binder := #[]
+    for (name, ty) in binder do
+      let (new_lctx, new_fvarid, newname) ← mkNewFVarId_keepoldnames lctx name ty
+      lctx := new_lctx
+      let old_fvarid := ⟨name⟩
+      let new_fvar := mkFVar new_fvarid
+      new_exp := new_exp.replaceFVarId old_fvarid new_fvar
+      new_binder := new_binder.push (newname, ty)
     let tyexp ← getComponentsOfArrowType new_exp
-    return (binder, new_exp, tyexp, new_ctx)-/
-
+    return (new_binder, new_exp, tyexp, lctx)
 
 
 def get_recursive_calls (typeName : Name) (e : Expr) : MetaM (Array Expr) := do
@@ -225,19 +210,26 @@ def get_recursive_calls (typeName : Name) (e : Expr) : MetaM (Array Expr) := do
     | _ => return acc
   go e #[]
 
-def mkEqs (expr_pairs: Array (Expr × Expr)) (lctx: LocalContext): MetaM (Array Expr) := do withLCtx' lctx do
-  let mut eqs := #[]
-  for (l,r) in expr_pairs do
-    let eq ← mkEq l r
-    eqs := eqs.push eq
-  return eqs
+/-- `mkEqualities pairs f lctx` creates an array of `Expr`s, where each `Expr` is an equality between each `α × α` pair in `pairs`.
+    The function `f` is used to convert `α` into `Expr`s using the `MetaM` monad, and the `LocalContext` `lctx` is updated
+    after the equalities have been created.
 
-def mkEqs_FvarIds (fvarid_pairs: Array (FVarId × FVarId)) (lctx: LocalContext): MetaM (Array Expr) := do withLCtx' lctx do
-  let mut eqs := #[]
-  for (l,r) in fvarid_pairs do
-    let eq ← mkEq (← l.getDecl).toExpr (← r.getDecl).toExpr
-    eqs := eqs.push eq
-  return eqs
+    See `mkExprEqualities` & `mkFVarEqualities` for specialized versions of this function. -/
+def mkEqualities (pairs : Array (α × α)) (f : α → MetaM Expr) (lctx : LocalContext) : MetaM (Array Expr) :=
+  withLCtx' lctx do
+    let mut equalities := #[]
+    for (lhs, rhs) in pairs do
+      let eq ← mkEq (← f lhs) (← f rhs)
+      equalities := equalities.push eq
+    return equalities
+
+/-- Version of `mkEqualities` where `α` is specialized to `Expr` -/
+def mkExprEqualities (exprPairs : Array (Expr × Expr)) (lctx : LocalContext) : MetaM (Array Expr) :=
+  mkEqualities exprPairs pure lctx
+
+/-- Version of `mkEqualities` where `α` is specialized to `FVarId` -/
+def mkFVarEqualities (fvarPairs : Array (FVarId × FVarId)) (lctx : LocalContext) : MetaM (Array Expr) :=
+  mkEqualities fvarPairs (fun fvarId => LocalDecl.toExpr <$> FVarId.getDecl fvarId) lctx
 
 /-- Decomposes an array `arr` into a pair `(xs, x)`
    where `xs = arr[0..=n-2]` and `x = arr[n - 1]` (where `n` is the length of `arr`).
@@ -259,7 +251,7 @@ def printConstructorsWithArgs (typeName : Name) : MetaM Unit := do
     for ctorName in info.ctors do
       let some ctor := env.find? ctorName
         | throwError "Constructor '{ctorName}' not found"
-      let (_, _, list_prop) ←  decomposeType ctor.type
+      let (_, _, list_prop) ← decomposeType ctor.type
       match splitLast? list_prop with
       | some (cond_prop, out_prop) =>
       IO.println s!"  {ctorName} : {ctor.type}"
