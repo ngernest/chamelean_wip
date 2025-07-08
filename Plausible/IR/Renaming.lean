@@ -132,11 +132,11 @@ def testSimpleRenaming : MetaM Unit := do
         checkInductiveActions := #[],
         checkNonInductiveActions := #[],
         ret_list := #[Action.ret (Expr.const `Tree.leaf [])],
-        variableEqualities := #[]
+        deprecatedVariableEqualities := #[]
         variableEqs := #[]
       },
       generatorSort := .InductiveGenerator,
-      variableEqualities := #[],
+      deprecatedVariableEqualities := #[],
       producerType := .Generator
       localCtx := ← getLCtx
       variableEqs := #[]

@@ -85,7 +85,7 @@ structure DecomposedInductiveHypothesis where
 
   /-- A collection of equations relating pairs of `FVarId`s to each other
       (e.g. `t = t1`) -/
-  variableEqualities : Array (FVarId × FVarId)
+  deprecatedVariableEqualities : Array (FVarId × FVarId)
 
   localCtx : LocalContext
 
@@ -132,7 +132,7 @@ def separateFVars (hyp : Expr) (lctx: LocalContext): MetaM DecomposedInductiveHy
     return {
       newHypothesis := newHyp
       fVarIds := fVarIds
-      variableEqualities := equations
+      deprecatedVariableEqualities := equations
       localCtx := lctx
       variableEqs := variableEqs
     }
@@ -151,18 +151,19 @@ def separateFVarsInHypothesis (hypothesis : Expr) (initialFVars : Array FVarId) 
       let fvarname ← fvar.getUserName
       let newName := Name.mkStr1 (fvarname.toString ++ "_" ++ toString hypIndex)
       let ty ← getFVarTypeInContext fvar lctx
-      let (new_lctx, newFVarId) ← addLocalDecl lctx newName ty
-      lctx := new_lctx
+      let (newLocalCtx, newFVarId) ← addLocalDecl lctx newName ty
+      lctx := newLocalCtx
       newHypothesis := newHypothesis.replaceFVarId fvar (mkFVar newFVarId)
       equalities := equalities.push (fvar, newFVarId)
     let decomposedHypothesis ← separateFVars newHypothesis lctx
-    let variableEqualities := equalities ++ decomposedHypothesis.variableEqualities
-    let variableEqs ← mkFVarEqualities variableEqualities lctx
+    let deprecatedVariableEqualities := equalities ++ decomposedHypothesis.deprecatedVariableEqualities
+    let variableEqs ← mkFVarEqualities equalities lctx
+    let finalVariableEqs := variableEqs ++ decomposedHypothesis.variableEqs
     return {
       newHypothesis := decomposedHypothesis.newHypothesis
       fVarIds := initializedFVars ++ decomposedHypothesis.fVarIds
-      variableEqualities := variableEqualities
-      variableEqs := variableEqs
+      deprecatedVariableEqualities := deprecatedVariableEqualities
+      variableEqs := finalVariableEqs
       localCtx := decomposedHypothesis.localCtx
     }
 
