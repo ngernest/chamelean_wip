@@ -79,7 +79,7 @@ def elabGetProducer : CommandElab := fun stx => do
 
 
 def get_mutual_rec_block (r: InductiveInfo) (inpname: List String) (btnum: Nat) (monad: String :="IO"): MetaM String := do
-  let checker ←  get_checker r inpname btnum monad
+  let checker ← get_checker r inpname btnum monad
   let mut mc_block := "mutual\n-- CHECKER \n " ++ checker
   for pos in [0:r.input_types.size] do
     let producer ← get_producer r inpname pos btnum monad
@@ -96,7 +96,7 @@ def elabGetMutualBlock : CommandElab := fun stx => do
     Command.liftTermElabM do
       let e ← elabTerm t none
       let inpname ← termToStringList t2
-      let relation ←  getInductiveInfoWithArgs e inpname.toArray
+      let relation ← getInductiveInfoWithArgs e inpname.toArray
       let btnum := TSyntax.getNat t3
       let mnad := TSyntax.getString t4
       let mc_block := get_mutual_rec_block relation inpname btnum mnad
@@ -127,9 +127,9 @@ def elabWriteMutualBlock : CommandElab := fun stx => do
       let e ← elabTerm t none
       let inpname ← termToStringList t2
       let filename := TSyntax.getString t4
-      let relation ←  getInductiveInfoWithArgs e inpname.toArray
+      let relation ← getInductiveInfoWithArgs e inpname.toArray
       let btnum := TSyntax.getNat t3
-      let mc_block ←  get_testfile relation inpname btnum
+      let mc_block ← get_testfile relation inpname btnum
       let path := System.FilePath.mk "Plausible" / "TestIR" / filename
       IO.FS.writeFile path.toString mc_block
   | _ => throwError "Invalid syntax"
@@ -146,10 +146,10 @@ def elabDeriveGenerator : CommandElab := fun stx => do
   match stx with
   | `(#derive_generator $t backtrack $t3) =>
       let mc_block ← Command.liftTermElabM do
-        let e ←  elabTerm t none
+        let e ← elabTerm t none
         let r0 ← getInductiveInfo e
         let inpname := makeInputs "in" r0.input_types.size
-        let relation ←  getInductiveInfoWithArgs e inpname.toArray
+        let relation ← getInductiveInfoWithArgs e inpname.toArray
         let btnum := TSyntax.getNat t3
         get_mutual_rec_block relation inpname btnum
       parseCommand mc_block
@@ -166,7 +166,7 @@ def get_mutual_rec_blocks_dependencies (IR: Expr) (btnum: Nat) (mond : String:= 
     --let inname := (afterLastDot dep.constName.toString) ++ "_in"
     let depinpname := makeInputs "in" deprel0.input_types.size
     let deprel ← getInductiveInfoWithArgs dep depinpname.toArray
-    let mc_block ←  get_mutual_rec_block deprel depinpname btnum mond
+    let mc_block ← get_mutual_rec_block deprel depinpname btnum mond
     mc_blocks := mc_blocks.push mc_block
   return mc_blocks
 
@@ -194,14 +194,14 @@ def elabDeriveGeneratorDep : CommandElab := fun stx => do
   match stx with
   | `(#derive_generator $t backtrack $t3) =>
       let mc_blocks ← Command.liftTermElabM do
-        let e ←  elabTerm t none
+        let e ← elabTerm t none
         let btnum := TSyntax.getNat t3
         get_mutual_rec_blocks_dependencies e btnum
       parseCommands mc_blocks
   | _ => throwError "Invalid syntax"
 
 def get_enumerator (r: InductiveInfo) (inpname: List String) (genpos: Nat) (iternum: Nat): MetaM String := do
-  let gen_prototype ←  prototype_for_producer r inpname genpos
+  let gen_prototype ← prototype_for_producer r inpname genpos
   let prototype := "enumerate" ++ ⟨gen_prototype.data.drop 3⟩
   let mut body := "let mut out:= [] "
   body := body ++ "for _i in [0:" ++ toString iternum ++ "] do \n"

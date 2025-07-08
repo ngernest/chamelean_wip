@@ -242,44 +242,6 @@ structure InductiveConstructor where
 
   deriving Repr
 
-
-
-/-- `ToMessageData` instance for polymorphic `HashMap`s
-    where the keys implement `Repr` and the values implement `ToMessageData` -/
-instance [Repr k] [BEq k] [Hashable k] [ToMessageData v]
-  : ToMessageData (HashMap k v) where
-  toMessageData hashMap :=
-    let entries := hashMap.toList.map fun (key, val) =>
-      let kMsg := .ofFormat (repr key)
-      let vMsg := toMessageData val
-      .compose kMsg (.compose " ↦ " vMsg)
-    .bracket "{" (.ofList entries) "}"
-
-
-instance : ToMessageData InductiveConstructor where
-  toMessageData inductiveCtor :=
-    let fields := [
-      m!"ctorType: {indentD $ inductiveCtor.ctorType}",
-      m!"bound_vars: {inductiveCtor.bound_vars}",
-      m!"bound_vars_with_base_types: {inductiveCtor.bound_vars_with_base_types}",
-      m!"bound_vars_with_non_base_types: {inductiveCtor.bound_vars_with_non_base_types}",
-      m!"all_hypotheses: {inductiveCtor.all_hypotheses}",
-      m!"recursive_hypotheses: {inductiveCtor.recursive_hypotheses}",
-      m!"hypotheses_with_only_base_type_args: {inductiveCtor.hypotheses_with_only_base_type_args}",
-      m!"hypotheses_that_are_inductive_applications: {inductiveCtor.hypotheses_that_are_inductive_applications}",
-      m!"nonlinear_hypotheses: {inductiveCtor.nonlinear_hypotheses}",
-      m!"conclusion: {inductiveCtor.conclusion}",
-      m!"final_arg_in_conclusion: {inductiveCtor.final_arg_in_conclusion}",
-      m!"conclusion_args: {inductiveCtor.conclusion_args}",
-      m!"inputEqualities: {inductiveCtor.inputEqualities}",
-      m!"baseTypeInputEqualities: {inductiveCtor.baseTypeInputEqualities}",
-      m!"nonBaseTypeInputEqualities: {inductiveCtor.nonBaseTypeInputEqualities}",
-      m!"name_space: {inductiveCtor.name_space}",
-      m!"dependencies: {inductiveCtor.dependencies}"
-    ]
-    .bracket "{" (.ofList fields) "}"
-
-
 /-- The datatype `InductiveInfo` bundles together metadata for an inductive relation -/
 structure InductiveInfo where
   /-- The name of the inductive relation -/
@@ -450,7 +412,7 @@ def process_constructor_unify_args (ctorName : Name) (ctorType: Expr) (inputVars
     let (baseTypeInputEqualities, _) := (inputEqualitiesWithTypes.filter (fun (_, ty) => isBaseType ty)).unzip
     let (nonBaseTypeInputEqualities, _) := (inputEqualitiesWithTypes.filter (fun (_, ty) => !isBaseType ty)).unzip
 
-    let inputEqs ←  mkEqs inputEqualities ConLCtx
+    let inputEqs ← mkExprEqualities inputEqualities ConLCtx
 
     return {
       ctorType := ctorType
@@ -479,16 +441,16 @@ def process_constructor_unify_args (ctorName : Name) (ctorType: Expr) (inputVars
     }
   | none => throwError "Not a match"
 
-def constructor_header (con: InductiveConstructor) : MetaM String := do withLCtx' con.LCtx do
+def constructor_header (con: InductiveConstructor) : MetaM String := withLCtx' con.LCtx do
   return toString (con.ctorName) ++ " : " ++  toString (← Meta.ppExpr con.ctorExpr)
 
-def process_constructor_print (pc: InductiveConstructor) : MetaM Unit := do withLCtx' pc.LCtx do
-  IO.println s!" Constructor Expr : {←  Meta.ppExpr pc.ctorExpr}"
+def process_constructor_print (pc: InductiveConstructor) : MetaM Unit := withLCtx' pc.LCtx do
+  IO.println s!" Constructor Expr : {← Meta.ppExpr pc.ctorExpr}"
   IO.println s!" Input Vars : {← Array.mapM Meta.ppExpr pc.input_vars}"
   IO.println s!" Bound Vars : {pc.bound_vars}"
   IO.println s!" Input maps : {(← Array.mapM Meta.ppExpr pc.inp_map.unzip.1).zip (← Array.mapM Meta.ppExpr pc.inp_map.unzip.2)}"
   IO.println s!" Cond props : {← Array.mapM Meta.ppExpr pc.all_hypotheses}"
-  IO.println s!" Conclusion prop :  {←  Meta.ppExpr pc.conclusion}"
+  IO.println s!" Conclusion prop :  {← Meta.ppExpr pc.conclusion}"
   IO.println s!" Builtin-typed vars : {pc.bound_vars_with_base_types}"
   IO.println s!" Non-builtin-typed vars : {pc.bound_vars_with_non_base_types}"
   IO.println s!" Builtin-typed props :  {← Array.mapM Meta.ppExpr pc.hypotheses_with_only_base_type_args}"
@@ -589,7 +551,7 @@ def getInductiveInfo (input_expr : Expr) : MetaM InductiveInfo := do
 
 
 /-- Prints the fields of an `inductiveInfo` -/
-def print_InductiveInfo (inductiveInfo : InductiveInfo) : MetaM Unit := do withLCtx' inductiveInfo.LCtx do
+def print_InductiveInfo (inductiveInfo : InductiveInfo) : MetaM Unit := withLCtx' inductiveInfo.LCtx do
   IO.println s!"Name of inductive relation: {inductiveInfo.inductive_name}"
   IO.println s!"Input types: {inductiveInfo.input_types}"
   IO.println s!"Input vars: { ← Array.mapM Meta.ppExpr inductiveInfo.input_vars }"
@@ -623,7 +585,7 @@ def elabGetIRInfoWithName : CommandElab := fun stx => do
     Command.liftTermElabM do
       let e ← elabTerm t none
       let inpname ← termToStringList t2
-      let inductiveInfo ←  getInductiveInfoWithArgs e inpname.toArray
+      let inductiveInfo ← getInductiveInfoWithArgs e inpname.toArray
       print_InductiveInfo inductiveInfo
   | _ => throwError "Invalid syntax"
 

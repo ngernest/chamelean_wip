@@ -42,18 +42,7 @@ structure GroupedActions where
 
   deriving Repr
 
--- Pretty print `GroupedActions`s using the `MessageData` typeclass
-instance : ToMessageData GroupedActions where
-  toMessageData groupedActions :=
-    let fields := [
-      m!"gen_list := {indentD $ toMessageData groupedActions.gen_list}",
-      m!"iflet_list := {indentD $ toMessageData groupedActions.iflet_list}",
-      m!"checkInductiveActions := {indentD $ toMessageData groupedActions.checkInductiveActions}",
-      m!"checkNonInductiveActions := {indentD $ toMessageData groupedActions.checkNonInductiveActions}",
-      m!"ret_list := {indentD $ toMessageData groupedActions.ret_list}",
-      m!"variableEqualities := {repr groupedActions.variableEqualities}",
-    ]
-    .bracket "{" (.ofList fields) "}"
+
 
 /-- Determines whether a generator is to be invoked during the base case when `size == 0` (`BaseGenerator`),
     or if it is inductively-defined (`InductiveGenerator`) and to be invoked when `size > 0` -/
@@ -140,36 +129,6 @@ structure SubCheckerInfo extends HandlerInfo where
   ctor : InductiveConstructor
 
   deriving Repr
-
--- Pretty print using the `MessageData` typeclass
-instance : ToMessageData HandlerInfo where
-  toMessageData handlerInfo : MessageData :=
-    let fields := [
-      m!"inputs := {toMessageData handlerInfo.inputs}",
-      m!"inputsToMatch := {toMessageData handlerInfo.inputsToMatch}",
-      m!"matchCases := {indentD $ toMessageData handlerInfo.matchCases}",
-      m!"actions := {indentD $ toMessageData handlerInfo.groupedActions}",
-      m!"variableEqualities := {repr handlerInfo.variableEqualities}",
-    ]
-    .bracket "{" (.ofList fields) "}"
-
-
--- Pretty printer for `SubGeneratorInfo`
-instance : ToMessageData SubGeneratorInfo where
-  toMessageData subGen : MessageData :=
-    .joinSep [
-      toMessageData subGen.toHandlerInfo,
-      m!"generatorSort := {repr subGen.generatorSort}"
-    ] "¬"
-
--- Pretty printer for `SubCheckerInfo`
-instance : ToMessageData SubCheckerInfo where
-  toMessageData subChecker : MessageData :=
-    .joinSep [
-      toMessageData subChecker.toHandlerInfo,
-      m!"checkerSort := {repr subChecker.checkerSort}"
-    ] "\n"
-
 
 /-- Converts an array of `Action`s into a `GroupedActions` -/
 def mkGroupedActions (gccs: Array Action) : MetaM GroupedActions := do
@@ -303,7 +262,7 @@ def gen_nonIR_toCode (fvar : FVarId) (ty : Expr) (lctx: LocalContext) (monad : S
   if monad = "IO" then
     out := out ++ " ← monadLift <| Gen.run (SampleableExt.interpSample " ++ typename ++ ") 100"
   else
-    out := out ++ " ←  SampleableExt.interpSample " ++ typename
+    out := out ++ " ← SampleableExt.interpSample " ++ typename
   return out
 
 /-- Produces a string containing the Lean code that corresponds to
@@ -392,10 +351,6 @@ def backtrackElem_return_checker (backtrackElem : HandlerInfo) (indentation : St
 def backtrack_elem_toString_checker (subChecker: SubCheckerInfo) (monad: String :="IO") : MetaM String := do
   let handlerInfo := subChecker.toHandlerInfo
 
-  IO.println "********************"
-  IO.println s!"entered `backtrack_elem_toString_checker`:"
-  IO.println (← MessageData.toString (toMessageData handlerInfo))
-
   let mut out := ""
   let matchblock ← backtrackElem_match_block handlerInfo
   let (genblock, iden) ← backtrackElem_gen_block handlerInfo monad
@@ -447,7 +402,6 @@ def elabgetBackTrack : CommandElab := fun stx => do
 -/
 def backtrackElem_if_return_producer (subGeneratorInfo : SubGeneratorInfo) (indentation : String) (vars: List String) (monad: String :="IO"): MetaM String := withLCtx' subGeneratorInfo.LCtx do
   logWarning "inside backtrackElem_if_return_producer"
-  -- logWarning m!"subGeneratorInfo = {subGeneratorInfo}"
 
   let mut out := ""
   if subGeneratorInfo.variableEqualities.size + subGeneratorInfo.groupedActions.checkNonInductiveActions.size + subGeneratorInfo.groupedActions.checkInductiveActions.size > 0 then

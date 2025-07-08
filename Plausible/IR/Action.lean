@@ -52,22 +52,22 @@ def numMatchingFVars (e : Expr) (id : FVarId) : Nat :=
   | _ => 0
 
 
-def subst_first_fVar (e: Expr) (old : FVarId) (new : FVarId) : MetaM Expr := do
-  if ¬ e.containsFVar old then return e
+/-- `substFirstFVar e oldFVar newFVar` substitutes the first (left-most)
+    occurrence of `oldFVar` in `e` with `newFVar` -/
+def substFirstFVar (e: Expr) (oldFVar : FVarId) (newFVar : FVarId) : MetaM Expr := do
+  if ¬ e.containsFVar oldFVar then return e
   else
     match e with
     | Expr.fvar id =>
-      if id == old then return (Expr.fvar new) else return e
-    | Expr.app f a =>
-      if f.containsFVar old then
-        let fnew ← subst_first_fVar f old new
-        return Expr.app fnew a
+      if id == oldFVar then return (Expr.fvar newFVar) else return e
+    | Expr.app f arg =>
+      if f.containsFVar oldFVar then
+        let fnew ← substFirstFVar f oldFVar newFVar
+        return Expr.app fnew arg
       else
-        let anew ← subst_first_fVar a old new
-        return Expr.app f anew
+        let newArg ← substFirstFVar arg oldFVar newFVar
+        return Expr.app f newArg
     | _ => return e
-
-
 
 
 /-- `DecomposedInductiveHypothesis` represents a hypothesis where the free variables
@@ -93,75 +93,78 @@ structure DecomposedInductiveHypothesis where
 
   deriving Repr
 
-/- keep the first occurence of the old FVarId in the expr, substitute the rest coccurences of it by the  new one-/
-def keep_first_subst_rest_fvarids (hyp: Expr) (old: FVarId) (new: FVarId) (lctx: LocalContext): MetaM Expr := withLCtx' lctx do
-  --The following tempfvarid is temporary for swapping and will not stay in the lctx, so we accept ←  mkFreshFVarId here
-  let tempfvarid ←  mkFreshFVarId
-  let mut newHyp := hyp
-  newHyp ← subst_first_fVar newHyp old tempfvarid
-  newHyp := newHyp.replaceFVarId old (mkFVar new)
-  newHyp := newHyp.replaceFVarId tempfvarid (mkFVar old)
-  return newHyp
-
+/-- `preserveFirstSubstRemainingFVars hyp oldFVar newFVar lctx` preserves the first occurence of the `oldFVar` in `hyp`,
+     with the remaining occurrences of `oldFVar` substituted with `newFVar`, updating the `LocalContext` `lctx` while doing so. -/
+def preserveFirstSubstRemainingFVars (hyp : Expr) (oldFVar : FVarId) (newFVar : FVarId) (lctx : LocalContext): MetaM Expr :=
+  withLCtx' lctx do
+    -- The following `tempfvarid` is temporary for swapping purposes
+    -- and does not remain in the `LocalContext`, so we allow the use `mkFreshFVarId` here
+    let tempFVar ← mkFreshFVarId
+    let mut newHyp ← substFirstFVar hyp oldFVar tempFVar
+    newHyp := newHyp.replaceFVarId oldFVar (.fvar newFVar)
+    newHyp := newHyp.replaceFVarId tempFVar (.fvar oldFVar)
+    return newHyp
 
 /-- For each free variable `t` that appears more than once in the hypothesis `hyp`,
     replace its second occurrence with `t1`, its 3rd occurrence with `t2`, etc.,
     and record the equalities `t = t1, t = t2, ...` -/
-def separateFVars (hyp : Expr) (lctx: LocalContext): MetaM DecomposedInductiveHypothesis := withLCtx' lctx do
-  let mut lctx := lctx
-  let fvars := extractFVarIds hyp
-  let mut equations : Array (FVarId × FVarId) := #[]
-  let mut fVarIds := fvars
-  let mut newHyp := hyp
-  for fv in fvars do
-    let mut i := 0
-    let mut currentFV := fv
-    while (numMatchingFVars newHyp currentFV > 1) do
-      let ty ←  getFVarId_type fv lctx
-      let newName := Name.appendAfter (← fv.getUserName) s!"_{i}"
-      let (new_lctx, newFVarId) ←  mkNewFVarId lctx newName ty
-      lctx := new_lctx
-      newHyp ← keep_first_subst_rest_fvarids newHyp currentFV newFVarId lctx
-      i:= i + 1
-      currentFV := newFVarId
-      equations := equations.push (fv, newFVarId)
-      fVarIds := fVarIds.push newFVarId
-  let variableEqs ←  mkEqs_FvarIds equations lctx
-  return {
-    newHypothesis := newHyp
-    fVarIds := fVarIds
-    variableEqualities := equations
-    LCtx := lctx
-    variableEqs := variableEqs
-  }
+def separateFVars (hyp : Expr) (lctx: LocalContext): MetaM DecomposedInductiveHypothesis :=
+  withLCtx' lctx do
+    let mut lctx := lctx
+    let fvars := extractFVarIds hyp
+    let mut equations : Array (FVarId × FVarId) := #[]
+    let mut fVarIds := fvars
+    let mut newHyp := hyp
+    for fv in fvars do
+      let mut i := 0
+      let mut currentFV := fv
+      while (numMatchingFVars newHyp currentFV > 1) do
+        let ty ← getFVarId_type fv lctx
+        let newName := Name.appendAfter (← fv.getUserName) s!"_{i}"
+        let (new_lctx, newFVarId) ← mkNewFVarId lctx newName ty
+        lctx := new_lctx
+        newHyp ← preserveFirstSubstRemainingFVars newHyp currentFV newFVarId lctx
+        i := i + 1
+        currentFV := newFVarId
+        equations := equations.push (fv, newFVarId)
+        fVarIds := fVarIds.push newFVarId
+    let variableEqs ← mkFVarEqualities equations lctx
+    return {
+      newHypothesis := newHyp
+      fVarIds := fVarIds
+      variableEqualities := equations
+      LCtx := lctx
+      variableEqs := variableEqs
+    }
 
 /-- Variant of `separateFVars` that only examines
     the free variables in `hypothesis` that appear in `initialFVars`,
     and uses the index of the hypothesis (`hypIndex`) to generate fresh names -/
 def separateFVarsInHypothesis (hypothesis : Expr) (initialFVars : Array FVarId) (hypIndex : Nat) (lctx: LocalContext)
-    : MetaM DecomposedInductiveHypothesis := do withLCtx' lctx do
-  let mut lctx := lctx
-  let initializedFVars := Array.intersect (extractFVarIds hypothesis) initialFVars
-  let mut newHypothesis := hypothesis
-  let mut equalities : Array (FVarId × FVarId) := #[]
-  for fvar in initializedFVars do
-    let fvarname ←  fvar.getUserName
-    let newName := Name.mkStr1 (fvarname.toString ++ "_" ++ toString hypIndex)
-    let ty ←  getFVarId_type fvar lctx
-    let (new_lctx, newFVarId) ← mkNewFVarId lctx newName ty
-    lctx := new_lctx
-    newHypothesis := newHypothesis.replaceFVarId fvar (mkFVar newFVarId)
-    equalities := equalities.push (fvar, newFVarId)
-  let decomposedHypothesis ← separateFVars newHypothesis lctx
-  let variableEqualities := equalities ++ decomposedHypothesis.variableEqualities
-  let variableEqs ← mkEqs_FvarIds variableEqualities lctx
-  return {
-    newHypothesis := decomposedHypothesis.newHypothesis
-    fVarIds := initializedFVars ++ decomposedHypothesis.fVarIds
-    variableEqualities := variableEqualities
-    variableEqs := variableEqs
-    LCtx := decomposedHypothesis.LCtx
-  }
+    : MetaM DecomposedInductiveHypothesis :=
+  withLCtx' lctx do
+    let mut lctx := lctx
+    let initializedFVars := Array.intersect (extractFVarIds hypothesis) initialFVars
+    let mut newHypothesis := hypothesis
+    let mut equalities : Array (FVarId × FVarId) := #[]
+    for fvar in initializedFVars do
+      let fvarname ← fvar.getUserName
+      let newName := Name.mkStr1 (fvarname.toString ++ "_" ++ toString hypIndex)
+      let ty ← getFVarId_type fvar lctx
+      let (new_lctx, newFVarId) ← mkNewFVarId lctx newName ty
+      lctx := new_lctx
+      newHypothesis := newHypothesis.replaceFVarId fvar (mkFVar newFVarId)
+      equalities := equalities.push (fvar, newFVarId)
+    let decomposedHypothesis ← separateFVars newHypothesis lctx
+    let variableEqualities := equalities ++ decomposedHypothesis.variableEqualities
+    let variableEqs ← mkFVarEqualities variableEqualities lctx
+    return {
+      newHypothesis := decomposedHypothesis.newHypothesis
+      fVarIds := initializedFVars ++ decomposedHypothesis.fVarIds
+      variableEqualities := variableEqualities
+      variableEqs := variableEqs
+      LCtx := decomposedHypothesis.LCtx
+    }
 
 /-- The `GenerationStyle` datatype describes the "style" in which a generator should be invoked:
     - `RecursiveCall` indicates that we should recursively call the current generator function
@@ -335,7 +338,7 @@ def Actions_for_hypotheses (ctor : InductiveConstructor) (fvars : Array FVarId) 
         else
           let nameOfFVarToGenerate := Name.mkStr1 ("tcond" ++ toString i)
           let ty ← inferType argToGenerate
-          let (new_lctx, fvarToGenerate) ←  mkNewFVarId lctx nameOfFVarToGenerate ty
+          let (new_lctx, fvarToGenerate) ← mkNewFVarId lctx nameOfFVarToGenerate ty
           lctx:= new_lctx
           let decomposedHypothesis ← separateFVarsInHypothesis argToGenerate initializedFVars i lctx
           lctx := decomposedHypothesis.LCtx
@@ -420,27 +423,7 @@ def Actions_toString (Action : Action) (lctx: LocalContext): MetaM String := wit
   | .ret e => return "return " ++ toString (← Meta.ppExpr e)
 
 
--- To pretty-print a `Action` idiomatically, we can just make it an instance
--- of the `ToMessageData` typeclass, which allows us to use Lean's delaborator
--- to pretty-print `Expr`s
-instance : ToMessageData Action where
-  toMessageData (Action : Action) : MessageData :=
-    match Action with
-    | .checkInductive hyp => m!"check_IR {hyp}"
-    | .checkNonInductive hyp => m!"check_nonIR ({hyp})"
-    | .genInputForInductive fvar hyp idx generationStyle =>
-      match generationStyle with
-      | .RecursiveCall =>
-        let remainingArgs := (hyp.getAppArgs.eraseIdx! idx).toList
-        m!"let {fvar.name} ← aux_arb size' {remainingArgs}"
-      | .TypeClassResolution =>
-        m!"let {fvar.name} ← ArbitrarySuchThat.arbitraryST (fun {fvar.name} => {hyp})"
-    | .matchFVar fvar hypothesis => m!"if let {hypothesis.newHypothesis} := {fvar.name} then ..."
-    | .genFVar fvar ty => m!"let {fvar.name} ← SampleableExt.interpSample {ty}"
-    | .ret e => m!"return {e}"
-
-
-def checker_header (con: InductiveConstructor) : MetaM String := do withLCtx' con.LCtx do
+def checker_header (con: InductiveConstructor) : MetaM String := withLCtx' con.LCtx do
   return toString (con.ctorName) ++ " : " ++  toString (← Meta.ppExpr con.ctorExpr)
 
 syntax (name := getCheckerCall) "#get_checker_actions" term : command
@@ -465,7 +448,7 @@ def elabCheckerCall : CommandElab := fun stx => do
 --#get_checker_actions balanced
 --#get_checker_actions bst
 
-def producer_header (con: InductiveConstructor) : MetaM String := do withLCtx' con.LCtx do
+def producer_header (con: InductiveConstructor) : MetaM String := withLCtx' con.LCtx do
   let hyp: String := toString (← Array.mapM Meta.ppExpr con.all_hypotheses)
   let conclusion := toString (← Meta.ppExpr con.conclusion)
   let arg: String := toString (← Array.mapM Meta.ppExpr con.conclusion_args)

@@ -88,7 +88,7 @@ def extract_IT_info (inpexp : Expr) : MetaM (IT_info) := do
       for ctorName in info.ctors do
         let some ctor := env.find? ctorName
          | throwError "IRConstructor '{ctorName}' not found"
-        let ctys ←  get_types_chain ctor.type
+        let ctys ← get_types_chain ctor.type
         let cargs := ctys.toList.dropLast
         for a in cargs do
           if ¬ (← has_instance a) then noinstance:= noinstance.push a
@@ -159,7 +159,7 @@ def IT_gen (r: IT_info)  (backtracknum: Nat): MetaM (String) := do
   return prototype ++ body
 
 def get_mutual_rec_block_for_IT (r: IT_info)  (btnum: Nat) : MetaM String := do
-  let generator ←  IT_gen r btnum
+  let generator ← IT_gen r btnum
   let mut mc_block := "mutual\n-- By_Cons \n" ++ generator ++ " \n"
   let mut order := 0
   for con in r.constructors do
@@ -181,7 +181,7 @@ def elabGetMutualBlock : CommandElab := fun stx => do
   | `(#gen_mutual_rec_IT $t backtrack $t3) =>
     Command.liftTermElabM do
       let e ← elabTerm t none
-      let it ←  extract_IT_info e
+      let it ← extract_IT_info e
       let btnum := TSyntax.getNat t3
       let mc_block := get_mutual_rec_block_for_IT it btnum
       print_m_string mc_block

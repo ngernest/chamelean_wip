@@ -57,7 +57,7 @@ def extract_IT_info (inpexp : Expr) : MetaM (IT_info) := do
       for ctorName in info.ctors do
         let some ctor := env.find? ctorName
          | throwError "IRConstructor '{ctorName}' not found"
-        let ctys ←  getComponentsOfArrowType ctor.type
+        let ctys ← getComponentsOfArrowType ctor.type
         let cargs := ctys.toList.dropLast
         for a in cargs do
           if (¬ (← has_instance a)) ∧ (¬ a.constName = typeName) ∧  (¬ a.constName ∈ noinstance.map Expr.constName)
@@ -174,7 +174,7 @@ def elabGetBlock : CommandElab := fun stx => do
   | `(#gen_IT $t:term) =>
     Command.liftTermElabM do
       let e ← elabTerm t none
-      let it ←  extract_IT_info e
+      let it ← extract_IT_info e
       let mc_block := IT_gen it
       print_m_string mc_block
   | _ => throwError "Invalid syntax"
@@ -189,9 +189,9 @@ def elabDeriveITGenerator : CommandElab := fun stx => do
   match stx with
   | `(#derive_sampleable $t with_size $t2) =>
       let (shrinkable, code, instance_def) ← Command.liftTermElabM do
-        let e ←  elabTerm t none
+        let e ← elabTerm t none
         let size := TSyntax.getNat t2
-        let it ←  extract_IT_info e
+        let it ← extract_IT_info e
         instance_def_code it size
       parseCommand shrinkable
       parseCommand code
