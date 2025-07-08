@@ -114,7 +114,6 @@ structure SubGeneratorInfo extends HandlerInfo where
   /-- Determines whether the producer is a generator or an enumerator -/
   producerType : ProducerType
 
-  deriving Repr
 
 /-- Datatype containing metadata needed to derive a sub-checker
     that is invoked from the main checker function -/
@@ -128,7 +127,6 @@ structure SubCheckerInfo extends HandlerInfo where
   /-- The constructor of an inductive relation corresponding to this sub-checker -/
   ctor : InductiveConstructor
 
-  deriving Repr
 
 /-- Converts an array of `Action`s into a `GroupedActions` -/
 def mkGroupedActions (gccs: Array Action) : MetaM GroupedActions := do

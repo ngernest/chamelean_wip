@@ -5,7 +5,7 @@ import Lean.Meta.Tactic.Simp.Main
 
 open Lean.Elab.Deriving.DecEq
 open List Nat Array String
-open Lean Elab Command Meta Term LocalContext
+open Lean Expr Elab Command Meta Term LocalContext
 open Lean.Parser.Term
 open Except
 open Std
@@ -142,23 +142,26 @@ def extractFVarsMetaM (e : Expr) : MetaM (Array FVarId) := do
   let (_, fvars_state) ← e.collectFVars.run {}
   return fvars_state.fvarIds
 
+/-- Creates a fresh user-facing name with the prefix `username` and type `ty` in the `LocalContext` `lctx`,
+    returning the updated context, associated `FVarId` and fresh name in the `MetaM` monad -/
+def addFreshLocalDecl (lctx : LocalContext) (username : Name) (ty : Expr) : MetaM (LocalContext × FVarId × Name) :=
+  withLCtx' lctx do
+    let newname := getUnusedName lctx username
+    withLocalDeclD newname ty $ fun expr =>
+      return (← getLCtx, expr.fvarId!, newname)
 
-def mkNewFVarId_keepoldnames (lctx: LocalContext) (username: Name) (ty: Expr): MetaM (LocalContext × FVarId × Name) := withLCtx' lctx do
-  let fvid ← mkFreshFVarId
-  let newname := lctx.getUnusedName username
-  let new_lctx := lctx.mkLocalDecl fvid newname ty
-  return (new_lctx, fvid, newname)
+/-- Creates a new `LocalDecl` with name `username` and type `ty`, returning the updated `LocalContext`
+    and `FVarId` associated with the new `LocalDecl` -/
+def addLocalDecl (lctx : LocalContext) (username : Name) (ty : Expr) : MetaM (LocalContext × FVarId) :=
+  withLCtx' lctx do
+    withLocalDeclD username ty $ fun expr =>
+      return (← getLCtx, expr.fvarId!)
 
-
-def mkNewFVarId (lctx: LocalContext) (username: Name) (ty: Expr): MetaM (LocalContext × FVarId) := withLCtx' lctx do
-  withLocalDeclD username ty fun expr =>
-    return (← getLCtx, expr.fvarId!)
-
-
-def getFVarId_type (fvarid: FVarId) (lctx: LocalContext) : MetaM Expr := withLCtx' lctx do
-  let err := "Cannot find FVarId of " ++ toString fvarid.name ++ " in LocalContext"
-  return (← option_to_MetaM (lctx.find? fvarid) err).type
-
+/-- `getFVarTypeInContext fvarId lctx` extracts the type associated with a `FVarId` in the context `lctx` -/
+def getFVarTypeInContext (fvarId : FVarId) (lctx : LocalContext) : MetaM Expr :=
+  match lctx.find? fvarId with
+  | none => throwError "Cannot find FVarId associated with {fvarId.name} in LocalContext"
+  | some localDecl => return localDecl.type
 
 /-- Decomposes a universally-quantified type expression whose body is an arrow type
     (i.e. `∀ (x1 : τ1) … (xn : τn), Q1 → … → Qn → P`), and returns a triple of the form
@@ -172,18 +175,19 @@ def decomposeType (e : Expr) : MetaM (Array (Name × Expr) × Expr × Array Expr
 
 
 /-- Decomposes a universally-quantified type expression whose body is an arrow type
-    (i.e. `∀ (x1 : τ1) … (xn : τn), Q1 → … → Qn → P`), and returns a triple of the form
-    `(#[(x1, τ1), …, (xn, τn)], Q1 → … → Qn → P, #[Q1, …, Qn, P])`.
+    (i.e. `∀ (x1 : τ1) … (xn : τn), Q1 → … → Qn → P`) using the `LocalContext` `lctx`,
+    and returns a quadruple of the form
+    `(#[(x1, τ1), …, (xn, τn)], Q1 → … → Qn → P, #[Q1, …, Qn, P], updated LocalContext)`.
     - The 2nd component is the body of the forall-expression
     - The 3rd component is an array containing each subterm of the arrow type -/
-def decomposeType_withLocalContext (e : Expr) (lctx: LocalContext): MetaM (Array (Name × Expr) × Expr × Array Expr × LocalContext) :=
+def decomposeTypeWithLocalContext (e : Expr) (lctx : LocalContext) : MetaM (Array (Name × Expr) × Expr × Array Expr × LocalContext) :=
   withLCtx' lctx do
     let (binder, exp) := extractForAllBinders e
     let mut new_exp := exp
     let mut lctx := lctx
     let mut new_binder := #[]
     for (name, ty) in binder do
-      let (new_lctx, new_fvarid, newname) ← mkNewFVarId_keepoldnames lctx name ty
+      let (new_lctx, new_fvarid, newname) ← addFreshLocalDecl lctx name ty
       lctx := new_lctx
       let old_fvarid := ⟨name⟩
       let new_fvar := mkFVar new_fvarid
@@ -191,24 +195,6 @@ def decomposeType_withLocalContext (e : Expr) (lctx: LocalContext): MetaM (Array
       new_binder := new_binder.push (newname, ty)
     let tyexp ← getComponentsOfArrowType new_exp
     return (new_binder, new_exp, tyexp, lctx)
-
-
-def get_recursive_calls (typeName : Name) (e : Expr) : MetaM (Array Expr) := do
-  let rec go (e : Expr) (acc : Array Expr) : MetaM (Array Expr) := do
-    match e with
-    | Expr.const n _ =>
-      if n == typeName then
-        return acc.push e
-      else
-        return acc
-    | Expr.app f a => do
-      let acc ← go f acc
-      go a acc
-    | Expr.forallE _ d b _ => do
-      let acc ← go d acc
-      go b acc
-    | _ => return acc
-  go e #[]
 
 /-- `mkEqualities pairs f lctx` creates an array of `Expr`s, where each `Expr` is an equality between each `α × α` pair in `pairs`.
     The function `f` is used to convert `α` into `Expr`s using the `MetaM` monad, and the `LocalContext` `lctx` is updated

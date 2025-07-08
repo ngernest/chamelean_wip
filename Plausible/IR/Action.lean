@@ -119,9 +119,9 @@ def separateFVars (hyp : Expr) (lctx: LocalContext): MetaM DecomposedInductiveHy
       let mut i := 0
       let mut currentFV := fv
       while (numMatchingFVars newHyp currentFV > 1) do
-        let ty ← getFVarId_type fv lctx
+        let ty ← getFVarTypeInContext fv lctx
         let newName := Name.appendAfter (← fv.getUserName) s!"_{i}"
-        let (new_lctx, newFVarId) ← mkNewFVarId lctx newName ty
+        let (new_lctx, newFVarId) ← addLocalDecl lctx newName ty
         lctx := new_lctx
         newHyp ← preserveFirstSubstRemainingFVars newHyp currentFV newFVarId lctx
         i := i + 1
@@ -150,8 +150,8 @@ def separateFVarsInHypothesis (hypothesis : Expr) (initialFVars : Array FVarId) 
     for fvar in initializedFVars do
       let fvarname ← fvar.getUserName
       let newName := Name.mkStr1 (fvarname.toString ++ "_" ++ toString hypIndex)
-      let ty ← getFVarId_type fvar lctx
-      let (new_lctx, newFVarId) ← mkNewFVarId lctx newName ty
+      let ty ← getFVarTypeInContext fvar lctx
+      let (new_lctx, newFVarId) ← addLocalDecl lctx newName ty
       lctx := new_lctx
       newHypothesis := newHypothesis.replaceFVarId fvar (mkFVar newFVarId)
       equalities := equalities.push (fvar, newFVarId)
@@ -318,7 +318,7 @@ def Actions_for_hypotheses (ctor : InductiveConstructor) (fvars : Array FVarId) 
           ← getLastUninitializedArgAndFVars hyp initializedFVars
 
         for fid in uninitializedFVars do
-          let ty ← getFVarId_type fid lctx
+          let ty ← getFVarTypeInContext fid lctx
           actions := actions.push (.genFVar fid ty)
 
         let argToGenerate := hyp.getAppArgs[uninitializedArgIdx]!
@@ -338,7 +338,7 @@ def Actions_for_hypotheses (ctor : InductiveConstructor) (fvars : Array FVarId) 
         else
           let nameOfFVarToGenerate := Name.mkStr1 ("tcond" ++ toString i)
           let ty ← inferType argToGenerate
-          let (new_lctx, fvarToGenerate) ← mkNewFVarId lctx nameOfFVarToGenerate ty
+          let (new_lctx, fvarToGenerate) ← addLocalDecl lctx nameOfFVarToGenerate ty
           lctx:= new_lctx
           let decomposedHypothesis ← separateFVarsInHypothesis argToGenerate initializedFVars i lctx
           lctx := decomposedHypothesis.LCtx
@@ -351,7 +351,7 @@ def Actions_for_hypotheses (ctor : InductiveConstructor) (fvars : Array FVarId) 
       else
         let uninitializedFVars := getUninitializedFVars hyp initializedFVars
         for fvar in uninitializedFVars do
-          let ty ← getFVarId_type fvar lctx
+          let ty ← getFVarTypeInContext fvar lctx
           actions := actions.push (.genFVar fvar ty)
         initializedFVars := Array.appendUniqueElements initializedFVars uninitializedFVars
         actions := actions.push (.checkNonInductive hyp)
@@ -381,7 +381,7 @@ def Actions_for_producer (ctor : InductiveConstructor) (genpos : Nat) : MetaM Co
   let gen_arg := ctor.conclusion.getAppArgs[genpos]!
   let uninitset := Array.removeAll (extractFVarIds gen_arg) initset
   for fid in uninitset do
-    let ty ← getFVarId_type fid lctx
+    let ty ← getFVarTypeInContext fid lctx
     actions := actions.push (Action.genFVar fid ty)
   actions := actions.push (Action.ret gen_arg)
   return {

@@ -240,8 +240,6 @@ structure InductiveConstructor where
 
   LCtx : LocalContext
 
-  deriving Repr
-
 /-- The datatype `InductiveInfo` bundles together metadata for an inductive relation -/
 structure InductiveInfo where
   /-- The name of the inductive relation -/
@@ -356,7 +354,7 @@ def unify_args_with_conclusion (hypotheses : Array Expr) (conclusion : Expr) (in
     conclusion of the constructor. -/
 def process_constructor_unify_args (ctorName : Name) (ctorType: Expr) (inputVars : Array Expr) (inputTypes : Array Expr)
   (inductiveRelationName: Name) (IRLCtx: LocalContext): MetaM InductiveConstructor := do
-  let (bound_vars_and_types, ctorExpr, components_of_arrow_type, ConLCtx) ← decomposeType_withLocalContext ctorType IRLCtx
+  let (bound_vars_and_types, ctorExpr, components_of_arrow_type, ConLCtx) ← decomposeTypeWithLocalContext ctorType IRLCtx
 
   -- `boundVarCtx` maps free variables (identified by their `FVarId`) to their types
   let mut boundVarCtx := HashMap.emptyWithCapacity
