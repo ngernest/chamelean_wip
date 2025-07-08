@@ -465,6 +465,7 @@ def print_constructors (ctors : Array InductiveConstructor) : MetaM Unit := do
     i := i+1
     process_constructor_print l
 
+/-- Helper function for creating `n` names -/
 def mkDefaultInputNames_aux (n: Nat) : MetaM (Array String) := do
   let mut input_names := #[]
   for i in [:n] do
@@ -472,6 +473,10 @@ def mkDefaultInputNames_aux (n: Nat) : MetaM (Array String) := do
     input_names := input_names.push inpname
   return input_names
 
+/-- Creates an array of default names corresponding to the function that appears
+    in `inputExpr`
+
+    (precondition: `inputExpr` should be a function application) -/
 def mkDefaultInputNames (inputExpr : Expr) : MetaM (Array String) := do
   match inputExpr.getAppFn.constName? with
   | some _ => do
@@ -479,15 +484,19 @@ def mkDefaultInputNames (inputExpr : Expr) : MetaM (Array String) := do
     let tyexprs_in_arrow_type ← getComponentsOfArrowType type
     let input_types := tyexprs_in_arrow_type.pop
     return (← mkDefaultInputNames_aux input_types.size)
-  | none => throwError "Not a type"
+  | none => throwError "input expression is not a function application"
 
+/-- `mkInitialContextForInductiveRelation inputTypes inputNameStrings`
+    creates the initial `LocalContext` where each `(x, τ)` in `Array.zip inputTypes inputNameStrings`
+    is given the declaration `x : τ` in the resultant context.
 
-def mkInitialIRLocalContext (input_types : Array Expr) (inp_names: Array String)
-    : MetaM ((Array Expr) × (Array Name) × LocalContext) := do
-  let inp_names := inp_names.map Name.mkStr1
-  let localdecls := inp_names.zip input_types
-  withLocalDeclsDND localdecls fun exprs => do
-    return (exprs, inp_names, ← getLCtx)
+    This function returns a triple containing `inputTypes`, `inputNames` represented as an `Array` of `Name`s,
+    and the resultant `LocalContext`. -/
+def mkInitialContextForInductiveRelation (inputTypes : Array Expr) (inputNameStrings : Array String) : MetaM (Array Expr × Array Name × LocalContext) := do
+  let inputNames := Name.mkStr1 <$> inputNameStrings
+  let localDecls := inputNames.zip inputTypes
+  withLocalDeclsDND localDecls $ fun exprs => do
+    return (exprs, inputNames, ← getLCtx)
 
 
 /-- Takes in an expression of the form `R e1 ... en`, where `R` is an inductive relation
@@ -502,7 +511,7 @@ def getInductiveInfoWithArgs (inputExpr : Expr) (argNames : Array String) : Meta
     -- `input_types` contains all elements of `tyexprs_in_arrow_type` except the conclusion (which is `Prop`)
     let input_types := tyexprs_in_arrow_type.pop
 
-    let (input_vars, input_vars_names, IRLCtx) ← mkInitialIRLocalContext input_types argNames
+    let (input_vars, input_vars_names, localCtx) ← mkInitialContextForInductiveRelation input_types argNames
 
     let env ← getEnv
     match env.find? inductive_name with
@@ -516,7 +525,7 @@ def getInductiveInfoWithArgs (inputExpr : Expr) (argNames : Array String) : Meta
         let decomposed_ctor_type ← decomposeType ctor.type
         decomposed_ctor_types := decomposed_ctor_types.push decomposed_ctor_type
         let constructor ←
-            process_constructor_unify_args ctorName ctor.type input_vars input_types inductive_name IRLCtx
+            process_constructor_unify_args ctorName ctor.type input_vars input_types inductive_name localCtx
         ctors := ctors.push constructor
       let constructors_with_arity_zero := ctors.filter (fun ctor => ctor.all_hypotheses.size == 0)
       let constructors_with_args := ctors.filter (fun ctor => ctor.all_hypotheses.size != 0)
@@ -535,7 +544,7 @@ def getInductiveInfoWithArgs (inputExpr : Expr) (argNames : Array String) : Meta
         constructors_with_arity_zero := constructors_with_arity_zero
         constructors_with_args := constructors_with_args
         dependencies := dependencies
-        localCtx := IRLCtx
+        localCtx := localCtx
       }
     | some _ =>
       throwError "'{inductive_name}' is not an inductive type"
