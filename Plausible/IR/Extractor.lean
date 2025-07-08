@@ -238,7 +238,7 @@ structure InductiveConstructor where
       (i.e. if `e` is an inductive relation that is defined within the current namespace) -/
   dependencies : Array Expr
 
-  LCtx : LocalContext
+  localCtx : LocalContext
 
 /-- The datatype `InductiveInfo` bundles together metadata for an inductive relation -/
 structure InductiveInfo where
@@ -267,7 +267,7 @@ structure InductiveInfo where
   constructors_with_args : Array InductiveConstructor
   dependencies: Array Expr
 
-  LCtx: LocalContext
+  localCtx : LocalContext
 
 /-- Determines if an expression `e` is an application of the form `R e1 ... en`,
     where `R` is an inductive relation  -/
@@ -434,15 +434,15 @@ def process_constructor_unify_args (ctorName : Name) (ctorType: Expr) (inputVars
       nonBaseTypeInputEqualities := nonBaseTypeInputEqualities
       name_space := inductiveRelationName.getRoot
       dependencies := dependencies
-      LCtx := ConLCtx
+      localCtx := ConLCtx
       inputEqs := inputEqs
     }
   | none => throwError "Not a match"
 
-def constructor_header (con: InductiveConstructor) : MetaM String := withLCtx' con.LCtx do
+def constructor_header (con: InductiveConstructor) : MetaM String := withLCtx' con.localCtx do
   return toString (con.ctorName) ++ " : " ++  toString (← Meta.ppExpr con.ctorExpr)
 
-def process_constructor_print (pc: InductiveConstructor) : MetaM Unit := withLCtx' pc.LCtx do
+def process_constructor_print (pc: InductiveConstructor) : MetaM Unit := withLCtx' pc.localCtx do
   IO.println s!" Constructor Expr : {← Meta.ppExpr pc.ctorExpr}"
   IO.println s!" Input Vars : {← Array.mapM Meta.ppExpr pc.input_vars}"
   IO.println s!" Bound Vars : {pc.bound_vars}"
@@ -535,7 +535,7 @@ def getInductiveInfoWithArgs (inputExpr : Expr) (argNames : Array String) : Meta
         constructors_with_arity_zero := constructors_with_arity_zero
         constructors_with_args := constructors_with_args
         dependencies := dependencies
-        LCtx := IRLCtx
+        localCtx := IRLCtx
       }
     | some _ =>
       throwError "'{inductive_name}' is not an inductive type"
@@ -549,7 +549,7 @@ def getInductiveInfo (input_expr : Expr) : MetaM InductiveInfo := do
 
 
 /-- Prints the fields of an `inductiveInfo` -/
-def print_InductiveInfo (inductiveInfo : InductiveInfo) : MetaM Unit := withLCtx' inductiveInfo.LCtx do
+def print_InductiveInfo (inductiveInfo : InductiveInfo) : MetaM Unit := withLCtx' inductiveInfo.localCtx do
   IO.println s!"Name of inductive relation: {inductiveInfo.inductive_name}"
   IO.println s!"Input types: {inductiveInfo.input_types}"
   IO.println s!"Input vars: { ← Array.mapM Meta.ppExpr inductiveInfo.input_vars }"

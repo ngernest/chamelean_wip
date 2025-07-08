@@ -155,7 +155,7 @@ def mkLetBindExprsInDoBlock (actions : Array Action) (producerType : ProducerTyp
 def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term) := do
 
   -- Create a monadic do-block containing all the calls to other producers (in the form of let-bind expressions)
-  let doElems ← mkLetBindExprsInDoBlock subGenerator.groupedActions.gen_list subGenerator.producerType subGenerator.LCtx
+  let doElems ← mkLetBindExprsInDoBlock subGenerator.groupedActions.gen_list subGenerator.producerType subGenerator.localCtx
 
   -- Check that all hypotheses which are not `inductive`s are upheld when we generate free variables
   let mut nonInductiveHypothesesToCheck := #[]
@@ -167,7 +167,7 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
       if ty.isProp then
         -- If yes, add it to our list of hypotheses to check using the `DecOpt` instance
         -- for that particular `Prop`
-        let predicateTerm ← delabExprInLocalContext subGenerator.LCtx predicateExpr
+        let predicateTerm ← delabExprInLocalContext subGenerator.localCtx predicateExpr
         nonInductiveHypothesesToCheck := nonInductiveHypothesesToCheck.push predicateTerm
       else if ty == mkSort levelOne then
         -- `predicateExpr` is a `Type` (i.e. `Type 0`, the usual universe level for ordinary types)
@@ -181,7 +181,7 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
   for action in subGenerator.groupedActions.checkInductiveActions do
     if let .checkInductive inductiveExpr := action then
       -- Convert the `Expr` into a `Term` using the info about free variables stored in the current `LocalContext`
-      let inductiveTerm ← delabExprInLocalContext subGenerator.LCtx inductiveExpr
+      let inductiveTerm ← delabExprInLocalContext subGenerator.localCtx inductiveExpr
 
       -- Conver the `Term` into a `TSyntax term`
       let typedInductiveTerm ← `($inductiveTerm:term)
@@ -190,7 +190,7 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
 
   -- Add equality checks for any pairs of variables in `variableEqualities`
   -- TODO: use `variableEqs` here instead of `variableEqualities`
-  let mut variableEqualitiesToCheck ← Array.mapM (fun e => delabExprInLocalContext subGenerator.LCtx e) subGenerator.variableEqs
+  let mut variableEqualitiesToCheck ← Array.mapM (fun e => delabExprInLocalContext subGenerator.localCtx e) subGenerator.variableEqs
   -- for (fvar1, fvar2) in subGenerator.variableEqualities do
   --   let ident1 := mkIdent fvar1.name
   --   let ident2 := mkIdent fvar2.name
@@ -205,7 +205,7 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
     match action' with
     | .ret expr =>
       -- Delaborate `expr` to get a `TSyntax` for the argument we're generating
-      let argToGenTerm ← delabExprInLocalContext subGenerator.LCtx expr
+      let argToGenTerm ← delabExprInLocalContext subGenerator.localCtx expr
 
       -- Create the body of the sub-generator consisting of a monadic do-block and any extra pattern-matches
       -- to check non-inductive hypotheses / variable equalities
@@ -225,7 +225,7 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
         let scrutinees := Lean.mkIdent <$> Array.map (fun name => genFreshName existingNames name) existingNames
 
         -- Construct the match expression based on the info in `matchCases`
-        let patterns ← Array.mapM (fun patternExpr => delabExprInLocalContext subGenerator.LCtx patternExpr) subGenerator.matchCases
+        let patterns ← Array.mapM (fun patternExpr => delabExprInLocalContext subGenerator.localCtx patternExpr) subGenerator.matchCases
         -- If there are multiple scrutinees, the LHS of each case is a tuple containing the elements in `matchCases`
         let case ← `(Term.matchAltExpr| | $[$patterns:term],* => $generatorBody:term)
         cases := cases.push case

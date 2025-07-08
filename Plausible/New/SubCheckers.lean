@@ -65,7 +65,7 @@ def mkSubCheckerBody (hypothesesToCheck : List Action) (ctor : InductiveConstruc
           -- If yes, perform a recursive call to the parent checker
           -- Otherwise, perform typeclass resolution & invoke the checker provided by the `DecOpt` instance for the proposition
           let checkerStyle := if hypothesisRecursivelyCallsCurrentInductive hyp ctor then .RecursiveCall else .TypeClassResolution
-          let checkerCall ← mkAuxiliaryCheckerCall hyp checkerStyle ctor.LCtx
+          let checkerCall ← mkAuxiliaryCheckerCall hyp checkerStyle ctor.localCtx
           callsToOtherCheckers := callsToOtherCheckers.push checkerCall
         | _ => throwError "hypothesesToCheck contains Actions that are not checker actions"
 
@@ -89,8 +89,8 @@ def mkSubCheckerBody (hypothesesToCheck : List Action) (ctor : InductiveConstruc
         -- Produces the code `enumeratingOpt (enumST (fun $newVar => $hyp)) (fun $newVar => $continuationBody) initSize`,
         -- which invokes a constrained enumerator that produces values satisfying `hyp` and pass them to `checkerContinuation`
         -- (the continuation handles the remaining producer actions in the tail of the `producerActions` list)
-        let newVar := mkIdent $ getUserNameInContext ctor.LCtx fvar
-        let hypTerm ← delabExprInLocalContext ctor.LCtx hyp
+        let newVar := mkIdent $ getUserNameInContext ctor.localCtx fvar
+        let hypTerm ← delabExprInLocalContext ctor.localCtx hyp
         let enumSuchThatCall ← `($enumSTFn (fun $newVar:ident => $hypTerm))
         let continuationBody ← mkSubCheckerBody hypothesesToCheck ctor remainingProdActions
         `($enumeratingOptFn:ident $enumSuchThatCall (fun $newVar:ident => $continuationBody) $initSizeIdent)
@@ -98,7 +98,7 @@ def mkSubCheckerBody (hypothesesToCheck : List Action) (ctor : InductiveConstruc
         -- Produces the code `enumerating enum (fun $newVar => $continuationBody) initSize`
         -- which invokes an unconstrained enumerator that enumerates values of the given type
         -- (the type is determined via typeclass resolution), and passes them to the `continuationBody`
-        let newVar := mkIdent $ getUserNameInContext ctor.LCtx fvar
+        let newVar := mkIdent $ getUserNameInContext ctor.localCtx fvar
         let continuationBody ← mkSubCheckerBody hypothesesToCheck ctor remainingProdActions
         `($enumeratingFn:ident $enumFn (fun $newVar:ident => $continuationBody) $initSizeIdent)
       | _ => throwError "producerActions contains Actions that are not producer actions"
@@ -125,7 +125,7 @@ def mkSubChecker (subChecker : SubCheckerInfo) : TermElabM (TSyntax `term) := do
     withOptions (fun opts => opts.setBool `pp.fieldNotation false) do
       -- Construct the match expression based on the info in `matchCases`
       let mut cases := #[]
-      let patterns ← Array.mapM (fun patternExpr => delabExprInLocalContext subChecker.LCtx patternExpr) subChecker.matchCases
+      let patterns ← Array.mapM (fun patternExpr => delabExprInLocalContext subChecker.localCtx patternExpr) subChecker.matchCases
 
       -- If there are multiple scrutinees, the LHS of each case is a tuple containing the elements in `matchCases`
       let case ← `(Term.matchAltExpr| | $[$patterns:term],* => $checkerBody:term)

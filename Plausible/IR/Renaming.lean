@@ -138,7 +138,7 @@ def testSimpleRenaming : MetaM Unit := do
       generatorSort := .InductiveGenerator,
       variableEqualities := #[],
       producerType := .Generator
-      LCtx := ← getLCtx
+      localCtx := ← getLCtx
       variableEqs := #[]
     }
 

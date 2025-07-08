@@ -94,7 +94,7 @@ structure HandlerInfo where
   variableEqualities : Array (FVarId × FVarId)
 
   /-- `LocalContext` associated with all the `FVarId`s -/
-  LCtx: LocalContext
+  localCtx : LocalContext
 
   /-- New field (stores a list of equality `Expr`s) -/
   variableEqs : Array Expr
@@ -113,7 +113,6 @@ structure SubGeneratorInfo extends HandlerInfo where
 
   /-- Determines whether the producer is a generator or an enumerator -/
   producerType : ProducerType
-
 
 /-- Datatype containing metadata needed to derive a sub-checker
     that is invoked from the main checker function -/
@@ -169,8 +168,8 @@ def mkGroupedActions (gccs: Array Action) : MetaM GroupedActions := do
     and returns a corresponding `SubCheckerInfo` for a checker -/
 def mkSubCheckerInfoFromConstructor (ctor : InductiveConstructor)
   (inputNames : Array String) : MetaM SubCheckerInfo := do
-  let conclusion ← separateFVars ctor.conclusion ctor.LCtx
-  let ctor := { ctor with LCtx := conclusion.LCtx }
+  let conclusion ← separateFVars ctor.conclusion ctor.localCtx
+  let ctor := { ctor with localCtx := conclusion.localCtx }
   let args := conclusion.newHypothesis.getAppArgs
   let inputNamesAndArgs := inputNames.zip args
   let inputPairsThatNeedMatching := inputNamesAndArgs.filter (fun (_, arg) => !arg.isFVar)
@@ -186,7 +185,7 @@ def mkSubCheckerInfoFromConstructor (ctor : InductiveConstructor)
     groupedActions := groupedActions
     variableEqualities := conclusion.variableEqualities ++ groupedActions.variableEqualities
     checkerSort := checkerSort
-    LCtx := actions.Lctx
+    localCtx := actions.localCtx
     variableEqs := conclusion.variableEqs ++ groupedActions.variableEqs
   }
 
@@ -194,16 +193,16 @@ def mkSubCheckerInfoFromConstructor (ctor : InductiveConstructor)
     the index of the argument we wish to generate (`idx`),
     and returns a corresponding `SubGeneratorInfo` for a generator -/
 def mkSubGeneratorInfoFromConstructor (ctor : InductiveConstructor) (inputNames : Array String)
-  (idx : Nat) (producerType : ProducerType) : MetaM SubGeneratorInfo := withLCtx' ctor.LCtx do
+  (idx : Nat) (producerType : ProducerType) : MetaM SubGeneratorInfo := withLCtx' ctor.localCtx do
 
   let inputNamesList := inputNames.toList
   let tempFVar := Expr.fvar (← mkFreshFVarId)
   let conclusion_args := ctor.conclusion.getAppArgs.set! idx tempFVar
   let new_conclusion := mkAppN ctor.conclusion.getAppFn conclusion_args
 
-  let conclusion ← separateFVars new_conclusion ctor.LCtx
+  let conclusion ← separateFVars new_conclusion ctor.localCtx
 
-  let ctor := { ctor with LCtx:= conclusion.LCtx }
+  let ctor := { ctor with localCtx := conclusion.localCtx }
   let args := conclusion.newHypothesis.getAppArgs.toList
   let zippedInputsAndArgs := List.zip inputNamesList args
 
@@ -228,7 +227,7 @@ def mkSubGeneratorInfoFromConstructor (ctor : InductiveConstructor) (inputNames 
     groupedActions := groupedActions
     variableEqualities := conclusion.variableEqualities ++ groupedActions.variableEqualities
     generatorSort := generatorSort
-    LCtx := actions.Lctx
+    localCtx := actions.localCtx
     producerType := producerType
     variableEqs := conclusion.variableEqs ++ groupedActions.variableEqs
   }
@@ -276,7 +275,7 @@ def actionToCode (Action : Action) (lctx: LocalContext) (monad: String := "IO") 
 
 /-- Produces the outer-most pattern-match block in a sub-generator
     based on the info in a `BacktrackElem` -/
-def backtrackElem_match_block (backtrackElem : HandlerInfo) : MetaM String := withLCtx' backtrackElem.LCtx do
+def backtrackElem_match_block (backtrackElem : HandlerInfo) : MetaM String := withLCtx' backtrackElem.localCtx do
   let mut out := ""
   if backtrackElem.inputsToMatch.size > 0 then
     out := out ++ "match "
@@ -297,7 +296,7 @@ def backtrackElem_gen_block (backtrackElem : HandlerInfo) (monad: String :="IO")
   let mut out := ""
   let mut indentation := ""
   for action in backtrackElem.groupedActions.gen_list do
-    out := out ++ indentation ++ (← actionToCode action backtrackElem.LCtx monad) ++ " \n"
+    out := out ++ indentation ++ (← actionToCode action backtrackElem.localCtx monad) ++ " \n"
     match action with
     | .matchFVar _ _ =>
         indentation := indentation ++ " "
@@ -317,14 +316,14 @@ def backtrackElem_gen_check_IR_block (backtrackElem : HandlerInfo) (indentation 
   let mut vars : List String := []
   let mut checkcount := 1
   for gcc in backtrackElem.groupedActions.checkInductiveActions do
-    out := out ++ indentation ++ "let check" ++ toString checkcount ++ " " ++ (← actionToCode gcc backtrackElem.LCtx monad) ++ " \n"
+    out := out ++ indentation ++ "let check" ++ toString checkcount ++ " " ++ (← actionToCode gcc backtrackElem.localCtx monad) ++ " \n"
     vars := vars ++ [toString checkcount]
     checkcount := checkcount + 1
   if backtrackElem.groupedActions.checkInductiveActions.size > 0 then
     out := ⟨out.data.dropLast.dropLast⟩
   return (out, vars)
 
-def backtrackElem_return_checker (backtrackElem : HandlerInfo) (indentation : String) (vars : List String) (monad: String :="IO"): MetaM String := withLCtx' backtrackElem.LCtx do
+def backtrackElem_return_checker (backtrackElem : HandlerInfo) (indentation : String) (vars : List String) (monad: String :="IO"): MetaM String := withLCtx' backtrackElem.localCtx do
   let mut out := ""
   if backtrackElem.variableEqualities.size + backtrackElem.groupedActions.checkNonInductiveActions.size + backtrackElem.groupedActions.checkInductiveActions.size > 0 then
     out := out ++ indentation ++ "return "
@@ -335,7 +334,7 @@ def backtrackElem_return_checker (backtrackElem : HandlerInfo) (indentation : St
   for i in backtrackElem.variableEqualities do
     out := out ++  "(" ++ toString (← i.1.getUserName) ++ " == " ++ toString (← i.2.getUserName) ++ ") && "
   for gcc in backtrackElem.groupedActions.checkNonInductiveActions do
-    out := out ++ (← actionToCode gcc backtrackElem.LCtx monad) ++ " && "
+    out := out ++ (← actionToCode gcc backtrackElem.localCtx monad) ++ " && "
   if backtrackElem.variableEqualities.size + backtrackElem.groupedActions.checkNonInductiveActions.size + backtrackElem.groupedActions.checkInductiveActions.size > 0 then
     out := ⟨out.data.dropLast.dropLast.dropLast⟩
   if backtrackElem.groupedActions.iflet_list.size > 0 then
@@ -398,7 +397,7 @@ def elabgetBackTrack : CommandElab := fun stx => do
     - `vars` is a list of free variables that were produced during the `check_IR` block
     - e.g. `vars = ["1", "2", ...]`
 -/
-def backtrackElem_if_return_producer (subGeneratorInfo : SubGeneratorInfo) (indentation : String) (vars: List String) (monad: String :="IO"): MetaM String := withLCtx' subGeneratorInfo.LCtx do
+def backtrackElem_if_return_producer (subGeneratorInfo : SubGeneratorInfo) (indentation : String) (vars: List String) (monad: String :="IO"): MetaM String := withLCtx' subGeneratorInfo.localCtx do
   logWarning "inside backtrackElem_if_return_producer"
 
   let mut out := ""
@@ -409,11 +408,11 @@ def backtrackElem_if_return_producer (subGeneratorInfo : SubGeneratorInfo) (inde
   for i in subGeneratorInfo.variableEqualities do
     out := out ++  "(" ++ toString (← i.1.getUserName) ++ " == " ++ toString (← i.2.getUserName) ++ ") && "
   for gcc in subGeneratorInfo.groupedActions.checkNonInductiveActions do
-    out := out ++ (← actionToCode gcc subGeneratorInfo.LCtx monad) ++ " && "
+    out := out ++ (← actionToCode gcc subGeneratorInfo.localCtx monad) ++ " && "
   if subGeneratorInfo.variableEqualities.size + subGeneratorInfo.groupedActions.checkNonInductiveActions.size + subGeneratorInfo.groupedActions.checkInductiveActions.size > 0 then
     out := ⟨out.data.dropLast.dropLast.dropLast⟩ ++ "\n" ++ indentation ++  "then "
   for gcc in subGeneratorInfo.groupedActions.ret_list do
-    out := out ++ indentation ++ (← actionToCode gcc subGeneratorInfo.LCtx monad)
+    out := out ++ indentation ++ (← actionToCode gcc subGeneratorInfo.localCtx monad)
   if subGeneratorInfo.variableEqualities.size + subGeneratorInfo.groupedActions.checkNonInductiveActions.size + subGeneratorInfo.groupedActions.checkInductiveActions.size + subGeneratorInfo.groupedActions.iflet_list.size > 0 then
     let monad_fail := if monad = "IO" then "throw (IO.userError \"fail at checkstep\")" else "return none"
     out := out ++ "\n" ++ monad_fail

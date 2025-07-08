@@ -87,7 +87,7 @@ structure DecomposedInductiveHypothesis where
       (e.g. `t = t1`) -/
   variableEqualities : Array (FVarId × FVarId)
 
-  LCtx: LocalContext
+  localCtx : LocalContext
 
   variableEqs : Array Expr
 
@@ -133,7 +133,7 @@ def separateFVars (hyp : Expr) (lctx: LocalContext): MetaM DecomposedInductiveHy
       newHypothesis := newHyp
       fVarIds := fVarIds
       variableEqualities := equations
-      LCtx := lctx
+      localCtx := lctx
       variableEqs := variableEqs
     }
 
@@ -163,7 +163,7 @@ def separateFVarsInHypothesis (hypothesis : Expr) (initialFVars : Array FVarId) 
       fVarIds := initializedFVars ++ decomposedHypothesis.fVarIds
       variableEqualities := variableEqualities
       variableEqs := variableEqs
-      LCtx := decomposedHypothesis.LCtx
+      localCtx := decomposedHypothesis.localCtx
     }
 
 /-- The `GenerationStyle` datatype describes the "style" in which a generator should be invoked:
@@ -212,7 +212,7 @@ inductive Action where
 
 structure ConstructorActions where
   actions : Array Action
-  Lctx: LocalContext
+  localCtx: LocalContext
 
 /-- Extracts all the free variables in the conclusion of a constructor
     for an inductive relation -/
@@ -304,7 +304,7 @@ def getLastUninitializedArgAndFVars
 
 
 def Actions_for_hypotheses (ctor : InductiveConstructor) (fvars : Array FVarId) : MetaM ConstructorActions := do
-  let mut lctx := ctor.LCtx
+  let mut lctx := ctor.localCtx
   let mut actions := #[]
   let mut initializedFVars := fvars
   for (hyp, i) in ctor.all_hypotheses.zipIdx do
@@ -341,7 +341,7 @@ def Actions_for_hypotheses (ctor : InductiveConstructor) (fvars : Array FVarId) 
           let (new_lctx, fvarToGenerate) ← addLocalDecl lctx nameOfFVarToGenerate ty
           lctx:= new_lctx
           let decomposedHypothesis ← separateFVarsInHypothesis argToGenerate initializedFVars i lctx
-          lctx := decomposedHypothesis.LCtx
+          lctx := decomposedHypothesis.localCtx
           actions := actions.push (.genInputForInductive fvarToGenerate hyp uninitializedArgIdx generationStyle)
           actions := actions.push (.matchFVar fvarToGenerate decomposedHypothesis)
         initializedFVars := Array.appendUniqueElements initializedFVars fVarsToBeInitialized
@@ -358,7 +358,7 @@ def Actions_for_hypotheses (ctor : InductiveConstructor) (fvars : Array FVarId) 
 
   return {
     actions := actions
-    Lctx := lctx
+    localCtx := lctx
   }
 
 
@@ -375,7 +375,7 @@ def Actions_for_producer (ctor : InductiveConstructor) (genpos : Nat) : MetaM Co
   let mut initset ← getFVarsInConclusionArgs ctor genpos
   let mut init_actions ← Actions_for_hypotheses ctor initset
   let mut actions := init_actions.actions
-  let lctx := init_actions.Lctx
+  let lctx := init_actions.localCtx
   for hyp in ctor.all_hypotheses do
     initset := Array.appendUniqueElements initset (extractFVarIds hyp)
   let gen_arg := ctor.conclusion.getAppArgs[genpos]!
@@ -386,7 +386,7 @@ def Actions_for_producer (ctor : InductiveConstructor) (genpos : Nat) : MetaM Co
   actions := actions.push (Action.ret gen_arg)
   return {
     actions := actions
-    Lctx := lctx
+    localCtx := lctx
   }
 
 
@@ -423,7 +423,7 @@ def Actions_toString (Action : Action) (lctx: LocalContext): MetaM String := wit
   | .ret e => return "return " ++ toString (← Meta.ppExpr e)
 
 
-def checker_header (con: InductiveConstructor) : MetaM String := withLCtx' con.LCtx do
+def checker_header (con: InductiveConstructor) : MetaM String := withLCtx' con.localCtx do
   return toString (con.ctorName) ++ " : " ++  toString (← Meta.ppExpr con.ctorExpr)
 
 syntax (name := getCheckerCall) "#get_checker_actions" term : command
@@ -440,7 +440,7 @@ def elabCheckerCall : CommandElab := fun stx => do
         --IO.println s!"---- Out prop : {con.conclusion}"
         let proc_conds ← Actions_for_checker con
         for pc in proc_conds.actions do
-          IO.println (← Actions_toString pc proc_conds.Lctx)
+          IO.println (← Actions_toString pc proc_conds.localCtx)
   | _ => throwError "Invalid syntax"
 
 
@@ -448,7 +448,7 @@ def elabCheckerCall : CommandElab := fun stx => do
 --#get_checker_actions balanced
 --#get_checker_actions bst
 
-def producer_header (con: InductiveConstructor) : MetaM String := withLCtx' con.LCtx do
+def producer_header (con: InductiveConstructor) : MetaM String := withLCtx' con.localCtx do
   let hyp: String := toString (← Array.mapM Meta.ppExpr con.all_hypotheses)
   let conclusion := toString (← Meta.ppExpr con.conclusion)
   let arg: String := toString (← Array.mapM Meta.ppExpr con.conclusion_args)
@@ -468,7 +468,7 @@ def elabGenCall : CommandElab := fun stx => do
         IO.println s!"\n---- Constructor : {← checker_header ctor}"
         let producer_Actions ← Actions_for_producer ctor pos
         for Action in producer_Actions.actions do
-          IO.println (← Actions_toString Action producer_Actions.Lctx)
+          IO.println (← Actions_toString Action producer_Actions.localCtx)
   | _ => throwError "Invalid syntax"
 
 
