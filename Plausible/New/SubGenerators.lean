@@ -216,8 +216,9 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
         let mut cases := #[]
 
         -- Handle multiple scrutinees by giving all of them fresh names
+        -- Use the name map to lookup the freshened versions of the scrutinee's name
         let existingNames := Name.mkStr1 <$> subGenerator.inputsToMatch
-        let scrutinees := Lean.mkIdent <$> Array.map (fun name => genFreshName existingNames name) existingNames
+        let scrutinees := (lookupFreshenedNameInNameMap subGenerator.nameMap existingNames) <$> existingNames
 
         -- Construct the match expression based on the info in `matchCases`
         let patterns ← Array.mapM (fun patternExpr => delabExprInLocalContext subGenerator.localCtx patternExpr) subGenerator.matchCases

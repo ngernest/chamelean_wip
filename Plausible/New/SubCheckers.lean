@@ -120,7 +120,7 @@ def mkSubChecker (subChecker : SubCheckerInfo) : TermElabM (TSyntax `term) := do
     let existingNames := Name.mkStr1 <$> subChecker.inputsToMatch
 
     -- Use the name map to lookup the freshened versions of the scrutinee's name
-    let scrutinees := (lookupNameInNameMap subChecker.nameMap existingNames) <$> existingNames
+    let scrutinees := (lookupFreshenedNameInNameMap subChecker.nameMap existingNames) <$> existingNames
 
     -- Force delaborator to pretty-print pattern cases in prefix position
     -- (as opposed to using postfix dot-notation, which is not allowed in pattern-matches)

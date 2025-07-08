@@ -96,6 +96,10 @@ structure HandlerInfo where
       (used when rewriting variables in patterns) -/
   variableEqs : Array Expr
 
+  /-- A `HashMap` mapping argument names to freshened versions of the same name
+      (the other `LocalContext` field in `HandlerInfo` only stores the freshened version) -/
+  nameMap : HashMap Name Name
+
   deriving Repr
 
 /-- Datatype containing metadata needed to derive a sub-generator
@@ -122,9 +126,6 @@ structure SubCheckerInfo extends HandlerInfo where
 
   /-- The constructor of an inductive relation corresponding to this sub-checker -/
   ctor : InductiveConstructor
-
-  -- TODO: move this into `SubGeneratorInfo` too
-  nameMap : HashMap Name Name
 
 
 /-- Converts an array of `Action`s into a `GroupedActions` -/
@@ -164,7 +165,7 @@ def mkGroupedActions (gccs: Array Action) : MetaM GroupedActions := do
 /-- Takes a constructor for an inductive relation, a list of argument names, the index of the argument we wish to generate (`genpos`),
     and returns a corresponding `SubCheckerInfo` for a checker -/
 def mkSubCheckerInfoFromConstructor (ctor : InductiveConstructor)
-  (inputNames : Array String) (nameMap : HashMap Name Name): MetaM SubCheckerInfo := do
+  (inputNames : Array String) (nameMap : HashMap Name Name) : MetaM SubCheckerInfo := do
   let conclusion ← separateFVars ctor.conclusion ctor.localCtx
   let ctor := { ctor with localCtx := conclusion.localCtx }
   let args := conclusion.newHypothesis.getAppArgs
@@ -190,43 +191,44 @@ def mkSubCheckerInfoFromConstructor (ctor : InductiveConstructor)
     the index of the argument we wish to generate (`idx`),
     and returns a corresponding `SubGeneratorInfo` for a generator -/
 def mkSubGeneratorInfoFromConstructor (ctor : InductiveConstructor) (inputNames : Array String)
-  (idx : Nat) (producerType : ProducerType) : MetaM SubGeneratorInfo := withLCtx' ctor.localCtx do
+  (idx : Nat) (producerType : ProducerType) (nameMap : HashMap Name Name) : MetaM SubGeneratorInfo :=
+  withLCtx' ctor.localCtx do
+    let inputNamesList := inputNames.toList
+    let tempFVar := Expr.fvar (← mkFreshFVarId)
+    let conclusion_args := ctor.conclusion.getAppArgs.set! idx tempFVar
+    let new_conclusion := mkAppN ctor.conclusion.getAppFn conclusion_args
 
-  let inputNamesList := inputNames.toList
-  let tempFVar := Expr.fvar (← mkFreshFVarId)
-  let conclusion_args := ctor.conclusion.getAppArgs.set! idx tempFVar
-  let new_conclusion := mkAppN ctor.conclusion.getAppFn conclusion_args
+    let conclusion ← separateFVars new_conclusion ctor.localCtx
 
-  let conclusion ← separateFVars new_conclusion ctor.localCtx
+    let ctor := { ctor with localCtx := conclusion.localCtx }
+    let args := conclusion.newHypothesis.getAppArgs.toList
+    let zippedInputsAndArgs := List.zip inputNamesList args
 
-  let ctor := { ctor with localCtx := conclusion.localCtx }
-  let args := conclusion.newHypothesis.getAppArgs.toList
-  let zippedInputsAndArgs := List.zip inputNamesList args
+    -- Take all elements of `inputNamesAndArgs`, but omit the element at the `genpos`-th index
+    let inputNamesAndArgs := List.eraseIdx zippedInputsAndArgs idx
 
-  -- Take all elements of `inputNamesAndArgs`, but omit the element at the `genpos`-th index
-  let inputNamesAndArgs := List.eraseIdx zippedInputsAndArgs idx
+    -- Find all pairs where the argument is not a free variable
+    -- (these are the arguments that need matching)
+    let inputPairsThatNeedMatching := inputNamesAndArgs.filter (fun (_, arg) => !arg.isFVar)
+    let (inputsToMatch, matchCases) := inputPairsThatNeedMatching.unzip
+    let actions ← Actions_for_producer ctor idx
+    let groupedActions ← mkGroupedActions actions.actions
 
-  -- Find all pairs where the argument is not a free variable
-  -- (these are the arguments that need matching)
-  let inputPairsThatNeedMatching := inputNamesAndArgs.filter (fun (_, arg) => !arg.isFVar)
-  let (inputsToMatch, matchCases) := inputPairsThatNeedMatching.unzip
-  let actions ← Actions_for_producer ctor idx
-  let groupedActions ← mkGroupedActions actions.actions
+    -- Constructors with no hypotheses get `BaseGenerator`s
+    -- (otherwise, the generator needs to make a recursive call and is thus inductively-defined)
+    let generatorSort := if ctor.recursive_hypotheses.isEmpty then .BaseGenerator else .InductiveGenerator
 
-  -- Constructors with no hypotheses get `BaseGenerator`s
-  -- (otherwise, the generator needs to make a recursive call and is thus inductively-defined)
-  let generatorSort := if ctor.recursive_hypotheses.isEmpty then .BaseGenerator else .InductiveGenerator
-
-  return {
-    inputs := (List.eraseIdx inputNamesList idx).toArray
-    inputsToMatch := inputsToMatch.toArray
-    matchCases := matchCases.toArray
-    groupedActions := groupedActions
-    generatorSort := generatorSort
-    localCtx := actions.localCtx
-    producerType := producerType
-    variableEqs := conclusion.variableEqs ++ groupedActions.variableEqs
-  }
+    return {
+      inputs := (List.eraseIdx inputNamesList idx).toArray
+      inputsToMatch := inputsToMatch.toArray
+      matchCases := matchCases.toArray
+      groupedActions := groupedActions
+      generatorSort := generatorSort
+      localCtx := actions.localCtx
+      producerType := producerType
+      variableEqs := conclusion.variableEqs ++ groupedActions.variableEqs
+      nameMap := nameMap
+    }
 
 -- The functions below create strings containing Lean code based on the information
 -- in a `BacktrackElement`
@@ -449,7 +451,7 @@ def producer_where_defs (relation: InductiveInfo) (inpname: List String) (genpos
     i := i + 1
     out_str:= out_str ++ "\n-- Constructor: " ++ (← constructor_header ctor) ++ "\n"
     out_str:= out_str ++ (← prototype_for_producer_by_con relation inpname genpos i monad) ++ ":= do\n"
-    let bt ← mkSubGeneratorInfoFromConstructor ctor inpname.toArray genpos .Generator
+    let bt ← mkSubGeneratorInfoFromConstructor ctor inpname.toArray genpos .Generator ∅
     let btStr ← subGeneratorInfoToString bt monad
     out_str:= out_str ++ btStr ++ "\n"
   return out_str
@@ -459,13 +461,16 @@ def producer_where_defs (relation: InductiveInfo) (inpname: List String) (genpos
     the index of the argument we wish to generate (`targetIdx`),
     and the desired `producerType` (`Generator` or `Enumerator`),
     and returns a collection of `SubGeneratorInfo`s for a producer -/
-def getSubGeneratorInfos (inductiveRelation : Expr) (argNames : Array String) (targetIdx: Nat) (producerType : ProducerType) : MetaM (Array SubGeneratorInfo) := do
+def getSubGeneratorInfos (inductiveRelation : Expr) (argNames : Array String) (targetIdx: Nat)
+  (producerType : ProducerType) : MetaM (Array SubGeneratorInfo × LocalContext × HashMap Name Name) := do
   let inductiveInfo ← getInductiveInfoWithArgs inductiveRelation argNames
+  let nameMap := inductiveInfo.nameMap
+  let topLevelLocalCtx := inductiveInfo.localCtx
   let mut subGenerators := #[]
   for ctor in inductiveInfo.constructors do
-    let subGenerator ← mkSubGeneratorInfoFromConstructor ctor argNames targetIdx producerType
+    let subGenerator ← mkSubGeneratorInfoFromConstructor ctor argNames targetIdx producerType nameMap
     subGenerators := subGenerators.push subGenerator
-  return subGenerators
+  return (subGenerators, topLevelLocalCtx, nameMap)
 
 /-- Takes an `Expr` representing an inductive relation and a list of names (arguments to the inductive relation),
     and returns a collection of `BacktrackElem`s for a checker -/

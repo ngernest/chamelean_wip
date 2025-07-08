@@ -32,7 +32,7 @@ def elabDeriveGenerator : CommandElab := fun stx => do
 
     -- Create an auxiliary `SubGeneratorInfo` structure that
     -- stores the metadata for each derived sub-generator
-    let allSubGeneratorInfos ← liftTermElabM $ getSubGeneratorInfos inductiveExpr argNameStrings targetIdx .Generator
+    let (allSubGeneratorInfos, topLevelLocalCtx, nameMap) ← liftTermElabM $ getSubGeneratorInfos inductiveExpr argNameStrings targetIdx .Generator
 
     -- Every generator is an inductive generator
     -- (they can all be invoked in the inductive case of the top-level generator),
@@ -43,7 +43,10 @@ def elabDeriveGenerator : CommandElab := fun stx => do
     let baseGenerators ← liftTermElabM $ mkWeightedThunkedSubGenerators baseGenInfo .BaseGenerator
     let inductiveGenerators ← liftTermElabM $ mkWeightedThunkedSubGenerators inductiveGenInfo .InductiveGenerator
 
-    let typeclassInstance ← mkProducerTypeClassInstance baseGenerators inductiveGenerators inductiveName args targetVar targetTypeSyntax .Generator
+    -- Create an instance of the `ArbitrarySuchThat` typeclass
+    let typeclassInstance ←
+      mkProducerTypeClassInstance baseGenerators inductiveGenerators inductiveName
+        args targetVar targetTypeSyntax .Generator topLevelLocalCtx nameMap
 
     -- Pretty-print the derived generator
     let genFormat ← liftCoreM (PrettyPrinter.ppCommand typeclassInstance)

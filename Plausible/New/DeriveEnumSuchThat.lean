@@ -32,27 +32,29 @@ def elabDeriveEnumerator : CommandElab := fun stx => do
 
     -- Create an auxiliary `SubGeneratorInfo` structure that
     -- stores the metadata for each derived sub-generator
-    let allSubGeneratorInfos ← liftTermElabM $ getSubGeneratorInfos inductiveExpr argNameStrings targetIdx .Enumerator
+    let (allSubGeneratorInfos, topLevelLocalCtx, nameMap) ← liftTermElabM $ getSubGeneratorInfos inductiveExpr argNameStrings targetIdx .Enumerator
 
-    -- Every generator is an inductive generator
-    -- (they can all be invoked in the inductive case of the top-level generator),
-    -- but only certain generators qualify as `BaseGenerator`s
+    -- Every enumerator is an inductive enumerator
+    -- (they can all be invoked in the inductive case of the top-level enumerator),
+    -- but only certain enumerator qualify as `BaseGenerator`s
     let baseGenInfo := Array.filter (fun gen => gen.generatorSort == .BaseGenerator) allSubGeneratorInfos
     let inductiveGenInfo := allSubGeneratorInfos
 
     let baseEnumerators ← liftTermElabM $ mkSubEnumeratorList baseGenInfo .BaseGenerator
     let inductiveEnumerators ← liftTermElabM $ mkSubEnumeratorList inductiveGenInfo .InductiveGenerator
 
+    -- Create an instance of the `EnumSuchThat` typeclass
     let typeclassInstance ←
-      mkProducerTypeClassInstance baseEnumerators inductiveEnumerators inductiveName args targetVar targetTypeSyntax .Enumerator
+      mkProducerTypeClassInstance baseEnumerators inductiveEnumerators inductiveName
+        args targetVar targetTypeSyntax .Enumerator topLevelLocalCtx nameMap
 
-    -- Pretty-print the derived generator
+    -- Pretty-print the derived enumerator
     let genFormat ← liftCoreM (PrettyPrinter.ppCommand typeclassInstance)
 
-    -- Display the code for the derived generator to the user
+    -- Display the code for the derived enumerator to the user
     -- & prompt the user to accept it in the VS Code side panel
     liftTermElabM $ Tactic.TryThis.addSuggestion stx
-      (Format.pretty genFormat) (header := "Try this generator: ")
+      (Format.pretty genFormat) (header := "Try this enumerator: ")
 
     -- Elaborate the typeclass instance and add it to the local context
     elabCommand typeclassInstance

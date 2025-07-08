@@ -262,8 +262,11 @@ structure InductiveInfo where
   constructors_with_args : Array InductiveConstructor
   dependencies: Array Expr
 
+  /-- The `LocalContext` associated with the inductive relation -/
   localCtx : LocalContext
 
+  /-- A `HashMap` mapping argument names to freshened versions of the same name
+      (the other `LocalContext` field in `InductiveInfo` only stores the freshened version) -/
   nameMap : HashMap Name Name
 
 /-- Determines if an expression `e` is an application of the form `R e1 ... en`,

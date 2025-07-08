@@ -57,9 +57,8 @@ def mkTopLevelChecker (baseCheckers : TSyntax `term) (inductiveCheckers : TSynta
 
     -- Each parameter to the inner `aux_arb` function needs to be a fresh name
     -- (so that if we pattern match on the parameter, we avoid pattern variables from shadowing it)
-
-    -- TODO: replace `genFreshName` with lookup into the local context
-    let innerParamIdent := lookupNameInNameMap nameMap (Array.map Prod.fst paramInfo) paramName
+    -- We obtain this fresh name by looking up in the `nameMap`
+    let innerParamIdent := lookupFreshenedNameInNameMap nameMap (Array.map Prod.fst paramInfo) paramName
 
     let innerParam ← `(Term.letIdBinder| ($innerParamIdent : $paramType))
     innerParams := innerParams.push innerParam
