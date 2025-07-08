@@ -5,9 +5,10 @@ import Lean.Meta.Tactic.Simp.Main
 
 open Lean.Elab.Deriving.DecEq
 open List Nat Array String
-open Lean Elab Command Meta Term
+open Lean Expr Elab Command Meta Term LocalContext
 open Lean.Parser.Term
 open Except
+open Std
 
 namespace Plausible.IR
 
@@ -75,6 +76,11 @@ def option_to_IO {α : Type} (o : Option α) (errorMsg : String := "Option is no
   | some a => return a
   | none => throw (IO.userError errorMsg)
 
+def option_to_MetaM (o: Option α) (errmsg: String := "Option is none"): MetaM α := do
+  match o with
+  | some v => return v
+  | _ => throwError errmsg
+
 /-- Takes a type expression `tyexpr` representing an arrow type, and returns an array of type-expressions
     where each element is a component of the arrow type.
     For example, `getComponentsOfArrowType (A -> B -> C)` produces `#[A, B, C]`. -/
@@ -97,6 +103,26 @@ elab "#get_type" t:term : command => do
     let typeStr ← typeArrayToString types
     IO.println typeStr
 
+/-- Computes the set of all free variables in an expression, returning a `HashSet` of `FVarId`s
+    - This is a non-monadic version of `Lean.CollectFVars`, defined in
+    https://github.com/leanprover/lean4/blob/6741444a63eec253a7eae7a83f1beb3de015023d/src/Lean/Util/CollectFVars.lean#L28 -/
+def getFVarsSet (e : Expr) : HashSet FVarId :=
+  open HashSet in
+  match e with
+  | .proj _ _ e => getFVarsSet e
+  | .forallE _ ty body _ => union (getFVarsSet ty) (getFVarsSet body)
+  | .lam _ ty body _ => union (getFVarsSet ty) (getFVarsSet body)
+  | .letE _ ty val body _ =>
+    union (getFVarsSet ty) (union (getFVarsSet val) (getFVarsSet body))
+  | .app f a => union (getFVarsSet f) (getFVarsSet a)
+  | .mdata _ e => getFVarsSet e
+  | .fvar fvar_id => HashSet.ofArray #[fvar_id]
+  | _ => ∅
+
+/-- Extracts the free variables in an expression, returning an array of `FVarID`s -/
+def extractFVarIds (e : Expr) : Array FVarId :=
+  HashSet.toArray $ getFVarsSet e
+
 /-- Takes a universally-quantified expression of the form `∀ (x1 : τ1) … (xn : τn), body`
     and returns the pair `(#[(x1, τ1), …, (xn, τn)], body)` -/
 partial def extractForAllBinders (e : Expr) : Array (Name × Expr) × Expr :=
@@ -110,6 +136,33 @@ partial def extractForAllBinders (e : Expr) : Array (Name × Expr) × Expr :=
     | _ => (acc, e)
   go e #[]
 
+/-- A monadic version of `extractFVarIds` (which collects the array of `FVarId`s
+    in the `MetaM` monad ) -/
+def extractFVarsMetaM (e : Expr) : MetaM (Array FVarId) := do
+  let (_, fvars_state) ← e.collectFVars.run {}
+  return fvars_state.fvarIds
+
+/-- Creates a fresh user-facing name with the prefix `username` and type `ty` in the `LocalContext` `lctx`,
+    returning the updated context, associated `FVarId` and fresh name in the `MetaM` monad -/
+def addFreshLocalDecl (lctx : LocalContext) (username : Name) (ty : Expr) : MetaM (LocalContext × FVarId × Name) :=
+  withLCtx' lctx do
+    let newname := getUnusedName lctx username
+    withLocalDeclD newname ty $ fun expr =>
+      return (← getLCtx, expr.fvarId!, newname)
+
+/-- Creates a new `LocalDecl` with name `username` and type `ty`, returning the updated `LocalContext`
+    and `FVarId` associated with the new `LocalDecl` -/
+def addLocalDecl (lctx : LocalContext) (username : Name) (ty : Expr) : MetaM (LocalContext × FVarId) :=
+  withLCtx' lctx do
+    withLocalDeclD username ty $ fun expr =>
+      return (← getLCtx, expr.fvarId!)
+
+/-- `getFVarTypeInContext fvarId lctx` extracts the type associated with a `FVarId` in the context `lctx` -/
+def getFVarTypeInContext (fvarId : FVarId) (lctx : LocalContext) : MetaM Expr :=
+  match lctx.find? fvarId with
+  | none => throwError "Cannot find FVarId associated with {fvarId.name} in LocalContext"
+  | some localDecl => return localDecl.type
+
 /-- Decomposes a universally-quantified type expression whose body is an arrow type
     (i.e. `∀ (x1 : τ1) … (xn : τn), Q1 → … → Qn → P`), and returns a triple of the form
     `(#[(x1, τ1), …, (xn, τn)], Q1 → … → Qn → P, #[Q1, …, Qn, P])`.
@@ -121,43 +174,48 @@ def decomposeType (e : Expr) : MetaM (Array (Name × Expr) × Expr × Array Expr
   return (binder, exp, tyexp)
 
 
-def get_recursive_calls (typeName : Name) (e : Expr) : MetaM (Array Expr) := do
-  let rec go (e : Expr) (acc : Array Expr) : MetaM (Array Expr) := do
-    match e with
-    | Expr.const n _ =>
-      if n == typeName then
-        return acc.push e
-      else
-        return acc
-    | Expr.app f a => do
-      let acc ← go f acc
-      go a acc
-    | Expr.forallE _ d b _ => do
-      let acc ← go d acc
-      go b acc
-    | _ => return acc
-  go e #[]
+/-- Decomposes a universally-quantified type expression whose body is an arrow type
+    (i.e. `∀ (x1 : τ1) … (xn : τn), Q1 → … → Qn → P`) using the `LocalContext` `lctx`,
+    and returns a quadruple of the form
+    `(#[(x1, τ1), …, (xn, τn)], Q1 → … → Qn → P, #[Q1, …, Qn, P], updated LocalContext)`.
+    - The 2nd component is the body of the forall-expression
+    - The 3rd component is an array containing each subterm of the arrow type -/
+def decomposeTypeWithLocalContext (e : Expr) (lctx : LocalContext) : MetaM (Array (Name × Expr) × Expr × Array Expr × LocalContext) :=
+  withLCtx' lctx do
+    let (binder, exp) := extractForAllBinders e
+    let mut new_exp := exp
+    let mut lctx := lctx
+    let mut new_binder := #[]
+    for (name, ty) in binder do
+      let (new_lctx, new_fvarid, newname) ← addFreshLocalDecl lctx name ty
+      lctx := new_lctx
+      let old_fvarid := ⟨name⟩
+      let new_fvar := mkFVar new_fvarid
+      new_exp := new_exp.replaceFVarId old_fvarid new_fvar
+      new_binder := new_binder.push (newname, ty)
+    let tyexp ← getComponentsOfArrowType new_exp
+    return (new_binder, new_exp, tyexp, lctx)
 
-def mk_equations (left right : Array Expr) : MetaM (Array Expr) := do
-  if left.size != right.size then
-    throwError s!"Arrays have different sizes: {left.size} ≠ {right.size}"
-  let mut equations : Array Expr := #[]
-  for i in [:left.size] do
-    let l := left[i]!
-    let r := right[i]!
-    let eq ←   mkEq l r
-    equations := equations.push (← whnf eq)
-  return equations
+/-- `mkEqualities pairs f lctx` creates an array of `Expr`s, where each `Expr` is an equality between each `α × α` pair in `pairs`.
+    The function `f` is used to convert `α` into `Expr`s using the `MetaM` monad, and the `LocalContext` `lctx` is updated
+    after the equalities have been created.
 
-def mk_eqs (ee: Array (Expr × Expr)) : MetaM (Array Expr) := do
-  let (left, right) := ee.unzip
-  let mut equations : Array Expr := #[]
-  for i in [:left.size] do
-    let l := left[i]!
-    let r := right[i]!
-    let eq ←   mkEq l r
-    equations := equations.push (← whnf eq)
-  return equations
+    See `mkExprEqualities` & `mkFVarEqualities` for specialized versions of this function. -/
+def mkEqualities (pairs : Array (α × α)) (f : α → MetaM Expr) (lctx : LocalContext) : MetaM (Array Expr) :=
+  withLCtx' lctx do
+    let mut equalities := #[]
+    for (lhs, rhs) in pairs do
+      let eq ← mkEq (← f lhs) (← f rhs)
+      equalities := equalities.push eq
+    return equalities
+
+/-- Version of `mkEqualities` where `α` is specialized to `Expr` -/
+def mkExprEqualities (exprPairs : Array (Expr × Expr)) (lctx : LocalContext) : MetaM (Array Expr) :=
+  mkEqualities exprPairs pure lctx
+
+/-- Version of `mkEqualities` where `α` is specialized to `FVarId` -/
+def mkFVarEqualities (fvarPairs : Array (FVarId × FVarId)) (lctx : LocalContext) : MetaM (Array Expr) :=
+  mkEqualities fvarPairs (fun fvarId => LocalDecl.toExpr <$> FVarId.getDecl fvarId) lctx
 
 /-- Decomposes an array `arr` into a pair `(xs, x)`
    where `xs = arr[0..=n-2]` and `x = arr[n - 1]` (where `n` is the length of `arr`).
@@ -179,7 +237,7 @@ def printConstructorsWithArgs (typeName : Name) : MetaM Unit := do
     for ctorName in info.ctors do
       let some ctor := env.find? ctorName
         | throwError "Constructor '{ctorName}' not found"
-      let (_, _, list_prop) ←  decomposeType ctor.type
+      let (_, _, list_prop) ← decomposeType ctor.type
       match splitLast? list_prop with
       | some (cond_prop, out_prop) =>
       IO.println s!"  {ctorName} : {ctor.type}"
@@ -194,22 +252,6 @@ elab "#show_constructors" n:ident : command => do
   Command.liftTermElabM do
     printConstructorsWithArgs typeName
 
-
-partial def mkFreshName (base : Name) : MetaM Name := do
-  let ctx ← getLCtx
-  let rec go (idx : Nat) := do
-    let name := if idx == 0 then base else Name.mkNum base idx
-    if ctx.findFromUserName? name |>.isNone then
-      return name
-    else
-      go (idx + 1)
-  go 0
-
-/-- Create a fresh FVar with base name -/
-def mkFreshFVar (base : Name) (type : Expr) : MetaM Expr := do
-  let name ← mkFreshName base
-  withLocalDeclD name type fun fvar => do
-    return fvar
 
 partial def getFinalType (type : Expr) : MetaM Expr := do
   let rec go (e : Expr) : MetaM Expr := do
@@ -367,7 +409,7 @@ def afterLastDot (s : String) : String :=
 def makeInputs (s: String) (n : Nat) := makeInputs_aux s n n
 where makeInputs_aux (s: String) (n : Nat) (z: Nat) : List String := match n with
 | 0 => []
-| succ n => [s ++ "_" ++ (toString (z - n) )] ++ (makeInputs_aux s n z)
+| succ n => [s  ++ (toString (z - n) )] ++ (makeInputs_aux s n z)
 
 
 def print_m_string (m: MetaM String) : MetaM Unit := do

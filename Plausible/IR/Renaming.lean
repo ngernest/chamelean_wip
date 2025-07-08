@@ -1,7 +1,7 @@
 import Lean
 import Std
 import Plausible.IR.Constructor
-import Plausible.IR.GCCall
+import Plausible.IR.Action
 
 open Lean Meta Std Plausible.IR
 
@@ -132,11 +132,12 @@ def testSimpleRenaming : MetaM Unit := do
         checkInductiveActions := #[],
         checkNonInductiveActions := #[],
         ret_list := #[Action.ret (Expr.const `Tree.leaf [])],
-        variableEqualities := #[]
+        variableEqs := #[]
       },
       generatorSort := .InductiveGenerator,
-      variableEqualities := #[],
       producerType := .Generator
+      localCtx := ← getLCtx
+      variableEqs := #[]
     }
 
     logWarning m!"Before renaming - nExpr name: {nExpr}"

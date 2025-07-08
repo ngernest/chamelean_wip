@@ -1,7 +1,7 @@
 import Lean
 import Std
 import Plausible
-import Lean.Meta.Eval
+--import Lean.Meta.Eval
 import Plausible.IR.PlausibleIR
 import Plausible.IR.KeyValueStore
 open Nat
@@ -18,7 +18,7 @@ open KeyValueStore
 
 --#gen_mutual_rec add_kv with_name ["s1", "s2", "l1", "l2"] backtrack 10 monad "IO"
 
-#get_relation eval_state_api_call
+#get_InductiveInfo eval_state_api_call
 #gen_mutual_rec eval_state_api_call with_name ["s", "l"] backtrack 10 monad "IO"
 
 
@@ -1000,5 +1000,3 @@ match size with
  throw (IO.userError "fail")
 
 end
-
-

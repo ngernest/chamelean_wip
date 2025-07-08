@@ -347,7 +347,7 @@ return check1 && check2
 def check_balanced (size : Nat) (h : Nat) (T : Tree) : IO Bool := do
   let a1 := #[check_balanced_by_con_1 h]
   let a2 := #[check_balanced_by_con_2 h]
-  let ret ←  try_backtracking_IO_range_size a1 a2 T size 1 100
+  let ret ← try_backtracking_IO_range_size a1 a2 T size 1 100
   return ret
 
 end

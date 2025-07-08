@@ -4,7 +4,7 @@ import Plausible.IR.Examples
 import Plausible.IR.Extractor
 import Plausible.IR.Prelude
 import Plausible.IR.Prototype
-import Plausible.IR.GCCall
+import Plausible.IR.Action
 import Lean.Elab.Deriving.DecEq
 open Lean.Elab.Deriving.DecEq
 open List Nat Array String
@@ -36,22 +36,13 @@ structure GroupedActions where
   /-- `ret_list` is the `Action`s which are all of the form `return e` -/
   ret_list : Array Action
 
-  variableEqualities : Array (FVarId × FVarId)
+  /-- A collection of equations (each represented as an `Expr`) relating variables to each other
+      (e.g. `t = t1`) -/
+  variableEqs : Array Expr
 
   deriving Repr
 
--- Pretty print `GroupedActions`s using the `MessageData` typeclass
-instance : ToMessageData GroupedActions where
-  toMessageData groupedActions :=
-    let fields := [
-      m!"gen_list := {indentD $ toMessageData groupedActions.gen_list}",
-      m!"iflet_list := {indentD $ toMessageData groupedActions.iflet_list}",
-      m!"checkInductiveActions := {indentD $ toMessageData groupedActions.checkInductiveActions}",
-      m!"checkNonInductiveActions := {indentD $ toMessageData groupedActions.checkNonInductiveActions}",
-      m!"ret_list := {indentD $ toMessageData groupedActions.ret_list}",
-      m!"variableEqualities := {repr groupedActions.variableEqualities}",
-    ]
-    .bracket "{" (.ofList fields) "}"
+
 
 /-- Determines whether a generator is to be invoked during the base case when `size == 0` (`BaseGenerator`),
     or if it is inductively-defined (`InductiveGenerator`) and to be invoked when `size > 0` -/
@@ -98,9 +89,12 @@ structure HandlerInfo where
       in the pattern match -/
   groupedActions : GroupedActions
 
-  /-- A list of equalities that must hold between free variables
-      (used when rewriting free variabels in patterns) -/
-  variableEqualities : Array (FVarId × FVarId)
+  /-- `LocalContext` associated with all the `FVarId`s -/
+  localCtx : LocalContext
+
+  /-- A list of equalities (represented as `Expr`s) that must hold between variables
+      (used when rewriting variables in patterns) -/
+  variableEqs : Array Expr
 
   deriving Repr
 
@@ -117,8 +111,6 @@ structure SubGeneratorInfo extends HandlerInfo where
   /-- Determines whether the producer is a generator or an enumerator -/
   producerType : ProducerType
 
-  deriving Repr
-
 /-- Datatype containing metadata needed to derive a sub-checker
     that is invoked from the main checker function -/
 structure SubCheckerInfo extends HandlerInfo where
@@ -131,37 +123,6 @@ structure SubCheckerInfo extends HandlerInfo where
   /-- The constructor of an inductive relation corresponding to this sub-checker -/
   ctor : InductiveConstructor
 
-  deriving Repr
-
--- Pretty print using the `MessageData` typeclass
-instance : ToMessageData HandlerInfo where
-  toMessageData handlerInfo : MessageData :=
-    let fields := [
-      m!"inputs := {toMessageData handlerInfo.inputs}",
-      m!"inputsToMatch := {toMessageData handlerInfo.inputsToMatch}",
-      m!"matchCases := {indentD $ toMessageData handlerInfo.matchCases}",
-      m!"actions := {indentD $ toMessageData handlerInfo.groupedActions}",
-      m!"variableEqualities := {repr handlerInfo.variableEqualities}",
-    ]
-    .bracket "{" (.ofList fields) "}"
-
-
--- Pretty printer for `SubGeneratorInfo`
-instance : ToMessageData SubGeneratorInfo where
-  toMessageData subGen : MessageData :=
-    .joinSep [
-      toMessageData subGen.toHandlerInfo,
-      m!"generatorSort := {repr subGen.generatorSort}"
-    ] "¬"
-
--- Pretty printer for `SubCheckerInfo`
-instance : ToMessageData SubCheckerInfo where
-  toMessageData subChecker : MessageData :=
-    .joinSep [
-      toMessageData subChecker.toHandlerInfo,
-      m!"checkerSort := {repr subChecker.checkerSort}"
-    ] "\n"
-
 
 /-- Converts an array of `Action`s into a `GroupedActions` -/
 def mkGroupedActions (gccs: Array Action) : MetaM GroupedActions := do
@@ -170,7 +131,7 @@ def mkGroupedActions (gccs: Array Action) : MetaM GroupedActions := do
   let mut checkNonInductiveActions := #[]
   let mut iflet_list := #[]
   let mut ret_list := #[]
-  let mut variableEqualities : Array (FVarId × FVarId) := #[]
+  let mut variableEqs := #[]
   for gcc in gccs do
     match gcc with
     | .genFVar _ _
@@ -179,7 +140,7 @@ def mkGroupedActions (gccs: Array Action) : MetaM GroupedActions := do
     | .matchFVar _ hyp => {
         iflet_list := iflet_list.push gcc;
         gen_list := gen_list.push gcc;
-        variableEqualities := variableEqualities ++ hyp.variableEqualities;
+        variableEqs := variableEqs ++ hyp.variableEqs
       }
     | .ret _ =>
         ret_list := ret_list.push gcc
@@ -193,19 +154,22 @@ def mkGroupedActions (gccs: Array Action) : MetaM GroupedActions := do
     checkNonInductiveActions := checkNonInductiveActions
     iflet_list := iflet_list
     ret_list := ret_list
-    variableEqualities := variableEqualities
+    variableEqs := variableEqs
   }
 
-/-- Takes a constructor for an inductive relation and a list of argument names,
+
+/-- Takes a constructor for an inductive relation, a list of argument names, the index of the argument we wish to generate (`genpos`),
     and returns a corresponding `SubCheckerInfo` for a checker -/
-def mkSubCheckerInfoFromConstructor (ctor : InductiveConstructor) (inputNames : Array String) : MetaM SubCheckerInfo := do
-  let conclusion ← separateFVars ctor.conclusion
+def mkSubCheckerInfoFromConstructor (ctor : InductiveConstructor)
+  (inputNames : Array String) : MetaM SubCheckerInfo := do
+  let conclusion ← separateFVars ctor.conclusion ctor.localCtx
+  let ctor := { ctor with localCtx := conclusion.localCtx }
   let args := conclusion.newHypothesis.getAppArgs
   let inputNamesAndArgs := inputNames.zip args
   let inputPairsThatNeedMatching := inputNamesAndArgs.filter (fun (_, arg) => !arg.isFVar)
   let (inputsToMatch, matchCases) := inputPairsThatNeedMatching.unzip
   let actions ← Actions_for_checker ctor
-  let groupedActions ← mkGroupedActions actions
+  let groupedActions ← mkGroupedActions actions.actions
   let checkerSort := if ctor.recursive_hypotheses.isEmpty then .BaseChecker else .InductiveChecker
   return {
     ctor := ctor
@@ -213,20 +177,62 @@ def mkSubCheckerInfoFromConstructor (ctor : InductiveConstructor) (inputNames : 
     inputsToMatch := inputsToMatch
     matchCases := matchCases
     groupedActions := groupedActions
-    variableEqualities := conclusion.variableEqualities ++ groupedActions.variableEqualities
     checkerSort := checkerSort
+    localCtx := actions.localCtx
+    variableEqs := conclusion.variableEqs ++ groupedActions.variableEqs
+  }
+
+/-- Takes a constructor for an inductive relation, a list of argument names,
+    the index of the argument we wish to generate (`idx`),
+    and returns a corresponding `SubGeneratorInfo` for a generator -/
+def mkSubGeneratorInfoFromConstructor (ctor : InductiveConstructor) (inputNames : Array String)
+  (idx : Nat) (producerType : ProducerType) : MetaM SubGeneratorInfo := withLCtx' ctor.localCtx do
+
+  let inputNamesList := inputNames.toList
+  let tempFVar := Expr.fvar (← mkFreshFVarId)
+  let conclusion_args := ctor.conclusion.getAppArgs.set! idx tempFVar
+  let new_conclusion := mkAppN ctor.conclusion.getAppFn conclusion_args
+
+  let conclusion ← separateFVars new_conclusion ctor.localCtx
+
+  let ctor := { ctor with localCtx := conclusion.localCtx }
+  let args := conclusion.newHypothesis.getAppArgs.toList
+  let zippedInputsAndArgs := List.zip inputNamesList args
+
+  -- Take all elements of `inputNamesAndArgs`, but omit the element at the `genpos`-th index
+  let inputNamesAndArgs := List.eraseIdx zippedInputsAndArgs idx
+
+  -- Find all pairs where the argument is not a free variable
+  -- (these are the arguments that need matching)
+  let inputPairsThatNeedMatching := inputNamesAndArgs.filter (fun (_, arg) => !arg.isFVar)
+  let (inputsToMatch, matchCases) := inputPairsThatNeedMatching.unzip
+  let actions ← Actions_for_producer ctor idx
+  let groupedActions ← mkGroupedActions actions.actions
+
+  -- Constructors with no hypotheses get `BaseGenerator`s
+  -- (otherwise, the generator needs to make a recursive call and is thus inductively-defined)
+  let generatorSort := if ctor.recursive_hypotheses.isEmpty then .BaseGenerator else .InductiveGenerator
+
+  return {
+    inputs := (List.eraseIdx inputNamesList idx).toArray
+    inputsToMatch := inputsToMatch.toArray
+    matchCases := matchCases.toArray
+    groupedActions := groupedActions
+    generatorSort := generatorSort
+    localCtx := actions.localCtx
+    producerType := producerType
+    variableEqs := conclusion.variableEqs ++ groupedActions.variableEqs
   }
 
 -- The functions below create strings containing Lean code based on the information
 -- in a `BacktrackElement`
--- TODO: rewrite to use `TSyntax`
 
 def add_size_param (hyp : Expr) : MetaM String := do
   let fnname := toString (← Meta.ppExpr hyp.getAppFn)
   let arg_str := (toString (← Meta.ppExpr hyp)).drop (fnname.length)
   return fnname ++ " size" ++ arg_str
 
-def genInputForInductiveToCode (fvar : FVarId) (hyp : Expr) (idx : Nat)  : MetaM String := do
+def genInputForInductiveToCode (fvar : FVarId) (hyp : Expr) (idx : Nat) (lctx: LocalContext) : MetaM String := withLCtx' lctx do
   let new_args := hyp.getAppArgs.eraseIdx! idx
 
   let mut fn_str := "gen_" ++ toString (← Meta.ppExpr hyp.getAppFn) ++ "_at_" ++ toString idx ++ " size"
@@ -236,32 +242,32 @@ def genInputForInductiveToCode (fvar : FVarId) (hyp : Expr) (idx : Nat)  : MetaM
       fn_str := fn_str ++ toString (← Meta.ppExpr a)
     else
       fn_str := fn_str ++ "(" ++ toString (← Meta.ppExpr a) ++ ")"
-  return "let " ++ toString (fvar.name)  ++ " ← " ++ fn_str
+  return "let " ++ toString (← fvar.getUserName)  ++ " ← " ++ fn_str
 
-def gen_nonIR_toCode (fvar : FVarId) (ty : Expr) (monad : String :="IO") : MetaM String := do
-  let mut out := "let "++ toString (fvar.name)
+def gen_nonIR_toCode (fvar : FVarId) (ty : Expr) (lctx: LocalContext) (monad : String :="IO") : MetaM String := withLCtx' lctx do
+  let mut out := "let "++ toString (← fvar.getUserName)
   let mut typename := afterLastDot (toString (← Meta.ppExpr ty))
   if typename.contains ' ' then typename:= "(" ++ typename ++ ")"
   if monad = "IO" then
     out := out ++ " ← monadLift <| Gen.run (SampleableExt.interpSample " ++ typename ++ ") 100"
   else
-    out := out ++ " ←  SampleableExt.interpSample " ++ typename
+    out := out ++ " ← SampleableExt.interpSample " ++ typename
   return out
 
 /-- Produces a string containing the Lean code that corresponds to
     a `Action` -/
-def actionToCode (Action : Action) (monad: String := "IO") : MetaM String := do
+def actionToCode (Action : Action) (lctx: LocalContext) (monad: String := "IO") : MetaM String := withLCtx' lctx do
   match Action with
   | .checkInductive hyp => return  "← check_" ++ (← add_size_param hyp)
   | .checkNonInductive hyp => return  "(" ++ toString (← Meta.ppExpr hyp) ++ ")"
-  | .genInputForInductive fvar hyp pos _ => genInputForInductiveToCode fvar hyp pos
-  | .matchFVar fvar hyp => return  "if let " ++ toString (← Meta.ppExpr hyp.newHypothesis) ++ " := " ++ toString (fvar.name) ++ " then "
-  | .genFVar fvar ty =>  gen_nonIR_toCode fvar ty monad
+  | .genInputForInductive fvar hyp pos _ => genInputForInductiveToCode fvar hyp pos lctx
+  | .matchFVar fvar hyp => return  "if let " ++ toString (← Meta.ppExpr hyp.newHypothesis) ++ " := " ++ toString (← fvar.getUserName) ++ " then "
+  | .genFVar fvar ty =>  gen_nonIR_toCode fvar ty lctx monad
   | .ret e => return "return " ++ (if monad = "IO" then "" else "some ") ++ toString (← Meta.ppExpr e)
 
 /-- Produces the outer-most pattern-match block in a sub-generator
     based on the info in a `BacktrackElem` -/
-def backtrackElem_match_block (backtrackElem : HandlerInfo) : MetaM String := do
+def backtrackElem_match_block (backtrackElem : HandlerInfo) : MetaM String := withLCtx' backtrackElem.localCtx do
   let mut out := ""
   if backtrackElem.inputsToMatch.size > 0 then
     out := out ++ "match "
@@ -282,7 +288,7 @@ def backtrackElem_gen_block (backtrackElem : HandlerInfo) (monad: String :="IO")
   let mut out := ""
   let mut indentation := ""
   for action in backtrackElem.groupedActions.gen_list do
-    out := out ++ indentation ++ (← actionToCode action monad) ++ " \n"
+    out := out ++ indentation ++ (← actionToCode action backtrackElem.localCtx monad) ++ " \n"
     match action with
     | .matchFVar _ _ =>
         indentation := indentation ++ " "
@@ -302,26 +308,26 @@ def backtrackElem_gen_check_IR_block (backtrackElem : HandlerInfo) (indentation 
   let mut vars : List String := []
   let mut checkcount := 1
   for gcc in backtrackElem.groupedActions.checkInductiveActions do
-    out := out ++ indentation ++ "let check" ++ toString checkcount ++ " " ++ (← actionToCode gcc monad) ++ " \n"
+    out := out ++ indentation ++ "let check" ++ toString checkcount ++ " " ++ (← actionToCode gcc backtrackElem.localCtx monad) ++ " \n"
     vars := vars ++ [toString checkcount]
     checkcount := checkcount + 1
   if backtrackElem.groupedActions.checkInductiveActions.size > 0 then
     out := ⟨out.data.dropLast.dropLast⟩
   return (out, vars)
 
-def backtrackElem_return_checker (backtrackElem : HandlerInfo) (indentation : String) (vars : List String) (monad: String :="IO"): MetaM String := do
+def backtrackElem_return_checker (backtrackElem : HandlerInfo) (indentation : String) (vars : List String) (monad: String :="IO"): MetaM String := withLCtx' backtrackElem.localCtx do
   let mut out := ""
-  if backtrackElem.variableEqualities.size + backtrackElem.groupedActions.checkNonInductiveActions.size + backtrackElem.groupedActions.checkInductiveActions.size > 0 then
+  if backtrackElem.variableEqs.size + backtrackElem.groupedActions.checkNonInductiveActions.size + backtrackElem.groupedActions.checkInductiveActions.size > 0 then
     out := out ++ indentation ++ "return "
   else
     out := out ++ "return true"
   for v in vars do
     out := out ++ "check" ++ v ++ " && "
-  for i in backtrackElem.variableEqualities do
-    out := out ++  "(" ++ toString (i.1.name) ++ " == " ++ toString (i.2.name) ++ ") && "
+  for i in backtrackElem.variableEqs do
+    out := out ++  "(" ++ Format.pretty (← ppExpr i) ++ ") && "
   for gcc in backtrackElem.groupedActions.checkNonInductiveActions do
-    out := out ++ (← actionToCode gcc monad) ++ " && "
-  if backtrackElem.variableEqualities.size + backtrackElem.groupedActions.checkNonInductiveActions.size + backtrackElem.groupedActions.checkInductiveActions.size > 0 then
+    out := out ++ (← actionToCode gcc backtrackElem.localCtx monad) ++ " && "
+  if backtrackElem.variableEqs.size + backtrackElem.groupedActions.checkNonInductiveActions.size + backtrackElem.groupedActions.checkInductiveActions.size > 0 then
     out := ⟨out.data.dropLast.dropLast.dropLast⟩
   if backtrackElem.groupedActions.iflet_list.size > 0 then
       out := out ++ "\nreturn false"
@@ -333,10 +339,6 @@ def backtrackElem_return_checker (backtrackElem : HandlerInfo) (indentation : St
     containing the Lean code for the sub-checker -/
 def backtrack_elem_toString_checker (subChecker: SubCheckerInfo) (monad: String :="IO") : MetaM String := do
   let handlerInfo := subChecker.toHandlerInfo
-
-  IO.println "********************"
-  IO.println s!"entered `backtrack_elem_toString_checker`:"
-  IO.println (← MessageData.toString (toMessageData handlerInfo))
 
   let mut out := ""
   let matchblock ← backtrackElem_match_block handlerInfo
@@ -361,9 +363,7 @@ def checker_where_defs (relation: InductiveInfo) (inpname: List String) (monad: 
   let mut i := 0
   for con in relation.constructors do
     i := i + 1
-    let conprops_str := (← con.all_hypotheses.mapM (fun a => Meta.ppExpr a)).map toString
-    out_str:= out_str ++ "\n-- Constructor: " ++ toString conprops_str
-    out_str:= out_str ++ " → " ++ toString (← Meta.ppExpr con.conclusion) ++ "\n"
+    out_str:= out_str ++ "\n-- Constructor: " ++ (← constructor_header con) ++ "\n"
     out_str:= out_str ++ (← prototype_for_checker_by_con relation inpname i monad) ++ ":= do \n"
     let bt ← mkSubCheckerInfoFromConstructor con inpname.toArray
     let btStr ← backtrack_elem_toString_checker bt monad
@@ -385,65 +385,27 @@ def elabgetBackTrack : CommandElab := fun stx => do
   | _ => throwError "Invalid syntax"
 
 
-
-
-/-- Takes a constructor `ctor` for an inductive relation, a list of argument names `inputNames`,
-    the index of the argument we wish to produce (`idx`),
-    the desired producer type (`producerType`, either `Enumerator` or `Generator`)
-    and returns a corresponding `SubGeneratorInfo` -/
-def mkSubGeneratorInfoFromConstructor (ctor : InductiveConstructor) (inputNames : Array String)
-  (idx : Nat) (producerType : ProducerType) : MetaM SubGeneratorInfo := do
-  let inputNamesList := inputNames.toList
-  let tempFVar := Expr.fvar (FVarId.mk (Name.mkStr1 "temp000"))
-  let conclusion_args := ctor.conclusion.getAppArgs.set! idx tempFVar
-  let new_conclusion := mkAppN ctor.conclusion.getAppFn conclusion_args
-  let conclusion ← separateFVars new_conclusion
-  let args := conclusion.newHypothesis.getAppArgs.toList
-  let zippedInputsAndArgs := List.zip inputNamesList args
-
-  -- Take all elements of `inputNamesAndArgs`, but omit the element at the `genpos`-th index
-  let inputNamesAndArgs := List.eraseIdx zippedInputsAndArgs idx
-
-  -- Find all pairs where the argument is not a free variable
-  -- (these are the arguments that need matching)
-  let inputPairsThatNeedMatching := inputNamesAndArgs.filter (fun (_, arg) => !arg.isFVar)
-  let (inputsToMatch, matchCases) := inputPairsThatNeedMatching.unzip
-  let actions ← Actions_for_producer ctor idx
-  let groupedActions ← mkGroupedActions actions
-
-  -- Constructors with no hypotheses get `BaseGenerator`s
-  -- (otherwise, the generator needs to make a recursive call and is thus inductively-defined)
-  let generatorSort := if ctor.recursive_hypotheses.isEmpty then .BaseGenerator else .InductiveGenerator
-
-  return {
-    inputs := (List.eraseIdx inputNamesList idx).toArray
-    inputsToMatch := inputsToMatch.toArray
-    matchCases := matchCases.toArray
-    groupedActions := groupedActions
-    variableEqualities := conclusion.variableEqualities ++ groupedActions.variableEqualities
-    generatorSort := generatorSort
-    producerType := producerType
-  }
-
 /-- Produces the final if-statement that checks the conjunction of all the hypotheses
     - `vars` is a list of free variables that were produced during the `check_IR` block
     - e.g. `vars = ["1", "2", ...]`
 -/
-def backtrackElem_if_return_producer (subGeneratorInfo : SubGeneratorInfo) (indentation : String) (vars: List String) (monad: String :="IO"): MetaM String := do
+def backtrackElem_if_return_producer (subGeneratorInfo : SubGeneratorInfo) (indentation : String) (vars: List String) (monad: String :="IO"): MetaM String := withLCtx' subGeneratorInfo.localCtx do
+  logWarning "inside backtrackElem_if_return_producer"
+
   let mut out := ""
-  if subGeneratorInfo.variableEqualities.size + subGeneratorInfo.groupedActions.checkNonInductiveActions.size + subGeneratorInfo.groupedActions.checkInductiveActions.size > 0 then
+  if subGeneratorInfo.variableEqs.size + subGeneratorInfo.groupedActions.checkNonInductiveActions.size + subGeneratorInfo.groupedActions.checkInductiveActions.size > 0 then
     out := out ++ indentation ++ "if "
   for j in vars do
     out := out ++ "check" ++ j ++ " && "
-  for i in subGeneratorInfo.variableEqualities do
-    out := out ++  "(" ++ toString (i.1.name) ++ " == " ++ toString (i.2.name) ++ ") && "
+  for i in subGeneratorInfo.variableEqs do
+    out := out ++  "(" ++ Format.pretty (← ppExpr i) ++ ") && "
   for gcc in subGeneratorInfo.groupedActions.checkNonInductiveActions do
-    out := out ++ (← actionToCode gcc monad) ++ " && "
-  if subGeneratorInfo.variableEqualities.size + subGeneratorInfo.groupedActions.checkNonInductiveActions.size + subGeneratorInfo.groupedActions.checkInductiveActions.size > 0 then
+    out := out ++ (← actionToCode gcc subGeneratorInfo.localCtx monad) ++ " && "
+  if subGeneratorInfo.variableEqs.size + subGeneratorInfo.groupedActions.checkNonInductiveActions.size + subGeneratorInfo.groupedActions.checkInductiveActions.size > 0 then
     out := ⟨out.data.dropLast.dropLast.dropLast⟩ ++ "\n" ++ indentation ++  "then "
   for gcc in subGeneratorInfo.groupedActions.ret_list do
-    out := out ++ indentation ++ (← actionToCode gcc monad)
-  if subGeneratorInfo.variableEqualities.size + subGeneratorInfo.groupedActions.checkNonInductiveActions.size + subGeneratorInfo.groupedActions.checkInductiveActions.size + subGeneratorInfo.groupedActions.iflet_list.size > 0 then
+    out := out ++ indentation ++ (← actionToCode gcc subGeneratorInfo.localCtx monad)
+  if subGeneratorInfo.variableEqs.size + subGeneratorInfo.groupedActions.checkNonInductiveActions.size + subGeneratorInfo.groupedActions.checkInductiveActions.size + subGeneratorInfo.groupedActions.iflet_list.size > 0 then
     let monad_fail := if monad = "IO" then "throw (IO.userError \"fail at checkstep\")" else "return none"
     out := out ++ "\n" ++ monad_fail
   if subGeneratorInfo.inputsToMatch.size > 0 then
@@ -481,9 +443,7 @@ def producer_where_defs (relation: InductiveInfo) (inpname: List String) (genpos
   let mut i := 0
   for ctor in relation.constructors do
     i := i + 1
-    let conprops_str := (← ctor.all_hypotheses.mapM (fun a => Meta.ppExpr a)).map toString
-    out_str:= out_str ++ "\n-- Constructor: " ++ toString conprops_str
-    out_str:= out_str ++ " → " ++ toString (← Meta.ppExpr ctor.conclusion) ++ "\n"
+    out_str:= out_str ++ "\n-- Constructor: " ++ (← constructor_header ctor) ++ "\n"
     out_str:= out_str ++ (← prototype_for_producer_by_con relation inpname genpos i monad) ++ ":= do\n"
     let bt ← mkSubGeneratorInfoFromConstructor ctor inpname.toArray genpos .Generator
     let btStr ← subGeneratorInfoToString bt monad
@@ -529,11 +489,11 @@ def elabgetBackTrackProducer : CommandElab := fun stx => do
       IO.println where_defs
   | _ => throwError "Invalid syntax"
 
--- #get_backtrack_producer typing with_name ["L", "e", "t"] for_arg 0
--- #get_backtrack_producer typing with_name ["L", "e", "t"] for_arg 2
--- #get_backtrack_producer typing with_name ["L", "e", "t"] for_arg 1
--- #get_backtrack_producer balanced with_name ["h", "T"] for_arg 1
--- #get_backtrack_producer bst with_name ["lo", "hi", "T"] for_arg 2
+--#get_backtrack_producer typing with_name ["L", "e", "t"] for_arg 0
+--#get_backtrack_producer typing with_name ["L", "e", "t"] for_arg 2
+--#get_backtrack_producer typing with_name ["L", "e", "t"] for_arg 1
+--#get_backtrack_producer balanced with_name ["h", "T"] for_arg 1
+--#get_backtrack_producer bst with_name ["lo", "hi", "T"] for_arg 2
 
 
 end Plausible.IR

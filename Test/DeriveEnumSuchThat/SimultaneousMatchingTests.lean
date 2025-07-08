@@ -54,8 +54,8 @@ info: Try this generator: instance : EnumSizedSuchThat (List Nat) (fun l => MinE
             | 0, [] => pure []
             | _, _ => OptionT.fail,
             match n_0, a_0 with
-            | Nat.succ n, x :: l' => do
-              let l ← aux_enum initSize size' n l'
+            | Nat.succ n_1, x :: l' => do
+              let l ← aux_enum initSize size' n_1 l'
               if x ∈ l then ⏎
                 return l
               else

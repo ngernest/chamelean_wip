@@ -91,8 +91,8 @@ info: Try this generator: instance : ArbitrarySizedSuchThat (List Nat) (fun l =>
               OptionTGen.thunkGen
                 (fun _ =>
                   match n_0, a_0 with
-                  | Nat.succ n, x :: l' => do
-                    let l ← aux_arb initSize size' n l'
+                  | Nat.succ n_1, x :: l' => do
+                    let l ← aux_arb initSize size' n_1 l'
                     if x ∈ l then ⏎
                       return l
                     else

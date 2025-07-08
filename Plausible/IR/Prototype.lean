@@ -107,7 +107,7 @@ def elabGetprotoProducer : CommandElab := fun stx => do
   | `(#get_producer_prototype $t with_name $t2:term for_arg $t3) =>
     Command.liftTermElabM do
       let e ← elabTerm t none
-      let relation ←  getInductiveInfo e
+      let relation ← getInductiveInfo e
       let inpname ← termToStringList t2
       let pos := TSyntax.getNat t3
       let proto := prototype_for_producer relation inpname pos

@@ -3,11 +3,12 @@ import Std
 import Plausible.IR.Examples
 import Plausible.IR.Prelude
 import Plausible.New.Idents
+import Plausible.IR.KeyValueStore
 import Lean.Elab.Deriving.DecEq
 import Batteries.Data.List.Basic
 open Lean.Elab.Deriving.DecEq
 open List Nat Array String
-open Lean Elab Command Meta Term
+open Lean Elab Command Meta Term LocalContext
 open Lean.Parser.Term
 open Idents
 
@@ -68,17 +69,15 @@ def isInductiveRelation (tyexpr : Expr) : MetaM Bool := do
   let return_type := arrow_type_components.toList.getLast!
   return return_type.isProp
 
-/-- `rewriteFuncCallsInConclusion hypotheses conclusion inductiveRelationName boundVarCtx` does the following:
+/-- `rewriteFuncCallsInConclusion hypotheses conclusion inductiveRelationName` does the following:
     1. Checks if the `conclusion` contains a function call where the function is *not* the same as the `inductiveRelationName`.
-       (If no, we just return the triple `(hypotheses, conclusion, boundVarCtx)` as is.)
+       (If no, we just return the pair `(hypotheses, conclusion)` as is.)
     2. If yes, we create a fresh variable & add an extra hypothesis where the fresh var is bound to the result of the function call.
     3. We then rewrite the conclusion, replacing occurrences of the function call with the fresh variable,
-    and add the new variable (along with its type) to `boundVarCtx`.
-    The updated hypotheses, conclusion and `boundVarCtx` are subsequently returned.
+    The updated hypotheses & conclusion are subsequently returned.
     - Note: it is the caller's responsibility to check that `conclusion` does indeed contain
       a non-trivial function application (e.g. by using `containsNonTrivialFuncApp`) -/
-def rewriteFuncCallsInConclusion (hypotheses : Array Expr) (conclusion : Expr) (inductiveRelationName : Name)
-  (boundVarCtx : HashMap FVarId Expr) : MetaM (Array Expr × Expr × HashMap FVarId Expr) :=
+def rewriteFuncCallsInConclusion (hypotheses : Array Expr) (conclusion : Expr) (inductiveRelationName : Name) : MetaM (Array Expr × Expr) :=
 
   -- Filter out cases where the function being called is the same as the inductive relation's name
   -- Note: this analysis is more simplistic compared to the one performed by `containsNonTrivialFuncApp`,
@@ -87,18 +86,16 @@ def rewriteFuncCallsInConclusion (hypotheses : Array Expr) (conclusion : Expr) (
     subExpr.isApp && subExpr.getAppFn.constName.getRoot != inductiveRelationName) conclusion
 
   match possibleFuncApp with
-  | none => return (hypotheses, conclusion, boundVarCtx)
+  | none => return (hypotheses, conclusion)
   | some funcAppExpr => do
     let funcAppType ← inferType funcAppExpr
 
     -- We use `withLocalDecl` to add the fresh variable to the local context
-    withLocalDecl `unknown BinderInfo.default funcAppType (fun newVarExpr => do
-      let newVarType ← inferType newVarExpr
-
+    withLocalDeclD `unknown funcAppType (fun newVarExpr => do
       -- Create a new hypothesis stating that `newVarExpr = funcAppExpr`, then
       -- add it to the array of `hypotheses`
       let newHyp ← mkEq newVarExpr funcAppExpr
-      let newVarFVarId := newVarExpr.fvarId!
+      -- let newVarFVarId := newVarExpr.fvarId!
       let updatedHypotheses := Array.push hypotheses newHyp
 
       -- Note: since we're doing a purely syntactic rewriting operation here,
@@ -107,8 +104,7 @@ def rewriteFuncCallsInConclusion (hypotheses : Array Expr) (conclusion : Expr) (
         (fun subExpr => if subExpr == funcAppExpr then some newVarExpr else none) conclusion
 
       -- Insert the fresh variable into the bound-variable context
-      let updatedCtx := HashMap.insert boundVarCtx newVarFVarId newVarType
-      return (updatedHypotheses, rewrittenConclusion, updatedCtx))
+      return (updatedHypotheses, rewrittenConclusion))
 
 /-- Determines whether a type expression corresponds to the name of a base type (`Nat, String, Bool`) -/
 def isBaseType (tyexpr : Expr) : Bool :=
@@ -139,8 +135,6 @@ def allArgsHaveBaseTypes (e : Expr) : MetaM Bool := do
   pure $ (types.size > 0) ∧ (∀ t ∈ types, isBaseType t)
 
 
-def mkFVars (a : Array Name) : Array Expr := a.map (fun x => mkFVar ⟨x⟩)
-
 /-- The type `DecomposedConstructorType` describes a universally-quantified type expression whose body is an arrow type,
      i.e. types of the form `∀ (x1 : τ1) … (xn : τn), Q1 → … → Qn → P`.
     - `DecomposedConstructorType` is a triple containing three components:
@@ -149,19 +143,44 @@ def mkFVars (a : Array Name) : Array Expr := a.map (fun x => mkFVar ⟨x⟩)
     - Note: The 3rd component is an array containing each subterm of the arrow type -/
 abbrev DecomposedConstructorType := Array (Name × Expr) × Expr × Array Expr
 
+/-- Simple `Repr` instance for `LocalContext` -/
+instance : Repr LocalContext where
+  reprPrec lctx _ :=
+    let decls := lctx.decls.toList.filterMap id
+    if decls.isEmpty then
+      "⟨⟩"
+    else
+      let declReprs := decls.map fun decl =>
+        let name := decl.userName
+        let type := decl.type
+        match decl.kind with
+        | .default => s!"{name} : {type}"
+        | .auxDecl => s!"{name} : {type} (aux)"
+        | .implDetail => s!"{name} : {type} (impl)"
+      let inner := String.intercalate ", " declReprs
+      Std.Format.bracket "⟨" (Std.Format.text inner) "⟩"
 
 /-- The datatype `InductiveConstructor` bundles together metadata
     for a constructor of an inductive relation -/
 structure InductiveConstructor where
+  /-- The name of the constructor, represented as an `Expr` -/
+  ctorName : Name
+
   /-- The type of the constructor, represented as an `Expr` -/
   ctorType : Expr
+
+  /-- Input variables -/
+  input_vars : Array Expr
+
+  /-- Constructor Expr -/
+  ctorExpr : Expr
 
   /-- Bound variables in the type of the constructor
       (i.e. universally-quantified variables) -/
   bound_vars : Array Name
 
-  /-- Typing context mapping each bound variable to its type -/
-  bound_var_ctx : HashMap FVarId Expr
+  /-- Unification map between bound variables in conclusion and input_vars -/
+  inputVarsToConclusionArgsMap : Array (Expr × Expr)
 
   /-- Bound variables that have base types -/
   bound_vars_with_base_types : Array Name
@@ -199,6 +218,7 @@ structure InductiveConstructor where
 
   /-- Maps each argument to the conclusion to the corresponding input variable -/
   inputEqualities: Array (Expr × Expr)
+  inputEqs: Array Expr
 
   /-- `inputEqualities` where the type of the input variable is a base type -/
   baseTypeInputEqualities : Array (Expr × Expr)
@@ -213,65 +233,16 @@ structure InductiveConstructor where
       (i.e. if `e` is an inductive relation that is defined within the current namespace) -/
   dependencies : Array Expr
 
-  deriving Repr
-
-/-- `ToMessageData` instance for polymorphic `HashMap`s
-    where the keys implement `Repr` and the values implement `ToMessageData` -/
-instance [Repr k] [BEq k] [Hashable k] [ToMessageData v]
-  : ToMessageData (HashMap k v) where
-  toMessageData hashMap :=
-    let entries := hashMap.toList.map fun (key, val) =>
-      let kMsg := .ofFormat (repr key)
-      let vMsg := toMessageData val
-      .compose kMsg (.compose " ↦ " vMsg)
-    .bracket "{" (.ofList entries) "}"
-
-instance : ToMessageData InductiveConstructor where
-  toMessageData inductiveCtor :=
-    let fields := [
-      m!"ctorType: {indentD $ inductiveCtor.ctorType}",
-      m!"bound_vars: {inductiveCtor.bound_vars}",
-      m!"bound_var_ctx: {inductiveCtor.bound_var_ctx}",
-      m!"bound_vars_with_base_types: {inductiveCtor.bound_vars_with_base_types}",
-      m!"bound_vars_with_non_base_types: {inductiveCtor.bound_vars_with_non_base_types}",
-      m!"all_hypotheses: {inductiveCtor.all_hypotheses}",
-      m!"recursive_hypotheses: {inductiveCtor.recursive_hypotheses}",
-      m!"hypotheses_with_only_base_type_args: {inductiveCtor.hypotheses_with_only_base_type_args}",
-      m!"hypotheses_that_are_inductive_applications: {inductiveCtor.hypotheses_that_are_inductive_applications}",
-      m!"nonlinear_hypotheses: {inductiveCtor.nonlinear_hypotheses}",
-      m!"conclusion: {inductiveCtor.conclusion}",
-      m!"final_arg_in_conclusion: {inductiveCtor.final_arg_in_conclusion}",
-      m!"conclusion_args: {inductiveCtor.conclusion_args}",
-      m!"inputEqualities: {inductiveCtor.inputEqualities}",
-      m!"baseTypeInputEqualities: {inductiveCtor.baseTypeInputEqualities}",
-      m!"nonBaseTypeInputEqualities: {inductiveCtor.nonBaseTypeInputEqualities}",
-      m!"name_space: {inductiveCtor.name_space}",
-      m!"dependencies: {inductiveCtor.dependencies}"
-    ]
-    .bracket "{" (.ofList fields) "}"
-
+  localCtx : LocalContext
 
 /-- The datatype `InductiveInfo` bundles together metadata for an inductive relation -/
 structure InductiveInfo where
   /-- The name of the inductive relation -/
   inductive_name : Name
 
-  /-- The names of the inputs to the inductive relation.
-      For a relation of the form `P : T1 → … → Tn-1 → Tn → Prop`, the `input_names` are the ames associated
-      with `#[T1, …, Tn-1]` -/
-  input_names : Array Name
-
   /-- The types of the inputs to the inductive relation.
       For a relation `P : T1 → … → Tn-1 → Tn → Prop`, the `input_types` are `#[T1, …, Tn-1]` -/
   input_types : Array Expr
-
-  /-- The name of the type for which we wish to generate an inhabitant.
-      For a relation `P : T1 → … → Tn-1 → Tn → Prop`, the `output_type_name` is `Tn` -/
-  output_type_name : Name
-
-  /-- The type for which we wish to generate an inhabitant.
-      For a relation `P : T1 → … → Tn-1 → Tn → Prop`, the `output_type` is `Tn` -/
-  output_type : Expr
 
   /-- The fresh variables correpsonding to the inputs of the inductive relation.
       For a relation of the form `P : T1 → … → Tn-1 → Tn → Prop`,
@@ -281,13 +252,7 @@ structure InductiveInfo where
   /-- The fresh variable names correpsonding to the inputs of the inductive relation.
       For a relation of the form `P : T1 → … → Tn-1 → Tn → Prop`,
       the `input_var_names` are the names associated with `#[T1, …, Tn-1]` -/
-  input_var_names: Array (Option Name)
-
-  /-- Variable corresponding to the value being generated -/
-  output_var : Expr
-
-  /-- Name corresponding to the value being generated -/
-  output_var_name : Option Name
+  input_var_names: Array Name
 
   /-- The decomposed types for each constructor of the induction relation.
       See docs for `DecomposedConstructorType` for further details. -/
@@ -296,6 +261,8 @@ structure InductiveInfo where
   constructors_with_arity_zero : Array InductiveConstructor
   constructors_with_args : Array InductiveConstructor
   dependencies: Array Expr
+
+  localCtx : LocalContext
 
 /-- Determines if an expression `e` is an application of the form `R e1 ... en`,
     where `R` is an inductive relation  -/
@@ -306,14 +273,22 @@ def isInductiveRelationApplication (e : Expr) : MetaM Bool := do
 
 /-- Determines whether an expression `e` is a hypothesis of a constructor `ctor`
    for an inductive relation -/
-def isHypothesisOfInductiveConstructor (e : Expr) (ctor : InductiveConstructor) : MetaM Bool := do
+def isHypothesisOfInductiveConstructor_inNamespace (e : Expr) (namesp : Name) : MetaM Bool := do
   let isIndRel ← isInductiveRelation e.getAppFn
   let exprNamespace := e.getAppFn.constName.getRoot
-
-  if isIndRel || exprNamespace == ctor.name_space then
-    return true
-  else
+  let allbasedtype ← allArgsHaveBaseTypes e
+  if ! isIndRel then
     return false
+  else if allbasedtype && exprNamespace != namesp then
+    return false
+  else return true
+
+
+/-- Determines whether an expression `e` is a hypothesis of a constructor `ctor`
+   for an inductive relation -/
+def isHypothesisOfInductiveConstructor (e : Expr) (ctor : InductiveConstructor) : MetaM Bool :=
+  isHypothesisOfInductiveConstructor_inNamespace e ctor.name_space
+
 
 /-- Determines if a hypothesis `hyp` is a recursive call to the inductive relation for which
     `ctor` is a constructor
@@ -331,10 +306,9 @@ def isDependency (e : Expr) (current_namespace : Name) : MetaM Bool := do
   return false
 
 /-- Takes each argument in `input_args` and produces a corresponding `FVarId`,
-    replacing the `i`-th argument in `conclusion` (if it is an application)
-    with the `FVarId` corresponding to the `i`-th `input_arg` -/
-def replaceFVarsInConclusion (conclusion : Expr) (inputArgs : Array String) : MetaM (Array (FVarId × Expr)) := do
-  let new_input_args := Array.map (Expr.fvar ∘ FVarId.mk ∘ Name.mkStr1) inputArgs
+    creates a mapping from that `FVarId` to the `i`-th argument in `conclusion` (if it is an application) -/
+def getFVarsMappingInConclusion (conclusion : Expr) (input_args : Array FVarId) : MetaM (Array (FVarId × Expr)) := do
+  let new_input_args := Array.map mkFVar input_args
   let conclusion_args_and_new_inputs := Array.zip (conclusion.getAppArgs) new_input_args
   pure $ Array.filterMap (fun (conclusion_arg, new_expr) =>
     if conclusion_arg.isFVar then
@@ -343,7 +317,7 @@ def replaceFVarsInConclusion (conclusion : Expr) (inputArgs : Array String) : Me
 
 /-- Replaces all occurrences of `FVarId`s in `e` using the association list `fvar_ids`, which
     maps each `FVarId` to an `expr` -/
-def replace_fvars_in_expr (e : Expr) (fvar_ids : Array (FVarId × Expr)) : MetaM Expr := do
+def replaceFVarInExpr (e : Expr) (fvar_ids : Array (FVarId × Expr)) : MetaM Expr := do
   let mut newcond := e
   for (fvar_id, expr) in fvar_ids do
     newcond := newcond.replaceFVarId fvar_id expr
@@ -351,42 +325,33 @@ def replace_fvars_in_expr (e : Expr) (fvar_ids : Array (FVarId × Expr)) : MetaM
 
 /-- For each `e` in `exprs_arr`, this function replaces all occurrences of `FVarId`s in `e`
     using the association list `fvar_ids`, which maps each `FVarId` to an `expr` -/
-def replace_fvars_in_exprs (exprs_arr : Array Expr) (fvar_ids: Array (FVarId × Expr)) : MetaM (Array Expr) :=
-  Array.mapM (fun x => replace_fvars_in_expr x fvar_ids) exprs_arr
+def replaceFVarsInExprs (exprs_arr : Array Expr) (fvar_ids: Array (FVarId × Expr)) : MetaM (Array Expr) :=
+  Array.mapM (fun x => replaceFVarInExpr x fvar_ids) exprs_arr
 
 /-- Unifies each argument in `arg_names` with each variable in the `conclusion`, returning
-    the updated `hypotheses`, `conclusion` and `bound_var_ctx`. If `arg_names` is empty,
-    this function just returns `hypotheses`, `conclusion` & `bound_var_ctx` as is. -/
-def unify_args_with_conclusion (hypotheses : Array Expr) (conclusion : Expr) (arg_names : Array String)
-  (bound_var_ctx : HashMap FVarId Expr) : MetaM (Array Expr × Expr × HashMap FVarId Expr) := do
-  if Array.isEmpty arg_names then
-    return (hypotheses, conclusion, bound_var_ctx)
+    the updated `hypotheses`, `conclusion` and `input_args`. If `arg_names` is empty,
+    this function just returns `hypotheses`, `conclusion` & `input_args` as is. -/
+def unifyArgsWithConclusion (hypotheses : Array Expr) (conclusion : Expr) (input_args : Array FVarId)
+    : MetaM (Array Expr × Expr × Array (Expr × Expr)) := do
+  if Array.isEmpty input_args then
+    return (hypotheses, conclusion, #[])
   else
-    let mut new_ctx := bound_var_ctx
-    let fvar_ids ← replaceFVarsInConclusion conclusion arg_names
-    for (fvar_id, expr) in fvar_ids do
-      let fvar := expr.fvarId!
-      let fvar_type := bound_var_ctx[fvar_id]!
-      new_ctx := new_ctx.insert fvar fvar_type
-    let conclusion ← replace_fvars_in_expr conclusion fvar_ids
-    let hypotheses ← replace_fvars_in_exprs hypotheses fvar_ids
-    return (hypotheses, conclusion, new_ctx)
+    let fvar_ids ← getFVarsMappingInConclusion conclusion input_args
+    let conclusion ← replaceFVarInExpr conclusion fvar_ids
+    let hypotheses ← replaceFVarsInExprs hypotheses fvar_ids
+    let mapping := fvar_ids.map fun (id, exp2) => (mkFVar id, exp2)
+    return (hypotheses, conclusion, mapping)
 
 
 /-- Takes in the constructor's type, the input variables & their types and the name of the inductive relation,
     and builds an `IRConstructor` containing metadata for the constructor.
     During this process, the names of input arguments (`argNames`) are unified with variables in the
     conclusion of the constructor. -/
-def process_constructor_unify_args (ctorType : Expr) (inputVars : Array Expr) (inputTypes : Array Expr)
-  (inductiveRelationName : Name) (argNames : Array String) : MetaM InductiveConstructor := do
-  let (bound_vars_and_types, _ , components_of_arrow_type) ← decomposeType ctorType
+def processConstructorUnifyArgs (ctorName : Name) (ctorType: Expr) (inputVars : Array Expr) (inputTypes : Array Expr)
+  (inductiveRelationName: Name) (localCtx: LocalContext): MetaM InductiveConstructor := do
+  let (bound_vars_and_types, ctorExpr, components_of_arrow_type, ctorLocalCtx) ← decomposeTypeWithLocalContext ctorType localCtx
 
-  -- `boundVarCtx` maps free variables (identified by their `FVarId`) to their types
-  let mut boundVarCtx := HashMap.emptyWithCapacity
-  for (boundVar, ty) in bound_vars_and_types do
-    let fid := FVarId.mk boundVar
-    boundVarCtx := boundVarCtx.insert fid ty
-
+  let inputFVarIds := inputVars.map Expr.fvarId!
   match splitLast? components_of_arrow_type with
   | some (originalHypotheses, originalConclusion) =>
     -- Check if `conclusion` contains any subterms that are function calls
@@ -394,11 +359,11 @@ def process_constructor_unify_args (ctorType : Expr) (inputVars : Array Expr) (i
     -- Then, unify `argNames` with each arg in the conclusion
     let (hypotheses, conclusion, newCtx) ←
       if (← containsNonTrivialFuncApp originalConclusion inductiveRelationName) then
-        let (updatedHypotheses, rewrittenConclusion, updatedCtx) ←
-          rewriteFuncCallsInConclusion originalHypotheses originalConclusion inductiveRelationName boundVarCtx
-        unify_args_with_conclusion updatedHypotheses rewrittenConclusion argNames updatedCtx
+        let (updatedHypotheses, rewrittenConclusion) ←
+          rewriteFuncCallsInConclusion originalHypotheses originalConclusion inductiveRelationName
+        unifyArgsWithConclusion updatedHypotheses rewrittenConclusion inputFVarIds
       else
-        unify_args_with_conclusion originalHypotheses originalConclusion argNames boundVarCtx
+        unifyArgsWithConclusion originalHypotheses originalConclusion inputFVarIds
 
     let (bound_vars, _) := bound_vars_and_types.unzip
     let (bound_vars_with_base_types, _) :=
@@ -417,14 +382,14 @@ def process_constructor_unify_args (ctorType : Expr) (inputVars : Array Expr) (i
       (throwError "conclusion_args is an unexpected empty list")
 
     for hyp in hypotheses do
+      if ← isHypothesisOfInductiveConstructor_inNamespace hyp inductiveRelationName.getRoot then
+        hypotheses_that_are_inductive_applications := hypotheses_that_are_inductive_applications.push hyp
       if ← isDependency hyp.getAppFn inductiveRelationName.getRoot then
         dependencies := dependencies.push hyp.getAppFn
       if hyp.getAppFn.constName == inductiveRelationName then
         recursive_hypotheses := recursive_hypotheses.push hyp
       else if ← allArgsHaveBaseTypes hyp then
         hypotheses_with_only_base_type_args := hypotheses_with_only_base_type_args.push hyp
-      else if ← isInductiveRelationApplication hyp then
-        hypotheses_that_are_inductive_applications := hypotheses_that_are_inductive_applications.push hyp
       else
         nonlinear_hypotheses := nonlinear_hypotheses.push hyp
 
@@ -433,10 +398,15 @@ def process_constructor_unify_args (ctorType : Expr) (inputVars : Array Expr) (i
     let (baseTypeInputEqualities, _) := (inputEqualitiesWithTypes.filter (fun (_, ty) => isBaseType ty)).unzip
     let (nonBaseTypeInputEqualities, _) := (inputEqualitiesWithTypes.filter (fun (_, ty) => !isBaseType ty)).unzip
 
+    let inputEqs ← mkExprEqualities inputEqualities ctorLocalCtx
+
     return {
       ctorType := ctorType
+      ctorName := ctorName
+      ctorExpr := ctorExpr
+      input_vars := inputVars,
       bound_vars := bound_vars,
-      bound_var_ctx := newCtx,
+      inputVarsToConclusionArgsMap := newCtx,
       all_hypotheses := hypotheses,
       conclusion := conclusion,
       conclusion_args := conclusion_args,
@@ -452,55 +422,70 @@ def process_constructor_unify_args (ctorType : Expr) (inputVars : Array Expr) (i
       nonBaseTypeInputEqualities := nonBaseTypeInputEqualities
       name_space := inductiveRelationName.getRoot
       dependencies := dependencies
+      localCtx := ctorLocalCtx
+      inputEqs := inputEqs
     }
   | none => throwError "Not a match"
 
-/-- Takes in the constructor's type, the input variables & their types and the name of the inductive relation,
-    and builds an `IRConstructor` containing metadata for the constructor -/
-def process_constructor (ctor_type : Expr) (input_vars: Array Expr) (input_types : Array Expr)
-  (inductive_relation_name : Name) : MetaM InductiveConstructor :=
-  process_constructor_unify_args ctor_type input_vars input_types inductive_relation_name #[]
+def constructor_header (con: InductiveConstructor) : MetaM String := withLCtx' con.localCtx do
+  return toString (con.ctorName) ++ " : " ++  toString (← Meta.ppExpr con.ctorExpr)
+
+def process_constructor_print (pc: InductiveConstructor) : MetaM Unit := withLCtx' pc.localCtx do
+  IO.println s!" Constructor Expr : {← Meta.ppExpr pc.ctorExpr}"
+  IO.println s!" Input Vars : {← Array.mapM Meta.ppExpr pc.input_vars}"
+  IO.println s!" Bound Vars : {pc.bound_vars}"
+  IO.println s!" Input maps : {(← Array.mapM Meta.ppExpr pc.inputVarsToConclusionArgsMap.unzip.1).zip (← Array.mapM Meta.ppExpr pc.inputVarsToConclusionArgsMap.unzip.2)}"
+  IO.println s!" Cond props : {← Array.mapM Meta.ppExpr pc.all_hypotheses}"
+  IO.println s!" Conclusion prop :  {← Meta.ppExpr pc.conclusion}"
+  IO.println s!" Builtin-typed vars : {pc.bound_vars_with_base_types}"
+  IO.println s!" Non-builtin-typed vars : {pc.bound_vars_with_non_base_types}"
+  IO.println s!" Builtin-typed props :  {← Array.mapM Meta.ppExpr pc.hypotheses_with_only_base_type_args}"
+  --IO.println s!" nonlinear_conds:  {← Array.mapM Meta.ppExpr pc.nonlinear_hypotheses}"
+  IO.println s!" Inductive_conds:  {← Array.mapM Meta.ppExpr pc.hypotheses_that_are_inductive_applications}"
+  IO.println s!" Recursive_conds:  {← Array.mapM Meta.ppExpr pc.recursive_hypotheses}"
+  IO.println s!" Input eqs:  {← Array.mapM Meta.ppExpr pc.inputEqs}"
 
 
-def arrayppExpr (a: Array Expr) : MetaM (Array Format) := do
-  let mut s : Array Format := #[]
-  for l in a do
-    let o ←  Meta.ppExpr l
-    s := s.push o
-  return s
+def print_constructors (ctors : Array InductiveConstructor) : MetaM Unit := do
+  let mut i := 0
+  for l in ctors do
+    IO.println s!"IRConstructor {i}: "
+    i := i+1
+    process_constructor_print l
 
-def process_constructor_print (pc: InductiveConstructor) : MetaM Unit := do
-  IO.println s!" Vars : {pc.bound_vars}"
-  IO.println s!" Cond prop : {pc.all_hypotheses}"
-  let op ←  Meta.ppExpr pc.conclusion
-  IO.println s!" Out prop:  {op}"
-  let oa := arrayppExpr (pc.conclusion_args)
-  IO.println s!" Out args:  {← oa}"
-  IO.println s!" num_vars : {pc.bound_vars_with_base_types}"
-  IO.println s!" num_conds:  {pc.hypotheses_with_only_base_type_args}"
-  IO.println s!" notnum_vars : {pc.bound_vars_with_non_base_types}"
-  IO.println s!" nonlinear_conds:  {pc.nonlinear_hypotheses}"
-  IO.println s!" inductive_conds:  {pc.hypotheses_that_are_inductive_applications}"
-  IO.println s!" recursive_conds:  {pc.recursive_hypotheses}"
-  IO.println s!" inp eqs:  {pc.inputEqualities}"
+/-- Helper function for creating `n` names -/
+def mkDefaultInputNames_aux (n: Nat) : MetaM (Array String) := do
+  let mut input_names := #[]
+  for i in [:n] do
+    let inpname := "in" ++ toString (i+1)
+    input_names := input_names.push inpname
+  return input_names
 
+/-- Creates an array of default names corresponding to the function that appears
+    in `inputExpr`
 
+    (precondition: `inputExpr` should be a function application) -/
+def mkDefaultInputNames (inputExpr : Expr) : MetaM (Array String) := do
+  match inputExpr.getAppFn.constName? with
+  | some _ => do
+    let type ← inferType inputExpr
+    let tyexprs_in_arrow_type ← getComponentsOfArrowType type
+    let input_types := tyexprs_in_arrow_type.pop
+    return (← mkDefaultInputNames_aux input_types.size)
+  | none => throwError "input expression is not a function application"
 
-def mkInpName (n : Nat) := makeInputs_aux  n n
-where makeInputs_aux  (n : Nat) (z: Nat) : List String := match n with
-| 0 => []
-| succ n => ["in" ++ (toString (z - n) )] ++  (makeInputs_aux  n z)
+/-- `mkInitialContextForInductiveRelation inputTypes inputNameStrings`
+    creates the initial `LocalContext` where each `(x, τ)` in `Array.zip inputTypes inputNameStrings`
+    is given the declaration `x : τ` in the resultant context.
 
-/-- Takes an array of input types and generates an array of fresh variable names,
-    one for each input -/
-def mkArrayFreshVar (input_types : Array Expr) : MetaM (Array Expr) := do
-  let mut vars :=#[]
-  for i in [:input_types.size-1] do
-    let strname := "in" ++ toString (i+1)
-    let name := Name.mkStr1 strname
-    let var :=  mkFVar ⟨name⟩
-    vars := vars.push var
-  return vars
+    This function returns a triple containing `inputTypes`, `inputNames` represented as an `Array` of `Name`s,
+    and the resultant `LocalContext`. -/
+def mkInitialContextForInductiveRelation (inputTypes : Array Expr) (inputNameStrings : Array String) : MetaM (Array Expr × Array Name × LocalContext) := do
+  let inputNames := Name.mkStr1 <$> inputNameStrings
+  let localDecls := inputNames.zip inputTypes
+  withLocalDeclsDND localDecls $ fun exprs => do
+    return (exprs, inputNames, ← getLCtx)
+
 
 /-- Takes in an expression of the form `R e1 ... en`, where `R` is an inductive relation
     with arguments specified by `argNames`, and extracts metadata corresponding to the `inductive`,
@@ -513,15 +498,8 @@ def getInductiveInfoWithArgs (inputExpr : Expr) (argNames : Array String) : Meta
 
     -- `input_types` contains all elements of `tyexprs_in_arrow_type` except the conclusion (which is `Prop`)
     let input_types := tyexprs_in_arrow_type.pop
-    let input_names := (input_types.map Expr.constName).pop
 
-    let input_vars ← mkArrayFreshVar input_types
-    let input_vars_names := input_vars.map Expr.name?
-
-    -- `output_type` is the last element (type expression) in the array `input_types`
-    let output_type ← Option.getDM (input_types.back?) (throwError "unexpected empty input type")
-    let output_var ← mkFreshExprMVar output_type (userName := `out)
-    let output_var_name := Expr.name? output_var
+    let (input_vars, input_vars_names, localCtx) ← mkInitialContextForInductiveRelation input_types argNames
 
     let env ← getEnv
     match env.find? inductive_name with
@@ -535,10 +513,7 @@ def getInductiveInfoWithArgs (inputExpr : Expr) (argNames : Array String) : Meta
         let decomposed_ctor_type ← decomposeType ctor.type
         decomposed_ctor_types := decomposed_ctor_types.push decomposed_ctor_type
         let constructor ←
-          if Array.isEmpty argNames then
-            process_constructor ctor.type input_vars input_types inductive_name
-          else
-            process_constructor_unify_args ctor.type input_vars input_types inductive_name argNames
+            processConstructorUnifyArgs ctorName ctor.type input_vars input_types inductive_name localCtx
         ctors := ctors.push constructor
       let constructors_with_arity_zero := ctors.filter (fun ctor => ctor.all_hypotheses.size == 0)
       let constructors_with_args := ctors.filter (fun ctor => ctor.all_hypotheses.size != 0)
@@ -549,19 +524,15 @@ def getInductiveInfoWithArgs (inputExpr : Expr) (argNames : Array String) : Meta
          dependencies := dependencies.push dep
       return {
         inductive_name := inductive_name
-        input_names := input_names,
-        output_type_name := Expr.constName output_type
         input_types := input_types,
-        output_type := output_type
-        output_var := output_var
         input_vars := input_vars
         input_var_names := input_vars_names
-        output_var_name := output_var_name
         decomposed_ctor_types := decomposed_ctor_types
         constructors := ctors
         constructors_with_arity_zero := constructors_with_arity_zero
         constructors_with_args := constructors_with_args
         dependencies := dependencies
+        localCtx := localCtx
       }
     | some _ =>
       throwError "'{inductive_name}' is not an inductive type"
@@ -569,52 +540,49 @@ def getInductiveInfoWithArgs (inputExpr : Expr) (argNames : Array String) : Meta
 
 /-- Takes in an inductive relation and extracts metadata corresponding to the `inductive`,
     returning an `IR_info` -/
-def getInductiveInfo (input_expr : Expr) : MetaM InductiveInfo :=
-  getInductiveInfoWithArgs input_expr #[]
-
-
-def print_constructors (ctors : Array InductiveConstructor) : MetaM Unit := do
-  let mut i := 0
-  for l in ctors do
-    IO.println s!"IRConstructor {i}: "
-    i := i+1
-    process_constructor_print l
+def getInductiveInfo (input_expr : Expr) : MetaM InductiveInfo := do
+  let inp_names ← mkDefaultInputNames input_expr
+  getInductiveInfoWithArgs input_expr inp_names
 
 
 /-- Prints the fields of an `inductiveInfo` -/
-def print_relation_info (inductiveInfo : InductiveInfo) : MetaM Unit := do
+def print_InductiveInfo (inductiveInfo : InductiveInfo) : MetaM Unit := withLCtx' inductiveInfo.localCtx do
   IO.println s!"Name of inductive relation: {inductiveInfo.inductive_name}"
   IO.println s!"Input types: {inductiveInfo.input_types}"
-  IO.println s!"Type to be generated: {inductiveInfo.output_type}"
-  IO.println s!"Input vars: {inductiveInfo.input_vars}"
-  IO.println s!"Output vars: {inductiveInfo.output_var}"
+  IO.println s!"Input vars: { ← Array.mapM Meta.ppExpr inductiveInfo.input_vars }"
   IO.println s!"Dependencies: {inductiveInfo.dependencies}"
   IO.println ""
   print_constructors inductiveInfo.constructors
 
 ---------------------------------------------------------------------------------------
--- Command `#get_relation` for printing metadata associated with an inductive relation
+-- Command `#get_InductiveInfo` for printing metadata associated with an inductive relation
 ---------------------------------------------------------------------------------------
 
-syntax (name := getRelationInfo) "#get_relation" term : command
+syntax (name := getRelationInfo) "#get_InductiveInfo" term : command
 
 @[command_elab getRelationInfo]
-def elabGetExpr : CommandElab := fun stx => do
+def elabGetIRInfo : CommandElab := fun stx => do
   match stx with
-  | `(#get_relation $t) =>
+  | `(#get_InductiveInfo $t) =>
     Command.liftTermElabM do
       let e ← elabTerm t none
       let inductiveInfo ← getInductiveInfo e
-      print_relation_info inductiveInfo
+      print_InductiveInfo inductiveInfo
   | _ => throwError "Invalid syntax"
 
-syntax (name := getRelationInfoChecker) "#get_relation_checker" term : command
 
+syntax (name := getRelationInfoWithName) "#get_InductiveInfo" term "with_name" term : command
 
--- #get_relation balanced
--- #get_relation bst
--- #get_relation typing
-
+@[command_elab getRelationInfoWithName]
+def elabGetIRInfoWithName : CommandElab := fun stx => do
+  match stx with
+  | `(#get_InductiveInfo $t with_name $t2:term) =>
+    Command.liftTermElabM do
+      let e ← elabTerm t none
+      let inpname ← termToStringList t2
+      let inductiveInfo ← getInductiveInfoWithArgs e inpname.toArray
+      print_InductiveInfo inductiveInfo
+  | _ => throwError "Invalid syntax"
 
 
 end Plausible.IR

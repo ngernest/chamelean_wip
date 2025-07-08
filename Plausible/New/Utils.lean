@@ -6,6 +6,30 @@ import Batteries.Data.List.Basic
 open Lean Meta
 open Plausible.IR
 
+/-- Looks up the user-facing `Name` corresponding to an `FVarId` in a specific `LocalContext` -/
+def getUserNameInContext (lctx : LocalContext) (fvarId : FVarId) : Name :=
+  (lctx.get! fvarId).userName
+
+/-- Helper function for setting delaborator options
+  (used in `delabExprInLocalContext`, which calls `PrettyPrinter.delab`)
+
+  - Note: this function forces delaborator to pretty-print pattern cases in prefix position,
+    as opposed to using postfix dot-notation, which is not allowed in pattern-matches -/
+def setDelaboratorOptions (opts : Options) : Options :=
+  opts.setBool `pp.fieldNotation false
+    |>.setBool `pp.notation true
+    |>.setBool `pp.instances true
+    |>.setBool `pp.instanceTypes false
+    |>.setBool `pp.all false
+    |>.setBool `pp.explicit false
+
+
+/-- Delaborates an `Expr` in a `LocalContext` to a `TSyntax term` -/
+def delabExprInLocalContext (lctx : LocalContext) (e : Expr) : MetaM (TSyntax `term) :=
+  withOptions setDelaboratorOptions $
+    withLCtx lctx #[] do
+      PrettyPrinter.delab e
+
 /-- Determines if an instance of the typeclass `className` exists for a particular `type`
     represented as an `Expr`. Under the hood, this tries to synthesize an instance of the typeclass for the type.
 
@@ -48,18 +72,3 @@ def replicateM [Monad m] (n : Nat) (action : m α) : m (List α) :=
     (akin to Haskell's `sequence`) -/
 def List.sequence (xs : List (Option α)) : Option (List α) :=
   List.traverse id xs
-
-/-- `ToMessageData` instance for pretty-printing `ConstructorVal`s -/
-instance : ToMessageData ConstructorVal where
-  toMessageData ctorVal :=
-    let fields := [
-      m!"name := {ctorVal.name}",
-      m!"levelParams := {ctorVal.levelParams}",
-      m!"type := {ctorVal.type}",
-      m!"induct := {ctorVal.induct}",
-      m!"cidx := {ctorVal.cidx}",
-      m!"numParams := {ctorVal.numParams}",
-      m!"numFields := {ctorVal.numFields}",
-      m!"isUnsafe := {ctorVal.isUnsafe}"
-    ]
-    .bracket "{" (.ofList fields) "}"

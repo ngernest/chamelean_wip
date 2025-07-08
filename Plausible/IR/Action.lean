@@ -8,7 +8,7 @@ import Lean.Meta.Tactic.Simp.Main
 
 open Lean.Elab.Deriving.DecEq
 open List Nat Array String
-open Lean Elab Command Meta Term
+open Lean Elab Command Meta Term LocalContext
 open Lean.Parser.Term
 open Std
 
@@ -51,47 +51,24 @@ def numMatchingFVars (e : Expr) (id : FVarId) : Nat :=
     c1 + c2
   | _ => 0
 
-/-- Computes the set of all free variables in an expression, returning a `HashSet` of `FVarId`s
-    - This is a non-monadic version of `Lean.CollectFVars`, defined in
-    https://github.com/leanprover/lean4/blob/6741444a63eec253a7eae7a83f1beb3de015023d/src/Lean/Util/CollectFVars.lean#L28 -/
-def getFVarsSet (e : Expr) : HashSet FVarId :=
-  open HashSet in
-  match e with
-  | .proj _ _ e => getFVarsSet e
-  | .forallE _ ty body _ => union (getFVarsSet ty) (getFVarsSet body)
-  | .lam _ ty body _ => union (getFVarsSet ty) (getFVarsSet body)
-  | .letE _ ty val body _ =>
-    union (getFVarsSet ty) (union (getFVarsSet val) (getFVarsSet body))
-  | .app f a => union (getFVarsSet f) (getFVarsSet a)
-  | .mdata _ e => getFVarsSet e
-  | .fvar fvar_id => HashSet.ofArray #[fvar_id]
-  | _ => ∅
 
-/-- Extracts the free variables in an expression, returning an array of `FVarID`s -/
-def extractFVars (e : Expr) : Array FVarId :=
-  HashSet.toArray $ getFVarsSet e
-
-/-- A monadic version of `extractFVars` (which collects the array of `FVarId`s
-    in the `MetaM` monad ) -/
-def extractFVarsMetaM (e : Expr) : MetaM (Array FVarId) := do
-  let (_, fvars_state) ← e.collectFVars.run {}
-  return fvars_state.fvarIds
-
-
-def subst_first_fVar (e: Expr) (old : FVarId) (new : FVarId) : MetaM Expr := do
-  if ¬ e.containsFVar old then return e
+/-- `substFirstFVar e oldFVar newFVar` substitutes the first (left-most)
+    occurrence of `oldFVar` in `e` with `newFVar` -/
+def substFirstFVar (e: Expr) (oldFVar : FVarId) (newFVar : FVarId) : MetaM Expr := do
+  if ¬ e.containsFVar oldFVar then return e
   else
     match e with
     | Expr.fvar id =>
-      if id == old then return (Expr.fvar new) else return e
-    | Expr.app f a =>
-      if f.containsFVar old then
-        let fnew ← subst_first_fVar f old new
-        return Expr.app fnew a
+      if id == oldFVar then return (Expr.fvar newFVar) else return e
+    | Expr.app f arg =>
+      if f.containsFVar oldFVar then
+        let fnew ← substFirstFVar f oldFVar newFVar
+        return Expr.app fnew arg
       else
-        let anew ← subst_first_fVar a old new
-        return Expr.app f anew
+        let newArg ← substFirstFVar arg oldFVar newFVar
+        return Expr.app f newArg
     | _ => return e
+
 
 /-- `DecomposedInductiveHypothesis` represents a hypothesis where the free variables
      in `fVarId`s have equalities on them as stipulated by the `variableEqualities` field,
@@ -106,60 +83,84 @@ structure DecomposedInductiveHypothesis where
      (including the new fvars that were produced) -/
   fVarIds : Array FVarId
 
-  /-- A collection of equations relating pairs of `FVarId`s to each other
+  localCtx : LocalContext
+
+  /-- A collection of equations (each represented as an `Expr`) relating variables to each other
       (e.g. `t = t1`) -/
-  variableEqualities : Array (FVarId × FVarId)
+  variableEqs : Array Expr
 
   deriving Repr
+
+/-- `preserveFirstSubstRemainingFVars hyp oldFVar newFVar lctx` preserves the first occurence of the `oldFVar` in `hyp`,
+     with the remaining occurrences of `oldFVar` substituted with `newFVar`, updating the `LocalContext` `lctx` while doing so. -/
+def preserveFirstSubstRemainingFVars (hyp : Expr) (oldFVar : FVarId) (newFVar : FVarId) (lctx : LocalContext): MetaM Expr :=
+  withLCtx' lctx do
+    -- The following `tempfvarid` is temporary for swapping purposes
+    -- and does not remain in the `LocalContext`, so we allow the use `mkFreshFVarId` here
+    let tempFVar ← mkFreshFVarId
+    let mut newHyp ← substFirstFVar hyp oldFVar tempFVar
+    newHyp := newHyp.replaceFVarId oldFVar (.fvar newFVar)
+    newHyp := newHyp.replaceFVarId tempFVar (.fvar oldFVar)
+    return newHyp
 
 /-- For each free variable `t` that appears more than once in the hypothesis `hyp`,
     replace its second occurrence with `t1`, its 3rd occurrence with `t2`, etc.,
     and record the equalities `t = t1, t = t2, ...` -/
-def separateFVars (hyp : Expr) : MetaM DecomposedInductiveHypothesis := do
-  let fvars := extractFVars hyp
-  let mut equations : Array (FVarId × FVarId) := #[]
-  let mut fVarIds := fvars
-  let temp := Name.mkStr1 "temp000"
-  let tempfvarid := FVarId.mk temp
-  let mut newHyp := hyp
-  for fv in fvars do
-    let mut i := 0
-    let mut currentFV := fv
-    while (numMatchingFVars newHyp currentFV > 1) do
-      let newName := Name.appendAfter fv.name s!"_{i}"
-      let newFVarId := FVarId.mk newName
-      newHyp ← subst_first_fVar newHyp currentFV tempfvarid
-      newHyp := newHyp.replaceFVarId currentFV (mkFVar newFVarId)
-      newHyp := newHyp.replaceFVarId tempfvarid (mkFVar currentFV)
-      i:= i + 1
-      currentFV := newFVarId
-      equations := equations.push (fv, newFVarId)
-      fVarIds := fVarIds.push newFVarId
-  return {
-    newHypothesis := newHyp
-    fVarIds := fVarIds
-    variableEqualities := equations
-  }
+def separateFVars (hyp : Expr) (lctx: LocalContext): MetaM DecomposedInductiveHypothesis :=
+  withLCtx' lctx do
+    let mut lctx := lctx
+    let fvars := extractFVarIds hyp
+    let mut equations : Array (FVarId × FVarId) := #[]
+    let mut fVarIds := fvars
+    let mut newHyp := hyp
+    for fv in fvars do
+      let mut i := 0
+      let mut currentFV := fv
+      while (numMatchingFVars newHyp currentFV > 1) do
+        let ty ← getFVarTypeInContext fv lctx
+        let newName := Name.appendAfter (← fv.getUserName) s!"_{i}"
+        let (new_lctx, newFVarId) ← addLocalDecl lctx newName ty
+        lctx := new_lctx
+        newHyp ← preserveFirstSubstRemainingFVars newHyp currentFV newFVarId lctx
+        i := i + 1
+        currentFV := newFVarId
+        equations := equations.push (fv, newFVarId)
+        fVarIds := fVarIds.push newFVarId
+    let variableEqs ← mkFVarEqualities equations lctx
+    return {
+      newHypothesis := newHyp
+      fVarIds := fVarIds
+      localCtx := lctx
+      variableEqs := variableEqs
+    }
 
 /-- Variant of `separateFVars` that only examines
     the free variables in `hypothesis` that appear in `initialFVars`,
     and uses the index of the hypothesis (`hypIndex`) to generate fresh names -/
-def separateFVarsInHypothesis (hypothesis : Expr) (initialFVars : Array FVarId)
-  (hypIndex : Nat) : MetaM DecomposedInductiveHypothesis := do
-  let initializedFVars := Array.intersect (extractFVars hypothesis) initialFVars
-  let mut newHypothesis := hypothesis
-  let mut equalities : Array (FVarId × FVarId) := #[]
-  for fvar in initializedFVars do
-    let newName := Name.mkStr1 (fvar.name.toString ++ "_" ++ toString hypIndex)
-    let newFVarId := FVarId.mk newName
-    newHypothesis := newHypothesis.replaceFVarId fvar (mkFVar newFVarId)
-    equalities := equalities.push (fvar, newFVarId)
-  let decomposedHypothesis ← separateFVars newHypothesis
-  return {
-    newHypothesis := decomposedHypothesis.newHypothesis
-    fVarIds := initializedFVars ++ decomposedHypothesis.fVarIds
-    variableEqualities := equalities ++ decomposedHypothesis.variableEqualities
-  }
+def separateFVarsInHypothesis (hypothesis : Expr) (initialFVars : Array FVarId) (hypIndex : Nat) (lctx: LocalContext)
+    : MetaM DecomposedInductiveHypothesis :=
+  withLCtx' lctx do
+    let mut lctx := lctx
+    let initializedFVars := Array.intersect (extractFVarIds hypothesis) initialFVars
+    let mut newHypothesis := hypothesis
+    let mut equalities : Array (FVarId × FVarId) := #[]
+    for fvar in initializedFVars do
+      let fvarname ← fvar.getUserName
+      let newName := Name.mkStr1 (fvarname.toString ++ "_" ++ toString hypIndex)
+      let ty ← getFVarTypeInContext fvar lctx
+      let (newLocalCtx, newFVarId) ← addLocalDecl lctx newName ty
+      lctx := newLocalCtx
+      newHypothesis := newHypothesis.replaceFVarId fvar (mkFVar newFVarId)
+      equalities := equalities.push (fvar, newFVarId)
+    let decomposedHypothesis ← separateFVars newHypothesis lctx
+    let variableEqs ← mkFVarEqualities equalities lctx
+    let finalVariableEqs := variableEqs ++ decomposedHypothesis.variableEqs
+    return {
+      newHypothesis := decomposedHypothesis.newHypothesis
+      fVarIds := initializedFVars ++ decomposedHypothesis.fVarIds
+      variableEqs := finalVariableEqs
+      localCtx := decomposedHypothesis.localCtx
+    }
 
 /-- The `GenerationStyle` datatype describes the "style" in which a generator should be invoked:
     - `RecursiveCall` indicates that we should recursively call the current generator function
@@ -183,8 +184,7 @@ inductive Action where
   | checkInductive (hyp : Expr)
 
   /-- The hypothesis `hyp` is not an inductive relation, but a function that returns
-      `Prop`, so we invoke a checker that determines whether the `Prop` is true
-      (this checker is provided via the `DecOpt` instance for the `Prop`) -/
+      `Prop`, so we invoke a checker that determines whether the `Prop` is true -/
   | checkNonInductive (hyp : Expr)
 
   /-- Generate an input at the given position `pos` for an inductive relation
@@ -204,13 +204,21 @@ inductive Action where
   /-- `return` the expression `e` in some ambient monad (e.g. `Gen`) -/
   | ret (e : Expr)
 
-  deriving Repr, Inhabited
+  deriving Repr
 
+/-- A structure containing an array of `Action`s (for a constructor of an inductive relation)
+    and their associated `LocalContext`-/
+structure ActionsWithLocalContext where
+  /-- A collection of `Action`s -/
+  actions : Array Action
+
+  /-- The `LocalContext` associated with the `action`s field -/
+  localCtx : LocalContext
 
 /-- Extracts all the free variables in the conclusion of a constructor
     for an inductive relation -/
 def getFVarsInConclusion (ctor : InductiveConstructor) : Array FVarId :=
-  extractFVars ctor.conclusion
+  extractFVarIds ctor.conclusion
 
 /-- Takes a constructor for an inductive relation,
     and collects the free variables in each of the arguments for the constructor's conclusion
@@ -222,7 +230,7 @@ def getFVarsInConclusionArgs (ctor : InductiveConstructor) (genpos : Nat) : Meta
   let mut outarr := #[]
   for argExpr in ctor.conclusion_args do
     if i != genpos then
-      outarr := Array.appendUniqueElements outarr (extractFVars argExpr)
+      outarr := Array.appendUniqueElements outarr (extractFVarIds argExpr)
     i := i + 1
   return outarr
 
@@ -231,7 +239,7 @@ def get_producer_outset (c: InductiveConstructor) (genpos: Nat): MetaM (Array FV
   else
     let initset ← getFVarsInConclusionArgs c genpos
     let gen_arg := c.conclusion_args[genpos]
-    let outvar := extractFVars gen_arg
+    let outvar := extractFVarIds gen_arg
     let mut outarr : Array FVarId := #[]
     for i in initset do
       if ¬ Array.elem i outvar then outarr:=outarr.push i
@@ -240,7 +248,7 @@ def get_producer_outset (c: InductiveConstructor) (genpos: Nat): MetaM (Array FV
 /-- Removes all free variables in an expression `e` from `fvars`, returning
     the resultant collection of `FVarId`s -/
 def getUninitializedFVars (e : Expr) (fvars : Array FVarId) : Array FVarId :=
-  Array.removeAll (extractFVars e) fvars
+  Array.removeAll (extractFVarIds e) fvars
 
 /-- Determines if all the free variables in `fvars` have been
     initialized in the expression `e`  -/
@@ -272,7 +280,7 @@ def getLastUninitializedArgIdx (hypothesis : Expr) (fvars : Array FVarId) : Meta
 def getLastUninitializedArgAndFVars
   (hypothesis : Expr) (fvars : Array FVarId) : MetaM (Nat × Array FVarId × Array FVarId) := do
   if !(← isInductiveRelationApplication hypothesis) then
-    throwError "not a inductive cond to get_last_uninit_arg "
+    throwError "{hypothesis} is not an application of an inductive relation"
   let args := hypothesis.getAppArgs
   let mut i := 0
   let mut uninitializedArgIdx := args.size + 1
@@ -282,7 +290,7 @@ def getLastUninitializedArgAndFVars
     if !allFVarsInExprInitialized arg fvars then {
       uninitializedArgIdx := i;
       uninitializedArg := arg;
-      fVarsToBeInitialized := extractFVars arg
+      fVarsToBeInitialized := extractFVarIds arg
     }
     i := i + 1
   if uninitializedArgIdx == args.size + 1 then
@@ -295,28 +303,34 @@ def getLastUninitializedArgAndFVars
   uninitializedFVars := Array.removeAll uninitializedFVars fVarsToBeInitialized
   return (uninitializedArgIdx, uninitializedFVars, fVarsToBeInitialized)
 
-
-def Actions_for_hypotheses (ctor : InductiveConstructor) (fvars : Array FVarId) : MetaM (Array Action) := do
-  let mut result := #[]
+/-- Produces a collection of `Actions` for the hypotheses of a constructor of an inductive relation -/
+def Actions_for_hypotheses (ctor : InductiveConstructor) (fvars : Array FVarId) : MetaM ActionsWithLocalContext := do
+  let mut lctx := ctor.localCtx
+  let mut actions := #[]
   let mut initializedFVars := fvars
   for (hyp, i) in ctor.all_hypotheses.zipIdx do
     let isHypOfInductiveCtor ← isHypothesisOfInductiveConstructor hyp ctor
 
     if isHypOfInductiveCtor then
+      -- If all free variables in the hypothesis have been initialized,
+      -- then we simply need to check whether the hypothesis holds, so we create a `checkInductive` `Action`
       if allFVarsInExprInitialized hyp initializedFVars then
-        result := result.push (.checkInductive hyp)
+        actions := actions.push (.checkInductive hyp)
       else
+        -- Certain variables have been uninitialized in the hypothesis
+        -- Find the index of last argument in the hypothesis that is uninitialized
         let (uninitializedArgIdx, uninitializedFVars, fVarsToBeInitialized)
           ← getLastUninitializedArgAndFVars hyp initializedFVars
 
+        -- Determine the type of the uninitialized variables
         for fid in uninitializedFVars do
-          let ty := ctor.bound_var_ctx.get! fid
-          result := result.push (.genFVar fid ty)
+          let ty ← getFVarTypeInContext fid lctx
+          actions := actions.push (.genFVar fid ty)
 
         let argToGenerate := hyp.getAppArgs[uninitializedArgIdx]!
-
         initializedFVars := Array.appendUniqueElements initializedFVars uninitializedFVars
 
+        -- Determine whether the generator should be invoked via a rec
         let generationStyle :=
           if hypothesisRecursivelyCallsCurrentInductive hyp ctor
           then .RecursiveCall
@@ -324,26 +338,56 @@ def Actions_for_hypotheses (ctor : InductiveConstructor) (fvars : Array FVarId) 
 
         if argToGenerate.isFVar then
           let fvarToGenerate := argToGenerate.fvarId!
-          result := result.push (.genInputForInductive fvarToGenerate hyp uninitializedArgIdx generationStyle)
+          actions := actions.push (.genInputForInductive fvarToGenerate hyp uninitializedArgIdx generationStyle)
         else
           let nameOfFVarToGenerate := Name.mkStr1 ("tcond" ++ toString i)
-          let fvarToGenerate := FVarId.mk nameOfFVarToGenerate
-          let decomposedHypothesis ← separateFVarsInHypothesis argToGenerate initializedFVars i
-          result := result.push (.genInputForInductive fvarToGenerate hyp uninitializedArgIdx generationStyle)
-          result := result.push (.matchFVar fvarToGenerate decomposedHypothesis)
+          let ty ← inferType argToGenerate
+          let (new_lctx, fvarToGenerate) ← addLocalDecl lctx nameOfFVarToGenerate ty
+          lctx:= new_lctx
+          let decomposedHypothesis ← separateFVarsInHypothesis argToGenerate initializedFVars i lctx
+          lctx := decomposedHypothesis.localCtx
+          actions := actions.push (.genInputForInductive fvarToGenerate hyp uninitializedArgIdx generationStyle)
+          actions := actions.push (.matchFVar fvarToGenerate decomposedHypothesis)
         initializedFVars := Array.appendUniqueElements initializedFVars fVarsToBeInitialized
     else
       if allFVarsInExprInitialized hyp initializedFVars then
-        result := result.push (.checkNonInductive hyp)
+        actions := actions.push (.checkNonInductive hyp)
       else
         let uninitializedFVars := getUninitializedFVars hyp initializedFVars
         for fvar in uninitializedFVars do
-          let ty := ctor.bound_var_ctx.get! fvar
-          result := result.push (.genFVar fvar ty)
+          let ty ← getFVarTypeInContext fvar lctx
+          actions := actions.push (.genFVar fvar ty)
         initializedFVars := Array.appendUniqueElements initializedFVars uninitializedFVars
-        result := result.push (.checkNonInductive hyp)
-  return result
+        actions := actions.push (.checkNonInductive hyp)
 
+  return {
+    actions := actions
+    localCtx := lctx
+  }
+
+/-- Produces a collection of `Actions` for a checker -/
+def Actions_for_checker (ctor : InductiveConstructor) : MetaM ActionsWithLocalContext := do
+  let mut initset := getFVarsInConclusion ctor
+  Actions_for_hypotheses ctor initset
+
+/-- Produces a collection of `Actions` for a generator -/
+def Actions_for_producer (ctor : InductiveConstructor) (genpos : Nat) : MetaM ActionsWithLocalContext := do
+  let mut initset ← getFVarsInConclusionArgs ctor genpos
+  let mut init_actions ← Actions_for_hypotheses ctor initset
+  let mut actions := init_actions.actions
+  let lctx := init_actions.localCtx
+  for hyp in ctor.all_hypotheses do
+    initset := Array.appendUniqueElements initset (extractFVarIds hyp)
+  let gen_arg := ctor.conclusion.getAppArgs[genpos]!
+  let uninitset := Array.removeAll (extractFVarIds gen_arg) initset
+  for fid in uninitset do
+    let ty ← getFVarTypeInContext fid lctx
+    actions := actions.push (Action.genFVar fid ty)
+  actions := actions.push (Action.ret gen_arg)
+  return {
+    actions := actions
+    localCtx := lctx
+  }
 
 /-- Note: this function is purely for debugging purposes, it is not used in the main algorithm -/
 def Actions_toStr (c: Action) : MetaM String := do
@@ -355,102 +399,78 @@ def Actions_toStr (c: Action) : MetaM String := do
   | .genFVar id ty =>  return  "gen_FVar " ++ toString (id.name) ++ ": " ++ toString (← Meta.ppExpr ty)
   | .ret e =>  return "return " ++ toString (← Meta.ppExpr e)
 
-def gen_IR_at_pos (id: FVarId) (cond: Expr) (pos: Nat) : MetaM String := do
+def gen_IR_at_pos (id: FVarId) (cond: Expr) (pos: Nat) (lctx: LocalContext): MetaM String := withLCtx' lctx do
   let tt := Lean.mkFVar ⟨Name.mkStr1 "tt"⟩
   let new_args := cond.getAppArgs.set! pos tt
   let new_cond := Lean.mkAppN cond.getAppFn new_args
   let fun_proto := "fun tt => " ++ toString (← Meta.ppExpr new_cond)
-  return "let " ++ toString (id.name)  ++ ":= gen_IR (" ++ fun_proto ++ ")"
+  return "let " ++ toString (← id.getUserName)  ++ ":= gen_IR (" ++ fun_proto ++ ")"
+
 
 /-- Converts a `Action` data structure to a string containing the
     corresponding Lean expression
     - Note: this function is purely for debugging purposes, it is not used in the main algorithm -/
-def Actions_toRawCode (Action : Action) : MetaM String := do
+def Actions_toString (Action : Action) (lctx: LocalContext): MetaM String := withLCtx' lctx do
   match Action with
   | .checkInductive hyp => MessageData.toString m!"check_IR ({← Meta.ppExpr hyp})"
   | .checkNonInductive hyp => return  "check (" ++ toString (← Meta.ppExpr hyp) ++ ")"
-  | .genInputForInductive fvar hyp pos _ => gen_IR_at_pos fvar hyp pos
-  | .matchFVar fvar hypothesis => return  "if let " ++ toString (← Meta.ppExpr hypothesis.newHypothesis) ++ ":= " ++ toString (fvar.name) ++ " then "
-  | .genFVar id ty =>  return  "let " ++ toString (id.name) ++ ":= gen_rand " ++ toString (← Meta.ppExpr ty)
+  | .genInputForInductive fvar hyp pos _ => gen_IR_at_pos fvar hyp pos lctx
+  | .matchFVar fvar hypothesis => return  "if let " ++ toString (← Meta.ppExpr hypothesis.newHypothesis) ++ ":= " ++ toString (← fvar.getUserName) ++ " then "
+  | .genFVar id ty =>  return  "let " ++ toString (← id.getUserName) ++ ":= gen_rand " ++ toString (← Meta.ppExpr ty)
   | .ret e => return "return " ++ toString (← Meta.ppExpr e)
 
 
--- To pretty-print a `Action` idiomatically, we can just make it an instance
--- of the `ToMessageData` typeclass, which allows us to use Lean's delaborator
--- to pretty-print `Expr`s
-instance : ToMessageData Action where
-  toMessageData (Action : Action) : MessageData :=
-    match Action with
-    | .checkInductive hyp => m!"check_IR {hyp}"
-    | .checkNonInductive hyp => m!"check_nonIR ({hyp})"
-    | .genInputForInductive fvar hyp idx generationStyle =>
-      match generationStyle with
-      | .RecursiveCall =>
-        let remainingArgs := (hyp.getAppArgs.eraseIdx! idx).toList
-        m!"let {fvar.name} ← aux_arb size' {remainingArgs}"
-      | .TypeClassResolution =>
-        m!"let {fvar.name} ← ArbitrarySuchThat.arbitraryST (fun {fvar.name} => {hyp})"
-    | .matchFVar fvar hypothesis => m!"if let {hypothesis.newHypothesis} := {fvar.name} then ..."
-    | .genFVar fvar ty => m!"let {fvar.name} ← SampleableExt.interpSample {ty}"
-    | .ret e => m!"return {e}"
+def checker_header (con: InductiveConstructor) : MetaM String := withLCtx' con.localCtx do
+  return toString (con.ctorName) ++ " : " ++  toString (← Meta.ppExpr con.ctorExpr)
 
-
-/-- Produces a collection of `Actions` for a checker -/
-def Actions_for_checker (ctor : InductiveConstructor) : MetaM (Array Action) := do
-  let mut initset := getFVarsInConclusion ctor
-  Actions_for_hypotheses ctor initset
-
-
-/-- Produces a collection of `Actions` for a generator -/
-def Actions_for_producer (ctor : InductiveConstructor) (genpos : Nat) : MetaM (Array Action) := do
-  let mut initset ← getFVarsInConclusionArgs ctor genpos
-  let mut outarr ← Actions_for_hypotheses ctor initset
-  for hyp in ctor.all_hypotheses do
-    initset := Array.appendUniqueElements initset (extractFVars hyp)
-  let gen_arg := ctor.conclusion.getAppArgs[genpos]!
-  let uninitset := Array.removeAll (extractFVars gen_arg) initset
-  for fid in uninitset do
-    let ty := ctor.bound_var_ctx.get! fid
-    outarr := outarr.push (Action.genFVar fid ty)
-  outarr := outarr.push (Action.ret gen_arg)
-  return outarr
-
-syntax (name := getCheckerCall) "#get_checker_call" term : command
+syntax (name := getCheckerCall) "#get_checker_actions" term : command
 
 @[command_elab getCheckerCall]
 def elabCheckerCall : CommandElab := fun stx => do
   match stx with
-  | `(#get_checker_call $t1:term) =>
+  | `(#get_checker_actions $t1:term) =>
     Command.liftTermElabM do
       let inpexp ← elabTerm t1 none
       let relation ← getInductiveInfo inpexp
       for con in relation.constructors do
-        IO.println s!"\n---- Cond prop : {con.all_hypotheses}"
-        IO.println s!"---- Out prop : {con.conclusion}"
+        IO.println s!"\n---- Constructor : {← checker_header con}"
+        --IO.println s!"---- Out prop : {con.conclusion}"
         let proc_conds ← Actions_for_checker con
-        for pc in proc_conds do
-          IO.println (← Actions_toRawCode pc)
+        for pc in proc_conds.actions do
+          IO.println (← Actions_toString pc proc_conds.localCtx)
   | _ => throwError "Invalid syntax"
 
 
-syntax (name := geGenCall) "#get_producer_call" term "for_arg" num : command
+--#get_checker_actions typing
+--#get_checker_actions balanced
+--#get_checker_actions bst
+
+def producer_header (con: InductiveConstructor) : MetaM String := withLCtx' con.localCtx do
+  let hyp: String := toString (← Array.mapM Meta.ppExpr con.all_hypotheses)
+  let conclusion := toString (← Meta.ppExpr con.conclusion)
+  let arg: String := toString (← Array.mapM Meta.ppExpr con.conclusion_args)
+  return hyp ++ " → " ++ conclusion ++ "\n---Args: " ++ arg
+
+syntax (name := geGenCall) "#get_producer_actions" term "for_arg" num : command
 
 @[command_elab geGenCall]
 def elabGenCall : CommandElab := fun stx => do
   match stx with
-  | `(#get_producer_call $t1:term for_arg $t2) =>
+  | `(#get_producer_actions $t1:term for_arg $t2) =>
     Command.liftTermElabM do
       let inpexp ← elabTerm t1 none
       let pos := TSyntax.getNat t2
       let relation ← getInductiveInfo inpexp
       for ctor in relation.constructors do
-        IO.println s!"\n---- Hypotheses : {ctor.all_hypotheses}"
-        IO.println s!"---- Conclusion : {ctor.conclusion}"
-        IO.println s!"---- Conclusion Args : {ctor.conclusion_args}"
+        IO.println s!"\n---- Constructor : {← checker_header ctor}"
         let producer_Actions ← Actions_for_producer ctor pos
-        for Action in producer_Actions do
-          IO.println (← Actions_toRawCode Action)
+        for Action in producer_Actions.actions do
+          IO.println (← Actions_toString Action producer_Actions.localCtx)
   | _ => throwError "Invalid syntax"
 
+
+--#get_producer_actions typing for_arg 2
+--#get_producer_actions balanced for_arg 1
+--#get_producer_actions bst for_arg 1
 
 end Plausible.IR

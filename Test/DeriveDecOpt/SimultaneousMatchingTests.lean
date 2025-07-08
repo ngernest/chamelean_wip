@@ -55,10 +55,10 @@ info: Try this checker: instance : DecOpt (MinEx n l a) where
             | _, _, _ => Option.some Bool.false,
             fun _ =>
             match n_0, a_0 with
-            | Nat.succ n, x :: l' =>
+            | Nat.succ n_1, x :: l' =>
               DecOpt.andOptList
                 [DecOpt.decOpt (@Membership.mem Nat (List Nat) List.instMembership l x) initSize,
-                  aux_dec initSize size' n l l']
+                  aux_dec initSize size' n_1 l l']
             | _, _ => Option.some Bool.false]
     fun size => aux_dec size size n l a
 -/

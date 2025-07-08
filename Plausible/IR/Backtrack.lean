@@ -5,7 +5,7 @@ import Plausible.IR.Examples
 import Plausible.IR.Extractor
 import Plausible.IR.Prelude
 import Plausible.IR.Prototype
-import Plausible.IR.GCCall
+import Plausible.IR.Action
 import Plausible.IR.Constructor
 import Plausible.Gen
 import Plausible.Sampleable
@@ -140,7 +140,7 @@ def IO_to_option (io : IO α) : IO (Option α) := do
 def uniform_backtracking_IO {α : Type } (a : Array α) : IO α := do
   -- Using monadLift to lift the random number generation from IO to MetaM
   let idx ← monadLift <| IO.rand 0 (a.size - 1)
-  let mem ←  option_to_IO (a[idx]?)
+  let mem ← option_to_IO (a[idx]?)
   return mem
 
 
@@ -149,7 +149,7 @@ def weight_backtracking_IO {α : Type } (a : Array α) (low_weight_size: Nat) (w
   let maxnum := low_weight_size + (a.size - low_weight_size) * weight - 1
   let randnat ← monadLift <| IO.rand 0 maxnum
   let idx := if randnat < low_weight_size then randnat else (randnat - low_weight_size)/weight + low_weight_size
-  let mem ←  option_to_IO (a[idx]?)
+  let mem ← option_to_IO (a[idx]?)
   return mem
 
 def uniform_backtracking_Gen {α : Type } (a : Array α) (h: a.size > 0): Gen α := do

@@ -1,4 +1,5 @@
 import Lean
+import Plausible.New.Utils
 import Plausible.IR.Constructor
 import Plausible.New.Idents
 import Plausible.New.TSyntaxCombinators
@@ -22,12 +23,12 @@ open Idents
       `ArbitrarySuchThat.arbitraryST` which produces values satisfying the hypothesis `hyp`
       (note: this requires that such an typeclass instance already exists)
       + If `producerType = .Enumerator`, we produce a similar term, but we call `EnumSuchThat.enumST` instead -/
-def genInputForInductive (fvar : FVarId) (hyp : Expr) (idx : Nat) (generationStyle : GenerationStyle) (producerType : ProducerType) : MetaM (TSyntax `doElem) := do
+def genInputForInductive (fvar : FVarId) (hyp : Expr) (idx : Nat) (generationStyle : GenerationStyle) (producerType : ProducerType) (localCtx : LocalContext) : MetaM (TSyntax `doElem) := do
   let argExprs := hyp.getAppArgs.eraseIdx! idx
-  let argTerms ← Array.mapM PrettyPrinter.delab argExprs
-  let lhs := mkIdent $ fvar.name
+  let argTerms ← Array.mapM (delabExprInLocalContext localCtx) argExprs
+  let lhs := Lean.mkIdent $ getUserNameInContext localCtx fvar
 
-  let hypTerm ← PrettyPrinter.delab hyp
+  let hypTerm ← delabExprInLocalContext localCtx hyp
   let producerConstraint ← `((fun $lhs:ident => $hypTerm))
 
   let recursiveProducerFn :=
@@ -126,7 +127,7 @@ def mkSubGeneratorBody (doBlock : TSyntaxArray `doElem) (argToGenTerm : Term) (n
     `Arbitrary.arbitrary` or `Enum.enum`), or if we should invoke a constrained producer
     by calling the producer associated with the `ArbitrarySuchThat` or `EnumSuchThat` instance
     for the constrianing proposition. -/
-def mkLetBindExprsInDoBlock (actions : Array Action) (producerType : ProducerType) : TermElabM (TSyntaxArray `doElem) := do
+def mkLetBindExprsInDoBlock (actions : Array Action) (producerType : ProducerType) (localCtx : LocalContext) : TermElabM (TSyntaxArray `doElem) := do
   let mut doElems := #[]
 
   for action in actions do
@@ -134,7 +135,7 @@ def mkLetBindExprsInDoBlock (actions : Array Action) (producerType : ProducerTyp
     | .genInputForInductive fvar hyp idx style =>
       -- Recursively invoke the producer to sample an argument for the hypothesis `hyp` at index `idx`,
       -- then bind the produced value to the free variable `fvar`
-      let bindExpr ← liftMetaM $ genInputForInductive fvar hyp idx style producerType
+      let bindExpr ← liftMetaM $ genInputForInductive fvar hyp idx style producerType localCtx
       doElems := doElems.push bindExpr
     | .genFVar fvar _ =>
       -- Sample a value from an unconstrained producer using `arbitrary` / `enum`, then bind it to `fvar`
@@ -142,7 +143,7 @@ def mkLetBindExprsInDoBlock (actions : Array Action) (producerType : ProducerTyp
         match producerType with
         | .Generator => arbitraryFn
         | .Enumerator => enumFn
-      let bindExpr ← mkLetBind (mkIdent fvar.name) #[producerFn]
+      let bindExpr ← mkLetBind (Lean.mkIdent $ getUserNameInContext localCtx fvar) #[producerFn]
       doElems := doElems.push bindExpr
     | _ => continue
 
@@ -154,7 +155,7 @@ def mkLetBindExprsInDoBlock (actions : Array Action) (producerType : ProducerTyp
 def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term) := do
 
   -- Create a monadic do-block containing all the calls to other producers (in the form of let-bind expressions)
-  let doElems ← mkLetBindExprsInDoBlock subGenerator.groupedActions.gen_list subGenerator.producerType
+  let doElems ← mkLetBindExprsInDoBlock subGenerator.groupedActions.gen_list subGenerator.producerType subGenerator.localCtx
 
   -- Check that all hypotheses which are not `inductive`s are upheld when we generate free variables
   let mut nonInductiveHypothesesToCheck := #[]
@@ -166,7 +167,7 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
       if ty.isProp then
         -- If yes, add it to our list of hypotheses to check using the `DecOpt` instance
         -- for that particular `Prop`
-        let predicateTerm ← PrettyPrinter.delab predicateExpr
+        let predicateTerm ← delabExprInLocalContext subGenerator.localCtx predicateExpr
         nonInductiveHypothesesToCheck := nonInductiveHypothesesToCheck.push predicateTerm
       else if ty == mkSort levelOne then
         -- `predicateExpr` is a `Type` (i.e. `Type 0`, the usual universe level for ordinary types)
@@ -179,8 +180,8 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
   let mut inductiveHypothesesToCheck : TSyntaxArray `term := #[]
   for action in subGenerator.groupedActions.checkInductiveActions do
     if let .checkInductive inductiveExpr := action then
-      -- Use the delaborator to convert an `Expr` into a `Term`
-      let inductiveTerm ← PrettyPrinter.delab inductiveExpr
+      -- Convert the `Expr` into a `Term` using the info about free variables stored in the current `LocalContext`
+      let inductiveTerm ← delabExprInLocalContext subGenerator.localCtx inductiveExpr
 
       -- Conver the `Term` into a `TSyntax term`
       let typedInductiveTerm ← `($inductiveTerm:term)
@@ -188,12 +189,8 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
       inductiveHypothesesToCheck := inductiveHypothesesToCheck.push typedInductiveTerm
 
   -- Add equality checks for any pairs of variables in `variableEqualities`
-  let mut variableEqualitiesToCheck := #[]
-  for (fvar1, fvar2) in subGenerator.variableEqualities do
-    let ident1 := mkIdent fvar1.name
-    let ident2 := mkIdent fvar2.name
-    let equalityCheck ← `($ident1:ident = $ident2:ident)
-    variableEqualitiesToCheck := variableEqualitiesToCheck.push equalityCheck
+  -- TODO: use `variableEqs` here instead of `variableEqualities`
+  let mut variableEqualitiesToCheck ← Array.mapM (fun e => delabExprInLocalContext subGenerator.localCtx e) subGenerator.variableEqs
 
   -- TODO: change `groupedActions.ret_list` to a single element since each do-block can only
   -- have one (final) `return` expression
@@ -203,7 +200,7 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
     match action' with
     | .ret expr =>
       -- Delaborate `expr` to get a `TSyntax` for the argument we're generating
-      let argToGenTerm ← PrettyPrinter.delab expr
+      let argToGenTerm ← delabExprInLocalContext subGenerator.localCtx expr
 
       -- Create the body of the sub-generator consisting of a monadic do-block and any extra pattern-matches
       -- to check non-inductive hypotheses / variable equalities
@@ -223,7 +220,7 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
         let scrutinees := Lean.mkIdent <$> Array.map (fun name => genFreshName existingNames name) existingNames
 
         -- Construct the match expression based on the info in `matchCases`
-        let patterns ← Array.mapM (fun patternExpr => PrettyPrinter.delab patternExpr) subGenerator.matchCases
+        let patterns ← Array.mapM (fun patternExpr => delabExprInLocalContext subGenerator.localCtx patternExpr) subGenerator.matchCases
         -- If there are multiple scrutinees, the LHS of each case is a tuple containing the elements in `matchCases`
         let case ← `(Term.matchAltExpr| | $[$patterns:term],* => $generatorBody:term)
         cases := cases.push case
