@@ -8,7 +8,7 @@ import Lean.Elab.Deriving.DecEq
 import Batteries.Data.List.Basic
 open Lean.Elab.Deriving.DecEq
 open List Nat Array String
-open Lean Elab Command Meta Term LocalContext
+open Lean Std Elab Command Meta Term LocalContext
 open Lean.Parser.Term
 open Idents
 
@@ -264,7 +264,7 @@ structure InductiveInfo where
 
   localCtx : LocalContext
 
-  nameMap : Array (Name × Name)
+  nameMap : HashMap Name Name
 
 /-- Determines if an expression `e` is an application of the form `R e1 ... en`,
     where `R` is an inductive relation  -/
@@ -482,16 +482,17 @@ def mkDefaultInputNames (inputExpr : Expr) : MetaM (Array String) := do
 
     This function returns a triple containing `inputTypes`, `inputNames` represented as an `Array` of `Name`s,
     and the resultant `LocalContext`. -/
-def mkInitialContextForInductiveRelation (inputTypes : Array Expr) (inputNameStrings : Array String) : MetaM (Array Expr × Array Name × LocalContext × Array (Name × Name)) := do
+def mkInitialContextForInductiveRelation (inputTypes : Array Expr) (inputNameStrings : Array String) : MetaM (Array Expr × Array Name × LocalContext × HashMap Name Name) := do
   let inputNames := Name.mkStr1 <$> inputNameStrings
   let localDecls := inputNames.zip inputTypes
   withLocalDeclsDND localDecls $ fun exprs => do
-    let mut nameMap := #[]
+    let mut nameMapBindings := #[]
     let mut localCtx ← getLCtx
     for currentName in inputNames do
       let freshName := getUnusedName localCtx currentName
       localCtx := renameUserName localCtx currentName freshName
-      nameMap := nameMap.push (currentName, freshName)
+      nameMapBindings := nameMapBindings.push (currentName, freshName)
+    let nameMap := HashMap.ofList (Array.toList nameMapBindings)
     return (exprs, inputNames, localCtx, nameMap)
 
 

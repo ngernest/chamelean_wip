@@ -5,7 +5,7 @@ import Plausible.New.SubCheckers
 import Plausible.New.Idents
 import Plausible.New.DecOpt
 
-open Lean Elab Command Meta Term Parser
+open Lean Std Elab Command Meta Term Parser
 open Idents
 open Plausible.IR
 
@@ -16,7 +16,7 @@ open Plausible.IR
     - the name of the inductive relation (`inductiveStx`)
     - the arguments (`args`) to the inductive relation -/
 def mkTopLevelChecker (baseCheckers : TSyntax `term) (inductiveCheckers : TSyntax `term)
-  (inductiveStx : TSyntax `term) (args : TSyntaxArray `term) (topLevelLocalCtx : LocalContext) (nameMap : Array (Name × Name)) : CommandElabM (TSyntax `command) := do
+  (inductiveStx : TSyntax `term) (args : TSyntaxArray `term) (topLevelLocalCtx : LocalContext) (nameMap : HashMap Name Name) : CommandElabM (TSyntax `command) := do
 
   -- Produce a fresh name for the `size` argument for the lambda
   -- at the end of the checker function, as well as the `aux_dec` inner helper function
@@ -60,9 +60,9 @@ def mkTopLevelChecker (baseCheckers : TSyntax `term) (inductiveCheckers : TSynta
 
     -- TODO: replace `genFreshName` with lookup into the local context
     let innerParamIdent :=
-      match Array.find? (fun (oldName, _) => oldName == paramName) nameMap with
-      | some (_, newName) => Lean.mkIdent newName
-      | none => mkIdent $ genFreshName (Array.map Prod.fst paramInfo) paramName
+      match nameMap[paramName]? with
+      | some newName => Lean.mkIdent newName
+      | none => Lean.mkIdent (genFreshName (Array.map Prod.fst paramInfo) paramName)
 
     let innerParam ← `(Term.letIdBinder| ($innerParamIdent : $paramType))
     innerParams := innerParams.push innerParam

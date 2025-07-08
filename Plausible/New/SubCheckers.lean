@@ -121,8 +121,8 @@ def mkSubChecker (subChecker : SubCheckerInfo) : TermElabM (TSyntax `term) := do
 
     -- TODO: rewrite `genFreshName` with local context stuff
     let scrutinees := Array.map (fun paramName =>
-      match Array.find? (fun (oldName, _) => oldName == paramName) subChecker.nameMap with
-      | some (_, newName) => Lean.mkIdent newName
+      match subChecker.nameMap[paramName]? with
+      | some newName => Lean.mkIdent newName
       | none => Lean.mkIdent $ genFreshName existingNames paramName) existingNames
 
     -- Force delaborator to pretty-print pattern cases in prefix position

@@ -8,7 +8,7 @@ import Plausible.IR.Action
 import Lean.Elab.Deriving.DecEq
 open Lean.Elab.Deriving.DecEq
 open List Nat Array String
-open Lean Elab Command Meta Term
+open Lean Elab Command Meta Term Std
 open Lean.Parser.Term
 
 
@@ -124,7 +124,7 @@ structure SubCheckerInfo extends HandlerInfo where
   ctor : InductiveConstructor
 
   -- TODO: move this into `SubGeneratorInfo` too
-  nameMap : Array (Name × Name)
+  nameMap : HashMap Name Name
 
 
 /-- Converts an array of `Action`s into a `GroupedActions` -/
@@ -164,7 +164,7 @@ def mkGroupedActions (gccs: Array Action) : MetaM GroupedActions := do
 /-- Takes a constructor for an inductive relation, a list of argument names, the index of the argument we wish to generate (`genpos`),
     and returns a corresponding `SubCheckerInfo` for a checker -/
 def mkSubCheckerInfoFromConstructor (ctor : InductiveConstructor)
-  (inputNames : Array String) (nameMap : Array (Name × Name)): MetaM SubCheckerInfo := do
+  (inputNames : Array String) (nameMap : HashMap Name Name): MetaM SubCheckerInfo := do
   let conclusion ← separateFVars ctor.conclusion ctor.localCtx
   let ctor := { ctor with localCtx := conclusion.localCtx }
   let args := conclusion.newHypothesis.getAppArgs
@@ -369,7 +369,7 @@ def checker_where_defs (relation: InductiveInfo) (inpname: List String) (monad: 
     i := i + 1
     out_str:= out_str ++ "\n-- Constructor: " ++ (← constructor_header con) ++ "\n"
     out_str:= out_str ++ (← prototype_for_checker_by_con relation inpname i monad) ++ ":= do \n"
-    let bt ← mkSubCheckerInfoFromConstructor con inpname.toArray #[]
+    let bt ← mkSubCheckerInfoFromConstructor con inpname.toArray ∅
     let btStr ← backtrack_elem_toString_checker bt monad
     out_str:= out_str ++ btStr ++ "\n"
   return out_str
@@ -469,7 +469,7 @@ def getSubGeneratorInfos (inductiveRelation : Expr) (argNames : Array String) (t
 
 /-- Takes an `Expr` representing an inductive relation and a list of names (arguments to the inductive relation),
     and returns a collection of `BacktrackElem`s for a checker -/
-def getSubCheckerInfos (inductiveRelation : Expr) (argNames : Array String) : MetaM (Array SubCheckerInfo × LocalContext × Array (Name × Name)) := do
+def getSubCheckerInfos (inductiveRelation : Expr) (argNames : Array String) : MetaM (Array SubCheckerInfo × LocalContext × HashMap Name Name) := do
   let inductiveInfo ← getInductiveInfoWithArgs inductiveRelation argNames
   let nameMap := inductiveInfo.nameMap
   let topLevelLocalCtx := inductiveInfo.localCtx

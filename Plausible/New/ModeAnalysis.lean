@@ -56,7 +56,7 @@ partial def analyzeRangeMode (r : Range) (constraints : Std.TreeMap Unknown Rang
   match r with
   | .Unknown u =>
     let rec followUnknown (u : Unknown) : RangeMode :=
-      match constraints.get? u with
+      match constraints[u]? with
       | some (.Undef ty) => .ModeUndefUnknown u ty
       | some (.Unknown u') => followUnknown u'
       | some .Fixed => .ModeFixed
