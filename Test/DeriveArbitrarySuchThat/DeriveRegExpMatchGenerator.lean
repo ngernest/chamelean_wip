@@ -55,26 +55,26 @@ def r0 : RegExp :=
 /--
 info: Try this generator: instance : ArbitrarySizedSuchThat (List Nat) (fun s => ExpMatch s r0) where
   arbitrarySizedST :=
-    let rec aux_arb (initSize : Nat) (size : Nat) (r0_0 : RegExp) : OptionT Plausible.Gen (List Nat) :=
+    let rec aux_arb (initSize : Nat) (size : Nat) (r0_1 : RegExp) : OptionT Plausible.Gen (List Nat) :=
       match size with
       | Nat.zero =>
         OptionTGen.backtrack
           [(1,
               OptionTGen.thunkGen
                 (fun _ =>
-                  match r0_0 with
+                  match r0_1 with
                   | RegExp.EmptyStr => pure []
                   | _ => OptionT.fail)),
             (1,
               OptionTGen.thunkGen
                 (fun _ =>
-                  match r0_0 with
+                  match r0_1 with
                   | RegExp.Char x => pure [x]
                   | _ => OptionT.fail)),
             (1,
               OptionTGen.thunkGen
                 (fun _ =>
-                  match r0_0 with
+                  match r0_1 with
                   | RegExp.Star re => pure []
                   | _ => OptionT.fail)),
             (1, OptionTGen.thunkGen (fun _ => OptionT.fail))]
@@ -83,19 +83,19 @@ info: Try this generator: instance : ArbitrarySizedSuchThat (List Nat) (fun s =>
           [(1,
               OptionTGen.thunkGen
                 (fun _ =>
-                  match r0_0 with
+                  match r0_1 with
                   | RegExp.EmptyStr => pure []
                   | _ => OptionT.fail)),
             (1,
               OptionTGen.thunkGen
                 (fun _ =>
-                  match r0_0 with
+                  match r0_1 with
                   | RegExp.Char x => pure [x]
                   | _ => OptionT.fail)),
             (Nat.succ size',
               OptionTGen.thunkGen
                 (fun _ =>
-                  match r0_0 with
+                  match r0_1 with
                   | RegExp.App re1 re2 => do
                     let s1 ← aux_arb initSize size' re1
                     let s2 ← aux_arb initSize size' re2
@@ -104,29 +104,29 @@ info: Try this generator: instance : ArbitrarySizedSuchThat (List Nat) (fun s =>
             (Nat.succ size',
               OptionTGen.thunkGen
                 (fun _ =>
-                  match r0_0 with
+                  match r0_1 with
                   | RegExp.Union re1 re2 => do
-                    let s ← aux_arb initSize size' re1
-                    return s
+                    let s_1 ← aux_arb initSize size' re1
+                    return s_1
                   | _ => OptionT.fail)),
             (Nat.succ size',
               OptionTGen.thunkGen
                 (fun _ =>
-                  match r0_0 with
+                  match r0_1 with
                   | RegExp.Union re1 re2 => do
-                    let s ← aux_arb initSize size' re2
-                    return s
+                    let s_1 ← aux_arb initSize size' re2
+                    return s_1
                   | _ => OptionT.fail)),
             (1,
               OptionTGen.thunkGen
                 (fun _ =>
-                  match r0_0 with
+                  match r0_1 with
                   | RegExp.Star re => pure []
                   | _ => OptionT.fail)),
             (Nat.succ size',
               OptionTGen.thunkGen
                 (fun _ =>
-                  match r0_0 with
+                  match r0_1 with
                   | RegExp.Star re => do
                     let s1 ← aux_arb initSize size' re
                     let s2 ← aux_arb initSize size' (RegExp.Star re)

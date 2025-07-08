@@ -21,20 +21,20 @@ inductive balancedTree : Nat → BinaryTree → Prop where
 /--
 info: Try this generator: instance : ArbitrarySizedSuchThat BinaryTree (fun t => balancedTree n t) where
   arbitrarySizedST :=
-    let rec aux_arb (initSize : Nat) (size : Nat) (n_0 : Nat) : OptionT Plausible.Gen BinaryTree :=
+    let rec aux_arb (initSize : Nat) (size : Nat) (n_1 : Nat) : OptionT Plausible.Gen BinaryTree :=
       match size with
       | Nat.zero =>
         OptionTGen.backtrack
           [(1,
               OptionTGen.thunkGen
                 (fun _ =>
-                  match n_0 with
+                  match n_1 with
                   | 0 => pure BinaryTree.Leaf
                   | _ => OptionT.fail)),
             (1,
               OptionTGen.thunkGen
                 (fun _ =>
-                  match n_0 with
+                  match n_1 with
                   | 1 => pure BinaryTree.Leaf
                   | _ => OptionT.fail)),
             (1, OptionTGen.thunkGen (fun _ => OptionT.fail))]
@@ -43,22 +43,22 @@ info: Try this generator: instance : ArbitrarySizedSuchThat BinaryTree (fun t =>
           [(1,
               OptionTGen.thunkGen
                 (fun _ =>
-                  match n_0 with
+                  match n_1 with
                   | 0 => pure BinaryTree.Leaf
                   | _ => OptionT.fail)),
             (1,
               OptionTGen.thunkGen
                 (fun _ =>
-                  match n_0 with
+                  match n_1 with
                   | 1 => pure BinaryTree.Leaf
                   | _ => OptionT.fail)),
             (Nat.succ size',
               OptionTGen.thunkGen
                 (fun _ =>
-                  match n_0 with
-                  | Nat.succ n_1 => do
-                    let l ← aux_arb initSize size' n_1
-                    let r ← aux_arb initSize size' n_1
+                  match n_1 with
+                  | Nat.succ n => do
+                    let l ← aux_arb initSize size' n
+                    let r ← aux_arb initSize size' n
                     let x ← Arbitrary.arbitrary
                     return BinaryTree.Node x l r
                   | _ => OptionT.fail))]

@@ -28,7 +28,7 @@ inductive BST : Nat → Nat → BinaryTree → Prop where
 /--
 info: Try this generator: instance : ArbitrarySizedSuchThat BinaryTree (fun t => BST lo hi t) where
   arbitrarySizedST :=
-    let rec aux_arb (initSize : Nat) (size : Nat) (lo_0 : Nat) (hi_0 : Nat) : OptionT Plausible.Gen BinaryTree :=
+    let rec aux_arb (initSize : Nat) (size : Nat) (lo_1 : Nat) (hi_1 : Nat) : OptionT Plausible.Gen BinaryTree :=
       match size with
       | Nat.zero =>
         OptionTGen.backtrack
@@ -40,9 +40,9 @@ info: Try this generator: instance : ArbitrarySizedSuchThat BinaryTree (fun t =>
               OptionTGen.thunkGen
                 (fun _ => do
                   let x ← Arbitrary.arbitrary
-                  let l ← aux_arb initSize size' lo x
-                  let r ← aux_arb initSize size' x hi
-                  if lo < x && x < hi then ⏎
+                  let l ← aux_arb initSize size' lo_1 x
+                  let r ← aux_arb initSize size' x hi_1
+                  if lo_1 < x && x < hi_1 then ⏎
                     return BinaryTree.Node x l r
                   else
                     OptionT.fail))]
