@@ -9,26 +9,26 @@ import Test.DeriveArbitrarySuchThat.SimultaneousMatchingTests
 set_option guard_msgs.diff true
 
 /--
-info: Try this generator: instance : EnumSizedSuchThat (List Nat) (fun l => MinOk l a) where
+info: Try this enumerator: instance : EnumSizedSuchThat (List Nat) (fun l => MinOk l a) where
   enumSizedST :=
-    let rec aux_enum (initSize : Nat) (size : Nat) (a_0 : List Nat) : OptionT Enumerator (List Nat) :=
+    let rec aux_enum (initSize : Nat) (size : Nat) (a_1 : List Nat) : OptionT Enumerator (List Nat) :=
       match size with
       | Nat.zero =>
         EnumeratorCombinators.enumerate
-          [match a_0 with
+          [match a_1 with
             | [] => pure []
             | _ => OptionT.fail,
             OptionT.fail]
       | Nat.succ size' =>
         EnumeratorCombinators.enumerate
-          [match a_0 with
+          [match a_1 with
             | [] => pure []
             | _ => OptionT.fail,
-            match a_0 with
+            match a_1 with
             | x :: l' => do
-              let l ← aux_enum initSize size' l'
-              if x ∈ l then ⏎
-                return l
+              let l_1 ← aux_enum initSize size' l'
+              if x ∈ l_1 then ⏎
+                return l_1
               else
                 OptionT.fail
             | _ => OptionT.fail]
@@ -38,26 +38,26 @@ info: Try this generator: instance : EnumSizedSuchThat (List Nat) (fun l => MinO
 #derive_enumerator (fun (l: List Nat) => MinOk l a)
 
 /--
-info: Try this generator: instance : EnumSizedSuchThat (List Nat) (fun l => MinEx n l a) where
+info: Try this enumerator: instance : EnumSizedSuchThat (List Nat) (fun l => MinEx n l a) where
   enumSizedST :=
-    let rec aux_enum (initSize : Nat) (size : Nat) (n_0 : Nat) (a_0 : List Nat) : OptionT Enumerator (List Nat) :=
+    let rec aux_enum (initSize : Nat) (size : Nat) (n_1 : Nat) (a_1 : List Nat) : OptionT Enumerator (List Nat) :=
       match size with
       | Nat.zero =>
         EnumeratorCombinators.enumerate
-          [match n_0, a_0 with
+          [match n_1, a_1 with
             | 0, [] => pure []
             | _, _ => OptionT.fail,
             OptionT.fail]
       | Nat.succ size' =>
         EnumeratorCombinators.enumerate
-          [match n_0, a_0 with
+          [match n_1, a_1 with
             | 0, [] => pure []
             | _, _ => OptionT.fail,
-            match n_0, a_0 with
-            | Nat.succ n_1, x :: l' => do
-              let l ← aux_enum initSize size' n_1 l'
-              if x ∈ l then ⏎
-                return l
+            match n_1, a_1 with
+            | Nat.succ n, x :: l' => do
+              let l_1 ← aux_enum initSize size' n l'
+              if x ∈ l_1 then ⏎
+                return l_1
               else
                 OptionT.fail
             | _, _ => OptionT.fail]

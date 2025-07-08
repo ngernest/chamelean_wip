@@ -7,18 +7,18 @@ import Test.DeriveArbitrarySuchThat.DeriveBSTGenerator
 set_option guard_msgs.diff true
 
 /--
-info: Try this generator: instance : EnumSizedSuchThat BinaryTree (fun t => BST lo hi t) where
+info: Try this enumerator: instance : EnumSizedSuchThat BinaryTree (fun t => BST lo hi t) where
   enumSizedST :=
-    let rec aux_enum (initSize : Nat) (size : Nat) (lo_0 : Nat) (hi_0 : Nat) : OptionT Enumerator BinaryTree :=
+    let rec aux_enum (initSize : Nat) (size : Nat) (lo_1 : Nat) (hi_1 : Nat) : OptionT Enumerator BinaryTree :=
       match size with
       | Nat.zero => EnumeratorCombinators.enumerate [pure BinaryTree.Leaf, OptionT.fail]
       | Nat.succ size' =>
         EnumeratorCombinators.enumerate
           [pure BinaryTree.Leaf, do
             let x ← Enum.enum
-            let l ← aux_enum initSize size' lo x
-            let r ← aux_enum initSize size' x hi
-            if lo < x && x < hi then ⏎
+            let l ← aux_enum initSize size' lo_1 x
+            let r ← aux_enum initSize size' x hi_1
+            if lo_1 < x && x < hi_1 then ⏎
               return BinaryTree.Node x l r
             else
               OptionT.fail]

@@ -22,7 +22,7 @@ inductive NatChain (a b : Nat) : Prop where
 /--
 info: Try this checker: instance : DecOpt (NatChain a b) where
   decOpt :=
-    let rec aux_dec (initSize : Nat) (size : Nat) (a_0 : Nat) (b_0 : Nat) : Option Bool :=
+    let rec aux_dec (initSize : Nat) (size : Nat) (a_1 : Nat) (b_1 : Nat) : Option Bool :=
       match size with
       | Nat.zero =>
         DecOpt.checkerBacktrack
@@ -32,9 +32,9 @@ info: Try this checker: instance : DecOpt (NatChain a b) where
                 EnumeratorCombinators.enumerating Enum.enum
                   (fun y =>
                     DecOpt.andOptList
-                      [DecOpt.decOpt (@LT.lt Nat instLTNat a x) initSize,
+                      [DecOpt.decOpt (@LT.lt Nat instLTNat a_1 x) initSize,
                         DecOpt.decOpt (@LT.lt Nat instLTNat x y) initSize,
-                        DecOpt.decOpt (@LT.lt Nat instLTNat y b) initSize])
+                        DecOpt.decOpt (@LT.lt Nat instLTNat y b_1) initSize])
                   initSize)
               initSize]
       | Nat.succ size' =>
@@ -45,9 +45,9 @@ info: Try this checker: instance : DecOpt (NatChain a b) where
                 EnumeratorCombinators.enumerating Enum.enum
                   (fun y =>
                     DecOpt.andOptList
-                      [DecOpt.decOpt (@LT.lt Nat instLTNat a x) initSize,
+                      [DecOpt.decOpt (@LT.lt Nat instLTNat a_1 x) initSize,
                         DecOpt.decOpt (@LT.lt Nat instLTNat x y) initSize,
-                        DecOpt.decOpt (@LT.lt Nat instLTNat y b) initSize])
+                        DecOpt.decOpt (@LT.lt Nat instLTNat y b_1) initSize])
                   initSize)
               initSize]
     fun size => aux_dec size size a b
