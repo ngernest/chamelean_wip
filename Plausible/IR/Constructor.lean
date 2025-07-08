@@ -123,6 +123,9 @@ structure SubCheckerInfo extends HandlerInfo where
   /-- The constructor of an inductive relation corresponding to this sub-checker -/
   ctor : InductiveConstructor
 
+  -- TODO: move this into `SubGeneratorInfo` too
+  nameMap : Array (Name × Name)
+
 
 /-- Converts an array of `Action`s into a `GroupedActions` -/
 def mkGroupedActions (gccs: Array Action) : MetaM GroupedActions := do
@@ -161,7 +164,7 @@ def mkGroupedActions (gccs: Array Action) : MetaM GroupedActions := do
 /-- Takes a constructor for an inductive relation, a list of argument names, the index of the argument we wish to generate (`genpos`),
     and returns a corresponding `SubCheckerInfo` for a checker -/
 def mkSubCheckerInfoFromConstructor (ctor : InductiveConstructor)
-  (inputNames : Array String) : MetaM SubCheckerInfo := do
+  (inputNames : Array String) (nameMap : Array (Name × Name)): MetaM SubCheckerInfo := do
   let conclusion ← separateFVars ctor.conclusion ctor.localCtx
   let ctor := { ctor with localCtx := conclusion.localCtx }
   let args := conclusion.newHypothesis.getAppArgs
@@ -180,6 +183,7 @@ def mkSubCheckerInfoFromConstructor (ctor : InductiveConstructor)
     checkerSort := checkerSort
     localCtx := actions.localCtx
     variableEqs := conclusion.variableEqs ++ groupedActions.variableEqs
+    nameMap := nameMap
   }
 
 /-- Takes a constructor for an inductive relation, a list of argument names,
@@ -365,7 +369,7 @@ def checker_where_defs (relation: InductiveInfo) (inpname: List String) (monad: 
     i := i + 1
     out_str:= out_str ++ "\n-- Constructor: " ++ (← constructor_header con) ++ "\n"
     out_str:= out_str ++ (← prototype_for_checker_by_con relation inpname i monad) ++ ":= do \n"
-    let bt ← mkSubCheckerInfoFromConstructor con inpname.toArray
+    let bt ← mkSubCheckerInfoFromConstructor con inpname.toArray #[]
     let btStr ← backtrack_elem_toString_checker bt monad
     out_str:= out_str ++ btStr ++ "\n"
   return out_str
@@ -465,13 +469,15 @@ def getSubGeneratorInfos (inductiveRelation : Expr) (argNames : Array String) (t
 
 /-- Takes an `Expr` representing an inductive relation and a list of names (arguments to the inductive relation),
     and returns a collection of `BacktrackElem`s for a checker -/
-def getSubCheckerInfos (inductiveRelation : Expr) (argNames : Array String) : MetaM (Array SubCheckerInfo) := do
+def getSubCheckerInfos (inductiveRelation : Expr) (argNames : Array String) : MetaM (Array SubCheckerInfo × LocalContext × Array (Name × Name)) := do
   let inductiveInfo ← getInductiveInfoWithArgs inductiveRelation argNames
+  let nameMap := inductiveInfo.nameMap
+  let topLevelLocalCtx := inductiveInfo.localCtx
   let mut subCheckers := #[]
   for ctor in inductiveInfo.constructors do
-    let subChecker ← mkSubCheckerInfoFromConstructor ctor argNames
+    let subChecker ← mkSubCheckerInfoFromConstructor ctor argNames nameMap
     subCheckers := subCheckers.push subChecker
-  return subCheckers
+  return (subCheckers, topLevelLocalCtx, nameMap)
 
 
 syntax (name := getBackTrackProducer) "#get_backtrack_producer" term "with_name" term "for_arg" num: command

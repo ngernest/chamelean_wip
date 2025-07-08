@@ -264,6 +264,8 @@ structure InductiveInfo where
 
   localCtx : LocalContext
 
+  nameMap : Array (Name × Name)
+
 /-- Determines if an expression `e` is an application of the form `R e1 ... en`,
     where `R` is an inductive relation  -/
 def isInductiveRelationApplication (e : Expr) : MetaM Bool := do
@@ -480,11 +482,17 @@ def mkDefaultInputNames (inputExpr : Expr) : MetaM (Array String) := do
 
     This function returns a triple containing `inputTypes`, `inputNames` represented as an `Array` of `Name`s,
     and the resultant `LocalContext`. -/
-def mkInitialContextForInductiveRelation (inputTypes : Array Expr) (inputNames : Array String) : MetaM (Array Expr × Array Name × LocalContext) := do
-  let freshenedNames := (fun name => genFreshName (Name.mkStr1 <$> inputNames) (Name.mkStr1 name)) <$> inputNames
-  let localDecls := freshenedNames.zip inputTypes
+def mkInitialContextForInductiveRelation (inputTypes : Array Expr) (inputNameStrings : Array String) : MetaM (Array Expr × Array Name × LocalContext × Array (Name × Name)) := do
+  let inputNames := Name.mkStr1 <$> inputNameStrings
+  let localDecls := inputNames.zip inputTypes
   withLocalDeclsDND localDecls $ fun exprs => do
-    return (exprs, freshenedNames, ← getLCtx)
+    let mut nameMap := #[]
+    let mut localCtx ← getLCtx
+    for currentName in inputNames do
+      let freshName := getUnusedName localCtx currentName
+      localCtx := renameUserName localCtx currentName freshName
+      nameMap := nameMap.push (currentName, freshName)
+    return (exprs, inputNames, localCtx, nameMap)
 
 
 /-- Takes in an expression of the form `R e1 ... en`, where `R` is an inductive relation
@@ -499,7 +507,7 @@ def getInductiveInfoWithArgs (inputExpr : Expr) (argNames : Array String) : Meta
     -- `input_types` contains all elements of `tyexprs_in_arrow_type` except the conclusion (which is `Prop`)
     let input_types := tyexprs_in_arrow_type.pop
 
-    let (input_vars, input_vars_names, localCtx) ← mkInitialContextForInductiveRelation input_types argNames
+    let (input_vars, input_vars_names, localCtx, nameMap) ← mkInitialContextForInductiveRelation input_types argNames
 
     let env ← getEnv
     match env.find? inductive_name with
@@ -533,6 +541,7 @@ def getInductiveInfoWithArgs (inputExpr : Expr) (argNames : Array String) : Meta
         constructors_with_args := constructors_with_args
         dependencies := dependencies
         localCtx := localCtx
+        nameMap := nameMap
       }
     | some _ =>
       throwError "'{inductive_name}' is not an inductive type"
