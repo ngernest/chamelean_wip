@@ -474,17 +474,17 @@ def mkDefaultInputNames (inputExpr : Expr) : MetaM (Array String) := do
     return (← mkDefaultInputNames_aux input_types.size)
   | none => throwError "input expression is not a function application"
 
-/-- `mkInitialContextForInductiveRelation inputTypes inputNameStrings`
-    creates the initial `LocalContext` where each `(x, τ)` in `Array.zip inputTypes inputNameStrings`
+/-- `mkInitialContextForInductiveRelation inputTypes inputNames`
+    creates the initial `LocalContext` where each `(x, τ)` in `Array.zip inputTypes inputNames`
     is given the declaration `x : τ` in the resultant context.
 
     This function returns a triple containing `inputTypes`, `inputNames` represented as an `Array` of `Name`s,
     and the resultant `LocalContext`. -/
-def mkInitialContextForInductiveRelation (inputTypes : Array Expr) (inputNameStrings : Array String) : MetaM (Array Expr × Array Name × LocalContext) := do
-  let inputNames := Name.mkStr1 <$> inputNameStrings
-  let localDecls := inputNames.zip inputTypes
+def mkInitialContextForInductiveRelation (inputTypes : Array Expr) (inputNames : Array String) : MetaM (Array Expr × Array Name × LocalContext) := do
+  let freshenedNames := (fun name => genFreshName (Name.mkStr1 <$> inputNames) (Name.mkStr1 name)) <$> inputNames
+  let localDecls := freshenedNames.zip inputTypes
   withLocalDeclsDND localDecls $ fun exprs => do
-    return (exprs, inputNames, ← getLCtx)
+    return (exprs, freshenedNames, ← getLCtx)
 
 
 /-- Takes in an expression of the form `R e1 ... en`, where `R` is an inductive relation
