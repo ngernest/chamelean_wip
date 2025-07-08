@@ -10,11 +10,23 @@ open Plausible.IR
 def getUserNameInContext (lctx : LocalContext) (fvarId : FVarId) : Name :=
   (lctx.get! fvarId).userName
 
-/-- Delaborates an `Expr` in a `LocalContext` to a `TSyntax term`
-    (this function forces delaborator to pretty-print pattern cases in prefix position,
-    as opposed to using postfix dot-notation, which is not allowed in pattern-matches) -/
+/-- Helper function for setting delaborator options
+  (used in `delabExprInLocalContext`, which calls `PrettyPrinter.delab`)
+
+  - Note: this function forces delaborator to pretty-print pattern cases in prefix position,
+    as opposed to using postfix dot-notation, which is not allowed in pattern-matches -/
+def setDelaboratorOptions (opts : Options) : Options :=
+  opts.setBool `pp.fieldNotation false
+    |>.setBool `pp.notation true
+    |>.setBool `pp.instances true
+    |>.setBool `pp.instanceTypes false
+    |>.setBool `pp.all false
+    |>.setBool `pp.explicit false
+
+
+/-- Delaborates an `Expr` in a `LocalContext` to a `TSyntax term` -/
 def delabExprInLocalContext (lctx : LocalContext) (e : Expr) : MetaM (TSyntax `term) :=
-  withOptions (fun opts => opts.setBool `pp.fieldNotation false) $
+  withOptions setDelaboratorOptions $
     withLCtx lctx #[] do
       PrettyPrinter.delab e
 

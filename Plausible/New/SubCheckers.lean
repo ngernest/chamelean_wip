@@ -122,7 +122,7 @@ def mkSubChecker (subChecker : SubCheckerInfo) : TermElabM (TSyntax `term) := do
 
     -- Force delaborator to pretty-print pattern cases in prefix position
     -- (as opposed to using postfix dot-notation, which is not allowed in pattern-matches)
-    withOptions (fun opts => opts.setBool `pp.fieldNotation false) do
+    withOptions setDelaboratorOptions do
       -- Construct the match expression based on the info in `matchCases`
       let mut cases := #[]
       let patterns ← Array.mapM (fun patternExpr => delabExprInLocalContext subChecker.localCtx patternExpr) subChecker.matchCases
