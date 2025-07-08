@@ -69,17 +69,15 @@ def isInductiveRelation (tyexpr : Expr) : MetaM Bool := do
   let return_type := arrow_type_components.toList.getLast!
   return return_type.isProp
 
-/-- `rewriteFuncCallsInConclusion hypotheses conclusion inductiveRelationName boundVarCtx` does the following:
+/-- `rewriteFuncCallsInConclusion hypotheses conclusion inductiveRelationName` does the following:
     1. Checks if the `conclusion` contains a function call where the function is *not* the same as the `inductiveRelationName`.
-       (If no, we just return the triple `(hypotheses, conclusion, boundVarCtx)` as is.)
+       (If no, we just return the pair `(hypotheses, conclusion)` as is.)
     2. If yes, we create a fresh variable & add an extra hypothesis where the fresh var is bound to the result of the function call.
     3. We then rewrite the conclusion, replacing occurrences of the function call with the fresh variable,
-    and add the new variable (along with its type) to `boundVarCtx`.
-    The updated hypotheses, conclusion and `boundVarCtx` are subsequently returned.
+    The updated hypotheses & conclusion are subsequently returned.
     - Note: it is the caller's responsibility to check that `conclusion` does indeed contain
       a non-trivial function application (e.g. by using `containsNonTrivialFuncApp`) -/
-def rewriteFuncCallsInConclusion (hypotheses : Array Expr) (conclusion : Expr) (inductiveRelationName : Name)
-  (boundVarCtx : HashMap FVarId Expr) : MetaM (Array Expr × Expr × HashMap FVarId Expr) :=
+def rewriteFuncCallsInConclusion (hypotheses : Array Expr) (conclusion : Expr) (inductiveRelationName : Name) : MetaM (Array Expr × Expr) :=
 
   -- Filter out cases where the function being called is the same as the inductive relation's name
   -- Note: this analysis is more simplistic compared to the one performed by `containsNonTrivialFuncApp`,
@@ -88,18 +86,16 @@ def rewriteFuncCallsInConclusion (hypotheses : Array Expr) (conclusion : Expr) (
     subExpr.isApp && subExpr.getAppFn.constName.getRoot != inductiveRelationName) conclusion
 
   match possibleFuncApp with
-  | none => return (hypotheses, conclusion, boundVarCtx)
+  | none => return (hypotheses, conclusion)
   | some funcAppExpr => do
     let funcAppType ← inferType funcAppExpr
 
     -- We use `withLocalDecl` to add the fresh variable to the local context
-    withLocalDecl `unknown BinderInfo.default funcAppType (fun newVarExpr => do
-      let newVarType ← inferType newVarExpr
-
+    withLocalDeclD `unknown funcAppType (fun newVarExpr => do
       -- Create a new hypothesis stating that `newVarExpr = funcAppExpr`, then
       -- add it to the array of `hypotheses`
       let newHyp ← mkEq newVarExpr funcAppExpr
-      let newVarFVarId := newVarExpr.fvarId!
+      -- let newVarFVarId := newVarExpr.fvarId!
       let updatedHypotheses := Array.push hypotheses newHyp
 
       -- Note: since we're doing a purely syntactic rewriting operation here,
@@ -108,8 +104,7 @@ def rewriteFuncCallsInConclusion (hypotheses : Array Expr) (conclusion : Expr) (
         (fun subExpr => if subExpr == funcAppExpr then some newVarExpr else none) conclusion
 
       -- Insert the fresh variable into the bound-variable context
-      let updatedCtx := HashMap.insert boundVarCtx newVarFVarId newVarType
-      return (updatedHypotheses, rewrittenConclusion, updatedCtx))
+      return (updatedHypotheses, rewrittenConclusion))
 
 /-- Determines whether a type expression corresponds to the name of a base type (`Nat, String, Bool`) -/
 def isBaseType (tyexpr : Expr) : Bool :=
@@ -185,7 +180,7 @@ structure InductiveConstructor where
   bound_vars : Array Name
 
   /-- Unification map between bound variables in conclusion and input_vars -/
-  inp_map : Array (Expr × Expr)
+  inputVarsToConclusionArgsMap : Array (Expr × Expr)
 
   /-- Bound variables that have base types -/
   bound_vars_with_base_types : Array Name
@@ -322,7 +317,7 @@ def getFVarsMappingInConclusion (conclusion : Expr) (input_args : Array FVarId) 
 
 /-- Replaces all occurrences of `FVarId`s in `e` using the association list `fvar_ids`, which
     maps each `FVarId` to an `expr` -/
-def replace_fvars_in_expr (e : Expr) (fvar_ids : Array (FVarId × Expr)) : MetaM Expr := do
+def replaceFVarInExpr (e : Expr) (fvar_ids : Array (FVarId × Expr)) : MetaM Expr := do
   let mut newcond := e
   for (fvar_id, expr) in fvar_ids do
     newcond := newcond.replaceFVarId fvar_id expr
@@ -330,20 +325,20 @@ def replace_fvars_in_expr (e : Expr) (fvar_ids : Array (FVarId × Expr)) : MetaM
 
 /-- For each `e` in `exprs_arr`, this function replaces all occurrences of `FVarId`s in `e`
     using the association list `fvar_ids`, which maps each `FVarId` to an `expr` -/
-def replace_fvars_in_exprs (exprs_arr : Array Expr) (fvar_ids: Array (FVarId × Expr)) : MetaM (Array Expr) :=
-  Array.mapM (fun x => replace_fvars_in_expr x fvar_ids) exprs_arr
+def replaceFVarsInExprs (exprs_arr : Array Expr) (fvar_ids: Array (FVarId × Expr)) : MetaM (Array Expr) :=
+  Array.mapM (fun x => replaceFVarInExpr x fvar_ids) exprs_arr
 
 /-- Unifies each argument in `arg_names` with each variable in the `conclusion`, returning
-    the updated `hypotheses`, `conclusion` and `bound_var_ctx`. If `arg_names` is empty,
-    this function just returns `hypotheses`, `conclusion` & `bound_var_ctx` as is. -/
-def unify_args_with_conclusion (hypotheses : Array Expr) (conclusion : Expr) (input_args : Array FVarId)
+    the updated `hypotheses`, `conclusion` and `input_args`. If `arg_names` is empty,
+    this function just returns `hypotheses`, `conclusion` & `input_args` as is. -/
+def unifyArgsWithConclusion (hypotheses : Array Expr) (conclusion : Expr) (input_args : Array FVarId)
     : MetaM (Array Expr × Expr × Array (Expr × Expr)) := do
   if Array.isEmpty input_args then
     return (hypotheses, conclusion, #[])
   else
     let fvar_ids ← getFVarsMappingInConclusion conclusion input_args
-    let conclusion ← replace_fvars_in_expr conclusion fvar_ids
-    let hypotheses ← replace_fvars_in_exprs hypotheses fvar_ids
+    let conclusion ← replaceFVarInExpr conclusion fvar_ids
+    let hypotheses ← replaceFVarsInExprs hypotheses fvar_ids
     let mapping := fvar_ids.map fun (id, exp2) => (mkFVar id, exp2)
     return (hypotheses, conclusion, mapping)
 
@@ -352,17 +347,11 @@ def unify_args_with_conclusion (hypotheses : Array Expr) (conclusion : Expr) (in
     and builds an `IRConstructor` containing metadata for the constructor.
     During this process, the names of input arguments (`argNames`) are unified with variables in the
     conclusion of the constructor. -/
-def process_constructor_unify_args (ctorName : Name) (ctorType: Expr) (inputVars : Array Expr) (inputTypes : Array Expr)
-  (inductiveRelationName: Name) (IRLCtx: LocalContext): MetaM InductiveConstructor := do
-  let (bound_vars_and_types, ctorExpr, components_of_arrow_type, ConLCtx) ← decomposeTypeWithLocalContext ctorType IRLCtx
+def processConstructorUnifyArgs (ctorName : Name) (ctorType: Expr) (inputVars : Array Expr) (inputTypes : Array Expr)
+  (inductiveRelationName: Name) (localCtx: LocalContext): MetaM InductiveConstructor := do
+  let (bound_vars_and_types, ctorExpr, components_of_arrow_type, ctorLocalCtx) ← decomposeTypeWithLocalContext ctorType localCtx
 
-  -- `boundVarCtx` maps free variables (identified by their `FVarId`) to their types
-  let mut boundVarCtx := HashMap.emptyWithCapacity
-  for (boundVar, ty) in bound_vars_and_types do
-    let fid := FVarId.mk boundVar
-    boundVarCtx := boundVarCtx.insert fid ty
-
-  let input_fvids := inputVars.map Expr.fvarId!
+  let inputFVarIds := inputVars.map Expr.fvarId!
   match splitLast? components_of_arrow_type with
   | some (originalHypotheses, originalConclusion) =>
     -- Check if `conclusion` contains any subterms that are function calls
@@ -370,12 +359,11 @@ def process_constructor_unify_args (ctorName : Name) (ctorType: Expr) (inputVars
     -- Then, unify `argNames` with each arg in the conclusion
     let (hypotheses, conclusion, newCtx) ←
       if (← containsNonTrivialFuncApp originalConclusion inductiveRelationName) then
-        -- TODO: update `rewriteFuncCallsInConclusion` to use local context
-        let (updatedHypotheses, rewrittenConclusion, updatedCtx) ←
-          rewriteFuncCallsInConclusion originalHypotheses originalConclusion inductiveRelationName boundVarCtx
-        unify_args_with_conclusion updatedHypotheses rewrittenConclusion input_fvids
+        let (updatedHypotheses, rewrittenConclusion) ←
+          rewriteFuncCallsInConclusion originalHypotheses originalConclusion inductiveRelationName
+        unifyArgsWithConclusion updatedHypotheses rewrittenConclusion inputFVarIds
       else
-        unify_args_with_conclusion originalHypotheses originalConclusion input_fvids
+        unifyArgsWithConclusion originalHypotheses originalConclusion inputFVarIds
 
     let (bound_vars, _) := bound_vars_and_types.unzip
     let (bound_vars_with_base_types, _) :=
@@ -410,7 +398,7 @@ def process_constructor_unify_args (ctorName : Name) (ctorType: Expr) (inputVars
     let (baseTypeInputEqualities, _) := (inputEqualitiesWithTypes.filter (fun (_, ty) => isBaseType ty)).unzip
     let (nonBaseTypeInputEqualities, _) := (inputEqualitiesWithTypes.filter (fun (_, ty) => !isBaseType ty)).unzip
 
-    let inputEqs ← mkExprEqualities inputEqualities ConLCtx
+    let inputEqs ← mkExprEqualities inputEqualities ctorLocalCtx
 
     return {
       ctorType := ctorType
@@ -418,7 +406,7 @@ def process_constructor_unify_args (ctorName : Name) (ctorType: Expr) (inputVars
       ctorExpr := ctorExpr
       input_vars := inputVars,
       bound_vars := bound_vars,
-      inp_map := newCtx,
+      inputVarsToConclusionArgsMap := newCtx,
       all_hypotheses := hypotheses,
       conclusion := conclusion,
       conclusion_args := conclusion_args,
@@ -434,7 +422,7 @@ def process_constructor_unify_args (ctorName : Name) (ctorType: Expr) (inputVars
       nonBaseTypeInputEqualities := nonBaseTypeInputEqualities
       name_space := inductiveRelationName.getRoot
       dependencies := dependencies
-      localCtx := ConLCtx
+      localCtx := ctorLocalCtx
       inputEqs := inputEqs
     }
   | none => throwError "Not a match"
@@ -446,7 +434,7 @@ def process_constructor_print (pc: InductiveConstructor) : MetaM Unit := withLCt
   IO.println s!" Constructor Expr : {← Meta.ppExpr pc.ctorExpr}"
   IO.println s!" Input Vars : {← Array.mapM Meta.ppExpr pc.input_vars}"
   IO.println s!" Bound Vars : {pc.bound_vars}"
-  IO.println s!" Input maps : {(← Array.mapM Meta.ppExpr pc.inp_map.unzip.1).zip (← Array.mapM Meta.ppExpr pc.inp_map.unzip.2)}"
+  IO.println s!" Input maps : {(← Array.mapM Meta.ppExpr pc.inputVarsToConclusionArgsMap.unzip.1).zip (← Array.mapM Meta.ppExpr pc.inputVarsToConclusionArgsMap.unzip.2)}"
   IO.println s!" Cond props : {← Array.mapM Meta.ppExpr pc.all_hypotheses}"
   IO.println s!" Conclusion prop :  {← Meta.ppExpr pc.conclusion}"
   IO.println s!" Builtin-typed vars : {pc.bound_vars_with_base_types}"
@@ -525,7 +513,7 @@ def getInductiveInfoWithArgs (inputExpr : Expr) (argNames : Array String) : Meta
         let decomposed_ctor_type ← decomposeType ctor.type
         decomposed_ctor_types := decomposed_ctor_types.push decomposed_ctor_type
         let constructor ←
-            process_constructor_unify_args ctorName ctor.type input_vars input_types inductive_name localCtx
+            processConstructorUnifyArgs ctorName ctor.type input_vars input_types inductive_name localCtx
         ctors := ctors.push constructor
       let constructors_with_arity_zero := ctors.filter (fun ctor => ctor.all_hypotheses.size == 0)
       let constructors_with_args := ctors.filter (fun ctor => ctor.all_hypotheses.size != 0)
