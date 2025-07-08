@@ -206,9 +206,14 @@ inductive Action where
 
   deriving Repr
 
-structure ConstructorActions where
+/-- A structure containing an array of `Action`s (for a constructor of an inductive relation)
+    and their associated `LocalContext`-/
+structure ActionsWithLocalContext where
+  /-- A collection of `Action`s -/
   actions : Array Action
-  localCtx: LocalContext
+
+  /-- The `LocalContext` associated with the `action`s field -/
+  localCtx : LocalContext
 
 /-- Extracts all the free variables in the conclusion of a constructor
     for an inductive relation -/
@@ -275,7 +280,7 @@ def getLastUninitializedArgIdx (hypothesis : Expr) (fvars : Array FVarId) : Meta
 def getLastUninitializedArgAndFVars
   (hypothesis : Expr) (fvars : Array FVarId) : MetaM (Nat × Array FVarId × Array FVarId) := do
   if !(← isInductiveRelationApplication hypothesis) then
-    throwError "not a inductive cond to get_last_uninit_arg "
+    throwError "{hypothesis} is not an application of an inductive relation"
   let args := hypothesis.getAppArgs
   let mut i := 0
   let mut uninitializedArgIdx := args.size + 1
@@ -298,8 +303,8 @@ def getLastUninitializedArgAndFVars
   uninitializedFVars := Array.removeAll uninitializedFVars fVarsToBeInitialized
   return (uninitializedArgIdx, uninitializedFVars, fVarsToBeInitialized)
 
-
-def Actions_for_hypotheses (ctor : InductiveConstructor) (fvars : Array FVarId) : MetaM ConstructorActions := do
+/-- Produces a collection of `Actions` for the hypotheses of a constructor of an inductive relation -/
+def Actions_for_hypotheses (ctor : InductiveConstructor) (fvars : Array FVarId) : MetaM ActionsWithLocalContext := do
   let mut lctx := ctor.localCtx
   let mut actions := #[]
   let mut initializedFVars := fvars
@@ -307,26 +312,29 @@ def Actions_for_hypotheses (ctor : InductiveConstructor) (fvars : Array FVarId) 
     let isHypOfInductiveCtor ← isHypothesisOfInductiveConstructor hyp ctor
 
     if isHypOfInductiveCtor then
+      -- If all free variables in the hypothesis have been initialized,
+      -- then we simply need to check whether the hypothesis holds, so we create a `checkInductive` `Action`
       if allFVarsInExprInitialized hyp initializedFVars then
         actions := actions.push (.checkInductive hyp)
       else
+        -- Certain variables have been uninitialized in the hypothesis
+        -- Find the index of last argument in the hypothesis that is uninitialized
         let (uninitializedArgIdx, uninitializedFVars, fVarsToBeInitialized)
           ← getLastUninitializedArgAndFVars hyp initializedFVars
 
+        -- Determine the type of the uninitialized variables
         for fid in uninitializedFVars do
           let ty ← getFVarTypeInContext fid lctx
           actions := actions.push (.genFVar fid ty)
 
         let argToGenerate := hyp.getAppArgs[uninitializedArgIdx]!
-
-
         initializedFVars := Array.appendUniqueElements initializedFVars uninitializedFVars
 
+        -- Determine whether the generator should be invoked via a rec
         let generationStyle :=
           if hypothesisRecursivelyCallsCurrentInductive hyp ctor
           then .RecursiveCall
           else .TypeClassResolution
-
 
         if argToGenerate.isFVar then
           let fvarToGenerate := argToGenerate.fvarId!
@@ -357,17 +365,13 @@ def Actions_for_hypotheses (ctor : InductiveConstructor) (fvars : Array FVarId) 
     localCtx := lctx
   }
 
-
-
-
 /-- Produces a collection of `Actions` for a checker -/
-def Actions_for_checker (ctor : InductiveConstructor) : MetaM ConstructorActions := do
+def Actions_for_checker (ctor : InductiveConstructor) : MetaM ActionsWithLocalContext := do
   let mut initset := getFVarsInConclusion ctor
   Actions_for_hypotheses ctor initset
 
-
 /-- Produces a collection of `Actions` for a generator -/
-def Actions_for_producer (ctor : InductiveConstructor) (genpos : Nat) : MetaM ConstructorActions := do
+def Actions_for_producer (ctor : InductiveConstructor) (genpos : Nat) : MetaM ActionsWithLocalContext := do
   let mut initset ← getFVarsInConclusionArgs ctor genpos
   let mut init_actions ← Actions_for_hypotheses ctor initset
   let mut actions := init_actions.actions
@@ -384,9 +388,6 @@ def Actions_for_producer (ctor : InductiveConstructor) (genpos : Nat) : MetaM Co
     actions := actions
     localCtx := lctx
   }
-
-
-
 
 /-- Note: this function is purely for debugging purposes, it is not used in the main algorithm -/
 def Actions_toStr (c: Action) : MetaM String := do
