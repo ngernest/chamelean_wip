@@ -1,12 +1,6 @@
 import Lean
-import Std
-import Lean.Elab.Deriving.DecEq
-import Lean.Meta.Tactic.Simp.Main
-
-open Lean.Elab.Deriving.DecEq
 open List Nat Array String
 open Lean Expr Elab Command Meta Term LocalContext
-open Lean.Parser.Term
 open Except
 open Std
 

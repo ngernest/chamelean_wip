@@ -4,9 +4,6 @@ import Plausible.IR.Examples
 import Plausible.IR.Prelude
 import Plausible.New.Idents
 import Plausible.IR.KeyValueStore
-import Lean.Elab.Deriving.DecEq
-import Batteries.Data.List.Basic
-open Lean.Elab.Deriving.DecEq
 open List Nat Array String
 open Lean Elab Command Meta Term LocalContext
 open Lean.Parser.Term

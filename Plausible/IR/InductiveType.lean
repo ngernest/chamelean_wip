@@ -10,7 +10,6 @@ import Plausible.IR.Constructor
 import Plausible.IR.Backtrack
 open List Nat Array String
 open Lean Elab Command Meta Term
-open Lean.Parser.Term
 open Plausible Gen
 
 
