@@ -1,4 +1,7 @@
+import Lean
 import Plausible.GeneratingGoodGenerators.UnificationMonad
+
+open Lean
 
 /-- Corresponds to the `range_mode` type in the QuickChick code -/
 inductive RangeMode
@@ -30,7 +33,7 @@ def compatible (b : Bool) (m : RangeMode) : Compatibility :=
   | .ModePartlyDef _ _ _, true => .PartCompatible
 
 /-- Determines whether a `range` is fixed with respect to the constraint map `constraints` -/
-partial def isFixedRange (constraints : Std.TreeMap Unknown Range compare) (r : Range) : Bool :=
+partial def isFixedRange (constraints : ConstraintMap) (r : Range) : Bool :=
   match r with
   | .Undef _ => false
   | .Fixed => true
@@ -40,7 +43,7 @@ partial def isFixedRange (constraints : Std.TreeMap Unknown Range compare) (r : 
 /-- Handle partially defined ranges
     -- TODO: fill this in according to the logic in `mode_analyze` in the QuickChick OCaml code-/
 def analyzePartiallyDefined (_ : Unknown) (r : Range)
-    (_ : Std.TreeMap Unknown Range compare) : RangeMode :=
+    (_ : ConstraintMap) : RangeMode :=
   match r with
   | .Ctr c _ =>
     -- This would implement the complex pattern generation logic
@@ -52,7 +55,7 @@ def analyzePartiallyDefined (_ : Unknown) (r : Range)
   | _ => .ModeFixed
 
 -- Corresponds to `mode_analyze` in the OCaml code
-partial def analyzeRangeMode (r : Range) (constraints : Std.TreeMap Unknown Range compare) : RangeMode :=
+partial def analyzeRangeMode (r : Range) (constraints : ConstraintMap) : RangeMode :=
   match r with
   | .Unknown u =>
     let rec followUnknown (u : Unknown) : RangeMode :=
@@ -66,8 +69,8 @@ partial def analyzeRangeMode (r : Range) (constraints : Std.TreeMap Unknown Rang
       | none => .ModeUndefUnknown u "unknown"
     followUnknown u
   | .Fixed => .ModeFixed
-  | .Ctr c rs => analyzePartiallyDefined "temp" (.Ctr c rs) constraints
-  | .Undef ty => .ModeUndefUnknown "temp" ty
+  | .Ctr c rs => analyzePartiallyDefined (Name.mkStr1 "temp") (.Ctr c rs) constraints
+  | .Undef ty => .ModeUndefUnknown (Name.mkStr1 "temp") ty
 
 /-- Compatibility scores (corresponds to `mode_score` in the OCaml code) -/
 structure CompatibilityScores where

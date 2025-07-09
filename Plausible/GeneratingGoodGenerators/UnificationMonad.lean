@@ -11,9 +11,13 @@ open Lean Idents
 -- Adapted from "Generating Good Generators for Inductive Relations", POPL '18
 --------------------------------------------------------------------------------
 
-/-- For the time being, an unknown is just a string containing the variable name -/
-abbrev Unknown := String
-deriving instance Repr, BEq, Ord for Unknown
+/-- An `Unknown` is just a Lean `Name` -/
+abbrev Unknown := Name
+deriving instance Repr, BEq for Unknown
+
+/- Ord instance for `Name` (needed in order to use `HashMap`s with `Name`s as the key) -/
+-- instance : Ord Name where
+--   compare name1 name2 := compare name1.getString! name2.getString!
 
 /-- *Ranges* represent sets of potential values (see section 4.2) -/
 inductive Range
@@ -29,21 +33,24 @@ inductive Pattern
   | Constructor : String -> List Pattern -> Pattern
   deriving Repr, Inhabited
 
+/-- A `ConstraintMap` maps `Unknown`s to `Range`s -/
+abbrev ConstraintMap := Std.HashMap Unknown Range
+
 /-- `UnifyState` stores the current state of the unification algorithm -/
 structure UnifyState where
   /-- `constraints` maps unknowns to ranges -/
-  constraints : Std.TreeMap Unknown Range (cmp := compare)
+  constraints : ConstraintMap
 
   /-- `equalities` keeps track of equalities between unknowns
       that need to be checked -/
-  equalities : Std.TreeSet (Unknown × Unknown) (cmp := compare)
+  equalities : Std.HashSet (Unknown × Unknown)
 
   /-- `patterns` contains a list of necessary pattern matches that
       need to be performed -/
   patterns : List (Unknown × Pattern)
 
   /-- A set of all existing unknowns -/
-  unknowns : Std.TreeSet Unknown (cmp := compare)
+  unknowns : Std.HashSet Unknown
 
   deriving Repr
 
@@ -63,12 +70,12 @@ namespace UnifyM
       { s with constraints := k.insert u r }
 
   /-- More efficient: get constraints without separate `get` call -/
-  def withConstraints {α : Type} (f : Std.TreeMap Unknown Range compare → UnifyM α) : UnifyM α := do
+  def withConstraints {α : Type} (f : ConstraintMap → UnifyM α) : UnifyM α := do
     let state ← get
     f state.constraints
 
   /-- Directly applies a function `f` to the `constraint` map in the state  -/
-  def modifyConstraints (f : Std.TreeMap Unknown Range compare → Std.TreeMap Unknown Range compare) : UnifyM Unit :=
+  def modifyConstraints (f : ConstraintMap → ConstraintMap) : UnifyM Unit :=
     modify $ fun s => { s with constraints := f s.constraints }
 
    /-- Batches multiple constraint updates together for performance  -/
@@ -80,7 +87,7 @@ namespace UnifyM
   def registerEquality (u1 : Unknown) (u2 : Unknown) : UnifyM Unit :=
     modify $ fun s =>
       let eqs := s.equalities
-      { s with equalities := eqs.merge {(u1, u2)} }
+      { s with equalities := eqs.union {(u1, u2)} }
 
   /-- Adds a new pattern match -/
   def addPattern (u : Unknown) (p : Pattern) : UnifyM Unit :=
@@ -89,16 +96,16 @@ namespace UnifyM
       { s with patterns := (u, p) :: ps }
 
   /-- Returns a fresh unknown -/
-  def freshUnknown (unknowns : Std.TreeSet Unknown) : Unknown :=
-    let existingNames := Name.mkStr1 <$> unknowns.toArray
-    toString $ genFreshName existingNames (Name.mkStr1 "unknown")
+  def freshUnknown (unknowns : Std.HashSet Unknown) : Unknown :=
+    let existingNames := unknowns.toArray
+    genFreshName existingNames (Name.mkStr1 "unknown")
 
   /-- Generates and registers a new unknown in the `UnifyState` -/
   def registerFreshUnknown : UnifyM Unknown :=
     modifyGet $ fun s =>
       let us := s.unknowns
       let u := freshUnknown us
-      (u, { s with unknowns := us.merge {u} })
+      (u, { s with unknowns := us.union {u} })
 
 end UnifyM
 
@@ -216,10 +223,10 @@ end
 
 /-- Initial (empty) unification state  -/
 def initUnifyState : UnifyState :=
-  { constraints := Std.TreeMap.empty,
-    equalities := Std.TreeSet.empty,
+  { constraints := ∅,
+    equalities := ∅,
     patterns := [],
-    unknowns := Std.TreeSet.empty }
+    unknowns := ∅ }
 
 /-- Runs a `UnifyM unit` action using the empty `UnifyState`,
     returning the resultant `UnifyState` in an `Option`  -/
@@ -282,7 +289,7 @@ def testCompleteTrees : IO Unit := do
 
     -- Unify constructor conclusion: complete (S n) (Node x l r) ~ complete in1 t
     let sn := Range.Ctr "S" [.Unknown n]
-    let nodePattern := Range.Ctr "Node" [.Unknown "x", .Unknown l, .Unknown r]
+    let nodePattern := Range.Ctr "Node" [.Unknown $ Name.mkStr1 "x", .Unknown l, .Unknown r]
 
     -- This should create pattern match on in1
     unify (.Unknown in1) sn
