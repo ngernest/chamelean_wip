@@ -8,6 +8,9 @@ open Plausible.IR
 open Lean Elab Command Meta Term Parser Std
 open Idents
 
+-- Disable debug flag for now
+-- See `Utils.lean` for the definition of the `chamelean.debug` option
+set_option chamelean.debug false
 
 /-- `genInputForInductive fvar hyp idx generationStyle producerType` produces a let-bind expression of the form
     based on the specified `generationStyle` and `producerType`:
@@ -64,11 +67,11 @@ def genInputForInductive (fvar : FVarId) (hyp : Expr) (idx : Nat) (generationSty
 def mkVariableEqualityCheckMatchExpr (syntaxKind : SyntaxNodeKind) (variableEqualities : TSyntaxArray `term)
   (retExpr : TSyntax `term) : TermElabM (TSyntax syntaxKind) := do
 
-
-
   let equality := variableEqualities[0]!
-  IO.println "inside mkVariableEqualityCheckMatchExpr"
-  IO.println s!"equality = {equality}"
+
+  if (← inDebugMode) then
+    IO.println "inside mkVariableEqualityCheckMatchExpr"
+    IO.println s!"equality = {equality}"
 
   let scrutinee ← `($decOptFn:ident ($equality) $initSizeIdent)
 
@@ -115,7 +118,8 @@ def mkSubGeneratorBody (doBlock : TSyntaxArray `doElem) (argToGenTerm : Term) (n
   -- so we can just create `pure $argToGenTerm` without needing
   -- to create a do-block
   } else {
-    IO.println "inside mkSubGeneratorBody, doElems is empty"
+    if (← inDebugMode) then
+      IO.println "inside mkSubGeneratorBody, doElems is empty"
 
     let retExpr ← `($pureFn $argToGenTerm:term)
     -- If there are any variable equalities that we need to check,
@@ -196,12 +200,12 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
       inductiveHypothesesToCheck := inductiveHypothesesToCheck.push typedInductiveTerm
 
   -- Add equality checks for any pairs of variables in `variableEqualities`
-  IO.println "inside mkSubGenerator"
-  IO.println s!"subGenerator.variableEqs = {subGenerator.variableEqs}"
-
   let mut variableEqualitiesToCheck ← Array.mapM (fun e => delabExprInLocalContext subGenerator.localCtx e) subGenerator.variableEqs
 
-  IO.println s!"variableEqualitiesToCheck = {variableEqualitiesToCheck}"
+  if (← inDebugMode) then
+    IO.println "inside mkSubGenerator"
+    IO.println s!"subGenerator.variableEqs = {subGenerator.variableEqs}"
+    IO.println s!"variableEqualitiesToCheck = {variableEqualitiesToCheck}"
 
   -- TODO: change `groupedActions.ret_list` to a single element since each do-block can only
   -- have one (final) `return` expression

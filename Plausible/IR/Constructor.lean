@@ -5,6 +5,7 @@ import Plausible.IR.Extractor
 import Plausible.IR.Prelude
 import Plausible.IR.Prototype
 import Plausible.IR.Action
+import Plausible.New.Utils
 import Lean.Elab.Deriving.DecEq
 open Lean.Elab.Deriving.DecEq
 open List Nat Array String
@@ -216,11 +217,15 @@ def mkSubGeneratorInfoFromConstructor (ctor : InductiveConstructor) (inputNames 
 
     -- Constructors with no hypotheses get `BaseGenerator`s
     -- (otherwise, the generator needs to make a recursive call and is thus inductively-defined)
-    let generatorSort := if ctor.recursive_hypotheses.isEmpty then .BaseGenerator else .InductiveGenerator
+    let generatorSort :=
+      if ctor.recursive_hypotheses.isEmpty
+        then .BaseGenerator
+        else .InductiveGenerator
 
-    IO.println s!"inside mkSubGeneratorInfoFromConstructor"
-    IO.println s!"ctor.inputEqs = {ctor.inputEqs}"
-    IO.println s!"groupedActions.variableEqs = {groupedActions.variableEqs}"
+    if (← inDebugMode) then
+      IO.println s!"inside mkSubGeneratorInfoFromConstructor"
+      IO.println s!"ctor.inputEqs = {ctor.inputEqs}"
+      IO.println s!"groupedActions.variableEqs = {groupedActions.variableEqs}"
 
     return {
       inputs := (List.eraseIdx inputNamesList idx).toArray
