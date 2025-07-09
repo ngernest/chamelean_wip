@@ -219,7 +219,7 @@ def gen_lookup (Γ : List type) (τ : type) : Nat → OptionT Plausible.Gen Nat 
                   return Nat.succ x))]
   fun size => aux_arb size size Γ τ
 
-/- `lookup Γ x τ` is an instance of the `ArbitrarySizedSuchThat` typeclass,
+/-- `lookup Γ x τ` is an instance of the `ArbitrarySizedSuchThat` typeclass,
     which describes generators for values that satisfy a proposition -/
 instance : ArbitrarySizedSuchThat Nat (fun x => lookup Γ x τ) where
   arbitrarySizedST := gen_lookup Γ τ
