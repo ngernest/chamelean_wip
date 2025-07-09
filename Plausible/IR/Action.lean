@@ -106,7 +106,7 @@ def preserveFirstSubstRemainingFVars (hyp : Expr) (oldFVar : FVarId) (newFVar : 
 /-- For each free variable `t` that appears more than once in the hypothesis `hyp`,
     replace its second occurrence with `t1`, its 3rd occurrence with `t2`, etc.,
     and record the equalities `t = t1, t = t2, ...` -/
-def separateFVars (hyp : Expr) (lctx: LocalContext): MetaM DecomposedInductiveHypothesis :=
+def separateFVars (hyp : Expr) (lctx : LocalContext): MetaM DecomposedInductiveHypothesis :=
   withLCtx' lctx do
     let mut lctx := lctx
     let fvars := extractFVarIds hyp
@@ -141,8 +141,8 @@ def separateFVars (hyp : Expr) (lctx: LocalContext): MetaM DecomposedInductiveHy
 /-- Variant of `separateFVars` that only examines
     the free variables in `hypothesis` that appear in `initialFVars`,
     and uses the index of the hypothesis (`hypIndex`) to generate fresh names -/
-def separateFVarsInHypothesis (hypothesis : Expr) (initialFVars : Array FVarId) (hypIndex : Nat) (lctx: LocalContext)
-    : MetaM DecomposedInductiveHypothesis :=
+def separateFVarsInHypothesis (hypothesis : Expr) (initialFVars : Array FVarId)
+  (hypIndex : Nat) (lctx: LocalContext) : MetaM DecomposedInductiveHypothesis :=
   withLCtx' lctx do
     let mut lctx := lctx
     let initializedFVars := Array.intersect (extractFVarIds hypothesis) initialFVars
@@ -258,24 +258,6 @@ def getUninitializedFVars (e : Expr) (fvars : Array FVarId) : Array FVarId :=
     initialized in the expression `e`  -/
 def allFVarsInExprInitialized (e : Expr) (fvars : Array FVarId) : Bool :=
   (getUninitializedFVars e fvars).size == 0
-
-/-- Retrieves the index of the last argument in the `hypothesis`
-    that contains an uninitialized free variable from the collection `fvars`
-    - Note: this function is currently unused -/
-def getLastUninitializedArgIdx (hypothesis : Expr) (fvars : Array FVarId) : MetaM (Option Nat) := do
-  if !(← isInductiveRelationApplication hypothesis) then
-    throwError "not a inductive cond to get_last_uninit_arg "
-  let args := hypothesis.getAppArgs
-  let mut i := 0
-  let mut pos := args.size + 1
-  for arg in args do
-    if !allFVarsInExprInitialized arg fvars then
-      pos := i
-    i := i + 1
-  if pos == args.size + 1 then
-    return none
-  else
-    return some pos
 
 /-- Returns a triple consisting of:
     1. The index of the last argument in the `hypothesis` that contains an uninitialized free variable from the collection `fvars`
