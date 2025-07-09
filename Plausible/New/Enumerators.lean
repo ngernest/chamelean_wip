@@ -153,7 +153,7 @@ instance : Enum Int where
   (enumerates all `Nat`s from 0 to `n - 1` inclusive) -/
 instance [NeZero n] : Enum (Fin n) where
   enum := fun _ =>
-    (Fin.ofNat' n) <$> lazyListNatRange 0 (n - 1)
+    (Fin.ofNat n) <$> lazyListNatRange 0 (n - 1)
 
 /-- `Enum` instance for `BitVec w`
     (uses the `Enum` instance for `Fin (2 ^ w)`, since bitvectors
