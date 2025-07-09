@@ -347,7 +347,7 @@ def unifyArgsWithConclusion (hypotheses : Array Expr) (conclusion : Expr) (input
 
 
 /-- Takes in the constructor's type, the input variables & their types and the name of the inductive relation,
-    and builds an `IRConstructor` containing metadata for the constructor.
+    and builds an `InductiveConstructor` containing metadata for the constructor.
     During this process, the names of input arguments (`argNames`) are unified with variables in the
     conclusion of the constructor. -/
 def processConstructorUnifyArgs (ctorName : Name) (ctorType: Expr) (inputVars : Array Expr) (inputTypes : Array Expr)
@@ -482,8 +482,8 @@ def mkDefaultInputNames (inputExpr : Expr) : MetaM (Array String) := do
     creates the initial `LocalContext` where each `(x, τ)` in `Array.zip inputTypes inputNames`
     is given the declaration `x : τ` in the resultant context.
 
-    This function returns a triple containing `inputTypes`, `inputNames` represented as an `Array` of `Name`s,
-    and the resultant `LocalContext`. -/
+    This function returns a quadruple containing `inputTypes`, `inputNames` represented as an `Array` of `Name`s,
+    the resultant `LocalContext` and a map from original names to freshened names. -/
 def mkInitialContextForInductiveRelation (inputTypes : Array Expr) (inputNameStrings : Array String) : MetaM (Array Expr × Array Name × LocalContext × HashMap Name Name) := do
   let inputNames := Name.mkStr1 <$> inputNameStrings
   let localDecls := inputNames.zip inputTypes
@@ -508,9 +508,9 @@ def getInductiveInfoWithArgs (inputExpr : Expr) (argNames : Array String) : Meta
     let tyexprs_in_arrow_type ← getComponentsOfArrowType type
 
     -- `input_types` contains all elements of `tyexprs_in_arrow_type` except the conclusion (which is `Prop`)
-    let input_types := tyexprs_in_arrow_type.pop
+    let inputTypes := tyexprs_in_arrow_type.pop
 
-    let (input_vars, input_vars_names, localCtx, nameMap) ← mkInitialContextForInductiveRelation input_types argNames
+    let (input_vars, input_vars_names, localCtx, nameMap) ← mkInitialContextForInductiveRelation inputTypes argNames
 
     let env ← getEnv
     match env.find? inductive_name with
@@ -524,7 +524,7 @@ def getInductiveInfoWithArgs (inputExpr : Expr) (argNames : Array String) : Meta
         let decomposed_ctor_type ← decomposeType ctor.type
         decomposed_ctor_types := decomposed_ctor_types.push decomposed_ctor_type
         let constructor ←
-            processConstructorUnifyArgs ctorName ctor.type input_vars input_types inductive_name localCtx
+            processConstructorUnifyArgs ctorName ctor.type input_vars inputTypes inductive_name localCtx
         ctors := ctors.push constructor
       let constructors_with_arity_zero := ctors.filter (fun ctor => ctor.all_hypotheses.size == 0)
       let constructors_with_args := ctors.filter (fun ctor => ctor.all_hypotheses.size != 0)
@@ -535,7 +535,7 @@ def getInductiveInfoWithArgs (inputExpr : Expr) (argNames : Array String) : Meta
          dependencies := dependencies.push dep
       return {
         inductive_name := inductive_name
-        input_types := input_types,
+        input_types := inputTypes,
         input_vars := input_vars
         input_var_names := input_vars_names
         decomposed_ctor_types := decomposed_ctor_types
