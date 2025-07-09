@@ -21,17 +21,6 @@ open Plausible ArbitrarySizedSuchThat OptionTGen
 
 deriving instance Enum for Tree
 
-
-
--- #derive_generator (fun (t : Tree) => bst lo hi t)
-
-
-
-
-
----
-
-
 /- Example usage:
   ```
   #derive_generator (fun (<name of generated value> : <type of generated value>) => <inductive relation applied to all args>)

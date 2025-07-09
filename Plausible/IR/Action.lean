@@ -2,6 +2,7 @@ import Lean
 import Plausible.IR.Examples
 import Plausible.IR.Extractor
 import Plausible.IR.Prelude
+import Plausible.New.Debug
 open List Nat Array String
 open Lean Elab Command Meta Term LocalContext
 
@@ -102,8 +103,16 @@ def preserveFirstSubstRemainingFVars (hyp : Expr) (oldFVar : FVarId) (newFVar : 
 def separateFVars (hyp : Expr) (lctx : LocalContext) : MetaM DecomposedInductiveHypothesis :=
   withLCtx' lctx do
     let mut lctx := lctx
+
     let fvars := extractFVarIds hyp
-    let mut equations : Array (FVarId × FVarId) := #[]
+
+    -- let names := Array.map (fun fvarId => lctx.get! fvarId |>.userName) fvars
+    -- withDebugFlag globalDebugFlag do
+    --   logInfo s!"inside separateFVars"
+    --   logInfo s!"{hyp} contains the names {names}"
+
+
+    let mut equations := #[]
     let mut fVarIds := fvars
     let mut newHyp := hyp
     for fv in fvars do
@@ -130,6 +139,9 @@ def separateFVars (hyp : Expr) (lctx : LocalContext) : MetaM DecomposedInductive
       localCtx := lctx
       variableEqs := variableEqs
     }
+
+
+
 
 /-- Variant of `separateFVars` that only examines
     the free variables in `hypothesis` that appear in `initialFVars`,
@@ -309,6 +321,11 @@ def Actions_for_hypotheses (ctor : InductiveConstructor) (fvars : Array FVarId) 
         -- Find the index of last argument in the hypothesis that is uninitialized
         let (uninitializedArgIdx, uninitializedFVars, fVarsToBeInitialized)
           ← getLastUninitializedArgAndFVars hyp initializedFVars
+
+        withDebugFlag globalDebugFlag do
+          logInfo s!"inside Actions_for_hypotheses"
+          logInfo s!"hyp = {hyp}"
+          logInfo s!"uninitializedArgIdx = {uninitializedArgIdx}, uninitializedFVars = {repr uninitializedFVars}, fVarsToBeInitialized = {repr fVarsToBeInitialized}"
 
         -- Determine the type of the uninitialized variables
         for fid in uninitializedFVars do

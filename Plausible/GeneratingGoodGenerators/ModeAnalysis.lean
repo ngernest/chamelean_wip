@@ -1,4 +1,4 @@
-import Plausible.New.UnificationMonad
+import Plausible.GeneratingGoodGenerators.UnificationMonad
 
 /-- Corresponds to the `range_mode` type in the QuickChick code -/
 inductive RangeMode

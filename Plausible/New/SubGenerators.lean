@@ -69,9 +69,8 @@ def mkVariableEqualityCheckMatchExpr (syntaxKind : SyntaxNodeKind) (variableEqua
 
   withOptions (fun opts => opts.set `chamelean.debug true) do
     withDebugFlag globalDebugFlag do
-      IO.println "inside mkVariableEqualityCheckMatchExpr"
-      IO.println s!"equality = {equality}"
-
+      logInfo "inside mkVariableEqualityCheckMatchExpr"
+      logInfo s!"equality = {equality}"
 
   let scrutinee ← `($decOptFn:ident ($equality) $initSizeIdent)
 
@@ -202,15 +201,9 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
   -- Add equality checks for any pairs of variables in `variableEqualities`
   let mut variableEqualitiesToCheck ← Array.mapM (fun e => delabExprInLocalContext subGenerator.localCtx e) subGenerator.variableEqs
 
-  let opts ← getOptions
-  let verbose := chamelean.debug.get opts
-
-  logInfo s!"verbose = {verbose}"
-
   withDebugFlag globalDebugFlag do
-    IO.println "inside mkSubGenerator"
-    IO.println s!"subGenerator.variableEqs = {subGenerator.variableEqs}"
-    IO.println s!"variableEqualitiesToCheck = {variableEqualitiesToCheck}"
+    logInfo "inside mkSubGenerator"
+    logInfo s!"variableEqualitiesToCheck = {variableEqualitiesToCheck}"
 
   -- TODO: change `groupedActions.ret_list` to a single element since each do-block can only
   -- have one (final) `return` expression

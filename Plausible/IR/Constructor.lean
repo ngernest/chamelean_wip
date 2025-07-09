@@ -197,6 +197,10 @@ def mkSubGeneratorInfoFromConstructor (ctor : InductiveConstructor) (inputNames 
 
     let conclusion ← separateFVars new_conclusion ctor.localCtx
 
+    withDebugFlag globalDebugFlag do
+      logInfo s!"conclusion before rewriting = {← ppExpr new_conclusion}"
+      logInfo s!"conclusion after rewriting = {← ppExpr conclusion.newHypothesis}"
+
     let ctor := { ctor with localCtx := conclusion.localCtx }
     let args := ctor.conclusion.getAppArgs.toList
     let zippedInputsAndArgs := List.zip inputNamesList args
@@ -219,9 +223,9 @@ def mkSubGeneratorInfoFromConstructor (ctor : InductiveConstructor) (inputNames 
         else .InductiveGenerator
 
     withDebugFlag globalDebugFlag do
-      IO.println s!"inside mkSubGeneratorInfoFromConstructor"
-      IO.println s!"ctor.inputEqs = {ctor.inputEqs}"
-      IO.println s!"groupedActions.variableEqs = {groupedActions.variableEqs}"
+      logInfo s!"inside mkSubGeneratorInfoFromConstructor"
+      logInfo s!"conclusion.variableEqs = {conclusion.variableEqs}"
+      logInfo s!"groupedActions.variableEqs = {groupedActions.variableEqs}"
 
     return {
       inputs := (List.eraseIdx inputNamesList idx).toArray
