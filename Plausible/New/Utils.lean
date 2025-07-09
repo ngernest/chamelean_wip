@@ -6,17 +6,6 @@ import Batteries.Data.List.Basic
 open Lean Meta
 open Plausible.IR
 
-/-- Option to enable debug messages from Chamelean -/
-register_option chamelean.debug : Bool := {
-  defValue := true
-  group := "chamelean"
-  descr := "enable debug messages from Chamelean"
-}
-
-/-- Determines whether the `chamelean.debug` Option flag is set -/
-def inDebugMode [Monad m] [MonadOptions m] : m Bool := do
-  let opts ← getOptions
-  return (Lean.Option.get opts chamelean.debug)
 
 /-- Looks up the user-facing `Name` corresponding to an `FVarId` in a specific `LocalContext` -/
 def getUserNameInContext (lctx : LocalContext) (fvarId : FVarId) : Name :=

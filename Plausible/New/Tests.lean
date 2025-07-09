@@ -14,6 +14,7 @@ import Plausible.New.DeriveArbitrarySuchThat
 import Plausible.New.STLC
 
 import Lean
+import Batteries
 open Lean Meta
 
 open Plausible ArbitrarySizedSuchThat OptionTGen
@@ -41,7 +42,7 @@ deriving instance Enum for Tree
 
 -/
 
-
+@[nolint docBlame]
 inductive GoodTree : Nat → Nat → Tree → Prop where
   | GoodLeaf : ∀ n, GoodTree n n .Leaf
 

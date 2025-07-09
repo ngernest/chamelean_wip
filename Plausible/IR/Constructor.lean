@@ -5,6 +5,7 @@ import Plausible.IR.Prelude
 import Plausible.IR.Prototype
 import Plausible.IR.Action
 import Plausible.New.Utils
+import Plausible.New.Debug
 open List Nat Array String Std
 open Lean Elab Command Meta Term
 
@@ -217,7 +218,7 @@ def mkSubGeneratorInfoFromConstructor (ctor : InductiveConstructor) (inputNames 
         then .BaseGenerator
         else .InductiveGenerator
 
-    if (← inDebugMode) then
+    withDebugFlag globalDebugFlag do
       IO.println s!"inside mkSubGeneratorInfoFromConstructor"
       IO.println s!"ctor.inputEqs = {ctor.inputEqs}"
       IO.println s!"groupedActions.variableEqs = {groupedActions.variableEqs}"
@@ -236,6 +237,7 @@ def mkSubGeneratorInfoFromConstructor (ctor : InductiveConstructor) (inputNames 
 
 -- The functions below create strings containing Lean code based on the information
 -- in a `BacktrackElement`
+
 
 def add_size_param (hyp : Expr) : MetaM String := do
   let fnname := toString (← Meta.ppExpr hyp.getAppFn)

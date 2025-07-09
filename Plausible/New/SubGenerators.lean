@@ -3,19 +3,11 @@ import Plausible.New.Utils
 import Plausible.IR.Constructor
 import Plausible.New.Idents
 import Plausible.New.TSyntaxCombinators
+import Plausible.New.Debug
 
 open Plausible.IR
 open Lean Elab Command Meta Term Parser Std
 open Idents
-
--- See `Utils.lean` for the definition of the `chamelean.debug` option
-set_option chamelean.debug true
-
--- Test immediately after setting
-elab "#testNow" : command => do
-  let opts ← getOptions
-  let debug := Lean.Option.get opts chamelean.debug
-  logInfo s!"Debug option: {debug}"
 
 
 /-- `genInputForInductive fvar hyp idx generationStyle producerType` produces a let-bind expression of the form
@@ -75,9 +67,11 @@ def mkVariableEqualityCheckMatchExpr (syntaxKind : SyntaxNodeKind) (variableEqua
 
   let equality := variableEqualities[0]!
 
-  if (← inDebugMode) then
-    IO.println "inside mkVariableEqualityCheckMatchExpr"
-    IO.println s!"equality = {equality}"
+  withOptions (fun opts => opts.set `chamelean.debug true) do
+    withDebugFlag globalDebugFlag do
+      IO.println "inside mkVariableEqualityCheckMatchExpr"
+      IO.println s!"equality = {equality}"
+
 
   let scrutinee ← `($decOptFn:ident ($equality) $initSizeIdent)
 
@@ -124,7 +118,7 @@ def mkSubGeneratorBody (doBlock : TSyntaxArray `doElem) (argToGenTerm : Term) (n
   -- so we can just create `pure $argToGenTerm` without needing
   -- to create a do-block
   } else {
-    if (← inDebugMode) then
+    withDebugFlag globalDebugFlag do
       IO.println "inside mkSubGeneratorBody, doElems is empty"
 
     let retExpr ← `($pureFn $argToGenTerm:term)
@@ -211,9 +205,9 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
   let opts ← getOptions
   let verbose := chamelean.debug.get opts
 
-  IO.println s!"verbose = {verbose}"
+  logInfo s!"verbose = {verbose}"
 
-  if (← inDebugMode) then
+  withDebugFlag globalDebugFlag do
     IO.println "inside mkSubGenerator"
     IO.println s!"subGenerator.variableEqs = {subGenerator.variableEqs}"
     IO.println s!"variableEqualitiesToCheck = {variableEqualitiesToCheck}"
