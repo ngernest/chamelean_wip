@@ -38,19 +38,19 @@ partial def isFixedRange (constraints : ConstraintMap) (r : Range) : Bool :=
   | .Undef _ => false
   | .Fixed => true
   | .Unknown u => isFixedRange constraints (constraints.get! u)
-  | .Ctr _ rs => List.all rs (isFixedRange constraints)
+  | .Ctor _ rs => List.all rs (isFixedRange constraints)
 
 /-- Handle partially defined ranges
     -- TODO: fill this in according to the logic in `mode_analyze` in the QuickChick OCaml code-/
 def analyzePartiallyDefined (_ : Unknown) (r : Range)
     (_ : ConstraintMap) : RangeMode :=
   match r with
-  | .Ctr c _ =>
+  | .Ctor c _ =>
     -- This would implement the complex pattern generation logic
     -- from the ML file's handle_partial function
     let eqs : List (Unknown × Unknown) := []  -- collect equalities
     let unks : List (Unknown × String) := []  -- collect unknowns
-    let pat := Pattern.Constructor c []        -- construct pattern
+    let pat := Pattern.CtorPattern c []        -- construct pattern
     .ModePartlyDef eqs unks pat
   | _ => .ModeFixed
 
@@ -63,13 +63,13 @@ partial def analyzeRangeMode (r : Range) (constraints : ConstraintMap) : RangeMo
       | some (.Undef ty) => .ModeUndefUnknown u ty
       | some (.Unknown u') => followUnknown u'
       | some .Fixed => .ModeFixed
-      | some (.Ctr c rs) =>
+      | some (.Ctor c rs) =>
         -- Handle partially defined case
-        analyzePartiallyDefined u (.Ctr c rs) constraints
+        analyzePartiallyDefined u (.Ctor c rs) constraints
       | none => .ModeUndefUnknown u $ mkConst `unknown
     followUnknown u
   | .Fixed => .ModeFixed
-  | .Ctr c rs => analyzePartiallyDefined (Name.mkStr1 "temp") (.Ctr c rs) constraints
+  | .Ctor c rs => analyzePartiallyDefined (Name.mkStr1 "temp") (.Ctor c rs) constraints
   | .Undef ty => .ModeUndefUnknown (Name.mkStr1 "temp") ty
 
 /-- Compatibility scores (corresponds to `mode_score` in the OCaml code) -/
