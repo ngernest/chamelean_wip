@@ -108,10 +108,8 @@ def preserveFirstSubstRemainingFVars (hyp : Expr) (oldFVar : FVarId) (newFVar : 
     and record the equalities `t = t1, t = t2, ...` -/
 def separateFVars (hyp : Expr) (lctx : LocalContext) : MetaM DecomposedInductiveHypothesis :=
   withLCtx' lctx do
-    -- IO.println s!"entered separateFVars, hyp = {hyp}"
     let mut lctx := lctx
     let fvars := extractFVarIds hyp
-    -- IO.println s!"fvars = {repr fvars}"
     let mut equations : Array (FVarId × FVarId) := #[]
     let mut fVarIds := fvars
     let mut newHyp := hyp
@@ -132,8 +130,6 @@ def separateFVars (hyp : Expr) (lctx : LocalContext) : MetaM DecomposedInductive
         equations := equations.push (fv, newFVarId)
         fVarIds := fVarIds.push newFVarId
     let variableEqs ← mkFVarEqualities equations lctx
-
-    -- IO.println s!"newHyp = {newHyp}"
 
     return {
       newHypothesis := newHyp

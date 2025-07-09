@@ -373,9 +373,9 @@ def processConstructorUnifyArgs (ctorName : Name) (ctorType: Expr) (inputVars : 
 
     let (bound_vars, _) := bound_vars_and_types.unzip
     let (bound_vars_with_base_types, _) :=
-      (bound_vars_and_types.filter (fun (_,b) => isBaseType b)).unzip
+      (bound_vars_and_types.filter (fun (_, b) => isBaseType b)).unzip
     let (bound_vars_with_non_base_types, _) :=
-      (bound_vars_and_types.filter (fun (_,b) => ¬ isBaseType b)).unzip
+      (bound_vars_and_types.filter (fun (_, b) => ¬ isBaseType b)).unzip
 
     let mut hypotheses_with_only_base_type_args := #[]
     let mut nonlinear_hypotheses := #[]
@@ -400,6 +400,10 @@ def processConstructorUnifyArgs (ctorName : Name) (ctorType: Expr) (inputVars : 
         nonlinear_hypotheses := nonlinear_hypotheses.push hyp
 
     let inputEqualities := conclusion_args.zip inputVars
+
+    IO.println s!"inside processConstructorUnifyArgs"
+    IO.println s!"inputEqualities = {inputEqualities}"
+
     let inputEqualitiesWithTypes := inputEqualities.zip inputTypes
     let (baseTypeInputEqualities, _) := (inputEqualitiesWithTypes.filter (fun (_, ty) => isBaseType ty)).unzip
     let (nonBaseTypeInputEqualities, _) := (inputEqualitiesWithTypes.filter (fun (_, ty) => !isBaseType ty)).unzip
@@ -518,8 +522,8 @@ def getInductiveInfoWithArgs (inputExpr : Expr) (argNames : Array String) : Meta
     match env.find? inductive_name with
     | none => throwError "Type '{inductive_name}' not found"
     | some (ConstantInfo.inductInfo info) => do
-      let mut decomposed_ctor_types : Array DecomposedConstructorType := #[]
-      let mut ctors : Array InductiveConstructor := #[]
+      let mut decomposed_ctor_types := #[]
+      let mut ctors := #[]
       for ctorName in info.ctors do
         let some ctor := env.find? ctorName
          | throwError "IRConstructor '{ctorName}' not found"
@@ -549,8 +553,8 @@ def getInductiveInfoWithArgs (inputExpr : Expr) (argNames : Array String) : Meta
         nameMap := nameMap
       }
     | some _ =>
-      throwError "'{inductive_name}' is not an inductive type"
-  | none => throwError "Not a type"
+      throwError s!"{inductive_name} is not an inductive relation"
+  | none => throwError s!"{inputExpr} is not a type"
 
 /-- Takes in an inductive relation and extracts metadata corresponding to the `inductive`,
     returning an `IR_info` -/

@@ -214,11 +214,13 @@ def mkSubGeneratorInfoFromConstructor (ctor : InductiveConstructor) (inputNames 
     let actions ← Actions_for_producer ctor idx
     let groupedActions ← mkGroupedActions actions.actions
 
-    -- IO.println s!"groupedActions = {repr groupedActions}"
-
     -- Constructors with no hypotheses get `BaseGenerator`s
     -- (otherwise, the generator needs to make a recursive call and is thus inductively-defined)
     let generatorSort := if ctor.recursive_hypotheses.isEmpty then .BaseGenerator else .InductiveGenerator
+
+    IO.println s!"inside mkSubGeneratorInfoFromConstructor"
+    IO.println s!"ctor.inputEqs = {ctor.inputEqs}"
+    IO.println s!"groupedActions.variableEqs = {groupedActions.variableEqs}"
 
     return {
       inputs := (List.eraseIdx inputNamesList idx).toArray

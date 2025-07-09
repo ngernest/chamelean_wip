@@ -189,6 +189,10 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
       inductiveHypothesesToCheck := inductiveHypothesesToCheck.push typedInductiveTerm
 
   -- Add equality checks for any pairs of variables in `variableEqualities`
+  -- IO.println "inside mkSubGenerator"
+  -- IO.println s!"nameMap = {repr subGenerator.nameMap}"
+  -- IO.println s!"subGenerator.variableEqs = {subGenerator.variableEqs}"
+
   let mut variableEqualitiesToCheck ← Array.mapM (fun e => do
     let term ← delabExprInLocalContext subGenerator.localCtx e
     match term with
@@ -196,8 +200,7 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
     | `(term| $lhs:ident = $rhs:term)
     | `(term| $lhs:term = $rhs:ident)
     | `(term| $lhs:term = $rhs:term) =>
-      -- IO.println "inside mkSubGenerator"
-      -- IO.println s!"lhs = {lhs.getId}, rhs = {rhs.getId}, nameMap = {repr subGenerator.nameMap}"
+      -- IO.println s!"lhs = {lhs}, rhs = {rhs}"
       return term
     | _ => throwError m!"encountered an expr {term} that is not an equality in subGenerator.variableEqs") subGenerator.variableEqs
 
