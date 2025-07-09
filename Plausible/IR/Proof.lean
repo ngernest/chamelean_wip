@@ -331,7 +331,7 @@ mutual
 
 def check_balanced_by_con_1 (h : Nat) (T : Tree) : IO Bool:= do
 {match h , T  with
-| 0 , Tree.Leaf x  =>  return true
+| 0 , Tree.Leaf  =>  return true
 | _ , _  => return false}
 
 

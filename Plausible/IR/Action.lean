@@ -1,16 +1,9 @@
 import Lean
-import Std
 import Plausible.IR.Examples
 import Plausible.IR.Extractor
 import Plausible.IR.Prelude
-import Lean.Elab.Deriving.DecEq
-import Lean.Meta.Tactic.Simp.Main
-
-open Lean.Elab.Deriving.DecEq
 open List Nat Array String
 open Lean Elab Command Meta Term LocalContext
-open Lean.Parser.Term
-open Std
 
 namespace Plausible.IR
 
