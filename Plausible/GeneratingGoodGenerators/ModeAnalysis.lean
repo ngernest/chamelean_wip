@@ -6,7 +6,7 @@ open Lean
 /-- Corresponds to the `range_mode` type in the QuickChick code -/
 inductive RangeMode
   | ModeFixed                                              -- Known input
-  | ModeUndefUnknown (u : Unknown) (ty : String)           -- Needs generation
+  | ModeUndefUnknown (u : Unknown) (ty : Expr)           -- Needs generation
   | ModePartlyDef (equalities : List (Unknown × Unknown))
                   (unknowns : List (Unknown × String))
                   (pattern : Pattern)                       -- Needs pattern matching
@@ -66,7 +66,7 @@ partial def analyzeRangeMode (r : Range) (constraints : ConstraintMap) : RangeMo
       | some (.Ctr c rs) =>
         -- Handle partially defined case
         analyzePartiallyDefined u (.Ctr c rs) constraints
-      | none => .ModeUndefUnknown u "unknown"
+      | none => .ModeUndefUnknown u $ mkConst `unknown
     followUnknown u
   | .Fixed => .ModeFixed
   | .Ctr c rs => analyzePartiallyDefined (Name.mkStr1 "temp") (.Ctr c rs) constraints

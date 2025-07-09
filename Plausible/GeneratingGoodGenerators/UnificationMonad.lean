@@ -15,13 +15,10 @@ open Lean Idents
 abbrev Unknown := Name
 deriving instance Repr, BEq for Unknown
 
-/- Ord instance for `Name` (needed in order to use `HashMap`s with `Name`s as the key) -/
--- instance : Ord Name where
---   compare name1 name2 := compare name1.getString! name2.getString!
-
 /-- *Ranges* represent sets of potential values (see section 4.2) -/
 inductive Range
-  | Undef (ty : String)
+  /-- Undefined value, parameterized by a type `ty` (represented as a Lean `Expr`) -/
+  | Undef (ty : Expr)
   | Fixed
   | Unknown (u : Unknown)
   | Ctr (ctor : String) (rs : List Range)
@@ -249,10 +246,10 @@ def testNonemptyTrees : IO Unit := do
     -- Set up: t should be undefined (we want to generate it)
     -- Set up: x, l, r should be undefined (arbitrary values)
     UnifyM.updateMany [
-      (t, .Undef "Tree"),
-      (x, .Undef "Nat"),
-      (l, .Undef "Tree"),
-      (r, .Undef "Tree")
+      (t, .Undef $ mkConst `Tree),
+      (x, .Undef $ mkConst `Nat),
+      (l, .Undef $ mkConst `Tree),
+      (r, .Undef $ mkConst `Tree)
     ]
 
     -- Unify: t ~ Node x l r (from constructor conclusion)
@@ -281,10 +278,10 @@ def testCompleteTrees : IO Unit := do
     -- Set up modes: in1 is fixed input, t should be generated
     UnifyM.updateMany [
       (in1, .Fixed),
-      (t, (.Undef "Tree")),
-      (n, (.Undef "nat")),
-      (l, (.Undef "Tree")),
-      (r, (.Undef "Tree"))
+      (t, (.Undef $ mkConst `Tree)),
+      (n, (.Undef $ mkConst `Nat)),
+      (l, (.Undef $ mkConst `Tree)),
+      (r, (.Undef $ mkConst `Tree))
     ]
 
     -- Unify constructor conclusion: complete (S n) (Node x l r) ~ complete in1 t
@@ -320,10 +317,10 @@ def testBinarySearchTrees : IO Unit := do
     UnifyM.updateMany [
       (lo, .Fixed),
       (hi, .Fixed),
-      (t, (.Undef "Tree")),
-      (x, (.Undef "nat")),
-      (l, (.Undef "Tree")),
-      (r, (.Undef "Tree"))
+      (t, (.Undef $ mkConst `Tree)),
+      (x, (.Undef $ mkConst `Nat)),
+      (l, (.Undef $ mkConst `Tree)),
+      (r, (.Undef $ mkConst `Tree))
     ]
 
     -- Unify constructor conclusion: bst lo hi (Node x l r) ~ bst lo hi t
@@ -359,9 +356,9 @@ def testNonLinearPatterns : IO Unit := do
       (gamma, .Fixed),
       (term, .Fixed),
       (typ, .Fixed),
-      (t1, (.Undef "type")),
-      (t2, (.Undef "type")),
-      (e, (.Undef "term"))
+      (t1, (.Undef $ mkConst `type)),
+      (t2, (.Undef $ mkConst `type)),
+      (e, (.Undef $ mkConst `term))
     ]
 
     -- Create patterns with t1 appearing twice
@@ -398,8 +395,8 @@ def testFunctionCalls : IO Unit := do
     UnifyM.updateMany [
       (in1, .Fixed),
       (in2, .Fixed),
-      (n, .Undef "nat"),
-      (m, .Undef "nat")
+      (n, .Undef $ mkConst `Nat),
+      (m, .Undef $ mkConst `Nat)
     ]
 
     -- Unify: `square_of n (n * n) ~ square_of in1 in2`
@@ -409,7 +406,7 @@ def testFunctionCalls : IO Unit := do
     -- The `(n * n)` part would normally create a fresh variable and equality
     -- For testing, we'll simulate this by creating an equality constraint
     let product ← UnifyM.registerFreshUnknown
-    UnifyM.update product (.Undef "nat")
+    UnifyM.update product (.Undef $ mkConst `Nat)
     UnifyM.registerEquality product in2  -- product should equal in2
 
     -- Simulate the equality: product = n * n (would be handled by preprocessing)
