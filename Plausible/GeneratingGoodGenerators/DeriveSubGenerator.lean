@@ -3,6 +3,7 @@ import Std
 import Plausible.GeneratingGoodGenerators.UnificationMonad
 
 open Lean
+
 ---------------------------------------------------------------------------------------------
 -- Implements figure 4 from "Generating Good Generators for Inductive Relations", POPL '18
 --------------------------------------------------------------------------------------------
@@ -34,3 +35,37 @@ def mkInitialUnifyState (inputNames : List Name) (outputName : Name) (outputType
 def convertToCtorExpr (e : Expr) : Option (Name × Array Expr) :=
   if !e.isApp then none
   else some e.getAppFnArgs
+
+-- The following implements the `emit` functions in Figure 4
+-- TODO: fill in the metaprogramming stuff
+
+mutual
+  partial def emitPatterns (patterns : List (Unknown × Pattern)) (equalities : List (Unknown × Unknown)) (constraints : ConstraintMap) : MetaM (TSyntax `term) :=
+    match patterns with
+    | [] => emitEqualities equalities constraints
+    | (u, p) :: ps => sorry
+
+  partial def emitEqualities (equalities : List (Unknown × Unknown)) (constraints : ConstraintMap) : MetaM (TSyntax `term) :=
+    match equalities with
+    | [] => sorry -- figure out how to get `S e`
+    | (u1, u2) :: eqs => sorry
+
+  partial def emitHypothesis (hypotheses : List (Name × List Unknown)) (constraints : ConstraintMap) : MetaM (TSyntax `term) :=
+    match hypotheses with
+    | [] => finalAssembly constraints
+    | _ => sorry
+
+  partial def finalAssembly (constraints : ConstriantMap) : MetaM (TSyntax `term) :=
+    sorry
+
+  partial def emitFinalCall (unknown : Unknown) : MetaM (TSyntax `doElem) := sorry
+
+  partial def emitResult (k : ConstraintMap) (u : Unknown) (range : Range) : MetaM (TSyntax `term) :=
+    match range with
+    | .Unknown u' => emitResult k u' k[u']!
+    | .Fixed => `($(mkIdent u))
+    | .Ctor c rs => do
+      let rs' ← List.mapM (fun r => emitResult k u r) rs
+      sorry
+    | .Undef ty => throwError s!"encountered Range of (Undef {ty}) in emitResult"
+end
