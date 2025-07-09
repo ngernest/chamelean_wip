@@ -218,6 +218,7 @@ structure InductiveConstructor where
 
   /-- Maps each argument to the conclusion to the corresponding input variable -/
   inputEqualities: Array (Expr × Expr)
+
   inputEqs: Array Expr
 
   /-- `inputEqualities` where the type of the input variable is a base type -/

@@ -106,18 +106,20 @@ def preserveFirstSubstRemainingFVars (hyp : Expr) (oldFVar : FVarId) (newFVar : 
 /-- For each free variable `t` that appears more than once in the hypothesis `hyp`,
     replace its second occurrence with `t1`, its 3rd occurrence with `t2`, etc.,
     and record the equalities `t = t1, t = t2, ...` -/
-def separateFVars (hyp : Expr) (lctx : LocalContext): MetaM DecomposedInductiveHypothesis :=
+def separateFVars (hyp : Expr) (lctx : LocalContext) : MetaM DecomposedInductiveHypothesis :=
   withLCtx' lctx do
+    -- IO.println s!"entered separateFVars, hyp = {hyp}"
     let mut lctx := lctx
     let fvars := extractFVarIds hyp
+    -- IO.println s!"fvars = {repr fvars}"
     let mut equations : Array (FVarId × FVarId) := #[]
     let mut fVarIds := fvars
     let mut newHyp := hyp
     for fv in fvars do
       let mut i := 0
-      let mut currentFV := fv
-      while (numMatchingFVars newHyp currentFV > 1) do
-        let ty ← getFVarTypeInContext fv lctx
+      let mut originalFV := fv
+      while (numMatchingFVars newHyp originalFV > 1) do
+        let ty ← getFVarTypeInContext originalFV lctx
         -- TODO: this is duplicate variable freshening logic
         -- pass in `nameMap` as an argument to this function
         -- maybe figure out how to use `nameMap` instead?
@@ -125,12 +127,14 @@ def separateFVars (hyp : Expr) (lctx : LocalContext): MetaM DecomposedInductiveH
         let newName := Name.appendAfter (← fv.getUserName) s!"_{i}"
         let (new_lctx, newFVarId) ← addLocalDecl lctx newName ty
         lctx := new_lctx
-        newHyp ← preserveFirstSubstRemainingFVars newHyp currentFV newFVarId lctx
+        newHyp ← preserveFirstSubstRemainingFVars newHyp originalFV newFVarId lctx
         i := i + 1
-        currentFV := newFVarId
         equations := equations.push (fv, newFVarId)
         fVarIds := fVarIds.push newFVarId
     let variableEqs ← mkFVarEqualities equations lctx
+
+    -- IO.println s!"newHyp = {newHyp}"
+
     return {
       newHypothesis := newHyp
       fVarIds := fVarIds
@@ -142,10 +146,13 @@ def separateFVars (hyp : Expr) (lctx : LocalContext): MetaM DecomposedInductiveH
     the free variables in `hypothesis` that appear in `initialFVars`,
     and uses the index of the hypothesis (`hypIndex`) to generate fresh names -/
 def separateFVarsInHypothesis (hypothesis : Expr) (initialFVars : Array FVarId)
-  (hypIndex : Nat) (lctx: LocalContext) : MetaM DecomposedInductiveHypothesis :=
+  (hypIndex : Nat) (lctx : LocalContext) : MetaM DecomposedInductiveHypothesis :=
   withLCtx' lctx do
     let mut lctx := lctx
     let initializedFVars := Array.intersect (extractFVarIds hypothesis) initialFVars
+
+    -- IO.println s!"initializedFVars = {repr initializedFVars}"
+
     let mut newHypothesis := hypothesis
     let mut equalities : Array (FVarId × FVarId) := #[]
     for fvar in initializedFVars do
@@ -291,11 +298,16 @@ def getLastUninitializedArgAndFVars
 
 /-- Produces a collection of `Actions` for the hypotheses of a constructor of an inductive relation -/
 def Actions_for_hypotheses (ctor : InductiveConstructor) (fvars : Array FVarId) : MetaM ActionsWithLocalContext := do
+  -- IO.println "entered Actions_for_hypotheses"
+  -- IO.println s!"hypotheses are {ctor.all_hypotheses}"
+
   let mut lctx := ctor.localCtx
   let mut actions := #[]
   let mut initializedFVars := fvars
   for (hyp, i) in ctor.all_hypotheses.zipIdx do
     let isHypOfInductiveCtor ← isHypothesisOfInductiveConstructor hyp ctor
+    -- IO.println s!"isHypOfInductiveCtor = {isHypOfInductiveCtor}"
+    -- IO.println s!"hyp = {hyp}"
 
     if isHypOfInductiveCtor then
       -- If all free variables in the hypothesis have been initialized,
@@ -316,10 +328,6 @@ def Actions_for_hypotheses (ctor : InductiveConstructor) (fvars : Array FVarId) 
         let argToGenerate := hyp.getAppArgs[uninitializedArgIdx]!
         initializedFVars := Array.appendUniqueElements initializedFVars uninitializedFVars
 
-        -- TODO: delete print stmts
-        -- IO.println s!"hyp = {hyp}"
-        -- IO.println s!"uninitializedArgIdx = {uninitializedArgIdx}, argToGenerate = {argToGenerate}, initializedFVars = {repr initializedFVars}"
-
         -- Determine whether the generator should be invoked via a recursive call or via the `Arbitrary` typeclass
         let generationStyle :=
           if hypothesisRecursivelyCallsCurrentInductive hyp ctor
@@ -333,8 +341,7 @@ def Actions_for_hypotheses (ctor : InductiveConstructor) (fvars : Array FVarId) 
           let nameOfFVarToGenerate := Name.mkStr1 ("tcond" ++ toString i)
           let ty ← inferType argToGenerate
           let (new_lctx, fvarToGenerate) ← addLocalDecl lctx nameOfFVarToGenerate ty
-          lctx:= new_lctx
-          let decomposedHypothesis ← separateFVarsInHypothesis argToGenerate initializedFVars i lctx
+          let decomposedHypothesis ← separateFVarsInHypothesis argToGenerate initializedFVars i new_lctx
           lctx := decomposedHypothesis.localCtx
           actions := actions.push (.genInputForInductive fvarToGenerate hyp uninitializedArgIdx generationStyle)
           actions := actions.push (.matchFVar fvarToGenerate decomposedHypothesis)

@@ -192,12 +192,14 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
   let mut variableEqualitiesToCheck ← Array.mapM (fun e => do
     let term ← delabExprInLocalContext subGenerator.localCtx e
     match term with
-    | `(term| $lhs:ident = $rhs:ident) =>
-      IO.println s!"lhs = {lhs.getId}, rhs = {rhs.getId}, nameMap = {repr subGenerator.nameMap}"
-      let freshLHS := lookupFreshenedNameInNameMap subGenerator.nameMap #[] lhs.getId
-      let freshRHS := lookupFreshenedNameInNameMap subGenerator.nameMap #[lhs.getId] rhs.getId
-      `($freshLHS:ident = $freshRHS:ident)
-    | _ => throwError "encountered an expr that is not an equality in subGenerator.variableEqs") subGenerator.variableEqs
+    | `(term| $lhs:ident = $rhs:ident)
+    | `(term| $lhs:ident = $rhs:term)
+    | `(term| $lhs:term = $rhs:ident)
+    | `(term| $lhs:term = $rhs:term) =>
+      -- IO.println "inside mkSubGenerator"
+      -- IO.println s!"lhs = {lhs.getId}, rhs = {rhs.getId}, nameMap = {repr subGenerator.nameMap}"
+      return term
+    | _ => throwError m!"encountered an expr {term} that is not an equality in subGenerator.variableEqs") subGenerator.variableEqs
 
   -- TODO: change `groupedActions.ret_list` to a single element since each do-block can only
   -- have one (final) `return` expression

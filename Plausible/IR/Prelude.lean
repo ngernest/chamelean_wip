@@ -119,7 +119,7 @@ def getFVarsSet (e : Expr) : HashSet FVarId :=
   | .fvar fvar_id => HashSet.ofArray #[fvar_id]
   | _ => ∅
 
-/-- Extracts the free variables in an expression, returning an array of `FVarID`s -/
+/-- Extracts all the *unique* `FVarId`s in an expression, returning an array of `FVarID`s -/
 def extractFVarIds (e : Expr) : Array FVarId :=
   HashSet.toArray $ getFVarsSet e
 

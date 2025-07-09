@@ -201,7 +201,7 @@ def mkSubGeneratorInfoFromConstructor (ctor : InductiveConstructor) (inputNames 
     let conclusion ← separateFVars new_conclusion ctor.localCtx
 
     let ctor := { ctor with localCtx := conclusion.localCtx }
-    let args := conclusion.newHypothesis.getAppArgs.toList
+    let args := ctor.conclusion.getAppArgs.toList
     let zippedInputsAndArgs := List.zip inputNamesList args
 
     -- Take all elements of `inputNamesAndArgs`, but omit the element at the `genpos`-th index
@@ -213,6 +213,8 @@ def mkSubGeneratorInfoFromConstructor (ctor : InductiveConstructor) (inputNames 
     let (inputsToMatch, matchCases) := inputPairsThatNeedMatching.unzip
     let actions ← Actions_for_producer ctor idx
     let groupedActions ← mkGroupedActions actions.actions
+
+    -- IO.println s!"groupedActions = {repr groupedActions}"
 
     -- Constructors with no hypotheses get `BaseGenerator`s
     -- (otherwise, the generator needs to make a recursive call and is thus inductively-defined)
@@ -226,7 +228,7 @@ def mkSubGeneratorInfoFromConstructor (ctor : InductiveConstructor) (inputNames 
       generatorSort := generatorSort
       localCtx := actions.localCtx
       producerType := producerType
-      variableEqs := conclusion.variableEqs ++ groupedActions.variableEqs
+      variableEqs := ctor.inputEqs ++ groupedActions.variableEqs
       nameMap := nameMap
     }
 
