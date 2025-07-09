@@ -1,10 +1,24 @@
 import Lean
+import Batteries
 open Lean
 
 /-- A source is the thing we wish to check/generate/enumerate -/
 inductive Source where
   | NonRec : Expr → Source
   | Rec : String → List Expr → Source
+
+/-- Producers are either enumerators or generators -/
+inductive ProducerSort : Type where
+  | Enumerator
+  | Generator
+
+inductive ScheduleSort : Type where
+  /-- tuple of produced outputs from conclusion of constructor -/
+  | ProducerSchedule : Bool → ProducerSort → Expr → ScheduleSort
+
+  /-- checkers need not bother with conclusion of constructor,
+      only hypotheses need be checked and conclusion of constructor follows-/
+  | CheckerSchedule
 
 /-- A single step in a generator schedule -/
 inductive ScheduleStep where
@@ -21,20 +35,6 @@ inductive ScheduleStep where
   /-- Used when you decompose a constructor constrained arg into a
     fresh variable followed by a pattern match -/
   | Match : Source → Expr → ScheduleStep
-
-/-- Producers are either enumerators or generators -/
-inductive ProducerSort where
-  | Enumerator
-  | Generator
-
-inductive ScheduleSort where
-
-  /-- tuple of produced outputs from conclusion of constructor -/
-  | ProducerSchedule : Bool → ProducerSort → Expr → ScheduleSort
-
-  /-- checkers need not bother with conclusion of constructor,
-      only hypotheses need be checked and conclusion of constructor follows-/
-  | CheckerSchedule
 
 /-- A schedule is a pair consisting of an ordered list of `ScheduleStep`s,
     and the sort of schedule we're dealing with -/

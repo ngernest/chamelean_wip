@@ -217,7 +217,17 @@
   ["docBlame", "Plausible.TestResult.toString"],
   ["docBlame", "Plausible.TestResult.isFailure"],
   ["docBlame", "Plausible.Configuration.numRetries"],
-  ["docBlame", "Plausible.printProp"],
+  ["docBlame", "Plausible.PrintableProp.printProp"],
   ["docBlame", "Plausible.NamedBinder"],
-  ["docBlame", "Plausible.Testable.runProp"]
+  ["docBlame", "Plausible.Testable.runProp"],
+  ["unusedArguments", "runSizedEnum"],
+  ["unusedArguments", "analyzePartiallyDefined"],
+  ["unusedArguments", "gen_typing.aux_arb"],
+  ["unusedArguments", "genBST.aux_arb"],
+  ["unusedArguments", "genBalancedTree.aux_arb"],
+  ["unusedArguments", "instDecOptBalanced.aux_arb"],
+  ["unusedArguments", "Plausible.RandT.up"],
+  ["unusedArguments", "Plausible.RandT.down"],
+  ["unusedArguments", "Plausible.NamedBinder"],
+  ["unusedArguments", "Plausible.Decorations.DecorationsOf"]
 ]
