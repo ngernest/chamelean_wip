@@ -401,8 +401,8 @@ def processConstructorUnifyArgs (ctorName : Name) (ctorType: Expr) (inputVars : 
 
     let inputEqualities := conclusion_args.zip inputVars
 
-    IO.println s!"inside processConstructorUnifyArgs"
-    IO.println s!"inputEqualities = {inputEqualities}"
+    -- IO.println s!"inside processConstructorUnifyArgs"
+    -- IO.println s!"inputEqualities = {inputEqualities}"
 
     let inputEqualitiesWithTypes := inputEqualities.zip inputTypes
     let (baseTypeInputEqualities, _) := (inputEqualitiesWithTypes.filter (fun (_, ty) => isBaseType ty)).unzip

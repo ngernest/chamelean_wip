@@ -230,7 +230,7 @@ def mkSubGeneratorInfoFromConstructor (ctor : InductiveConstructor) (inputNames 
       generatorSort := generatorSort
       localCtx := actions.localCtx
       producerType := producerType
-      variableEqs := ctor.inputEqs ++ groupedActions.variableEqs
+      variableEqs := conclusion.variableEqs ++ groupedActions.variableEqs
       nameMap := nameMap
     }
 

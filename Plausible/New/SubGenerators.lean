@@ -64,7 +64,12 @@ def genInputForInductive (fvar : FVarId) (hyp : Expr) (idx : Nat) (generationSty
 def mkVariableEqualityCheckMatchExpr (syntaxKind : SyntaxNodeKind) (variableEqualities : TSyntaxArray `term)
   (retExpr : TSyntax `term) : TermElabM (TSyntax syntaxKind) := do
 
+
+
   let equality := variableEqualities[0]!
+  IO.println "inside mkVariableEqualityCheckMatchExpr"
+  IO.println s!"equality = {equality}"
+
   let scrutinee ← `($decOptFn:ident ($equality) $initSizeIdent)
 
   let trueCase ← `(Term.matchAltExpr| | $(mkIdent ``some) $(mkIdent ``true) => $retExpr:term)
@@ -110,6 +115,8 @@ def mkSubGeneratorBody (doBlock : TSyntaxArray `doElem) (argToGenTerm : Term) (n
   -- so we can just create `pure $argToGenTerm` without needing
   -- to create a do-block
   } else {
+    IO.println "inside mkSubGeneratorBody, doElems is empty"
+
     let retExpr ← `($pureFn $argToGenTerm:term)
     -- If there are any variable equalities that we need to check,
     -- create a match expression before doing `pure $argToGenTerm`
@@ -189,20 +196,12 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
       inductiveHypothesesToCheck := inductiveHypothesesToCheck.push typedInductiveTerm
 
   -- Add equality checks for any pairs of variables in `variableEqualities`
-  -- IO.println "inside mkSubGenerator"
-  -- IO.println s!"nameMap = {repr subGenerator.nameMap}"
-  -- IO.println s!"subGenerator.variableEqs = {subGenerator.variableEqs}"
+  IO.println "inside mkSubGenerator"
+  IO.println s!"subGenerator.variableEqs = {subGenerator.variableEqs}"
 
-  let mut variableEqualitiesToCheck ← Array.mapM (fun e => do
-    let term ← delabExprInLocalContext subGenerator.localCtx e
-    match term with
-    | `(term| $lhs:ident = $rhs:ident)
-    | `(term| $lhs:ident = $rhs:term)
-    | `(term| $lhs:term = $rhs:ident)
-    | `(term| $lhs:term = $rhs:term) =>
-      -- IO.println s!"lhs = {lhs}, rhs = {rhs}"
-      return term
-    | _ => throwError m!"encountered an expr {term} that is not an equality in subGenerator.variableEqs") subGenerator.variableEqs
+  let mut variableEqualitiesToCheck ← Array.mapM (fun e => delabExprInLocalContext subGenerator.localCtx e) subGenerator.variableEqs
+
+  IO.println s!"variableEqualitiesToCheck = {variableEqualitiesToCheck}"
 
   -- TODO: change `groupedActions.ret_list` to a single element since each do-block can only
   -- have one (final) `return` expression
