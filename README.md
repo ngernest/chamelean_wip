@@ -101,6 +101,13 @@ We provide a command elaborator which elaborates the `#derive_checker` command:
 
 ## Repo overview
 
+**Building & compiling**:
+- To compile, run `lake build` from the top-level repository.
+- To run snapshot tests, run `lake test`.
+- To run linter checks, run `lake lint`. 
+  + This invokes the linter provided via the [Batteries](https://github.com/leanprover-community/batteries/tree/main) library.
+  + Note that some linter warnings are suppressed in [`scripts/nolints.json`](./scripts/nolints.json).
+
 **Typeclass definitions**:
 - [`Arbitrary.lean`](./Plausible/New/Arbitrary.lean): The `Arbitrary` & `ArbitrarySized` typeclasses for unconstrained generators, adapted from QuickChick
 - [`ArbitrarySizedSuchThat.lean`](./Plausible/New/ArbitrarySizedSuchThat.lean): The `ArbitrarySuchThat` & `ArbitrarySizedSuchThat` typeclasses for constrained generators, adapted from QuickChick
