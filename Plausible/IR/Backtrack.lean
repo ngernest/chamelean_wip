@@ -15,6 +15,8 @@ open Lean Elab Command Meta Term
 open Lean.Parser.Term
 open Plausible Gen
 
+set_option linter.missingDocs false
+
 namespace Plausible.IR
 
 -- Generate backtrack list --

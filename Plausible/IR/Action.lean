@@ -227,6 +227,7 @@ def getFVarsInConclusionArgs (ctor : InductiveConstructor) (genpos : Nat) : Meta
     i := i + 1
   return outarr
 
+
 def get_producer_outset (c: InductiveConstructor) (genpos: Nat): MetaM (Array FVarId) := do
   if h: genpos ≥ c.conclusion_args.size then throwError "invalid gen position"
   else

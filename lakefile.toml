@@ -2,17 +2,20 @@ name = "plausible"
 version = "0.1.0"
 defaultTargets = ["Plausible"]
 testRunner = "Test"
+lintDriver = "batteries/runLinter"
+
+[leanOptions]
+linter.missingDocs = false
 
 [[lean_lib]]
 name = "Test"
 
 [[lean_lib]]
 name = "Plausible"
-
-[[lean_lib]]
-name = "ChameleanTests"
+leanOptions = {linter.missingDocs = false}
 
 [[require]]
-name = "aesop"
-git = "https://github.com/leanprover-community/aesop"
-rev = "v4.19.0"
+name = "batteries"
+scope = "leanprover-community"
+rev = "main"
+

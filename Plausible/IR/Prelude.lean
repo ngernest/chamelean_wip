@@ -6,6 +6,8 @@ open Std
 
 namespace Plausible.IR
 
+set_option linter.missingDocs false
+
 -- Enhanced debug function
 def debugLocalContext : MetaM Unit := do
   let localCtx ← getLCtx

@@ -2,6 +2,8 @@ import Plausible.Sampleable
 import Plausible.New.DeriveArbitrary
 open Plausible
 
+set_option linter.missingDocs false
+
 /-- A datatype for binary trees -/
 inductive Tree where
 | Leaf : Tree
@@ -48,7 +50,7 @@ inductive lookup : List type -> Nat -> type -> Prop where
   | LookupLater : forall τ τ' n Γ,
       lookup Γ n τ -> lookup (τ' :: Γ) (.succ n) τ
 
-/- `typing Γ e τ` is the typing judgement `Γ ⊢ e : τ` -/
+/-- `typing Γ e τ` is the typing judgement `Γ ⊢ e : τ` -/
 inductive typing: List type → term → type → Prop where
 | TConst : ∀ n,
     typing Γ (.Const n) .Nat

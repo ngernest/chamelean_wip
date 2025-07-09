@@ -12,6 +12,8 @@ open Lean.Parser.Term
 
 namespace Plausible.IR
 
+set_option linter.missingDocs false
+
 -- Generate prototype --
 def elim_dot_for_type (name: String) : String :=
   let q := (name.split (fun x => x == ' ')).map afterLastDot

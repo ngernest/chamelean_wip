@@ -10,11 +10,13 @@ open OptionTGen
 
 open ArbitrarySizedSuchThat
 
+set_option linter.missingDocs false
+
 --------------------------------------------------------------------------
 -- Some example `OptionT Gen α` generators
 --------------------------------------------------------------------------
 
-/- `arbitrarySizedST` contains a handwritten generator for BSTs
+/-- `arbitrarySizedST` contains a handwritten generator for BSTs
     (modelled after the automatically derived generator produced by QuickChick).
     Note that:
     - We use the `OptionT` monad transformer to add the possibility of failure to the `Gen` monad
