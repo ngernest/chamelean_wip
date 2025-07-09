@@ -6,9 +6,9 @@ import Batteries.Data.List.Basic
 open Lean Meta
 open Plausible.IR
 
-/-- Option to  enable debug messages from Chamelean -/
+/-- Option to enable debug messages from Chamelean -/
 register_option chamelean.debug : Bool := {
-  defValue := false
+  defValue := true
   group := "chamelean"
   descr := "enable debug messages from Chamelean"
 }

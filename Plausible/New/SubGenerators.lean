@@ -8,9 +8,15 @@ open Plausible.IR
 open Lean Elab Command Meta Term Parser Std
 open Idents
 
--- Disable debug flag for now
 -- See `Utils.lean` for the definition of the `chamelean.debug` option
-set_option chamelean.debug false
+set_option chamelean.debug true
+
+-- Test immediately after setting
+elab "#testNow" : command => do
+  let opts ← getOptions
+  let debug := Lean.Option.get opts chamelean.debug
+  logInfo s!"Debug option: {debug}"
+
 
 /-- `genInputForInductive fvar hyp idx generationStyle producerType` produces a let-bind expression of the form
     based on the specified `generationStyle` and `producerType`:
@@ -201,6 +207,11 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
 
   -- Add equality checks for any pairs of variables in `variableEqualities`
   let mut variableEqualitiesToCheck ← Array.mapM (fun e => delabExprInLocalContext subGenerator.localCtx e) subGenerator.variableEqs
+
+  let opts ← getOptions
+  let verbose := chamelean.debug.get opts
+
+  IO.println s!"verbose = {verbose}"
 
   if (← inDebugMode) then
     IO.println "inside mkSubGenerator"
