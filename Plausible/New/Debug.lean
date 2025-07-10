@@ -9,7 +9,7 @@ register_option chamelean.debug : Bool := {
 }
 
 /-- Global flag for enabling/diabling debug messages -/
-def globalDebugFlag : Bool := true
+def globalDebugFlag : Bool := false
 
 /-- Determines whether the `chamelean.debug` Option flag is set -/
 def inDebugMode [Monad m] [MonadOptions m] : m Bool := do

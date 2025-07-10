@@ -131,6 +131,8 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
       let initialUnifyState := mkInitialUnifyState inputNames.toList outputName outputType forAllVariables.toList
       logInfo m!"initialUnifyState = {repr initialUnifyState}"
 
+      -- TODO: implement rest of algorithm
+
   | _ => throwUnsupportedSyntax
 
 
