@@ -1,8 +1,14 @@
 import Lean
 import Std
-import Plausible.GeneratingGoodGenerators.UnificationMonad
 
-open Lean
+import Plausible.GeneratingGoodGenerators.UnificationMonad
+import Plausible.New.DeriveConstrainedProducers
+import Plausible.New.SubGenerators
+import Plausible.New.DeriveArbitrary
+import Plausible.IR.Examples
+
+open Lean Elab Command Meta Term Parser
+open Idents
 
 ---------------------------------------------------------------------------------------------
 -- Implements figure 4 from "Generating Good Generators for Inductive Relations", POPL '18
@@ -69,3 +75,36 @@ mutual
       sorry
     | .Undef ty => throwError s!"encountered Range of (Undef {ty}) in emitResult"
 end
+
+-- Command elaborator infrastructure below
+
+syntax (name := derive_subgenerator) "#derive_subgenerator" "(" "fun" "(" ident ":" term ")" "=>" term ")" : command
+
+@[command_elab derive_subgenerator]
+def elabDeriveSubGenerator : CommandElab := fun stx => do
+  match stx with
+  | `(#derive_subgenerator ( fun ( $var:ident : $targetTypeSyntax:term ) => $body:term )) => do
+
+    -- Parse the body of the lambda for an application of the inductive relation
+    let (inductiveName, args) ← parseInductiveApp body
+    let targetVar := var.getId
+
+
+    -- Find the index of the argument in the inductive application for the value we wish to generate
+    -- (i.e. find `i` s.t. `args[i] == targetVar`)
+    let targetIdxOpt := findTargetVarIndex targetVar args
+    if let .none := targetIdxOpt then
+      throwError "cannot find index of value to be generated"
+    let targetIdx := Option.get! targetIdxOpt
+
+    -- Obtain Lean's `InductiveVal` data structure, which contains metadata about the inductive relation
+    let inductiveVal ← getConstInfoInduct inductiveName
+
+    logInfo m!"ctors = {inductiveVal.ctors}"
+
+
+  | _ => throwUnsupportedSyntax
+
+
+-- Example usage:
+-- #derive_subgenerator (fun (t : Tree) => bst lo hi t)
