@@ -3,8 +3,26 @@ import Lean
 import Plausible.IR.Prelude
 import Batteries.Data.List.Basic
 
-open Lean Meta
+open Lean Meta LocalContext Std
 open Plausible.IR
+
+/-- `mkInitialContextForInductiveRelation inputTypes inputNames`
+    creates the initial `LocalContext` where each `(x, τ)` in `Array.zip inputTypes inputNames`
+    is given the declaration `x : τ` in the resultant context.
+
+    This function returns a quadruple containing `inputTypes`, `inputNames` represented as an `Array` of `Name`s,
+    the resultant `LocalContext` and a map from original names to freshened names. -/
+def mkInitialContextForInductiveRelation (inputTypes : Array Expr) (inputNames : Array Name) : MetaM (Array Expr × Array Name × LocalContext × HashMap Name Name) := do
+  let localDecls := inputNames.zip inputTypes
+  withLocalDeclsDND localDecls $ fun exprs => do
+    let mut nameMapBindings := #[]
+    let mut localCtx ← getLCtx
+    for currentName in inputNames do
+      let freshName := getUnusedName localCtx currentName
+      localCtx := renameUserName localCtx currentName freshName
+      nameMapBindings := nameMapBindings.push (currentName, freshName)
+    let nameMap := HashMap.ofList (Array.toList nameMapBindings)
+    return (exprs, inputNames, localCtx, nameMap)
 
 
 /-- Looks up the user-facing `Name` corresponding to an `FVarId` in a specific `LocalContext` -/
