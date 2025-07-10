@@ -1,13 +1,17 @@
 import Lean
 import Std
+import LSpec
 
 import Plausible.GeneratingGoodGenerators.UnificationMonad
 import Plausible.New.DeriveConstrainedProducers
 import Plausible.New.SubGenerators
 import Plausible.New.DeriveArbitrary
+import Plausible.New.Debug
 import Plausible.IR.Examples
 
+
 open Lean Elab Command Meta Term Parser
+open LSpec
 open Idents
 
 ---------------------------------------------------------------------------------------------
@@ -83,28 +87,50 @@ syntax (name := derive_subgenerator) "#derive_subgenerator" "(" "fun" "(" ident 
 @[command_elab derive_subgenerator]
 def elabDeriveSubGenerator : CommandElab := fun stx => do
   match stx with
-  | `(#derive_subgenerator ( fun ( $var:ident : $targetTypeSyntax:term ) => $body:term )) => do
+  | `(#derive_subgenerator ( fun ( $var:ident : $outputTypeSyntax:term ) => $body:term )) => do
 
     -- Parse the body of the lambda for an application of the inductive relation
     let (inductiveName, args) ← parseInductiveApp body
-    let targetVar := var.getId
 
+    let outputName := var.getId
+    let outputType ← liftTermElabM $ elabTerm outputTypeSyntax none
 
     -- Find the index of the argument in the inductive application for the value we wish to generate
     -- (i.e. find `i` s.t. `args[i] == targetVar`)
-    let targetIdxOpt := findTargetVarIndex targetVar args
-    if let .none := targetIdxOpt then
+    let outputIdxOpt := findTargetVarIndex outputName args
+    if let .none := outputIdxOpt then
       throwError "cannot find index of value to be generated"
-    let targetIdx := Option.get! targetIdxOpt
+    let outputIdx := Option.get! outputIdxOpt
+
+    let inputNames := TSyntax.getId <$> Array.eraseIdx! args outputIdx
 
     -- Obtain Lean's `InductiveVal` data structure, which contains metadata about the inductive relation
     let inductiveVal ← getConstInfoInduct inductiveName
+    for ctorName in inductiveVal.ctors do
+      -- Get all the names & types of the constructor's arguments
+      let ctorArgNamesTypes ← liftTermElabM $ getCtorArgsNamesAndTypes ctorName
 
-    logInfo m!"ctors = {inductiveVal.ctors}"
+      logInfo m!"ctor = {ctorName}"
 
+      let mut forAllVariables := #[]
+      for (arg, argTy) in ctorArgNamesTypes do
+        let isProp ← liftTermElabM $ Meta.isProp argTy
+
+        -- If `argTy` is *not* a `Prop`, then we know `arg` is a universally quantified variable,
+        -- which we treat as an `Unknown` that maps to an `Undef` `Range`
+        if !isProp then
+          forAllVariables := forAllVariables.push (arg, argTy)
+
+      let initialUnifyState := mkInitialUnifyState inputNames.toList outputName outputType forAllVariables.toList
+      logInfo m!"initialUnifyState = {repr initialUnifyState}"
 
   | _ => throwUnsupportedSyntax
 
 
 -- Example usage:
--- #derive_subgenerator (fun (t : Tree) => bst lo hi t)
+#derive_subgenerator (fun (tree : Tree) => bst in1 in2 tree)
+
+
+-- def initialUnifyStateTestSuite : List TestSeq := [
+--   test "BST initial unify state" (4 = 4)
+-- ]
