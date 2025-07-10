@@ -46,7 +46,7 @@ def checkLookup (Γ : List type) (x : Nat) (τ : type) : Nat → Option Bool :=
           | .succ x' =>
             match Γ with
             | [] => some false
-            | _ :: Γ' => DecOpt.andOptList [aux_arb initSize size' Γ' x' τ])
+            | τ' :: Γ' => DecOpt.andOptList [aux_arb initSize size' Γ' x' τ])
       ]
   fun size => aux_arb size size Γ x τ
 
