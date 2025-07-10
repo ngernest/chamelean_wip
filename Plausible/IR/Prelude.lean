@@ -77,16 +77,15 @@ def option_to_MetaM (o: Option α) (errmsg: String := "Option is none"): MetaM �
   | some v => return v
   | _ => throwError errmsg
 
-/-- Takes a type expression `tyexpr` representing an arrow type, and returns an array of type-expressions
+/-- Takes a type expression `tyExpr` representing an arrow type, and returns an array of type-expressions
     where each element is a component of the arrow type.
     For example, `getComponentsOfArrowType (A -> B -> C)` produces `#[A, B, C]`. -/
-partial def getComponentsOfArrowType (tyexpr : Expr) : MetaM (Array Expr) := do
-  let rec helper (e : Expr) (acc : Array Expr) : MetaM (Array Expr) := do
-    match e with
-    | Expr.forallE _ domain body _ =>
-      helper (body.instantiate1 (mkFVar ⟨`x⟩)) (acc.push domain)
-    | e => return acc.push e
-  helper tyexpr #[]
+def getComponentsOfArrowType (tyExpr : Expr) : MetaM (Array Expr) := do
+  forallTelescopeReducing tyExpr $ fun fvars body => do
+    let domains ← fvars.mapM (fun fvar => do
+      let decl ← fvar.fvarId!.getDecl
+      return decl.type)
+    return (domains.push body)
 
 def typeArrayToString (types : Array Expr) : MetaM String := do
   let typeStrs ← types.mapM (fun t => do pure s!"{← Meta.ppExpr t}")
