@@ -115,7 +115,7 @@ def getFVarsSet (e : Expr) : HashSet FVarId :=
   | .fvar fvar_id => HashSet.ofArray #[fvar_id]
   | _ => ∅
 
-/-- Extracts the free variables in an expression, returning an array of `FVarID`s -/
+/-- Extracts all the *unique* `FVarId`s in an expression, returning an array of `FVarID`s -/
 def extractFVarIds (e : Expr) : Array FVarId :=
   HashSet.toArray $ getFVarsSet e
 
@@ -193,6 +193,9 @@ def decomposeTypeWithLocalContext (e : Expr) (lctx : LocalContext) : MetaM (Arra
     return (new_binder, new_exp, tyexp, lctx)
 
 /-- `mkEqualities pairs f lctx` creates an array of `Expr`s, where each `Expr` is an equality between each `α × α` pair in `pairs`.
+    (Any pairs where the two components are definitionally equal are filtered out, since
+    we want to avoid create trivial equalities.)
+
     The function `f` is used to convert `α` into `Expr`s using the `MetaM` monad, and the `LocalContext` `lctx` is updated
     after the equalities have been created.
 
@@ -201,8 +204,14 @@ def mkEqualities (pairs : Array (α × α)) (f : α → MetaM Expr) (lctx : Loca
   withLCtx' lctx do
     let mut equalities := #[]
     for (lhs, rhs) in pairs do
-      let eq ← mkEq (← f lhs) (← f rhs)
-      equalities := equalities.push eq
+      let lhsExpr ← f lhs
+      let rhsExpr ← f rhs
+      -- Avoid creating an equality if LHS & RHS are definitionally equal
+      if (← isDefEq lhsExpr rhsExpr) then
+        continue
+      else
+        let eq ← mkEq lhsExpr rhsExpr
+        equalities := equalities.push eq
     return equalities
 
 /-- Version of `mkEqualities` where `α` is specialized to `Expr` -/

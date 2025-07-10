@@ -1,6 +1,6 @@
 import Lean
 import Plausible.Gen
-open Lean Meta
+open Lean Meta Std
 
 -- Create idents for commonly-called functions & commonly-referenced types
 
@@ -83,6 +83,7 @@ def genTypeConstructor : Ident := mkIdent ``Plausible.Gen
 def enumTypeConstructor : Ident := mkIdent $ Name.mkStr1 "Enumerator"
 
 
+
 /-- Produces a fresh user-facing & *accessible* identifier with respect to the local context
     - Note: prefer using this function over `Core.mkFreshUserName`, which is meant
       to create fresh names that are *inaccessible* to the user (i.e. `mkFreshUserName` will
@@ -113,5 +114,20 @@ def genFreshName (existingNames : Array Name) (namePrefix : Name) : Name :=
     we ensure that it does not clash with `existingNames` *and* the previous `i-1` fresh names produced. -/
 def genFreshNames (existingNames : Array Name) (namePrefixes : Array Name) : Array Name :=
   Array.foldl (fun acc name => Array.push acc (genFreshName (acc ++ existingNames) name)) #[] namePrefixes
+
+/-- `lookupNameInNameMap nameMap existingNames name` returns the `Ident` for the freshened name associated with
+     the key `name` in `nameMap`. If `name` doesn't appear as a key in `nameMap`, a fresh name
+     that is guaranteed not to clash with `existingNames` is produced. -/
+def lookupFreshenedNameInNameMap (nameMap : HashMap Name Name) (existingNames : Array Name) (name : Name) : Ident :=
+  match nameMap[name]? with
+  | some newName => Lean.mkIdent newName
+  | none => Lean.mkIdent (genFreshName existingNames name)
+
+/-- Extracts the name of a parameter from a corresponding `Term`.
+    If this is not possible, a fresh user-facing name is produced. -/
+def extractParamName (arg : Term) : MetaM Name :=
+  match arg with
+  | `($name:ident) => return name.getId
+  | _ => return (genFreshName #[] `param)
 
 end Idents

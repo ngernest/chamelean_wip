@@ -23,5 +23,9 @@ import Plausible.New.DeriveEnum
 import Plausible.New.DeriveEnumSuchThat
 import Plausible.New.SubEnumerators
 import Plausible.New.Utils
-import Plausible.New.UnificationMonad
-import Plausible.New.ModeAnalysis
+import Plausible.New.Debug
+
+-- Experimental code which implements the algorithm from "Generating Good Generators for Inductive Relations"
+import Plausible.GeneratingGoodGenerators.UnificationMonad
+import Plausible.GeneratingGoodGenerators.ModeAnalysis
+import Plausible.GeneratingGoodGenerators.DeriveSubGenerator

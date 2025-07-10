@@ -14,36 +14,12 @@ import Plausible.New.DeriveArbitrarySuchThat
 import Plausible.New.STLC
 
 import Lean
+import Batteries
 open Lean Meta
 
 open Plausible ArbitrarySizedSuchThat OptionTGen
 
 deriving instance Enum for Tree
-
--- instance : ArbitrarySizedSuchThat Tree (fun t => bst lo hi t) where
---   arbitrarySizedST :=
---     let rec aux_arb (initSize : Nat) (size : Nat) (lo_0 : Nat) (hi_0 : Nat) : OptionT Plausible.Gen Tree :=
---       match size with
---       | Nat.zero =>
---         OptionTGen.backtrack
---           [(1, OptionTGen.thunkGen (fun _ => pure Tree.Leaf)), (1, OptionTGen.thunkGen (fun _ => OptionT.fail))]
---       | Nat.succ size' =>
---         OptionTGen.backtrack
---           [(1, OptionTGen.thunkGen (fun _ => pure Tree.Leaf)),
---             (Nat.succ size',
---               OptionTGen.thunkGen
---                 (fun _ => do
---                   let _uniq.544 ← Arbitrary.arbitrary
---                   let _uniq.545 ← aux_arb initSize size' _fvar.537 _fvar.544
---                   let _uniq.546 ← aux_arb initSize size' _fvar.544 _fvar.538
---                   if _fvar.537 < _fvar.544 && _fvar.544 < _fvar.538 then
---                     return Tree.Node _fvar.544 _fvar.545 _fvar.546
---                   else
---                     OptionT.fail))]
---     fun size => aux_arb size size lo hi
-
-
----
 
 /- Example usage:
   ```
@@ -55,9 +31,11 @@ deriving instance Enum for Tree
 
 -/
 
+@[nolint docBlame]
+inductive GoodTree : Nat → Nat → Tree → Prop where
+  | GoodLeaf : ∀ n, GoodTree n n .Leaf
 
--- #derive_generator (fun (t : Tree) => balanced n t)
--- #derive_generator (fun (t : Tree) => bst lo hi t)
+-- #derive_generator (fun (t : Tree) => GoodTree in1 in2 t)
 
 /-
 (Note: this is not the most efficient generator -- ideally we would be able to push the if-expression that checks

@@ -138,6 +138,7 @@ def testSimpleRenaming : MetaM Unit := do
       producerType := .Generator
       localCtx := ← getLCtx
       variableEqs := #[]
+      nameMap := ∅
     }
 
     logWarning m!"Before renaming - nExpr name: {nExpr}"

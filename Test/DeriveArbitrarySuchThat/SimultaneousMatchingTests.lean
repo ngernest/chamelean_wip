@@ -22,14 +22,14 @@ inductive MinOk : List Nat → List Nat → Prop where
 /--
 info: Try this generator: instance : ArbitrarySizedSuchThat (List Nat) (fun l => MinOk l a) where
   arbitrarySizedST :=
-    let rec aux_arb (initSize : Nat) (size : Nat) (a_0 : List Nat) : OptionT Plausible.Gen (List Nat) :=
+    let rec aux_arb (initSize : Nat) (size : Nat) (a_1 : List Nat) : OptionT Plausible.Gen (List Nat) :=
       match size with
       | Nat.zero =>
         OptionTGen.backtrack
           [(1,
               OptionTGen.thunkGen
                 (fun _ =>
-                  match a_0 with
+                  match a_1 with
                   | [] => pure []
                   | _ => OptionT.fail)),
             (1, OptionTGen.thunkGen (fun _ => OptionT.fail))]
@@ -38,17 +38,17 @@ info: Try this generator: instance : ArbitrarySizedSuchThat (List Nat) (fun l =>
           [(1,
               OptionTGen.thunkGen
                 (fun _ =>
-                  match a_0 with
+                  match a_1 with
                   | [] => pure []
                   | _ => OptionT.fail)),
             (Nat.succ size',
               OptionTGen.thunkGen
                 (fun _ =>
-                  match a_0 with
+                  match a_1 with
                   | x :: l' => do
-                    let l ← aux_arb initSize size' l'
-                    if x ∈ l then ⏎
-                      return l
+                    let l_1 ← aux_arb initSize size' l'
+                    if x ∈ l_1 then ⏎
+                      return l_1
                     else
                       OptionT.fail
                   | _ => OptionT.fail))]
@@ -68,14 +68,14 @@ inductive MinEx : Nat → List Nat → List Nat → Prop where
 /--
 info: Try this generator: instance : ArbitrarySizedSuchThat (List Nat) (fun l => MinEx n l a) where
   arbitrarySizedST :=
-    let rec aux_arb (initSize : Nat) (size : Nat) (n_0 : Nat) (a_0 : List Nat) : OptionT Plausible.Gen (List Nat) :=
+    let rec aux_arb (initSize : Nat) (size : Nat) (n_1 : Nat) (a_1 : List Nat) : OptionT Plausible.Gen (List Nat) :=
       match size with
       | Nat.zero =>
         OptionTGen.backtrack
           [(1,
               OptionTGen.thunkGen
                 (fun _ =>
-                  match n_0, a_0 with
+                  match n_1, a_1 with
                   | 0, [] => pure []
                   | _, _ => OptionT.fail)),
             (1, OptionTGen.thunkGen (fun _ => OptionT.fail))]
@@ -84,17 +84,17 @@ info: Try this generator: instance : ArbitrarySizedSuchThat (List Nat) (fun l =>
           [(1,
               OptionTGen.thunkGen
                 (fun _ =>
-                  match n_0, a_0 with
+                  match n_1, a_1 with
                   | 0, [] => pure []
                   | _, _ => OptionT.fail)),
             (Nat.succ size',
               OptionTGen.thunkGen
                 (fun _ =>
-                  match n_0, a_0 with
-                  | Nat.succ n_1, x :: l' => do
-                    let l ← aux_arb initSize size' n_1 l'
-                    if x ∈ l then ⏎
-                      return l
+                  match n_1, a_1 with
+                  | Nat.succ n, x :: l' => do
+                    let l_1 ← aux_arb initSize size' n l'
+                    if x ∈ l_1 then ⏎
+                      return l_1
                     else
                       OptionT.fail
                   | _, _ => OptionT.fail))]

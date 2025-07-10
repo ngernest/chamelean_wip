@@ -1,9 +1,12 @@
-import Plausible.New.UnificationMonad
+import Lean
+import Plausible.GeneratingGoodGenerators.UnificationMonad
+
+open Lean
 
 /-- Corresponds to the `range_mode` type in the QuickChick code -/
 inductive RangeMode
   | ModeFixed                                              -- Known input
-  | ModeUndefUnknown (u : Unknown) (ty : String)           -- Needs generation
+  | ModeUndefUnknown (u : Unknown) (ty : Expr)           -- Needs generation
   | ModePartlyDef (equalities : List (Unknown × Unknown))
                   (unknowns : List (Unknown × String))
                   (pattern : Pattern)                       -- Needs pattern matching
@@ -30,44 +33,44 @@ def compatible (b : Bool) (m : RangeMode) : Compatibility :=
   | .ModePartlyDef _ _ _, true => .PartCompatible
 
 /-- Determines whether a `range` is fixed with respect to the constraint map `constraints` -/
-partial def isFixedRange (constraints : Std.TreeMap Unknown Range compare) (r : Range) : Bool :=
+partial def isFixedRange (constraints : ConstraintMap) (r : Range) : Bool :=
   match r with
   | .Undef _ => false
   | .Fixed => true
   | .Unknown u => isFixedRange constraints (constraints.get! u)
-  | .Ctr _ rs => List.all rs (isFixedRange constraints)
+  | .Ctor _ rs => List.all rs (isFixedRange constraints)
 
 /-- Handle partially defined ranges
     -- TODO: fill this in according to the logic in `mode_analyze` in the QuickChick OCaml code-/
 def analyzePartiallyDefined (_ : Unknown) (r : Range)
-    (_ : Std.TreeMap Unknown Range compare) : RangeMode :=
+    (_ : ConstraintMap) : RangeMode :=
   match r with
-  | .Ctr c _ =>
+  | .Ctor c _ =>
     -- This would implement the complex pattern generation logic
     -- from the ML file's handle_partial function
     let eqs : List (Unknown × Unknown) := []  -- collect equalities
     let unks : List (Unknown × String) := []  -- collect unknowns
-    let pat := Pattern.Constructor c []        -- construct pattern
+    let pat := Pattern.CtorPattern c []        -- construct pattern
     .ModePartlyDef eqs unks pat
   | _ => .ModeFixed
 
 -- Corresponds to `mode_analyze` in the OCaml code
-partial def analyzeRangeMode (r : Range) (constraints : Std.TreeMap Unknown Range compare) : RangeMode :=
+partial def analyzeRangeMode (r : Range) (constraints : ConstraintMap) : RangeMode :=
   match r with
   | .Unknown u =>
     let rec followUnknown (u : Unknown) : RangeMode :=
-      match constraints.get? u with
+      match constraints[u]? with
       | some (.Undef ty) => .ModeUndefUnknown u ty
       | some (.Unknown u') => followUnknown u'
       | some .Fixed => .ModeFixed
-      | some (.Ctr c rs) =>
+      | some (.Ctor c rs) =>
         -- Handle partially defined case
-        analyzePartiallyDefined u (.Ctr c rs) constraints
-      | none => .ModeUndefUnknown u "unknown"
+        analyzePartiallyDefined u (.Ctor c rs) constraints
+      | none => .ModeUndefUnknown u $ mkConst `unknown
     followUnknown u
   | .Fixed => .ModeFixed
-  | .Ctr c rs => analyzePartiallyDefined "temp" (.Ctr c rs) constraints
-  | .Undef ty => .ModeUndefUnknown "temp" ty
+  | .Ctor c rs => analyzePartiallyDefined (Name.mkStr1 "temp") (.Ctor c rs) constraints
+  | .Undef ty => .ModeUndefUnknown (Name.mkStr1 "temp") ty
 
 /-- Compatibility scores (corresponds to `mode_score` in the OCaml code) -/
 structure CompatibilityScores where

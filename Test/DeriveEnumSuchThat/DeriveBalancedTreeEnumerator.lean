@@ -9,31 +9,31 @@ import Test.DeriveArbitrarySuchThat.DeriveBalancedTreeGenerator
 set_option guard_msgs.diff true
 
 /--
-info: Try this generator: instance : EnumSizedSuchThat BinaryTree (fun t => balancedTree n t) where
+info: Try this enumerator: instance : EnumSizedSuchThat BinaryTree (fun t => balancedTree n t) where
   enumSizedST :=
-    let rec aux_enum (initSize : Nat) (size : Nat) (n_0 : Nat) : OptionT Enumerator BinaryTree :=
+    let rec aux_enum (initSize : Nat) (size : Nat) (n_1 : Nat) : OptionT Enumerator BinaryTree :=
       match size with
       | Nat.zero =>
         EnumeratorCombinators.enumerate
-          [match n_0 with
+          [match n_1 with
             | 0 => pure BinaryTree.Leaf
             | _ => OptionT.fail,
-            match n_0 with
+            match n_1 with
             | 1 => pure BinaryTree.Leaf
             | _ => OptionT.fail,
             OptionT.fail]
       | Nat.succ size' =>
         EnumeratorCombinators.enumerate
-          [match n_0 with
+          [match n_1 with
             | 0 => pure BinaryTree.Leaf
             | _ => OptionT.fail,
-            match n_0 with
+            match n_1 with
             | 1 => pure BinaryTree.Leaf
             | _ => OptionT.fail,
-            match n_0 with
-            | Nat.succ n_1 => do
-              let l ← aux_enum initSize size' n_1
-              let r ← aux_enum initSize size' n_1
+            match n_1 with
+            | Nat.succ n => do
+              let l ← aux_enum initSize size' n
+              let r ← aux_enum initSize size' n
               let x ← Enum.enum
               return BinaryTree.Node x l r
             | _ => OptionT.fail]

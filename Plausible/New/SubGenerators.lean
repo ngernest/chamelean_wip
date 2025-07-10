@@ -3,6 +3,7 @@ import Plausible.New.Utils
 import Plausible.IR.Constructor
 import Plausible.New.Idents
 import Plausible.New.TSyntaxCombinators
+import Plausible.New.Debug
 
 open Plausible.IR
 open Lean Elab Command Meta Term Parser Std
@@ -65,6 +66,12 @@ def mkVariableEqualityCheckMatchExpr (syntaxKind : SyntaxNodeKind) (variableEqua
   (retExpr : TSyntax `term) : TermElabM (TSyntax syntaxKind) := do
 
   let equality := variableEqualities[0]!
+
+  withOptions (fun opts => opts.set `chamelean.debug true) do
+    withDebugFlag globalDebugFlag do
+      logInfo "inside mkVariableEqualityCheckMatchExpr"
+      logInfo s!"equality = {equality}"
+
   let scrutinee ← `($decOptFn:ident ($equality) $initSizeIdent)
 
   let trueCase ← `(Term.matchAltExpr| | $(mkIdent ``some) $(mkIdent ``true) => $retExpr:term)
@@ -110,6 +117,9 @@ def mkSubGeneratorBody (doBlock : TSyntaxArray `doElem) (argToGenTerm : Term) (n
   -- so we can just create `pure $argToGenTerm` without needing
   -- to create a do-block
   } else {
+    withDebugFlag globalDebugFlag do
+      IO.println "inside mkSubGeneratorBody, doElems is empty"
+
     let retExpr ← `($pureFn $argToGenTerm:term)
     -- If there are any variable equalities that we need to check,
     -- create a match expression before doing `pure $argToGenTerm`
@@ -189,8 +199,11 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
       inductiveHypothesesToCheck := inductiveHypothesesToCheck.push typedInductiveTerm
 
   -- Add equality checks for any pairs of variables in `variableEqualities`
-  -- TODO: use `variableEqs` here instead of `variableEqualities`
   let mut variableEqualitiesToCheck ← Array.mapM (fun e => delabExprInLocalContext subGenerator.localCtx e) subGenerator.variableEqs
+
+  withDebugFlag globalDebugFlag do
+    logInfo "inside mkSubGenerator"
+    logInfo s!"variableEqualitiesToCheck = {variableEqualitiesToCheck}"
 
   -- TODO: change `groupedActions.ret_list` to a single element since each do-block can only
   -- have one (final) `return` expression
@@ -216,8 +229,9 @@ def mkSubGenerator (subGenerator : SubGeneratorInfo) : TermElabM (TSyntax `term)
         let mut cases := #[]
 
         -- Handle multiple scrutinees by giving all of them fresh names
+        -- Use the name map to lookup the freshened versions of the scrutinee's name
         let existingNames := Name.mkStr1 <$> subGenerator.inputsToMatch
-        let scrutinees := Lean.mkIdent <$> Array.map (fun name => genFreshName existingNames name) existingNames
+        let scrutinees := (lookupFreshenedNameInNameMap subGenerator.nameMap existingNames) <$> existingNames
 
         -- Construct the match expression based on the info in `matchCases`
         let patterns ← Array.mapM (fun patternExpr => delabExprInLocalContext subGenerator.localCtx patternExpr) subGenerator.matchCases

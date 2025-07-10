@@ -5,7 +5,7 @@ import Plausible.New.SubCheckers
 import Plausible.New.Idents
 import Plausible.New.DecOpt
 
-open Lean Elab Command Meta Term Parser
+open Lean Std Elab Command Meta Term Parser
 open Idents
 open Plausible.IR
 
@@ -16,15 +16,13 @@ open Plausible.IR
     - the name of the inductive relation (`inductiveStx`)
     - the arguments (`args`) to the inductive relation -/
 def mkTopLevelChecker (baseCheckers : TSyntax `term) (inductiveCheckers : TSyntax `term)
-  (inductiveStx : TSyntax `term) (args : TSyntaxArray `term) : CommandElabM (TSyntax `command) := do
-  -- Fetch the ambient local context, which we need to produce user-accessible fresh names
-  let localCtx ← liftTermElabM $ getLCtx
+  (inductiveStx : TSyntax `term) (args : TSyntaxArray `term) (topLevelLocalCtx : LocalContext) (nameMap : HashMap Name Name) : CommandElabM (TSyntax `command) := do
 
   -- Produce a fresh name for the `size` argument for the lambda
   -- at the end of the checker function, as well as the `aux_dec` inner helper function
-  let freshSizeIdent := mkFreshAccessibleIdent localCtx `size
-  let freshSize' := mkFreshAccessibleIdent localCtx `size'
-  let auxDecIdent := mkFreshAccessibleIdent localCtx `aux_dec
+  let freshSizeIdent := mkFreshAccessibleIdent topLevelLocalCtx `size
+  let freshSize' := mkFreshAccessibleIdent topLevelLocalCtx `size'
+  let auxDecIdent := mkFreshAccessibleIdent topLevelLocalCtx `aux_dec
   let checkerType ← `($optionTypeConstructor $boolIdent)
 
   let inductiveName := inductiveStx.raw.getId
@@ -59,7 +57,8 @@ def mkTopLevelChecker (baseCheckers : TSyntax `term) (inductiveCheckers : TSynta
 
     -- Each parameter to the inner `aux_arb` function needs to be a fresh name
     -- (so that if we pattern match on the parameter, we avoid pattern variables from shadowing it)
-    let innerParamIdent := mkIdent $ genFreshName (Array.map Prod.fst paramInfo) paramName
+    -- We obtain this fresh name by looking up in the `nameMap`
+    let innerParamIdent := lookupFreshenedNameInNameMap nameMap (Array.map Prod.fst paramInfo) paramName
 
     let innerParam ← `(Term.letIdBinder| ($innerParamIdent : $paramType))
     innerParams := innerParams.push innerParam
@@ -86,7 +85,7 @@ def mkDecOptInstance (indProp : TSyntax `term) : CommandElabM (TSyntax `command)
 
   -- Create an auxiliary `SubGeneratorInfo` structure that
   -- stores the metadata for each derived sub-generator
-  let allSubCheckerInfos ← liftTermElabM $ getSubCheckerInfos inductiveExpr argNameStrings
+  let (allSubCheckerInfos, topLevelLocalCtx, nameMap) ← liftTermElabM $ getSubCheckerInfos inductiveExpr argNameStrings
 
   -- Every generator is an inductive generator
   -- (they can all be invoked in the inductive case of the top-level generator),
@@ -98,7 +97,7 @@ def mkDecOptInstance (indProp : TSyntax `term) : CommandElabM (TSyntax `command)
   let inductiveCheckers ← liftTermElabM $ mkThunkedSubCheckers inductiveCheckerInfos
 
   -- Produce an instance of the `DecOpt` typeclass
-  mkTopLevelChecker baseCheckers inductiveCheckers inductiveName args
+  mkTopLevelChecker baseCheckers inductiveCheckers inductiveName args topLevelLocalCtx nameMap
 
 
 ----------------------------------------------------------------------

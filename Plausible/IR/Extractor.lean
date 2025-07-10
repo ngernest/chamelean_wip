@@ -5,7 +5,7 @@ import Plausible.IR.Prelude
 import Plausible.New.Idents
 import Plausible.IR.KeyValueStore
 open List Nat Array String
-open Lean Elab Command Meta Term LocalContext
+open Lean Std Elab Command Meta Term LocalContext
 open Lean.Parser.Term
 open Idents
 
@@ -215,6 +215,7 @@ structure InductiveConstructor where
 
   /-- Maps each argument to the conclusion to the corresponding input variable -/
   inputEqualities: Array (Expr × Expr)
+
   inputEqs: Array Expr
 
   /-- `inputEqualities` where the type of the input variable is a base type -/
@@ -259,7 +260,12 @@ structure InductiveInfo where
   constructors_with_args : Array InductiveConstructor
   dependencies: Array Expr
 
+  /-- The `LocalContext` associated with the inductive relation -/
   localCtx : LocalContext
+
+  /-- A `HashMap` mapping argument names to freshened versions of the same name
+      (the other `LocalContext` field in `InductiveInfo` only stores the freshened version) -/
+  nameMap : HashMap Name Name
 
 /-- Determines if an expression `e` is an application of the form `R e1 ... en`,
     where `R` is an inductive relation  -/
@@ -341,7 +347,7 @@ def unifyArgsWithConclusion (hypotheses : Array Expr) (conclusion : Expr) (input
 
 
 /-- Takes in the constructor's type, the input variables & their types and the name of the inductive relation,
-    and builds an `IRConstructor` containing metadata for the constructor.
+    and builds an `InductiveConstructor` containing metadata for the constructor.
     During this process, the names of input arguments (`argNames`) are unified with variables in the
     conclusion of the constructor. -/
 def processConstructorUnifyArgs (ctorName : Name) (ctorType: Expr) (inputVars : Array Expr) (inputTypes : Array Expr)
@@ -364,9 +370,9 @@ def processConstructorUnifyArgs (ctorName : Name) (ctorType: Expr) (inputVars : 
 
     let (bound_vars, _) := bound_vars_and_types.unzip
     let (bound_vars_with_base_types, _) :=
-      (bound_vars_and_types.filter (fun (_,b) => isBaseType b)).unzip
+      (bound_vars_and_types.filter (fun (_, b) => isBaseType b)).unzip
     let (bound_vars_with_non_base_types, _) :=
-      (bound_vars_and_types.filter (fun (_,b) => ¬ isBaseType b)).unzip
+      (bound_vars_and_types.filter (fun (_, b) => ¬ isBaseType b)).unzip
 
     let mut hypotheses_with_only_base_type_args := #[]
     let mut nonlinear_hypotheses := #[]
@@ -391,6 +397,7 @@ def processConstructorUnifyArgs (ctorName : Name) (ctorType: Expr) (inputVars : 
         nonlinear_hypotheses := nonlinear_hypotheses.push hyp
 
     let inputEqualities := conclusion_args.zip inputVars
+
     let inputEqualitiesWithTypes := inputEqualities.zip inputTypes
     let (baseTypeInputEqualities, _) := (inputEqualitiesWithTypes.filter (fun (_, ty) => isBaseType ty)).unzip
     let (nonBaseTypeInputEqualities, _) := (inputEqualitiesWithTypes.filter (fun (_, ty) => !isBaseType ty)).unzip
@@ -471,17 +478,24 @@ def mkDefaultInputNames (inputExpr : Expr) : MetaM (Array String) := do
     return (← mkDefaultInputNames_aux input_types.size)
   | none => throwError "input expression is not a function application"
 
-/-- `mkInitialContextForInductiveRelation inputTypes inputNameStrings`
-    creates the initial `LocalContext` where each `(x, τ)` in `Array.zip inputTypes inputNameStrings`
+/-- `mkInitialContextForInductiveRelation inputTypes inputNames`
+    creates the initial `LocalContext` where each `(x, τ)` in `Array.zip inputTypes inputNames`
     is given the declaration `x : τ` in the resultant context.
 
-    This function returns a triple containing `inputTypes`, `inputNames` represented as an `Array` of `Name`s,
-    and the resultant `LocalContext`. -/
-def mkInitialContextForInductiveRelation (inputTypes : Array Expr) (inputNameStrings : Array String) : MetaM (Array Expr × Array Name × LocalContext) := do
+    This function returns a quadruple containing `inputTypes`, `inputNames` represented as an `Array` of `Name`s,
+    the resultant `LocalContext` and a map from original names to freshened names. -/
+def mkInitialContextForInductiveRelation (inputTypes : Array Expr) (inputNameStrings : Array String) : MetaM (Array Expr × Array Name × LocalContext × HashMap Name Name) := do
   let inputNames := Name.mkStr1 <$> inputNameStrings
   let localDecls := inputNames.zip inputTypes
   withLocalDeclsDND localDecls $ fun exprs => do
-    return (exprs, inputNames, ← getLCtx)
+    let mut nameMapBindings := #[]
+    let mut localCtx ← getLCtx
+    for currentName in inputNames do
+      let freshName := getUnusedName localCtx currentName
+      localCtx := renameUserName localCtx currentName freshName
+      nameMapBindings := nameMapBindings.push (currentName, freshName)
+    let nameMap := HashMap.ofList (Array.toList nameMapBindings)
+    return (exprs, inputNames, localCtx, nameMap)
 
 
 /-- Takes in an expression of the form `R e1 ... en`, where `R` is an inductive relation
@@ -494,23 +508,23 @@ def getInductiveInfoWithArgs (inputExpr : Expr) (argNames : Array String) : Meta
     let tyexprs_in_arrow_type ← getComponentsOfArrowType type
 
     -- `input_types` contains all elements of `tyexprs_in_arrow_type` except the conclusion (which is `Prop`)
-    let input_types := tyexprs_in_arrow_type.pop
+    let inputTypes := tyexprs_in_arrow_type.pop
 
-    let (input_vars, input_vars_names, localCtx) ← mkInitialContextForInductiveRelation input_types argNames
+    let (input_vars, input_vars_names, localCtx, nameMap) ← mkInitialContextForInductiveRelation inputTypes argNames
 
     let env ← getEnv
     match env.find? inductive_name with
     | none => throwError "Type '{inductive_name}' not found"
     | some (ConstantInfo.inductInfo info) => do
-      let mut decomposed_ctor_types : Array DecomposedConstructorType := #[]
-      let mut ctors : Array InductiveConstructor := #[]
+      let mut decomposed_ctor_types := #[]
+      let mut ctors := #[]
       for ctorName in info.ctors do
         let some ctor := env.find? ctorName
          | throwError "IRConstructor '{ctorName}' not found"
         let decomposed_ctor_type ← decomposeType ctor.type
         decomposed_ctor_types := decomposed_ctor_types.push decomposed_ctor_type
         let constructor ←
-            processConstructorUnifyArgs ctorName ctor.type input_vars input_types inductive_name localCtx
+            processConstructorUnifyArgs ctorName ctor.type input_vars inputTypes inductive_name localCtx
         ctors := ctors.push constructor
       let constructors_with_arity_zero := ctors.filter (fun ctor => ctor.all_hypotheses.size == 0)
       let constructors_with_args := ctors.filter (fun ctor => ctor.all_hypotheses.size != 0)
@@ -521,7 +535,7 @@ def getInductiveInfoWithArgs (inputExpr : Expr) (argNames : Array String) : Meta
          dependencies := dependencies.push dep
       return {
         inductive_name := inductive_name
-        input_types := input_types,
+        input_types := inputTypes,
         input_vars := input_vars
         input_var_names := input_vars_names
         decomposed_ctor_types := decomposed_ctor_types
@@ -530,10 +544,11 @@ def getInductiveInfoWithArgs (inputExpr : Expr) (argNames : Array String) : Meta
         constructors_with_args := constructors_with_args
         dependencies := dependencies
         localCtx := localCtx
+        nameMap := nameMap
       }
     | some _ =>
-      throwError "'{inductive_name}' is not an inductive type"
-  | none => throwError "Not a type"
+      throwError s!"{inductive_name} is not an inductive relation"
+  | none => throwError s!"{inputExpr} is not a type"
 
 /-- Takes in an inductive relation and extracts metadata corresponding to the `inductive`,
     returning an `IR_info` -/
