@@ -1,6 +1,6 @@
 import Lean
 import Std
-import LSpec
+import Batteries
 
 import Plausible.GeneratingGoodGenerators.UnificationMonad
 import Plausible.New.DeriveConstrainedProducers
@@ -11,11 +11,10 @@ import Plausible.IR.Examples
 
 
 open Lean Elab Command Meta Term Parser
-open LSpec
 open Idents
 
 ---------------------------------------------------------------------------------------------
--- Implements figure 4 from "Generating Good Generators for Inductive Relations", POPL '18
+-- Implements figure 4 from "Generating Good Generators for Inductive Relations" (GGG), POPL '18
 --------------------------------------------------------------------------------------------
 
 /-- Creates the initial constraint map κ where all inputs are `Fixed`, the output & all universally-quantified variables is `Undef`
@@ -50,26 +49,33 @@ def convertToCtorExpr (e : Expr) : Option (Name × Array Expr) :=
 -- TODO: fill in the metaprogramming stuff
 
 mutual
+
+  /-- Produces the code for a pattern match on an unknown -/
   partial def emitPatterns (patterns : List (Unknown × Pattern)) (equalities : List (Unknown × Unknown)) (constraints : ConstraintMap) : MetaM (TSyntax `term) :=
     match patterns with
     | [] => emitEqualities equalities constraints
     | (u, p) :: ps => sorry
 
+  /-- Produces the code for an equality check -/
   partial def emitEqualities (equalities : List (Unknown × Unknown)) (constraints : ConstraintMap) : MetaM (TSyntax `term) :=
     match equalities with
     | [] => sorry -- figure out how to get `S e`
     | (u1, u2) :: eqs => sorry
 
+  /-- Produces the code for the body of a sub-generator which processes hypotheses -/
   partial def emitHypothesis (hypotheses : List (Name × List Unknown)) (constraints : ConstraintMap) : MetaM (TSyntax `term) :=
     match hypotheses with
     | [] => finalAssembly constraints
     | _ => sorry
 
+  /-- Assembles the body of the generator (this function is called when all hypotheses have ben processed by `emitHypotheses`) -/
   partial def finalAssembly (constraints : ConstriantMap) : MetaM (TSyntax `term) :=
     sorry
 
+  /-- Produces the call to the final generator call in the body of the sub-generator -/
   partial def emitFinalCall (unknown : Unknown) : MetaM (TSyntax `doElem) := sorry
 
+  /-- Produces a term corresponding to the value being generated -/
   partial def emitResult (k : ConstraintMap) (u : Unknown) (range : Range) : MetaM (TSyntax `term) :=
     match range with
     | .Unknown u' => emitResult k u' k[u']!
@@ -78,11 +84,12 @@ mutual
       let rs' ← List.mapM (fun r => emitResult k u r) rs
       sorry
     | .Undef ty => throwError s!"encountered Range of (Undef {ty}) in emitResult"
+
 end
 
--- Command elaborator infrastructure below
-
+/-- Command for deriving a sub-generator for one construtctor of an inductive relation (per figure 4 of GGG) -/
 syntax (name := derive_subgenerator) "#derive_subgenerator" "(" "fun" "(" ident ":" term ")" "=>" term ")" : command
+
 
 @[command_elab derive_subgenerator]
 def elabDeriveSubGenerator : CommandElab := fun stx => do
@@ -128,9 +135,17 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
 
 
 -- Example usage:
-#derive_subgenerator (fun (tree : Tree) => bst in1 in2 tree)
+-- #derive_subgenerator (fun (tree : Tree) => bst in1 in2 tree)
 
 
--- def initialUnifyStateTestSuite : List TestSeq := [
---   test "BST initial unify state" (4 = 4)
--- ]
+/-- Example initial constraint map from Section 4.2 of GGG -/
+def bstInitialConstraints := Std.HashMap.ofList [
+  (`hi, .Undef (mkConst `Nat)),
+  (`tree, .Undef (mkConst `Tree)),
+  (`in2, .Fixed),
+  (`l, .Undef (mkConst `Tree)),
+  (`x, .Undef (mkConst `Nat)),
+  (`lo, .Undef (mkConst `Nat)),
+  (`r, .Undef (mkConst `Tree)),
+  (`in1, Range.Fixed)
+]

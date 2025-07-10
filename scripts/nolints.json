@@ -220,6 +220,7 @@
   ["docBlame", "Plausible.PrintableProp.printProp"],
   ["docBlame", "Plausible.NamedBinder"],
   ["docBlame", "Plausible.Testable.runProp"],
+  ["docBlame", "elabDeriveSubGenerator"],
   ["unusedArguments", "runSizedEnum"],
   ["unusedArguments", "analyzePartiallyDefined"],
   ["unusedArguments", "gen_typing.aux_arb"],
