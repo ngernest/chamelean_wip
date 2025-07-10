@@ -7,11 +7,13 @@ import Plausible.New.DeriveConstrainedProducers
 import Plausible.New.SubGenerators
 import Plausible.New.DeriveArbitrary
 import Plausible.New.Debug
+import Plausible.IR.Prelude
 import Plausible.IR.Examples
 
 
 open Lean Elab Command Meta Term Parser
 open Idents
+open Plausible.IR
 
 ---------------------------------------------------------------------------------------------
 -- Implements figure 4 from "Generating Good Generators for Inductive Relations" (GGG), POPL '18
@@ -87,9 +89,51 @@ mutual
 
 end
 
+-- This function is only for handling freshening top-level args to the generator (ignored for now)
+-- def addInputsToLocalContext (inputExpr : Expr) (argNames : Array Name) := do
+--   match inputExpr.getAppFn.constName? with
+--   | some inductiveName => do
+--     let type ← inferType inputExpr
+--     let arrowTypeComponents ← getComponentsOfArrowType type
+
+--     -- `input_types` contains all elements of `tyexprs_in_arrow_type` except the conclusion (which is `Prop`)
+--     let inputTypes := arrowTypeComponents.pop
+
+--     let (inputVars, inputVarNames, localCtx, nameMap) ← mkInitialContextForInductiveRelation inputTypes argNames
+
+--     withLCtx' localCtx do
+--       -- inputVars contains the original names of the args to the inductive relation
+--       logInfo m!"inputVars = {inputVars}"
+
+--       -- inputVarNames contains the freshened names
+--       logInfo m!"inputVarNames = {inputVarNames}"
+
+--       -- TODO: remove dummy return expr
+--       return (localCtx, nameMap)
+--   | none => throwError "input expression is not a function application"
+
+
+/-- Takes the name of a constructor and the existing `LocalContext`,
+    and returns a triple consisting of:
+    1. The names & types of universally quantified variables
+    2. The components of the body of the constructor's arrow type (which mentions the universally quantified variables)
+    3. An updated `LocalContext` populated with all the univerally quantified variables
+       (this is needed for pretty-printing purposes) -/
+def getCtorArgsInContext (ctorName : Name) (localCtx : LocalContext) : MetaM (Array (Name × Expr) × Array Expr × LocalContext) := do
+  let ctorInfo ← getConstInfoCtor ctorName
+  let ctorType := ctorInfo.type
+
+  let (forAllVars, ctorTypeBody) := extractForAllBinders ctorType
+  let ctorTypeComponents ← getComponentsOfArrowType ctorTypeBody
+
+  withLCtx' localCtx do
+    withLocalDeclsDND forAllVars fun _ => do
+      logInfo m!"forAllVars = {forAllVars}"
+      logInfo m!"ctorTypeComponents = {ctorTypeComponents}"
+      return (forAllVars, ctorTypeComponents, ← getLCtx)
+
 /-- Command for deriving a sub-generator for one construtctor of an inductive relation (per figure 4 of GGG) -/
 syntax (name := derive_subgenerator) "#derive_subgenerator" "(" "fun" "(" ident ":" term ")" "=>" term ")" : command
-
 
 @[command_elab derive_subgenerator]
 def elabDeriveSubGenerator : CommandElab := fun stx => do
@@ -97,49 +141,50 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
   | `(#derive_subgenerator ( fun ( $var:ident : $outputTypeSyntax:term ) => $body:term )) => do
 
     -- Parse the body of the lambda for an application of the inductive relation
-    let (inductiveName, args) ← parseInductiveApp body
+    let (inductiveSyntax, argNames) ← parseInductiveApp body
+    let inductiveName := inductiveSyntax.getId
 
+    -- Figure out the name and type of the value we wish to generate (the "output")
     let outputName := var.getId
     let outputType ← liftTermElabM $ elabTerm outputTypeSyntax none
 
+    -- Elaborate the name of the inductive relation and the type
+    -- of the value to be generated
+    let inductiveExpr ← liftTermElabM $ elabTerm inductiveSyntax none
+
     -- Find the index of the argument in the inductive application for the value we wish to generate
     -- (i.e. find `i` s.t. `args[i] == targetVar`)
-    let outputIdxOpt := findTargetVarIndex outputName args
+    let outputIdxOpt := findTargetVarIndex outputName argNames
     if let .none := outputIdxOpt then
       throwError "cannot find index of value to be generated"
     let outputIdx := Option.get! outputIdxOpt
 
-    let inputNames := TSyntax.getId <$> Array.eraseIdx! args outputIdx
+    let inputNames := TSyntax.getId <$> Array.eraseIdx! argNames outputIdx
+
+    let mut localCtx ← liftTermElabM getLCtx
 
     -- Obtain Lean's `InductiveVal` data structure, which contains metadata about the inductive relation
     let inductiveVal ← getConstInfoInduct inductiveName
     for ctorName in inductiveVal.ctors do
-      -- Get all the names & types of the constructor's arguments
-      let ctorArgNamesTypes ← liftTermElabM $ getCtorArgsNamesAndTypes ctorName
+      logInfo m!"ctorName = {ctorName}"
 
-      logInfo m!"ctor = {ctorName}"
+      let (forAllVars, ctorTypeComponents, updatedCtx) ← liftTermElabM $ getCtorArgsInContext ctorName localCtx
 
-      let mut forAllVariables := #[]
-      for (arg, argTy) in ctorArgNamesTypes do
-        let isProp ← liftTermElabM $ Meta.isProp argTy
 
-        -- If `argTy` is *not* a `Prop`, then we know `arg` is a universally quantified variable,
-        -- which we treat as an `Unknown` that maps to an `Undef` `Range`
-        if !isProp then
-          forAllVariables := forAllVariables.push (arg, argTy)
+      let initialUnifyState := mkInitialUnifyState inputNames.toList outputName outputType forAllVars.toList
+      logInfo m!"{repr initialUnifyState}"
 
-      let initialUnifyState := mkInitialUnifyState inputNames.toList outputName outputType forAllVariables.toList
+      localCtx := updatedCtx
 
-      -- let conclusion := ctorArgNamesTypes.back!
-      logInfo m!"ctorArgNamesTypes = {ctorArgNamesTypes}"
 
       -- TODO: implement rest of algorithm
+
 
   | _ => throwUnsupportedSyntax
 
 
 -- Example usage:
--- #derive_subgenerator (fun (t : Tree) => complete n t)
+#derive_subgenerator (fun (tree : Tree) => bst lo hi tree)
 
 
 /-- Example initial constraint map from Section 4.2 of GGG -/

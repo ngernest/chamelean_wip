@@ -15,12 +15,12 @@ open Lean Elab Command Meta Term Parser Std
 open Idents
 
 /-- Extracts the name of the induction relation and its arguments -/
-def parseInductiveApp (body : Term) : CommandElabM (Name × TSyntaxArray `ident) := do
+def parseInductiveApp (body : Term) : CommandElabM (TSyntax `ident × TSyntaxArray `ident) := do
   match body with
   | `($indRel:ident $args:ident*) => do
-    return (indRel.getId, args)
+    return (indRel, args)
   | `($indRel:ident) => do
-    return (indRel.getId, #[])
+    return (indRel, #[])
   | _ => throwErrorAt body "Expected inductive type application"
 
 /-- Extracts the name of the induction relation and its arguments
