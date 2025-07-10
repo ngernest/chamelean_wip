@@ -25,8 +25,9 @@ def mkInitialContextForInductiveRelation (inputTypes : Array Expr) (inputNames :
     return (exprs, inputNames, localCtx, nameMap)
 
 
-/-- Looks up the user-facing `Name` corresponding to an `FVarId` in a specific `LocalContext` -/
-def getUserNameInContext (lctx : LocalContext) (fvarId : FVarId) : Name :=
+/-- Looks up the user-facing `Name` corresponding to an `FVarId` in a specific `LocalContext`
+    - Panics if `fvarId` is not in the `LocalContext` -/
+def getUserNameInContext! (lctx : LocalContext) (fvarId : FVarId) : Name :=
   (lctx.get! fvarId).userName
 
 /-- Helper function for setting delaborator options

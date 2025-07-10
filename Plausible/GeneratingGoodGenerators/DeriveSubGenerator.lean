@@ -47,6 +47,19 @@ def convertToCtorExpr (e : Expr) : Option (Name × Array Expr) :=
   if !e.isApp then none
   else some e.getAppFnArgs
 
+/-- Converts an `Expr` to a `Range`, using the `LocalContext` to find the user-facing names
+    corresponding to `FVarId`s -/
+partial def convertExprToRange (e : Expr) (localCtx : LocalContext) : MetaM Range :=
+  match convertToCtorExpr e with
+  | some (f, args) => do
+    let argRanges ← List.mapM (fun arg => convertExprToRange arg localCtx) args.toList
+    return (Range.Ctor f argRanges)
+  | none =>
+    match localCtx.findFVar? e with
+    | some localDecl => return (Range.Unknown localDecl.userName)
+    | none => throwError m!"{e} missing from LocalContext"
+
+
 -- The following implements the `emit` functions in Figure 4
 -- TODO: fill in the metaprogramming stuff
 
@@ -148,10 +161,6 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
     let outputName := var.getId
     let outputType ← liftTermElabM $ elabTerm outputTypeSyntax none
 
-    -- Elaborate the name of the inductive relation and the type
-    -- of the value to be generated
-    let inductiveExpr ← liftTermElabM $ elabTerm inductiveSyntax none
-
     -- Find the index of the argument in the inductive application for the value we wish to generate
     -- (i.e. find `i` s.t. `args[i] == targetVar`)
     let outputIdxOpt := findTargetVarIndex outputName argNames
@@ -169,6 +178,13 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
       logInfo m!"ctorName = {ctorName}"
 
       let (forAllVars, ctorTypeComponents, updatedCtx) ← liftTermElabM $ getCtorArgsInContext ctorName localCtx
+
+      if ctorTypeComponents.isEmpty then
+        throwError "constructor {ctorName} has a malformed type expression"
+
+      let conclusion := ctorTypeComponents.back!
+      logInfo m!"conclusion = {conclusion}"
+
 
 
       let initialUnifyState := mkInitialUnifyState inputNames.toList outputName outputType forAllVars.toList
