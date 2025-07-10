@@ -484,8 +484,7 @@ def mkDefaultInputNames (inputExpr : Expr) : MetaM (Array String) := do
 
     This function returns a quadruple containing `inputTypes`, `inputNames` represented as an `Array` of `Name`s,
     the resultant `LocalContext` and a map from original names to freshened names. -/
-def mkInitialContextForInductiveRelation (inputTypes : Array Expr) (inputNameStrings : Array String) : MetaM (Array Expr × Array Name × LocalContext × HashMap Name Name) := do
-  let inputNames := Name.mkStr1 <$> inputNameStrings
+def mkInitialContextForInductiveRelation (inputTypes : Array Expr) (inputNames : Array Name) : MetaM (Array Expr × Array Name × LocalContext × HashMap Name Name) := do
   let localDecls := inputNames.zip inputTypes
   withLocalDeclsDND localDecls $ fun exprs => do
     let mut nameMapBindings := #[]
@@ -510,7 +509,7 @@ def getInductiveInfoWithArgs (inputExpr : Expr) (argNames : Array String) : Meta
     -- `input_types` contains all elements of `tyexprs_in_arrow_type` except the conclusion (which is `Prop`)
     let inputTypes := tyexprs_in_arrow_type.pop
 
-    let (input_vars, input_vars_names, localCtx, nameMap) ← mkInitialContextForInductiveRelation inputTypes argNames
+    let (input_vars, input_vars_names, localCtx, nameMap) ← mkInitialContextForInductiveRelation inputTypes (Name.mkStr1 <$> argNames)
 
     let env ← getEnv
     match env.find? inductive_name with
