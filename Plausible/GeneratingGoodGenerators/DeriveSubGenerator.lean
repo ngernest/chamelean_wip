@@ -129,7 +129,7 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
           forAllVariables := forAllVariables.push (arg, argTy)
 
       let initialUnifyState := mkInitialUnifyState inputNames.toList outputName outputType forAllVariables.toList
-      logInfo m!"initialUnifyState = {repr initialUnifyState}"
+      logInfo m!"{repr initialUnifyState}"
 
       -- TODO: implement rest of algorithm
 
@@ -137,7 +137,7 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
 
 
 -- Example usage:
--- #derive_subgenerator (fun (tree : Tree) => bst in1 in2 tree)
+-- #derive_subgenerator (fun (t : Tree) => nonempty t)
 
 
 /-- Example initial constraint map from Section 4.2 of GGG -/

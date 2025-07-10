@@ -68,3 +68,15 @@ inductive typing: List type → term → type → Prop where
     typing Γ e2 τ1 →
     typing Γ e1 (.Fun τ1 τ2) →
     typing Γ (.App (.Abs .Nat e1) e2) τ2
+
+/-- Non-empty trees (trees that are not just leaves) -/
+inductive nonempty : Tree -> Prop where
+  | NonEmpty : forall x l r, nonempty (.Node x l r)
+
+/-- Complete trees (aka perfect treees) are binary trees whose leaves are all at the same depth -/
+inductive complete : Nat -> Tree -> Prop where
+  | CompleteLeaf : complete 0 .Leaf
+  | CompleteNode : forall n x l r,
+    complete n l ->
+    complete n r ->
+    complete (.succ n) (.Node x l r)
