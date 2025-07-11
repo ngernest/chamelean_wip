@@ -72,7 +72,7 @@ partial def toMessageDataRange (range : Range) : MessageData :=
   | .Ctor c rs =>
     let rendredCtorArgs := toMessageDataRange <$> rs
     m!"Ctor {c} {rendredCtorArgs}"
-  | .Unknown u => m!"{u}"
+  | .Unknown u => m!"Unknown {u}"
   | .Fixed => m!"Fixed"
 
 instance : ToMessageData Range where

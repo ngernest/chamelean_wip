@@ -123,7 +123,7 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
     for hyp in hypotheses do
       logInfo m!"Processing hypothesis: {hyp}"
       let hypRange ← convertExprToRangeInCurrentContext hyp
-      logInfo m!"Hypothesis range: {hypRange}")
+      logInfo m!"Hyp range: {hypRange}")
 
 
 -- The following implements the `emit` functions in Figure 4
