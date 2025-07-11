@@ -32,12 +32,10 @@ def mkInitialUnifyState (inputNames : List Name) (outputName : Name) (outputType
   let forAllVarNames := Prod.fst <$> forAllVariables
   let constraints := mkInitialConstraintMap inputNames outputName outputType forAllVariables
   let unknowns := Std.HashSet.ofList (outputName :: (inputNames ++ forAllVarNames))
-  {
-    constraints := constraints
+  { constraints := constraints
     equalities := ∅
     patterns := []
-    unknowns := unknowns
-  }
+    unknowns := unknowns }
 
 /-- Converts a expression `e` to a *constructor expression* `C r1 … rn`,
     where `C` is a constructor and the `ri` are arguments,
@@ -47,30 +45,85 @@ def convertToCtorExpr (e : Expr) : Option (Name × Array Expr) :=
   if !e.isApp then none
   else some e.getAppFnArgs
 
-/-- Converts an `Expr` to a `Range`, using the `LocalContext` to find the user-facing names
+/-- Converts an `Expr` to a `Range`, using the ambient `LocalContext` to find the user-facing names
     corresponding to `FVarId`s -/
-partial def convertExprToRange (e : Expr) (localCtx : LocalContext) : MetaM Range :=
+partial def convertExprToRangeInCurrentContext (e : Expr) : MetaM Range :=
   match convertToCtorExpr e with
   | some (f, args) => do
-    let argRanges ← List.mapM (fun arg => convertExprToRange arg localCtx) args.toList
+    let argRanges ← args.toList.mapM convertExprToRangeInCurrentContext
     return (Range.Ctor f argRanges)
   | none =>
-    -- `e` is an identifier (a `FVarId`)
-    withLCtx' localCtx do
-      if localCtx.containsFVar e then
-        logInfo m!"{repr e} is in LocalContext"
-      else
-        logInfo m!"{repr e} not in LocalContext"
-      match localCtx.find? e.fvarId! with
-      | some localDecl => return (Range.Unknown localDecl.userName)
+    if e.isFVar then do
+      let localCtx ← getLCtx
+      match localCtx.findFVar? e with
+      | some localDecl => return (.Unknown localDecl.userName)
       | none =>
-        let name := getUserNameInContext! localCtx e.fvarId!
         let namesInContext := (fun e => getUserNameInContext! localCtx e.fvarId!) <$> localCtx.getFVars
-        if namesInContext.contains name then
-          return (Range.Unknown name)
-        else
-          -- TODO: figure out why `lo` isn't in the `LocalContext` for the BST example
-          throwError m!"{e} missing from LocalContext, which only contains {namesInContext}"
+        throwError m!"{e} missing from LocalContext, which only contains {namesInContext}"
+    else
+      match e with
+      | .const name _ => return (.Unknown name)
+      | _ => throwError m!"Cannot convert expression {e} to Range"
+
+/-- Function that handles the bulk of the generator derivation algorithm for a single constructor:
+    processes the entire type of the constructor within the same `LocalContext` (the one produced by `forallTelescopeReducing`)
+
+    Takes as argument:
+    - The constructor name `ctorName`
+    - The name and type of the output (value to be generated)
+    - The names of inputs (arguments to the generator) -/
+def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Expr) (inputNames : List Name) : MetaM Unit := do
+  let ctorInfo ← getConstInfoCtor ctorName
+  let ctorType := ctorInfo.type
+
+  logInfo m!"inputNames = {inputNames}"
+
+  -- Stay within the forallTelescope scope for all processing
+  forallTelescopeReducing ctorType (cleanupAnnotations := true) (fun forAllVarsAndHyps conclusion => do
+    logInfo m!"Processing constructor {ctorName}"
+    logInfo m!"boundVars = {forAllVarsAndHyps}"
+    logInfo m!"conclusion = {conclusion}"
+
+    -- Universally-quantified variables `x : τ` are represented using `(some x, τ)`
+    -- Hypotheses are represented using `(none, hyp)` (first component is `none` since a hypothesis doesn't have a name)
+    let forAllVarsAndHypsWithTypes ← forAllVarsAndHyps.mapM (fun fvar => do
+      let localCtx ← getLCtx
+      let localDecl := localCtx.get! fvar.fvarId!
+      let userName := localDecl.userName
+      if not userName.hasMacroScopes then
+        return (some userName, localDecl.type)
+      else
+        return (none, localDecl.type))
+
+    logInfo m!"forAllVars = {forAllVarsAndHypsWithTypes}"
+
+    let forAllVars := forAllVarsAndHypsWithTypes.filterMap (fun (nameOpt, ty) =>
+      match nameOpt with
+      | some name => (name, ty)
+      | none => none)
+
+    -- Creates the initial `UnifyState` needed for the unification algorithm
+    let initialUnifyState := mkInitialUnifyState inputNames outputName outputType forAllVars.toList
+    logInfo m!"{initialUnifyState}"
+
+    -- Now convert expressions while staying in the same context
+    let conclusionArgs := conclusion.getAppArgs
+    let conclusionArgRanges ← conclusionArgs.toList.mapM convertExprToRangeInCurrentContext
+
+    logInfo m!"conclusion = {conclusion}"
+    logInfo m!"conclusionArgs = {conclusionArgs}"
+    logInfo m!"conclusionArgRanges = {conclusionArgRanges}"
+
+    -- Extract hypotheses (which correspond to pairs in `forAllVarsAndHypsWithTypes` where the first component is `none`)
+    let hypotheses := forAllVarsAndHypsWithTypes.filterMap (fun (nameOpt, tyExpr) =>
+      match nameOpt with
+      | none => tyExpr
+      | some _ => none)
+    logInfo m!"hypotheses = {hypotheses}"
+    for hyp in hypotheses do
+      logInfo m!"Processing hypothesis: {hyp}"
+      let hypRange ← convertExprToRangeInCurrentContext hyp
+      logInfo m!"Hypothesis range: {hypRange}")
 
 
 -- The following implements the `emit` functions in Figure 4
@@ -115,28 +168,6 @@ mutual
 
 end
 
--- This function is only for handling freshening top-level args to the generator (ignored for now)
--- def addInputsToLocalContext (inputExpr : Expr) (argNames : Array Name) := do
---   match inputExpr.getAppFn.constName? with
---   | some inductiveName => do
---     let type ← inferType inputExpr
---     let arrowTypeComponents ← getComponentsOfArrowType type
-
---     -- `input_types` contains all elements of `tyexprs_in_arrow_type` except the conclusion (which is `Prop`)
---     let inputTypes := arrowTypeComponents.pop
-
---     let (inputVars, inputVarNames, localCtx, nameMap) ← mkInitialContextForInductiveRelation inputTypes argNames
-
---     withLCtx' localCtx do
---       -- inputVars contains the original names of the args to the inductive relation
---       logInfo m!"inputVars = {inputVars}"
-
---       -- inputVarNames contains the freshened names
---       logInfo m!"inputVarNames = {inputVarNames}"
-
---       -- TODO: remove dummy return expr
---       return (localCtx, nameMap)
---   | none => throwError "input expression is not a function application"
 
 
 /-- Takes the name of a constructor and the existing `LocalContext`,
@@ -190,31 +221,13 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
 
     let inputNames := TSyntax.getId <$> Array.eraseIdx! argNames outputIdx
 
-    let mut localCtx ← liftTermElabM getLCtx
-
     -- Obtain Lean's `InductiveVal` data structure, which contains metadata about the inductive relation
     let inductiveVal ← getConstInfoInduct inductiveName
+
     for ctorName in inductiveVal.ctors do
-      logInfo m!"ctorName = {ctorName}"
-
-      let (forAllVars, ctorTypeComponents, updatedCtx) ← liftTermElabM $ getCtorArgsInContext ctorName localCtx
-      localCtx := updatedCtx
-
-      if ctorTypeComponents.isEmpty then
-        throwError "constructor {ctorName} has a malformed type expression"
-
-      let initialUnifyState := mkInitialUnifyState inputNames.toList outputName outputType forAllVars.toList
-      logInfo m!"{initialUnifyState}"
-
-      -- Convert each arugment in the constructor's conclusion to a range
-      let conclusion := ctorTypeComponents.back!
-      let conclusionArgs := conclusion.getAppArgs
-      let conclusionArgRanges ← Array.mapM (fun e => liftTermElabM $ convertExprToRange e localCtx) conclusionArgs
-
-      logInfo m!"conclusionArgs = {conclusionArgs}"
-      logInfo m!"conclusionArgRanges = {conclusionArgRanges}"
-
-
+      logInfo m!"Processing constructor: {ctorName}"
+      -- Process everything within the scope of the telescope
+      liftTermElabM $ processCtorInContext ctorName outputName outputType inputNames.toList
 
       -- TODO: implement rest of algorithm
 
