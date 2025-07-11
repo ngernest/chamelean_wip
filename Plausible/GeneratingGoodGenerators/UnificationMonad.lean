@@ -65,11 +65,18 @@ structure UnifyState where
 -- `ToMessageData` instances for pretty-printing
 ---------------------------------------------------------------
 
+/-- Pretty-prints a `Range` as a `MessageData` -/
+partial def toMessageDataRange (range : Range) : MessageData :=
+  match range with
+  | .Undef tyExpr => m!"Undef {tyExpr}"
+  | .Ctor c rs =>
+    let rendredCtorArgs := toMessageDataRange <$> rs
+    m!"Ctor {c} {rendredCtorArgs}"
+  | .Unknown u => m!"{u}"
+  | .Fixed => m!"Fixed"
+
 instance : ToMessageData Range where
-  toMessageData range :=
-    match range with
-    | .Undef tyExpr => m!"Undef {tyExpr}"
-    | _ => repr range
+  toMessageData := toMessageDataRange
 
 instance : ToMessageData Pattern where
   toMessageData pattern := repr pattern
@@ -86,7 +93,6 @@ instance : ToMessageData UnifyState where
       unifyState.unknowns.toList.map $ fun u => m!"{u}"
 
     m!"⟨\n  constraints := {constraints},\n  equalities := {equalities},\n  patterns := {patterns},\n  unknowns := {unknowns}\n⟩"
-
 
 
 
