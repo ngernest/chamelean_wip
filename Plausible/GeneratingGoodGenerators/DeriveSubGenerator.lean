@@ -182,13 +182,11 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
       if ctorTypeComponents.isEmpty then
         throwError "constructor {ctorName} has a malformed type expression"
 
+      let initialUnifyState := mkInitialUnifyState inputNames.toList outputName outputType forAllVars.toList
+      logInfo m!"{initialUnifyState}"
+
       let conclusion := ctorTypeComponents.back!
       logInfo m!"conclusion = {conclusion}"
-
-
-
-      let initialUnifyState := mkInitialUnifyState inputNames.toList outputName outputType forAllVars.toList
-      logInfo m!"{repr initialUnifyState}"
 
       localCtx := updatedCtx
 

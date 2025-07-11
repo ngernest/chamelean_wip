@@ -33,6 +33,7 @@ inductive Range
   | Ctor (ctor : Name) (rs : List Range)
   deriving Repr, Inhabited
 
+
 /-- A `Pattern` is either an unknown or a fully-applied constructor -/
 inductive Pattern
   | UnknownPattern : Unknown -> Pattern
@@ -59,6 +60,35 @@ structure UnifyState where
   unknowns : Std.HashSet Unknown
 
   deriving Repr
+
+---------------------------------------------------------------
+-- `ToMessageData` instances for pretty-printing
+---------------------------------------------------------------
+
+instance : ToMessageData Range where
+  toMessageData range :=
+    match range with
+    | .Undef tyExpr => m!"Undef {tyExpr}"
+    | _ => repr range
+
+instance : ToMessageData Pattern where
+  toMessageData pattern := repr pattern
+
+instance : ToMessageData UnifyState where
+  toMessageData unifyState :=
+    let constraints :=
+      unifyState.constraints.toList.map $ fun (u, r) => m!"{u} ↦ {r}"
+    let equalities :=
+      unifyState.equalities.toList.map $ fun (u1, u2) => m!"{u1} = {u2}"
+    let patterns :=
+      unifyState.patterns.map $ fun (u, pat) => m!"{u} ≡ {pat}"
+    let unknowns :=
+      unifyState.unknowns.toList.map $ fun u => m!"{u}"
+
+    m!"⟨\n  constraints := {constraints},\n  equalities := {equalities},\n  patterns := {patterns},\n  unknowns := {unknowns}\n⟩"
+
+
+
 
 ---------------------------------------------------------------
 -- Unification monad (fig. 2 in Generating Good Generators)
