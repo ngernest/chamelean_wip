@@ -55,9 +55,22 @@ partial def convertExprToRange (e : Expr) (localCtx : LocalContext) : MetaM Rang
     let argRanges ← List.mapM (fun arg => convertExprToRange arg localCtx) args.toList
     return (Range.Ctor f argRanges)
   | none =>
-    match localCtx.findFVar? e with
-    | some localDecl => return (Range.Unknown localDecl.userName)
-    | none => throwError m!"{e} missing from LocalContext"
+    -- `e` is an identifier (a `FVarId`)
+    withLCtx' localCtx do
+      if localCtx.containsFVar e then
+        logInfo m!"{repr e} is in LocalContext"
+      else
+        logInfo m!"{repr e} not in LocalContext"
+      match localCtx.find? e.fvarId! with
+      | some localDecl => return (Range.Unknown localDecl.userName)
+      | none =>
+        let name := getUserNameInContext! localCtx e.fvarId!
+        let namesInContext := (fun e => getUserNameInContext! localCtx e.fvarId!) <$> localCtx.getFVars
+        if namesInContext.contains name then
+          return (Range.Unknown name)
+        else
+          -- TODO: figure out why `lo` isn't in the `LocalContext` for the BST example
+          throwError m!"{e} missing from LocalContext, which only contains {namesInContext}"
 
 
 -- The following implements the `emit` functions in Figure 4
@@ -137,13 +150,20 @@ def getCtorArgsInContext (ctorName : Name) (localCtx : LocalContext) : MetaM (Ar
   let ctorType := ctorInfo.type
 
   let (forAllVars, ctorTypeBody) := extractForAllBinders ctorType
+  logInfo m!"inside getCtorArgsInContext"
+  logInfo m!"forAllVars = {forAllVars}"
+
   let ctorTypeComponents ← getComponentsOfArrowType ctorTypeBody
 
   withLCtx' localCtx do
-    withLocalDeclsDND forAllVars fun _ => do
-      logInfo m!"forAllVars = {forAllVars}"
+    forallTelescopeReducing ctorType (cleanupAnnotations := true) $ fun boundVars body => do
+      logInfo m!"boundVars = {boundVars}"
+      logInfo m!"body = {body}"
       logInfo m!"ctorTypeComponents = {ctorTypeComponents}"
-      return (forAllVars, ctorTypeComponents, ← getLCtx)
+      let lctx ← getLCtx
+      let exprsInContext := lctx.getFVars
+      logInfo m!"exprsInContext = {exprsInContext}"
+      return (forAllVars, ctorTypeComponents, lctx)
 
 /-- Command for deriving a sub-generator for one construtctor of an inductive relation (per figure 4 of GGG) -/
 syntax (name := derive_subgenerator) "#derive_subgenerator" "(" "fun" "(" ident ":" term ")" "=>" term ")" : command
@@ -178,6 +198,7 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
       logInfo m!"ctorName = {ctorName}"
 
       let (forAllVars, ctorTypeComponents, updatedCtx) ← liftTermElabM $ getCtorArgsInContext ctorName localCtx
+      localCtx := updatedCtx
 
       if ctorTypeComponents.isEmpty then
         throwError "constructor {ctorName} has a malformed type expression"
@@ -185,10 +206,14 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
       let initialUnifyState := mkInitialUnifyState inputNames.toList outputName outputType forAllVars.toList
       logInfo m!"{initialUnifyState}"
 
+      -- Convert each arugment in the constructor's conclusion to a range
       let conclusion := ctorTypeComponents.back!
-      logInfo m!"conclusion = {conclusion}"
+      let conclusionArgs := conclusion.getAppArgs
+      let conclusionArgRanges ← Array.mapM (fun e => liftTermElabM $ convertExprToRange e localCtx) conclusionArgs
 
-      localCtx := updatedCtx
+      logInfo m!"conclusionArgs = {conclusionArgs}"
+      logInfo m!"conclusionArgRanges = {conclusionArgRanges}"
+
 
 
       -- TODO: implement rest of algorithm
