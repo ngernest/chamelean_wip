@@ -52,18 +52,22 @@ partial def convertExprToRangeInCurrentContext (e : Expr) : UnifyM Range :=
   | some (f, args) => do
     let argRanges ← args.toList.mapM convertExprToRangeInCurrentContext
     return (Range.Ctor f argRanges)
-  | none =>
-    if e.isFVar then do
-      let localCtx ← getLCtx
-      match localCtx.findFVar? e with
-      | some localDecl => return (.Unknown localDecl.userName)
-      | none =>
-        let namesInContext := (fun e => getUserNameInContext! localCtx e.fvarId!) <$> localCtx.getFVars
-        throwError m!"{e} missing from LocalContext, which only contains {namesInContext}"
-    else
-      match e with
-      | .const name _ => return (.Unknown name)
-      | _ => throwError m!"Cannot convert expression {e} to Range"
+  | none => do
+    let ty ← inferType e
+    return (.Undef ty)
+
+
+    -- if e.isFVar then do
+    --   let localCtx ← getLCtx
+    --   match localCtx.findFVar? e with
+    --   | some localDecl => return (.Unknown localDecl.userName)
+    --   | none =>
+    --     let namesInContext := (fun e => getUserNameInContext! localCtx e.fvarId!) <$> localCtx.getFVars
+    --     throwError m!"{e} missing from LocalContext, which only contains {namesInContext}"
+    -- else
+    --   match e with
+    --   | .const name _ => return (.Unknown name)
+    --   | _ => throwError m!"Cannot convert expression {e} to Range"
 
 
 -- The following implements the `emit` functions in Figure 4
@@ -153,6 +157,8 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
       (fun acc unknown => acc.push initialUnifyState.constraints[unknown]!) #[] unknowns
     let unknownArgsAndRanges := unknowns.zip unknownRanges
 
+    logInfo m!"unknownArgsAndRanges = {unknownArgsAndRanges}"
+
     -- Now convert expressions while staying in the same context
     let conclusionArgs := conclusion.getAppArgs
     let conclusionRanges ← conclusionArgs.mapM convertExprToRangeInCurrentContext
@@ -161,7 +167,7 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
 
 
     logInfo m!"conclusion = {conclusion}"
-    logInfo m!"conclusionArgRanges = {conclusionRanges}"
+    logInfo m!"conclusionArgsAndRanges = {conclusionArgsAndRanges}"
 
     -- Extract hypotheses (which correspond to pairs in `forAllVarsAndHypsWithTypes` where the first component is `none`)
     -- let hypotheses := forAllVarsAndHypsWithTypes.filterMap (fun (nameOpt, tyExpr) =>
@@ -256,7 +262,7 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
 
 
 -- Example usage:
-#derive_subgenerator (fun (tree : Tree) => bst in1 in2 tree)
+#derive_subgenerator (fun (tree : Tree) => goodTree in1 in2 tree)
 
 
 /-- Example initial constraint map from Section 4.2 of GGG -/
