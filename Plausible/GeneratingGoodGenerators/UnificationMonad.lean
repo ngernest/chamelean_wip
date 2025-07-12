@@ -101,7 +101,7 @@ instance : ToMessageData UnifyState where
 ---------------------------------------------------------------
 
 /-- Under the hood, this means `UnifyM α := UnifyState → Option (α × UnifyState)` -/
-abbrev UnifyM (α : Type) := StateT UnifyState Option α
+abbrev UnifyM (α : Type) := StateT UnifyState (OptionT MetaM) α
 
 namespace UnifyM
 
@@ -149,6 +149,10 @@ namespace UnifyM
       let u := freshUnknown us
       (u, { s with unknowns := us.union {u} })
 
+  /-- Runs a `UnifyM` computation, returning the result in the `MetaM` monad -/
+  def runInMetaM {α : Type} (action : UnifyM α) (st : UnifyState) : MetaM (Option (α × UnifyState)) := do
+    OptionT.run (StateT.run action st)
+
 end UnifyM
 
 ------------------------------------------------------------------
@@ -175,7 +179,7 @@ mutual
       UnifyM.withConstraints $ fun k => do
         let r2 := k.get! u2
         unifyRC (u2, r2) c1
-    | _, _ => panic! "reached catch-all case in unify"
+    | r1, r2 => throwError "Unable to unify {r1} with {r2}"
 
   /-- Takes two `(Unknown, Range)` pairs & unifies them based on their `Range`s -/
   partial def unifyR : Unknown × Range → Unknown × Range → UnifyM Unit
@@ -264,7 +268,7 @@ end
 -------------
 
 /-- Initial (empty) unification state  -/
-def initUnifyState : UnifyState :=
+def emptyUnifyState : UnifyState :=
   { constraints := ∅,
     equalities := ∅,
     patterns := [],
@@ -272,12 +276,13 @@ def initUnifyState : UnifyState :=
 
 /-- Runs a `UnifyM unit` action using the empty `UnifyState`,
     returning the resultant `UnifyState` in an `Option`  -/
-def runUnify (action : UnifyM Unit) : Option UnifyState :=
-  Prod.snd <$> StateT.run action initUnifyState
+def runUnifyState (action : UnifyM α) : OptionT MetaM UnifyState := do
+  let (_, finalState) ← StateT.run action emptyUnifyState
+  return finalState
 
 
 /-- Test the nonempty trees example from Section 3 -/
-def testNonemptyTrees : IO Unit := do
+def testNonemptyTrees : MetaM Unit := do
   -- Simulate: nonempty (Node x l r)
   -- This should unify successfully and bind unknowns
 
@@ -301,7 +306,7 @@ def testNonemptyTrees : IO Unit := do
     let nodePattern := Range.Ctor `Node [.Unknown x, .Unknown l, .Unknown r]
     unify (.Unknown t) nodePattern
 
-  match runUnify testUnify with
+  match (← runUnifyState testUnify) with
   | some finalState =>
     IO.println s!"✓ Nonempty trees test passed"
     IO.println s!"  Final constraints: {repr finalState.constraints.toList}"
@@ -310,7 +315,7 @@ def testNonemptyTrees : IO Unit := do
     IO.println "✗ Nonempty trees test failed"
 
 /-- Test complete trees example: complete n t -/
-def testCompleteTrees : IO Unit := do
+def testCompleteTrees : MetaM Unit := do
   -- Simulate: complete in1 t where in1 is input, t is output
 
   let testUnify : UnifyM Unit := do
@@ -337,7 +342,7 @@ def testCompleteTrees : IO Unit := do
     unify (.Unknown in1) sn
     unify (.Unknown t) nodePattern
 
-  match runUnify testUnify with
+  match (← runUnifyState testUnify) with
   | some finalState =>
     IO.println s!"✓ Complete trees test passed"
     IO.println s!"  Patterns generated: {repr finalState.patterns}"
@@ -347,7 +352,7 @@ def testCompleteTrees : IO Unit := do
 
 
 /-- Test binary search trees with bounds -/
-def testBinarySearchTrees : IO Unit := do
+def testBinarySearchTrees : MetaM Unit := do
   -- Simulate: bst lo hi (Node x l r) where lo, hi are inputs
 
   let testUnify : UnifyM Unit := do
@@ -375,7 +380,7 @@ def testBinarySearchTrees : IO Unit := do
     -- Simulate processing premises: lo < x, x < hi, bst lo x l, bst x hi r
     -- These would create additional constraints in a full implementation
 
-  match runUnify testUnify with
+  match (← runUnifyState testUnify) with
   | some finalState =>
     IO.println s!"✓ BST test passed"
     IO.println s!"  Tree structure unified: {repr finalState.constraints}"
@@ -384,7 +389,7 @@ def testBinarySearchTrees : IO Unit := do
 
 
 /-- Test non-linear patterns (same variable appears multiple times) -/
-def testNonLinearPatterns : IO Unit := do
+def testNonLinearPatterns : MetaM Unit := do
   -- Simulate: typing Γ (Abs t1 e) (Arr t1 t2)
   -- Note: t1 appears twice (non-linear)
 
@@ -416,7 +421,7 @@ def testNonLinearPatterns : IO Unit := do
 
     -- The non-linearity of t1 should create equality constraints (unknown_3, unknown_6)
 
-  match runUnify testUnify with
+  match (← runUnifyState testUnify) with
   | some finalState =>
     IO.println s!"✓ Non-linear patterns test passed"
     IO.println s!"  Patterns: {repr finalState.patterns}"
@@ -426,7 +431,7 @@ def testNonLinearPatterns : IO Unit := do
     IO.println "✗ Non-linear patterns test failed"
 
 /-- Test function calls in constructor conclusions -/
-def testFunctionCalls : IO Unit := do
+def testFunctionCalls : MetaM Unit := do
   -- Simulate: square_of n (n * n) -> square_of n m
   -- where (n * n) needs to be converted to fresh variable with equality
 
@@ -456,7 +461,7 @@ def testFunctionCalls : IO Unit := do
 
     -- Simulate the equality: product = n * n (would be handled by preprocessing)
 
-  match runUnify testUnify with
+  match (← runUnifyState testUnify) with
   | some finalState =>
     IO.println s!"✓ Function calls test passed"
     IO.println s!"  Equalities created: {repr finalState.equalities.toList}"
@@ -465,7 +470,7 @@ def testFunctionCalls : IO Unit := do
 
 
 /-- Run all test cases -/
-def runAllTests : IO Unit := do
+def runAllTests : MetaM Unit := do
   IO.println "=== Testing Unification Monad ==="
   IO.println ""
 

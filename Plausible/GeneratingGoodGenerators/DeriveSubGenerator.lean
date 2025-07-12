@@ -47,7 +47,7 @@ def convertToCtorExpr (e : Expr) : Option (Name × Array Expr) :=
 
 /-- Converts an `Expr` to a `Range`, using the ambient `LocalContext` to find the user-facing names
     corresponding to `FVarId`s -/
-partial def convertExprToRangeInCurrentContext (e : Expr) : MetaM Range :=
+partial def convertExprToRangeInCurrentContext (e : Expr) : UnifyM Range :=
   match convertToCtorExpr e with
   | some (f, args) => do
     let argRanges ← args.toList.mapM convertExprToRangeInCurrentContext
@@ -64,74 +64,6 @@ partial def convertExprToRangeInCurrentContext (e : Expr) : MetaM Range :=
       match e with
       | .const name _ => return (.Unknown name)
       | _ => throwError m!"Cannot convert expression {e} to Range"
-
-/-- Function that handles the bulk of the generator derivation algorithm for a single constructor:
-    processes the entire type of the constructor within the same `LocalContext` (the one produced by `forallTelescopeReducing`)
-
-    Takes as argument:
-    - The constructor name `ctorName`
-    - The name and type of the output (value to be generated)
-    - The names of inputs (arguments to the generator)
-    - An array of unknowns (the arguments to the inductive relation) -/
-def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Expr) (inputNames : List Name) (unknowns : Array Unknown) : MetaM (UnifyM Unit) := do
-  let ctorInfo ← getConstInfoCtor ctorName
-  let ctorType := ctorInfo.type
-
-  logInfo m!"inputNames = {inputNames}"
-
-  -- Stay within the forallTelescope scope for all processing
-  forallTelescopeReducing ctorType (cleanupAnnotations := true) (fun forAllVarsAndHyps conclusion => do
-    logInfo m!"Processing constructor {ctorName}"
-    logInfo m!"conclusion = {conclusion}"
-
-    -- Universally-quantified variables `x : τ` are represented using `(some x, τ)`
-    -- Hypotheses are represented using `(none, hyp)` (first component is `none` since a hypothesis doesn't have a name)
-    let forAllVarsAndHypsWithTypes ← forAllVarsAndHyps.mapM (fun fvar => do
-      let localCtx ← getLCtx
-      let localDecl := localCtx.get! fvar.fvarId!
-      let userName := localDecl.userName
-      if not userName.hasMacroScopes then
-        return (some userName, localDecl.type)
-      else
-        return (none, localDecl.type))
-
-    let forAllVars := forAllVarsAndHypsWithTypes.filterMap (fun (nameOpt, ty) =>
-      match nameOpt with
-      | some name => (name, ty)
-      | none => none)
-
-    -- Creates the initial `UnifyState` needed for the unification algorithm
-    let initialUnifyState := mkInitialUnifyState inputNames outputName outputType forAllVars.toList
-    logInfo m!"{initialUnifyState}"
-
-    -- Get the ranges corresponding to each of the unknowns
-    let unknownRanges := Array.foldl
-      (fun acc unknown => acc.push initialUnifyState.constraints[unknown]!) #[] unknowns
-
-    -- Now convert expressions while staying in the same context
-    let conclusionArgs := conclusion.getAppArgs
-    let conclusionArgRanges ← conclusionArgs.mapM convertExprToRangeInCurrentContext
-
-
-    logInfo m!"conclusion = {conclusion}"
-    logInfo m!"conclusionArgRanges = {conclusionArgRanges}"
-
-    -- Extract hypotheses (which correspond to pairs in `forAllVarsAndHypsWithTypes` where the first component is `none`)
-    let hypotheses := forAllVarsAndHypsWithTypes.filterMap (fun (nameOpt, tyExpr) =>
-      match nameOpt with
-      | none => tyExpr
-      | some _ => none)
-    for hyp in hypotheses do
-      let hypRange ← convertExprToRangeInCurrentContext hyp
-
-
-    return do
-      -- Update the state in `UnifyM` to be `initialUnifyState`
-      modify (fun _ => initialUnifyState)
-
-      for (r1, r2) in conclusionArgRanges.zip unknownRanges do
-        -- TODO: figure out how to print out the final state after all the unification is done
-        unify r1 r2)
 
 
 -- The following implements the `emit` functions in Figure 4
@@ -175,6 +107,80 @@ mutual
     | .Undef ty => throwError s!"encountered Range of (Undef {ty}) in emitResult"
 
 end
+
+
+/-- Function that handles the bulk of the generator derivation algorithm for a single constructor:
+    processes the entire type of the constructor within the same `LocalContext` (the one produced by `forallTelescopeReducing`)
+
+    Takes as argument:
+    - The constructor name `ctorName`
+    - The name and type of the output (value to be generated)
+    - The names of inputs (arguments to the generator)
+    - An array of unknowns (the arguments to the inductive relation) -/
+def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Expr) (inputNames : List Name) (unknowns : Array Unknown) : UnifyM Unit := do
+  let ctorInfo ← getConstInfoCtor ctorName
+  let ctorType := ctorInfo.type
+
+  logInfo m!"inputNames = {inputNames}"
+
+  -- Stay within the forallTelescope scope for all processing
+  forallTelescopeReducing ctorType (cleanupAnnotations := true) (fun forAllVarsAndHyps conclusion => do
+    logInfo m!"Processing constructor {ctorName}"
+    logInfo m!"conclusion = {conclusion}"
+
+    -- Universally-quantified variables `x : τ` are represented using `(some x, τ)`
+    -- Hypotheses are represented using `(none, hyp)` (first component is `none` since a hypothesis doesn't have a name)
+    let forAllVarsAndHypsWithTypes ← forAllVarsAndHyps.mapM (fun fvar => do
+      let localCtx ← getLCtx
+      let localDecl := localCtx.get! fvar.fvarId!
+      let userName := localDecl.userName
+      if not userName.hasMacroScopes then
+        return (some userName, localDecl.type)
+      else
+        return (none, localDecl.type))
+
+    let forAllVars := forAllVarsAndHypsWithTypes.filterMap (fun (nameOpt, ty) =>
+      match nameOpt with
+      | some name => (name, ty)
+      | none => none)
+
+    -- Creates the initial `UnifyState` needed for the unification algorithm
+    let initialUnifyState := mkInitialUnifyState inputNames outputName outputType forAllVars.toList
+    logInfo m!"{initialUnifyState}"
+
+    -- Get the ranges corresponding to each of the unknowns
+    let unknownRanges := Array.foldl
+      (fun acc unknown => acc.push initialUnifyState.constraints[unknown]!) #[] unknowns
+    let unknownArgsAndRanges := unknowns.zip unknownRanges
+
+    -- Now convert expressions while staying in the same context
+    let conclusionArgs := conclusion.getAppArgs
+    let conclusionRanges ← conclusionArgs.mapM convertExprToRangeInCurrentContext
+
+    let conclusionArgsAndRanges := conclusionArgs.zip conclusionRanges
+
+
+    logInfo m!"conclusion = {conclusion}"
+    logInfo m!"conclusionArgRanges = {conclusionRanges}"
+
+    -- Extract hypotheses (which correspond to pairs in `forAllVarsAndHypsWithTypes` where the first component is `none`)
+    -- let hypotheses := forAllVarsAndHypsWithTypes.filterMap (fun (nameOpt, tyExpr) =>
+    --   match nameOpt with
+    --   | none => tyExpr
+    --   | some _ => none)
+    -- for hyp in hypotheses do
+    --   let hypRange ← convertExprToRangeInCurrentContext hyp
+
+
+    -- Update the state in `UnifyM` to be `initialUnifyState`
+    modify (fun _ => initialUnifyState)
+
+    for ((u1, r1), (u2, r2)) in conclusionArgsAndRanges.zip unknownArgsAndRanges do
+      logInfo m!"Unifying ({u1} ↦ {r1}) with ({u2} ↦ {r2})"
+      unify r1 r2
+
+    let finalState ← get
+    logInfo m!"finalState = {finalState}")
 
 
 
@@ -241,7 +247,7 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
     for ctorName in inductiveVal.ctors do
       logInfo m!"Processing constructor: {ctorName}"
       -- Process everything within the scope of the telescope
-      let _ ← liftTermElabM $ processCtorInContext ctorName outputName outputType inputNames.toList allUnknowns
+      let _ ← liftTermElabM (UnifyM.runInMetaM (processCtorInContext ctorName outputName outputType inputNames.toList allUnknowns) emptyUnifyState)
 
       -- TODO: implement rest of algorithm
 
