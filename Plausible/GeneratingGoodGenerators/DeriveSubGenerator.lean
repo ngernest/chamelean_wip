@@ -71,8 +71,9 @@ partial def convertExprToRangeInCurrentContext (e : Expr) : MetaM Range :=
     Takes as argument:
     - The constructor name `ctorName`
     - The name and type of the output (value to be generated)
-    - The names of inputs (arguments to the generator) -/
-def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Expr) (inputNames : List Name) : MetaM Unit := do
+    - The names of inputs (arguments to the generator)
+    - An array of unknowns (the arguments to the inductive relation) -/
+def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Expr) (inputNames : List Name) (unknowns : Array Unknown) : MetaM (UnifyM Unit) := do
   let ctorInfo ← getConstInfoCtor ctorName
   let ctorType := ctorInfo.type
 
@@ -81,7 +82,6 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
   -- Stay within the forallTelescope scope for all processing
   forallTelescopeReducing ctorType (cleanupAnnotations := true) (fun forAllVarsAndHyps conclusion => do
     logInfo m!"Processing constructor {ctorName}"
-    logInfo m!"boundVars = {forAllVarsAndHyps}"
     logInfo m!"conclusion = {conclusion}"
 
     -- Universally-quantified variables `x : τ` are represented using `(some x, τ)`
@@ -95,8 +95,6 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
       else
         return (none, localDecl.type))
 
-    logInfo m!"forAllVars = {forAllVarsAndHypsWithTypes}"
-
     let forAllVars := forAllVarsAndHypsWithTypes.filterMap (fun (nameOpt, ty) =>
       match nameOpt with
       | some name => (name, ty)
@@ -106,12 +104,16 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
     let initialUnifyState := mkInitialUnifyState inputNames outputName outputType forAllVars.toList
     logInfo m!"{initialUnifyState}"
 
+    -- Get the ranges corresponding to each of the unknowns
+    let unknownRanges := Array.foldl
+      (fun acc unknown => acc.push initialUnifyState.constraints[unknown]!) #[] unknowns
+
     -- Now convert expressions while staying in the same context
     let conclusionArgs := conclusion.getAppArgs
-    let conclusionArgRanges ← conclusionArgs.toList.mapM convertExprToRangeInCurrentContext
+    let conclusionArgRanges ← conclusionArgs.mapM convertExprToRangeInCurrentContext
+
 
     logInfo m!"conclusion = {conclusion}"
-    logInfo m!"conclusionArgs = {conclusionArgs}"
     logInfo m!"conclusionArgRanges = {conclusionArgRanges}"
 
     -- Extract hypotheses (which correspond to pairs in `forAllVarsAndHypsWithTypes` where the first component is `none`)
@@ -119,11 +121,17 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
       match nameOpt with
       | none => tyExpr
       | some _ => none)
-    logInfo m!"hypotheses = {hypotheses}"
     for hyp in hypotheses do
-      logInfo m!"Processing hypothesis: {hyp}"
       let hypRange ← convertExprToRangeInCurrentContext hyp
-      logInfo m!"Hyp range: {hypRange}")
+
+
+    return do
+      -- Update the state in `UnifyM` to be `initialUnifyState`
+      modify (fun _ => initialUnifyState)
+
+      for (r1, r2) in conclusionArgRanges.zip unknownRanges do
+        -- TODO: figure out how to print out the final state after all the unification is done
+        unify r1 r2)
 
 
 -- The following implements the `emit` functions in Figure 4
@@ -219,7 +227,13 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
       throwError "cannot find index of value to be generated"
     let outputIdx := Option.get! outputIdxOpt
 
+    -- Each argument to the inductive relation (except the one at `outputIdx`)
+    -- is treated as an input
     let inputNames := TSyntax.getId <$> Array.eraseIdx! argNames outputIdx
+
+    -- Each argument to the inductive relation (as specified by the user) is treated as an unknown
+    -- (including the output variable)
+    let allUnknowns := TSyntax.getId <$> argNames
 
     -- Obtain Lean's `InductiveVal` data structure, which contains metadata about the inductive relation
     let inductiveVal ← getConstInfoInduct inductiveName
@@ -227,7 +241,7 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
     for ctorName in inductiveVal.ctors do
       logInfo m!"Processing constructor: {ctorName}"
       -- Process everything within the scope of the telescope
-      liftTermElabM $ processCtorInContext ctorName outputName outputType inputNames.toList
+      let _ ← liftTermElabM $ processCtorInContext ctorName outputName outputType inputNames.toList allUnknowns
 
       -- TODO: implement rest of algorithm
 
@@ -236,7 +250,7 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
 
 
 -- Example usage:
-#derive_subgenerator (fun (tree : Tree) => bst lo hi tree)
+#derive_subgenerator (fun (tree : Tree) => bst in1 in2 tree)
 
 
 /-- Example initial constraint map from Section 4.2 of GGG -/

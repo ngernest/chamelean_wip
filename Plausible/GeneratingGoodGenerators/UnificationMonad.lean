@@ -111,7 +111,7 @@ namespace UnifyM
       let k := s.constraints
       { s with constraints := k.insert u r }
 
-  /-- More efficient: get constraints without separate `get` call -/
+  /-- Fetcesh the `constraints` map without a separate `get` call -/
   def withConstraints {α : Type} (f : ConstraintMap → UnifyM α) : UnifyM α := do
     let state ← get
     f state.constraints
