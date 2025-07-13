@@ -139,6 +139,8 @@ namespace UnifyM
       let ps := s.patterns
       { s with patterns := (u, p) :: ps }
 
+  /-- Produces a fresh unknown that is guaranteed not to be in the
+      existing set of `unknowns` -/
   def freshUnknown (unknowns : Std.HashSet Unknown) : Unknown :=
     let existingNames := unknowns.toArray
     genFreshName existingNames `u
