@@ -21,17 +21,17 @@ open Plausible.IR
 
 /-- Creates the initial constraint map κ where all inputs are `Fixed`, the output & all universally-quantified variables is `Undef`
     - `forAllVariables` is a list of (variable name, variable type) pairs -/
-def mkInitialConstraintMap (inputNames: List Name) (outputName : Name) (outputType : Expr) (forAllVariables : List (Name × Expr)): ConstraintMap :=
+def mkInitialUnknownMap (inputNames: List Name) (outputName : Name) (outputType : Expr) (forAllVariables : List (Name × Expr)) : UnknownMap :=
   let inputConstraints := inputNames.zip (List.replicate inputNames.length .Fixed)
   let outputConstraints := [(outputName, .Undef outputType)]
   let filteredForAllVariables := forAllVariables.filter (fun (x, _) => x ∉ inputNames)
   let forAllVarsConstraints := (fun (x, ty) => (x, .Undef ty)) <$> filteredForAllVariables
   Std.HashMap.ofList $ inputConstraints ++ outputConstraints ++ forAllVarsConstraints
 
-/-- Creates the initial `UnifyState` where the constraint map is created using `mkInitialConstraintMap` -/
+/-- Creates the initial `UnifyState` where the constraint map is created using `mkInitialUnknownMap` -/
 def mkInitialUnifyState (inputNames : List Name) (outputName : Name) (outputType : Expr) (forAllVariables : List (Name × Expr)) : UnifyState :=
   let forAllVarNames := Prod.fst <$> forAllVariables
-  let constraints := mkInitialConstraintMap inputNames outputName outputType forAllVariables
+  let constraints := mkInitialUnknownMap inputNames outputName outputType forAllVariables
   let unknowns := Std.HashSet.ofList (outputName :: (inputNames ++ forAllVarNames))
   { constraints := constraints
     equalities := ∅
@@ -105,19 +105,19 @@ partial def convertExprToRangeInCurrentContext (e : Expr) : UnifyM Range :=
 mutual
 
   /-- Produces the code for a pattern match on an unknown -/
-  partial def emitPatterns (patterns : List (Unknown × Pattern)) (equalities : List (Unknown × Unknown)) (constraints : ConstraintMap) : MetaM (TSyntax `term) :=
+  partial def emitPatterns (patterns : List (Unknown × Pattern)) (equalities : List (Unknown × Unknown)) (constraints : UnknownMap) : MetaM (TSyntax `term) :=
     match patterns with
     | [] => emitEqualities equalities constraints
     | (u, p) :: ps => sorry
 
   /-- Produces the code for an equality check -/
-  partial def emitEqualities (equalities : List (Unknown × Unknown)) (constraints : ConstraintMap) : MetaM (TSyntax `term) :=
+  partial def emitEqualities (equalities : List (Unknown × Unknown)) (constraints : UnknownMap) : MetaM (TSyntax `term) :=
     match equalities with
     | [] => sorry -- figure out how to get `S e`
     | (u1, u2) :: eqs => sorry
 
   /-- Produces the code for the body of a sub-generator which processes hypotheses -/
-  partial def emitHypothesis (hypotheses : List (Name × List Unknown)) (constraints : ConstraintMap) : MetaM (TSyntax `term) :=
+  partial def emitHypothesis (hypotheses : List (Name × List Unknown)) (constraints : UnknownMap) : MetaM (TSyntax `term) :=
     match hypotheses with
     | [] => finalAssembly constraints
     | _ => sorry
@@ -130,7 +130,7 @@ mutual
   partial def emitFinalCall (unknown : Unknown) : MetaM (TSyntax `doElem) := sorry
 
   /-- Produces a term corresponding to the value being generated -/
-  partial def emitResult (k : ConstraintMap) (u : Unknown) (range : Range) : MetaM (TSyntax `term) :=
+  partial def emitResult (k : UnknownMap) (u : Unknown) (range : Range) : MetaM (TSyntax `term) :=
     match range with
     | .Unknown u' => emitResult k u' k[u']!
     | .Fixed => `($(mkIdent u))

@@ -33,7 +33,7 @@ def compatible (b : Bool) (m : RangeMode) : Compatibility :=
   | .ModePartlyDef _ _ _, true => .PartCompatible
 
 /-- Determines whether a `range` is fixed with respect to the constraint map `constraints` -/
-partial def isFixedRange (constraints : ConstraintMap) (r : Range) : Bool :=
+partial def isFixedRange (constraints : UnknownMap) (r : Range) : Bool :=
   match r with
   | .Undef _ => false
   | .Fixed => true
@@ -43,7 +43,7 @@ partial def isFixedRange (constraints : ConstraintMap) (r : Range) : Bool :=
 /-- Handle partially defined ranges
     -- TODO: fill this in according to the logic in `mode_analyze` in the QuickChick OCaml code-/
 def analyzePartiallyDefined (_ : Unknown) (r : Range)
-    (_ : ConstraintMap) : RangeMode :=
+    (_ : UnknownMap) : RangeMode :=
   match r with
   | .Ctor c _ =>
     -- This would implement the complex pattern generation logic
@@ -55,7 +55,7 @@ def analyzePartiallyDefined (_ : Unknown) (r : Range)
   | _ => .ModeFixed
 
 -- Corresponds to `mode_analyze` in the OCaml code
-partial def analyzeRangeMode (r : Range) (constraints : ConstraintMap) : RangeMode :=
+partial def analyzeRangeMode (r : Range) (constraints : UnknownMap) : RangeMode :=
   match r with
   | .Unknown u =>
     let rec followUnknown (u : Unknown) : RangeMode :=

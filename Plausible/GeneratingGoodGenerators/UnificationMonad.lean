@@ -40,13 +40,13 @@ inductive Pattern
   | CtorPattern : Name -> List Pattern -> Pattern
   deriving Repr, Inhabited
 
-/-- A `ConstraintMap` maps `Unknown`s to `Range`s -/
-abbrev ConstraintMap := Std.HashMap Unknown Range
+/-- An `UnknownMap` maps `Unknown`s to `Range`s -/
+abbrev UnknownMap := Std.HashMap Unknown Range
 
 /-- `UnifyState` stores the current state of the unification algorithm -/
 structure UnifyState where
-  /-- `constraints` maps unknowns to ranges -/
-  constraints : ConstraintMap
+  /-- `constraints` is an `UnknownMap` that maps unknowns to ranges -/
+  constraints : UnknownMap
 
   /-- `equalities` keeps track of equalities between unknowns
       that need to be checked -/
@@ -114,12 +114,12 @@ namespace UnifyM
   /-- Applies a function `f` to the `constraints` map
       - This function allows us to fetch the `constraints` map without needing
         a seperate `get` call inside the State monad -/
-  def withConstraints {α : Type} (f : ConstraintMap → UnifyM α) : UnifyM α := do
+  def withConstraints {α : Type} (f : UnknownMap → UnifyM α) : UnifyM α := do
     let state ← get
     f state.constraints
 
   /-- Directly applies a function `f` to the `constraint` map in the state  -/
-  def modifyConstraints (f : ConstraintMap → ConstraintMap) : UnifyM Unit :=
+  def modifyConstraints (f : UnknownMap → UnknownMap) : UnifyM Unit :=
     modify $ fun s => { s with constraints := f s.constraints }
 
    /-- Batches multiple constraint updates together for performance  -/
@@ -156,18 +156,19 @@ namespace UnifyM
   def runInMetaM {α : Type} (action : UnifyM α) (st : UnifyState) : MetaM (Option (α × UnifyState)) := do
     OptionT.run (StateT.run action st)
 
+  /-- Finds the `Range` corresponding to an `Unknown` `u` in the
+      `UnknownMap` `k`, returning an informative error message if `u ∉ k.keys` -/
+  def findCorrespondingRange (k : UnknownMap) (u : Unknown) : UnifyM Range :=
+    match k[u]? with
+    | some r => return r
+    | none => throwError m!"unable to find {u} in {k.toList}"
+
 end UnifyM
 
 ------------------------------------------------------------------
 -- Unification algorithm (fig. 3 of Generating Good Generators)
 ------------------------------------------------------------------
 
-/-- Looks up an unknown `u` in the `ConstraintMap` `k`, returning an
-    informative error message if `u ∉ k.keys` -/
-def getWithError (k : ConstraintMap) (u : Unknown) : UnifyM Range :=
-  match k[u]? with
-  | some r => return r
-  | none => throwError m!"unable to find {u} in {repr k}"
 
 mutual
   /-- Top-level unification function which unifies the ranges mapped to by two unknowns -/
@@ -176,18 +177,18 @@ mutual
       if u1 == u2 then
         return ()
       else UnifyM.withConstraints $ fun k => do
-        let r1 ← getWithError k u1
-        let r2 ← getWithError k u2
+        let r1 ← UnifyM.findCorrespondingRange k u1
+        let r2 ← UnifyM.findCorrespondingRange k u2
         unifyR (u1, r1) (u2, r2)
     | c1@(.Ctor _ _), c2@(.Ctor _ _) =>
       unifyC c1 c2
     | .Unknown u1, c2@(.Ctor _ _) =>
       UnifyM.withConstraints $ fun k => do
-        let r1 ← getWithError k u1
+        let r1 ← UnifyM.findCorrespondingRange k u1
         unifyRC (u1, r1) c2
     | c1@(.Ctor _ _), .Unknown u2 =>
       UnifyM.withConstraints $ fun k => do
-        let r2 ← getWithError k u2
+        let r2 ← UnifyM.findCorrespondingRange k u2
         unifyRC (u2, r2) c1
     | r1, r2 => throwError "Unable to unify {r1} with {r2}"
 
