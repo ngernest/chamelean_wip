@@ -137,17 +137,17 @@ namespace UnifyM
       let ps := s.patterns
       { s with patterns := (u, p) :: ps }
 
-  /-- Returns a fresh unknown -/
   def freshUnknown (unknowns : Std.HashSet Unknown) : Unknown :=
     let existingNames := unknowns.toArray
     genFreshName existingNames (Name.mkStr1 "unknown")
 
-  /-- Generates and registers a new unknown in the `UnifyState` -/
-  def registerFreshUnknown : UnifyM Unknown :=
+  /-- Produces and registers a new unknown in the `UnifyState` -/
+  def registerFreshUnknown : UnifyM Unknown := do
+    let localCtx ← getLCtx
+    let u := localCtx.getUnusedName `u
     modifyGet $ fun s =>
       let us := s.unknowns
-      let u := freshUnknown us
-      (u, { s with unknowns := us.union {u} })
+      (u, { s with unknowns := us.union { u }})
 
   /-- Runs a `UnifyM` computation, returning the result in the `MetaM` monad -/
   def runInMetaM {α : Type} (action : UnifyM α) (st : UnifyState) : MetaM (Option (α × UnifyState)) := do
