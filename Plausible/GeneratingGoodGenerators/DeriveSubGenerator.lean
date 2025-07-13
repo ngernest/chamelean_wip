@@ -51,7 +51,30 @@ def convertToCtorExpr (e : Expr) : Option (Name × Array Expr) :=
     some e.getAppFnArgs
   else none
 
-#eval convertToCtorExpr (Expr.const `type.Nat [])
+/-- Takes an unknown `u`, and finds the `Range` `r` that corresponds to
+    `u` in the `constraints` map.
+
+    However, there are 3 conditions in which we generate a fresh unknown `u'`,
+    register the equality `u' = u` and update the `constraints` map
+    with the binding `u' |-> Unknown u`:
+
+    1. `u` isn't present in the `constraints` map (i.e. no such `r` exists)
+    2. `r = .Fixed`
+    3. `r = .Undef τ` for some type τ
+    (We need to hand latter two conditions are )
+
+    We need to handle conditions (2) and (3) because the top-level ranges
+    passed to `UnifyM.unify` cannot be `Fixed` or `Undef`, as stipulated
+    in the QuickChick codebase / the Generating Good Generators paper. -/
+def processCorrespondingRange (u : Unknown) : UnifyM Range :=
+  UnifyM.withConstraints $ fun k =>
+    match k[u]? with
+    | some .Fixed | some (.Undef _) | none => do
+      let u' ← UnifyM.registerFreshUnknown
+      UnifyM.registerEquality u' u
+      UnifyM.update u' (.Unknown u)
+      return .Unknown u'
+    | some r => return r
 
 /-- Converts an `Expr` to a `Range`, using the ambient `LocalContext` to find the user-facing names
     corresponding to `FVarId`s -/
@@ -66,28 +89,13 @@ partial def convertExprToRangeInCurrentContext (e : Expr) : UnifyM Range :=
       match localCtx.findFVar? e with
       | some localDecl =>
         let u := localDecl.userName
-        UnifyM.withConstraints $ fun k =>
-          match k[u]? with
-          | some .Fixed | some (.Undef _) | none => do
-            let u' ← UnifyM.registerFreshUnknown
-            UnifyM.registerEquality u' u
-            UnifyM.update u' (.Unknown u)
-            return .Unknown u'
-          | some r => return r
+        processCorrespondingRange u
       | none =>
         let namesInContext := (fun e => getUserNameInContext! localCtx e.fvarId!) <$> localCtx.getFVars
         throwError m!"{e} missing from LocalContext, which only contains {namesInContext}"
     else
       match e with
-      | .const u _ =>
-        UnifyM.withConstraints $ fun k =>
-          match k[u]? with
-          | some .Fixed | some (.Undef _) | none => do
-            let u' ← UnifyM.registerFreshUnknown
-            UnifyM.registerEquality u' u
-            UnifyM.update u' (.Unknown u)
-            return .Unknown u'
-          | some r => return r
+      | .const u _ => processCorrespondingRange u
       | _ => throwError m!"Cannot convert expression {e} to Range"
 
 
@@ -178,16 +186,7 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
     set initialUnifyState
 
     -- Get the ranges corresponding to each of the unknowns
-    let unknownRanges ← Array.mapM (fun u => do
-      let state ← get
-      let range ← getWithError state.constraints u
-      match range with
-      | .Fixed | .Undef _ =>
-        let u' ← UnifyM.registerFreshUnknown
-        UnifyM.registerEquality u' u
-        UnifyM.update u' (.Unknown u)
-        return .Unknown u'
-      | _ => return range) unknowns
+    let unknownRanges ← unknowns.mapM processCorrespondingRange
     let unknownArgsAndRanges := unknowns.zip unknownRanges
 
     logInfo m!"unknownArgsAndRanges = {unknownArgsAndRanges}"

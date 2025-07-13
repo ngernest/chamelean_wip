@@ -111,7 +111,9 @@ namespace UnifyM
       let k := s.constraints
       { s with constraints := k.insert u r }
 
-  /-- Fetcesh the `constraints` map without a separate `get` call -/
+  /-- Applies a function `f` to the `constraints` map
+      - This function allows us to fetch the `constraints` map without needing
+        a seperate `get` call inside the State monad -/
   def withConstraints {α : Type} (f : ConstraintMap → UnifyM α) : UnifyM α := do
     let state ← get
     f state.constraints
@@ -158,6 +160,8 @@ end UnifyM
 -- Unification algorithm (fig. 3 of Generating Good Generators)
 ------------------------------------------------------------------
 
+/-- Looks up an unknown `u` in the `ConstraintMap` `k`, returning an
+    informative error message if `u ∉ k.keys` -/
 def getWithError (k : ConstraintMap) (u : Unknown) : UnifyM Range :=
   match k[u]? with
   | some r => return r
