@@ -139,14 +139,13 @@ namespace UnifyM
 
   def freshUnknown (unknowns : Std.HashSet Unknown) : Unknown :=
     let existingNames := unknowns.toArray
-    genFreshName existingNames (Name.mkStr1 "unknown")
+    genFreshName existingNames `u
 
   /-- Produces and registers a new unknown in the `UnifyState` -/
   def registerFreshUnknown : UnifyM Unknown := do
-    let localCtx ← getLCtx
-    let u := localCtx.getUnusedName `u
     modifyGet $ fun s =>
       let us := s.unknowns
+      let u := freshUnknown us
       (u, { s with unknowns := us.union { u }})
 
   /-- Runs a `UnifyM` computation, returning the result in the `MetaM` monad -/
@@ -159,6 +158,11 @@ end UnifyM
 -- Unification algorithm (fig. 3 of Generating Good Generators)
 ------------------------------------------------------------------
 
+def getWithError (k : ConstraintMap) (u : Unknown) : UnifyM Range :=
+  match k[u]? with
+  | some r => return r
+  | none => throwError m!"unable to find {u} in {repr k}"
+
 mutual
   /-- Top-level unification function which unifies the ranges mapped to by two unknowns -/
   partial def unify : Range → Range → UnifyM Unit
@@ -166,18 +170,18 @@ mutual
       if u1 == u2 then
         return ()
       else UnifyM.withConstraints $ fun k => do
-        let r1 := k.get! u1
-        let r2 := k.get! u2
+        let r1 ← getWithError k u1
+        let r2 ← getWithError k u2
         unifyR (u1, r1) (u2, r2)
     | c1@(.Ctor _ _), c2@(.Ctor _ _) =>
       unifyC c1 c2
     | .Unknown u1, c2@(.Ctor _ _) =>
       UnifyM.withConstraints $ fun k => do
-        let r1 := k.get! u1
+        let r1 ← getWithError k u1
         unifyRC (u1, r1) c2
     | c1@(.Ctor _ _), .Unknown u2 =>
       UnifyM.withConstraints $ fun k => do
-        let r2 := k.get! u2
+        let r2 ← getWithError k u2
         unifyRC (u2, r2) c1
     | r1, r2 => throwError "Unable to unify {r1} with {r2}"
 

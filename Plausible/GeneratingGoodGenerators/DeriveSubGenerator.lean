@@ -24,7 +24,8 @@ open Plausible.IR
 def mkInitialConstraintMap (inputNames: List Name) (outputName : Name) (outputType : Expr) (forAllVariables : List (Name × Expr)): ConstraintMap :=
   let inputConstraints := inputNames.zip (List.replicate inputNames.length .Fixed)
   let outputConstraints := [(outputName, .Undef outputType)]
-  let forAllVarsConstraints := (fun (x, ty) => (x, .Undef ty)) <$> forAllVariables
+  let filteredForAllVariables := forAllVariables.filter (fun (x, _) => x ∉ inputNames)
+  let forAllVarsConstraints := (fun (x, ty) => (x, .Undef ty)) <$> filteredForAllVariables
   Std.HashMap.ofList $ inputConstraints ++ outputConstraints ++ forAllVarsConstraints
 
 /-- Creates the initial `UnifyState` where the constraint map is created using `mkInitialConstraintMap` -/
@@ -42,8 +43,15 @@ def mkInitialUnifyState (inputNames : List Name) (outputName : Name) (outputType
     returning `some (C, #[r1, …, rn])`
     - If `e` is not an application, this function returns `none`  -/
 def convertToCtorExpr (e : Expr) : Option (Name × Array Expr) :=
-  if !e.isApp then none
-  else some e.getAppFnArgs
+  if e.isConst then
+    -- Nullary constructors are identified by name
+    some (e.constName!, #[])
+  else if e.isApp then
+    -- Constructors with arguments
+    some e.getAppFnArgs
+  else none
+
+#eval convertToCtorExpr (Expr.const `type.Nat [])
 
 /-- Converts an `Expr` to a `Range`, using the ambient `LocalContext` to find the user-facing names
     corresponding to `FVarId`s -/
@@ -52,22 +60,35 @@ partial def convertExprToRangeInCurrentContext (e : Expr) : UnifyM Range :=
   | some (f, args) => do
     let argRanges ← args.toList.mapM convertExprToRangeInCurrentContext
     return (Range.Ctor f argRanges)
-  | none => do
-    let ty ← inferType e
-    return (.Undef ty)
-
-
-    -- if e.isFVar then do
-    --   let localCtx ← getLCtx
-    --   match localCtx.findFVar? e with
-    --   | some localDecl => return (.Unknown localDecl.userName)
-    --   | none =>
-    --     let namesInContext := (fun e => getUserNameInContext! localCtx e.fvarId!) <$> localCtx.getFVars
-    --     throwError m!"{e} missing from LocalContext, which only contains {namesInContext}"
-    -- else
-    --   match e with
-    --   | .const name _ => return (.Unknown name)
-    --   | _ => throwError m!"Cannot convert expression {e} to Range"
+  | none =>
+    if e.isFVar then do
+      let localCtx ← getLCtx
+      match localCtx.findFVar? e with
+      | some localDecl =>
+        let u := localDecl.userName
+        UnifyM.withConstraints $ fun k =>
+          match k[u]? with
+          | some .Fixed | some (.Undef _) | none => do
+            let u' ← UnifyM.registerFreshUnknown
+            UnifyM.registerEquality u' u
+            UnifyM.update u' (.Unknown u)
+            return .Unknown u'
+          | some r => return r
+      | none =>
+        let namesInContext := (fun e => getUserNameInContext! localCtx e.fvarId!) <$> localCtx.getFVars
+        throwError m!"{e} missing from LocalContext, which only contains {namesInContext}"
+    else
+      match e with
+      | .const u _ =>
+        UnifyM.withConstraints $ fun k =>
+          match k[u]? with
+          | some .Fixed | some (.Undef _) | none => do
+            let u' ← UnifyM.registerFreshUnknown
+            UnifyM.registerEquality u' u
+            UnifyM.update u' (.Unknown u)
+            return .Unknown u'
+          | some r => return r
+      | _ => throwError m!"Cannot convert expression {e} to Range"
 
 
 -- The following implements the `emit` functions in Figure 4
@@ -125,8 +146,6 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
   let ctorInfo ← getConstInfoCtor ctorName
   let ctorType := ctorInfo.type
 
-  logInfo m!"inputNames = {inputNames}"
-
   -- Stay within the forallTelescope scope for all processing
   forallTelescopeReducing ctorType (cleanupAnnotations := true) (fun forAllVarsAndHyps conclusion => do
     logInfo m!"Processing constructor {ctorName}"
@@ -148,13 +167,27 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
       | some name => (name, ty)
       | none => none)
 
+    logInfo m!"forAllVars = {forAllVars}"
+    logInfo m!"inputNames = {inputNames}"
+
     -- Creates the initial `UnifyState` needed for the unification algorithm
     let initialUnifyState := mkInitialUnifyState inputNames outputName outputType forAllVars.toList
-    logInfo m!"{initialUnifyState}"
+    logInfo m!"initialUnifyState = {initialUnifyState}"
+
+    -- Update the state in `UnifyM` to be `initialUnifyState`
+    set initialUnifyState
 
     -- Get the ranges corresponding to each of the unknowns
-    let unknownRanges := Array.foldl
-      (fun acc unknown => acc.push initialUnifyState.constraints[unknown]!) #[] unknowns
+    let unknownRanges ← Array.mapM (fun u => do
+      let state ← get
+      let range ← getWithError state.constraints u
+      match range with
+      | .Fixed | .Undef _ =>
+        let u' ← UnifyM.registerFreshUnknown
+        UnifyM.registerEquality u' u
+        UnifyM.update u' (.Unknown u)
+        return .Unknown u'
+      | _ => return range) unknowns
     let unknownArgsAndRanges := unknowns.zip unknownRanges
 
     logInfo m!"unknownArgsAndRanges = {unknownArgsAndRanges}"
@@ -164,7 +197,6 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
     let conclusionRanges ← conclusionArgs.mapM convertExprToRangeInCurrentContext
 
     let conclusionArgsAndRanges := conclusionArgs.zip conclusionRanges
-
 
     logInfo m!"conclusion = {conclusion}"
     logInfo m!"conclusionArgsAndRanges = {conclusionArgsAndRanges}"
@@ -177,9 +209,6 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
     -- for hyp in hypotheses do
     --   let hypRange ← convertExprToRangeInCurrentContext hyp
 
-
-    -- Update the state in `UnifyM` to be `initialUnifyState`
-    modify (fun _ => initialUnifyState)
 
     for ((u1, r1), (u2, r2)) in conclusionArgsAndRanges.zip unknownArgsAndRanges do
       logInfo m!"Unifying ({u1} ↦ {r1}) with ({u2} ↦ {r2})"
@@ -251,18 +280,17 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
     let inductiveVal ← getConstInfoInduct inductiveName
 
     for ctorName in inductiveVal.ctors do
-      logInfo m!"Processing constructor: {ctorName}"
       -- Process everything within the scope of the telescope
       let _ ← liftTermElabM (UnifyM.runInMetaM (processCtorInContext ctorName outputName outputType inputNames.toList allUnknowns) emptyUnifyState)
 
-      -- TODO: implement rest of algorithm
 
 
   | _ => throwUnsupportedSyntax
 
 
 -- Example usage:
-#derive_subgenerator (fun (tree : Tree) => goodTree in1 in2 tree)
+#derive_subgenerator (fun (e : term) => typing Γ e τ)
+-- #derive_subgenerator (fun (tree : Tree) => goodTree in1 in2 tree)
 
 
 /-- Example initial constraint map from Section 4.2 of GGG -/
