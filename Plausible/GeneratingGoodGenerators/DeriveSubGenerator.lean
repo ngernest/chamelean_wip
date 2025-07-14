@@ -6,6 +6,7 @@ import Plausible.GeneratingGoodGenerators.UnificationMonad
 import Plausible.New.DeriveConstrainedProducers
 import Plausible.New.SubGenerators
 import Plausible.New.DeriveArbitrary
+import Plausible.New.TSyntaxCombinators
 import Plausible.New.Debug
 import Plausible.IR.Prelude
 import Plausible.IR.Examples
@@ -98,9 +99,14 @@ partial def convertExprToRangeInCurrentContext (e : Expr) : UnifyM Range :=
       | .const u _ => processCorrespondingRange u
       | _ => throwError m!"Cannot convert expression {e} to Range"
 
-
--- The following implements the `emit` functions in Figure 4
--- TODO: fill in the metaprogramming stuff
+/-- Converts a `Pattern` to a `TSyntax term` -/
+def convertPatternToTerm (pattern : Pattern) : MetaM (TSyntax `term) :=
+  match pattern with
+  | .UnknownPattern name => return (mkIdent name)
+  | .CtorPattern ctorName args => do
+    let ctorSyntax := mkIdent ctorName
+    let argSyntaxes ← args.mapM convertPatternToTerm
+    argSyntaxes.foldlM (fun acc arg => `($acc $arg)) ctorSyntax
 
 mutual
 
@@ -108,7 +114,12 @@ mutual
   partial def emitPatterns (patterns : List (Unknown × Pattern)) (equalities : List (Unknown × Unknown)) (constraints : UnknownMap) : MetaM (TSyntax `term) :=
     match patterns with
     | [] => emitEqualities equalities constraints
-    | (u, p) :: ps => sorry
+    | (u, p) :: ps => do
+      let caseRHS ← emitPatterns ps equalities constraints
+      let caseLHS ← convertPatternToTerm p
+      let case ← `(Term.matchAltExpr| | $caseLHS => $caseRHS)
+      let cases : TSyntaxArray ``Parser.Term.matchAlt := #[]
+      mkMatchExpr (mkIdent u) cases
 
   /-- Produces the code for an equality check -/
   partial def emitEqualities (equalities : List (Unknown × Unknown)) (constraints : UnknownMap) : MetaM (TSyntax `term) :=
@@ -139,7 +150,7 @@ mutual
     | .Ctor c rs => do
       let rs' ← List.mapM (fun r => emitResult k u r) rs
       sorry
-    | .Undef ty => throwError s!"encountered Range of (Undef {ty}) in emitResult"
+    | .Undef ty => throwError m!"encountered Range of (Undef {ty}) in emitResult"
 
 end
 
