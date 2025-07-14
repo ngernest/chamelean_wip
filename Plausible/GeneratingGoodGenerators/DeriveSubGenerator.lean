@@ -148,8 +148,9 @@ mutual
     | .Unknown u' => emitResult k u' k[u']!
     | .Fixed => `($(mkIdent u))
     | .Ctor c rs => do
-      let rs' ← List.mapM (fun r => emitResult k u r) rs
-      sorry
+      let ctorIdent := mkIdent c
+      let ctorArgs ← Array.mapM (fun r => emitResult k u r) rs.toArray
+      `($ctorIdent $ctorArgs*)
     | .Undef ty => throwError m!"encountered Range of (Undef {ty}) in emitResult"
 
 end
