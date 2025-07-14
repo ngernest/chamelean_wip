@@ -136,12 +136,21 @@ mutual
     | _ => sorry
 
   /-- Assembles the body of the generator (this function is called when all hypotheses have ben processed by `emitHypotheses`) -/
-  partial def finalAssembly (constraints : ConstriantMap) : UnifyM (TSyntax `term) := do
-    let undefUnknowns ← UnifyM.withConstraints (fun k =>
-      return Std.HashMap.fold (fun acc u r =>
-        match r with
-        | .Undef _ => r :: acc
-        | _ => acc) [] k)
+  partial def finalAssembly (constraints : UnknownMap) : UnifyM (TSyntax `term) := do
+    -- Find all unknowns whose ranges are `Undef`
+    let undefUnknowns ←
+      UnifyM.withConstraints (fun k =>
+        return Std.HashMap.fold (fun acc u r =>
+          match r with
+          | .Undef _ => u :: acc
+          | _ => acc) [] k)
+
+    -- Update the constraint map so that all unknowns in `undefKnowns` now have a `Fixed` `Range`
+    UnifyM.updateMany (undefUnknowns.zip (List.replicate undefUnknowns.length .Fixed))
+
+    -- TODO: figure out how to get `out` (maybe we need to add `out` as a field to `UnifyState`)
+    -- let result ← UnifyM.withConstraints (fun k' => emitResult k' out k'[out]!)
+
     sorry -- TODO: fill in the rest
 
   /-- Produces the call to the final generator call in the body of the sub-generator -/
