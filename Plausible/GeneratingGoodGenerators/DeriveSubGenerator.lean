@@ -34,11 +34,13 @@ def mkInitialUnifyState (inputNames : List Name) (outputName : Name) (outputType
   let forAllVarNames := Prod.fst <$> forAllVariables
   let constraints := mkInitialUnknownMap inputNames outputName outputType forAllVariables
   let unknowns := Std.HashSet.ofList (outputName :: (inputNames ++ forAllVarNames))
+  -- TODO: fill in `hypotheses` here
   { constraints := constraints
     equalities := ∅
     patterns := []
     unknowns := unknowns
-    outputName := outputName }
+    outputName := outputName,
+    hypotheses := [] }
 
 /-- Converts a expression `e` to a *constructor expression* `C r1 … rn`,
     where `C` is a constructor and the `ri` are arguments,
@@ -132,13 +134,13 @@ mutual
   /-- Produces the code for an equality check -/
   partial def emitEqualities (equalities : List (Unknown × Unknown)) (constraints : UnknownMap) : UnifyM (TSyntax `term) :=
     match equalities with
-    | [] => sorry -- figure out how to get `S e`
+    | [] => UnifyM.withHypotheses (fun hyps => emitHypotheses hyps constraints)
     | (u1, u2) :: eqs => do
       let trueBranch ← emitEqualities eqs constraints
       `(if ($(mkIdent u1) == $(mkIdent u2)) then $trueBranch else $failFn)
 
   /-- Produces the code for the body of a sub-generator which processes hypotheses -/
-  partial def emitHypothesis (hypotheses : List (Name × List Unknown)) (constraints : UnknownMap) : UnifyM (TSyntax `term) :=
+  partial def emitHypotheses (hypotheses : List (Name × List Unknown)) (constraints : UnknownMap) : UnifyM (TSyntax `term) :=
     match hypotheses with
     | [] => finalAssembly constraints
     | _ => sorry
@@ -156,7 +158,7 @@ mutual
     -- Update the constraint map so that all unknowns in `undefKnowns` now have a `Fixed` `Range`
     UnifyM.updateMany (undefUnknowns.zip (List.replicate undefUnknowns.length .Fixed))
 
-    -- Produce the
+    -- Construct the final expression that will be produced by the generator
     let unifyState ← get
     let outputName := unifyState.outputName
     let constraints := unifyState.constraints
@@ -173,7 +175,22 @@ mutual
     mkDoBlock doElems
 
   /-- Produces the call to the final generator call in the body of the sub-generator -/
-  partial def emitFinalCall (unknown : Unknown) : UnifyM (TSyntax `doElem) := sorry
+  partial def emitFinalCall (unknown : Unknown) : UnifyM (TSyntax `doElem) := do
+    let unifyState ← get
+    let outputName := unifyState.outputName
+    let lhs := mkIdent unknown
+    if unknown == outputName then
+      -- TODO: handle other arguments that need to be supplied to `aux_arb`
+      mkLetBind lhs #[auxArbFn, initSizeIdent, mkIdent `size']
+    else
+      let unknownIdent := mkIdent unknown
+      match unifyState.hypotheses.getLast? with
+      | none => throwError m!"encountered empty list of hypotheses in emitFinalCall, state = {unifyState}"
+      | some (ctorName, ctorArgs) => do
+        let ctorArgsArr := Lean.mkIdent <$> ctorArgs.toArray
+        let constraint ← `((fun $unknownIdent => ctorName $ctorArgsArr*))
+        let rhsTerms := #[(arbitrarySTFn : TSyntax `term), constraint]
+        mkLetBind lhs rhsTerms
 
   /-- Produces a term corresponding to the value being generated -/
   partial def emitResult (k : UnknownMap) (u : Unknown) (range : Range) : UnifyM (TSyntax `term) :=

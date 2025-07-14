@@ -62,6 +62,10 @@ structure UnifyState where
   /-- The name of the output variable (variable to be generated) -/
   outputName : Name
 
+  /-- The list of hypotheses in the constructor's type (excluding the constructor's conclusion)
+      - Each hypothesis is represented as a pair consisting of `(constructor name, list of constructor args)` -/
+  hypotheses : List (Unknown × (List Unknown))
+
   deriving Repr
 
 ---------------------------------------------------------------
@@ -118,12 +122,19 @@ namespace UnifyM
       let k := s.constraints
       { s with constraints := k.insert u r }
 
-  /-- Applies a function `f` to the `constraints` map
+  /-- Applies a function `f` to the `constraints` map stored in `UnifyState`
       - This function allows us to fetch the `constraints` map without needing
         a seperate `get` call inside the State monad -/
-  def withConstraints {α : Type} (f : UnknownMap → UnifyM α) : UnifyM α := do
-    let state ← get
-    f state.constraints
+  def withConstraints (f : UnknownMap → UnifyM α) : UnifyM α := do
+    let unifyState ← get
+    f unifyState.constraints
+
+  /-- Applies a function `f` to the list of `hypotheses` stored in `UnifyState`
+      - This function allows us to fetch the `hypotheses` field without needing
+        a seperate `get` call inside the State monad -/
+  def withHypotheses (f : List (Unknown × List Unknown) → UnifyM α) : UnifyM α := do
+    let unifyState ← get
+    f unifyState.hypotheses
 
   /-- Directly applies a function `f` to the `constraint` map in the state  -/
   def modifyConstraints (f : UnknownMap → UnknownMap) : UnifyM Unit :=
@@ -291,7 +302,8 @@ def emptyUnifyState : UnifyState :=
     equalities := ∅,
     patterns := [],
     unknowns := ∅,
-    outputName := `dummyOutput }
+    outputName := `dummyOutput,
+    hypotheses := [] }
 
 /-- Runs a `UnifyM unit` action using the empty `UnifyState`,
     returning the resultant `UnifyState` in an `Option`  -/
