@@ -59,9 +59,8 @@ def convertToCtorExpr (e : Expr) : Option (Name × Array Expr) :=
 /-- Takes an unknown `u`, and finds the `Range` `r` that corresponds to
     `u` in the `constraints` map.
 
-    However, there are 3 conditions in which we generate a fresh unknown `u'`,
-    register the equality `u' = u` and update the `constraints` map
-    with the binding `u' |-> Unknown u`:
+    However, there are 3 conditions in which we generate a fresh unknown `u'`
+    and update the `constraints` map with the binding `u' ↦ Unknown u`:
 
     1. `u` isn't present in the `constraints` map (i.e. no such `r` exists)
     2. `r = .Fixed`
@@ -76,7 +75,6 @@ def processCorrespondingRange (u : Unknown) : UnifyM Range :=
     match k[u]? with
     | some .Fixed | some (.Undef _) | none => do
       let u' ← UnifyM.registerFreshUnknown
-      UnifyM.registerEquality u' u
       UnifyM.update u' (.Unknown u)
       return .Unknown u'
     | some r => return r
@@ -402,7 +400,9 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
 
 -- Example usage:
 -- #derive_subgenerator (fun (e : term) => typing Γ e τ)
+
 #derive_subgenerator (fun (tree : Tree) => nonempty tree)
+-- #derive_subgenerator (fun (tree : Tree) => goodTree in1 in2 tree)
 
 
 /-- Example initial constraint map from Section 4.2 of GGG -/
