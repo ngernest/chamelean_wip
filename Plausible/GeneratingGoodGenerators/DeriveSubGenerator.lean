@@ -312,7 +312,7 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
     -- for hyp in hypotheses do
     --   let hypRange ← convertExprToRangeInCurrentContext hyp
 
-
+    -- TODO: figure out how to handle repeated unknowns in `conclusionArgsAndRanges`
     for ((u1, r1), (u2, r2)) in conclusionArgsAndRanges.zip unknownArgsAndRanges do
       logInfo m!"Unifying ({u1} ↦ {r1}) with ({u2} ↦ {r2})"
       unify r1 r2
@@ -402,7 +402,10 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
 -- #derive_subgenerator (fun (e : term) => typing Γ e τ)
 
 -- #derive_subgenerator (fun (tree : Tree) => nonempty tree)
--- #derive_subgenerator (fun (tree : Tree) => goodTree in1 in2 tree)
+
+
+-- TODO: figure out why `UnifyR` isn't being called with `(in1, Fixed) (in2, Fixed)`
+#derive_subgenerator (fun (t : Tree) => goodTree in1 in2 t)
 
 
 /-- Example initial constraint map from Section 4.2 of GGG -/

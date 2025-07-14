@@ -232,6 +232,7 @@ mutual
       else UnifyM.withConstraints $ fun k => do
         let r1 ← UnifyM.findCorrespondingRange k u1
         let r2 ← UnifyM.findCorrespondingRange k u2
+        logInfo m!"Calling unifyR ({u1}, {r1}) ({u2}, {r2})"
         unifyR (u1, r1) (u2, r2)
     | c1@(.Ctor _ _), c2@(.Ctor _ _) =>
       unifyC c1 c2
@@ -255,6 +256,7 @@ mutual
     | (_, r1), (_, u2'@(.Unknown _)) => unify r1 u2'
     | (_, c1@(.Ctor _ _)), (_, c2@(.Ctor _ _)) => unifyC c1 c2
     | (u1, .Fixed), (u2, .Fixed) => do
+      logInfo m!"registering equality {u1} = {u2}"
       -- Assert that whatever the values of `u1` and `u2` are, they are equal
       -- Record this equality check using `equality`, then update `u1`'s range to the other
       UnifyM.registerEquality u1 u2
