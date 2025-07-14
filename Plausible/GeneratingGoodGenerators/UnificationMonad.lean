@@ -181,6 +181,31 @@ namespace UnifyM
     | some r => return r
     | none => throwError m!"unable to find {u} in {k.toList}"
 
+  /-- Determines if an unknown `u` has a `Range` of `Undef τ` for some type `τ`
+      in the constraints map -/
+  def hasUndefRange (u : Unknown) : UnifyM Bool :=
+    UnifyM.withConstraints (fun k => do
+      let r ← findCorrespondingRange k u
+      match r with
+      | .Undef _ => return true
+      | _ => return false)
+
+  /-- Returns all `Unknown`s that are mapped to `Undef τ` for some type `τ` in the `constraints` map -/
+  def findUnknownsWithUndefRanges : UnifyM (List Unknown) :=
+    UnifyM.withConstraints
+      (fun k => return Std.HashMap.fold accumulateUndefUnknowns [] k)
+    where
+      accumulateUndefUnknowns (acc : List Unknown) (u : Unknown) (r : Range) :=
+        match r with
+        | .Undef _ => u :: acc
+        | _ => acc
+
+  /-- Updates the `constraint` map so that for each `u ∈ unknowns`,
+      we have the binding `u ↦ Fixed` in `constraints` -/
+  def fixRanges (unknowns : List Unknown) : UnifyM Unit :=
+    updateMany (unknowns.zip (List.replicate unknowns.length .Fixed))
+
+
 end UnifyM
 
 ------------------------------------------------------------------

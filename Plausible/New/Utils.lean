@@ -6,6 +6,16 @@ import Batteries.Data.List.Basic
 open Lean Meta LocalContext Std
 open Plausible.IR
 
+/-- Decomposes an list `xs` into a pair `(xs', x)`
+   where `xs' = xs[0..=n-2]` and `x = xs[n - 1]` (where `n` is the length of `xs`).
+   - If `xs` is empty, this function returns `none`
+   - If `xs = #[x]`, this function returns `some (#[], x)`
+   - Note: this function is the same as `unsnoc` in the Haskell's `Data.List` library -/
+def unsnoc (xs : List α) : Option (List α × α) :=
+  match xs.getLast? with
+  | none => none
+  | some x => some (xs.take (xs.length - 1), x)
+
 /-- `mkInitialContextForInductiveRelation inputTypes inputNames`
     creates the initial `LocalContext` where each `(x, τ)` in `Array.zip inputTypes inputNames`
     is given the declaration `x : τ` in the resultant context.
