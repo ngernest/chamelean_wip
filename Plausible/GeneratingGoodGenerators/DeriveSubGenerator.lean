@@ -180,9 +180,12 @@ mutual
     let outputName := unifyState.outputName
     let lhs := mkIdent unknown
     if unknown == outputName then
+      -- Produce a call to `aux_arb` (recursively generate a value for the unknown)
       -- TODO: handle other arguments that need to be supplied to `aux_arb`
       mkLetBind lhs #[auxArbFn, initSizeIdent, mkIdent `size']
     else
+      -- Generate a value for the unknown via a call to `arbitraryST`, passing in the final hypothesis
+      -- as an argument to `arbitraryST`
       let unknownIdent := mkIdent unknown
       match unifyState.hypotheses.getLast? with
       | none => throwError m!"encountered empty list of hypotheses in emitFinalCall, state = {unifyState}"
