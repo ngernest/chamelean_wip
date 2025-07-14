@@ -294,7 +294,9 @@ mutual
 
   /-- Corresponds to `match` in the pseudocode
      (we call this `handleMatch` since `match` is a reserved keyword in Lean) -/
-  partial def handleMatch : Unknown → Range → UnifyM Unit
+  partial def handleMatch (unknown : Unknown) (range : Range) : UnifyM Unit := do
+    logInfo m!"handleMatch called with unknown {unknown}, range {range}"
+    match unknown, range with
     | u, .Ctor c rs => do
       let p ← rs.mapM matchAux
       UnifyM.addPattern u (Pattern.CtorPattern c p)

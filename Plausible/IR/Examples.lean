@@ -46,18 +46,18 @@ inductive term where
 
 /-- `lookup Γ n τ` checks whether the `n`th element of the context `Γ` has type `τ` -/
 inductive lookup : List type -> Nat -> type -> Prop where
-  | LookupNow   : forall τ Γ, lookup (τ :: Γ) 0 τ
-  | LookupLater : forall τ τ' n Γ,
-      lookup Γ n τ -> lookup (τ' :: Γ) (.succ n) τ
+  | Now   : forall τ Γ, lookup (τ :: Γ) .zero τ
+  -- | Later : forall τ τ' n Γ,
+  --     lookup Γ n τ -> lookup (τ' :: Γ) (.succ n) τ
 
 /-- `typing Γ e τ` is the typing judgement `Γ ⊢ e : τ` -/
 inductive typing: List type → term → type → Prop where
 -- | TConst : ∀ n,
 --     typing Γ (.Const n) .Nat
-| TAdd: ∀ e1 e2,
-    typing Γ e1 .Nat →
-    typing Γ e2 .Nat →
-    typing Γ (.Add e1 e2) .Nat
+-- | TAdd: ∀ e1 e2,
+--     typing Γ e1 .Nat →
+--     typing Γ e2 .Nat →
+--     typing Γ (.Add e1 e2) .Nat
 -- | TAbs: ∀ e τ1 τ2,
 --     typing (τ1::Γ) e τ2 →
 --     typing Γ (.Abs τ1 e) (.Fun τ1 τ2)
@@ -68,6 +68,7 @@ inductive typing: List type → term → type → Prop where
 --     typing Γ e2 τ1 →
 --     typing Γ e1 (.Fun τ1 τ2) →
 --     typing Γ (.App (.Abs .Nat e1) e2) τ2
+
 
 
 /-- Non-empty trees (trees that are not just leaves) -/

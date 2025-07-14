@@ -135,8 +135,12 @@ mutual
     match equalities with
     | [] => UnifyM.withHypotheses (fun hyps => emitHypotheses hyps constraints)
     | (u1, u2) :: eqs => do
-      let trueBranch ← emitEqualities eqs constraints
-      `(if ($(mkIdent u1) == $(mkIdent u2)) then $trueBranch else $failFn)
+      let scrutinee ← `($decOptFn ($(mkIdent u1) == $(mkIdent u2)) $initSizeIdent)
+      let trueCaseRHS ← emitEqualities eqs constraints
+      let trueCase ← `(Term.matchAltExpr | | $(mkIdent ``some) $(mkIdent ``true) => $trueCaseRHS)
+      let catchAllCase ← `(Term.matchAltExpr | | _ => $failFn)
+      let cases := #[trueCase, catchAllCase]
+      mkMatchExprWithScrutineeTerm scrutinee cases
 
   /-- Produces the code for the body of a sub-generator which processes hypotheses -/
   partial def emitHypotheses (hypotheses : List (Name × List Unknown)) (constraints : UnknownMap) : UnifyM (TSyntax `term) :=
@@ -233,11 +237,13 @@ mutual
         mkLetBind lhs rhsTerms
 
   /-- Produces a term corresponding to the value being generated -/
-  partial def emitResult (k : UnknownMap) (u : Unknown) (range : Range) : UnifyM (TSyntax `term) :=
+  partial def emitResult (k : UnknownMap) (u : Unknown) (range : Range) : UnifyM (TSyntax `term) := do
+    logInfo m!"emitResult called with unknown {u}, range {range}"
     match range with
     | .Unknown u' => emitResult k u' k[u']!
     | .Fixed => `($(mkIdent u))
     | .Ctor c rs => do
+      logInfo m!"Entered recursive case of emitResult with range = {range}"
       let ctorIdent := mkIdent c
       let ctorArgs ← Array.mapM (fun r => emitResult k u r) rs.toArray
       `($ctorIdent $ctorArgs*)
@@ -245,10 +251,11 @@ mutual
 
 end
 
--- def rewriteNonLinearPatterns (args : Array Expr) : UnifyM (Array Expr) := do
+-- def rewriteNonLinearPatterns (args : Array Expr) : UnifyM (Array Name) := do
 --   let localCtx ← getLCtx
---   let mut exprs := #[]
+--   let mut names := #[]
 --   for arg in args do
+--     let argTy ← inferType arg
 --     match arg with
 --     | .fvar fvarId =>
 --       let existingName ← fvarId.getUserName
@@ -264,7 +271,11 @@ end
 --       else
 --         names := names.push existingName
 --     | _ => throwError m!"arg {arg} is not an FVarId nor a const"
---   return exprs
+--   return names
+
+
+-- def rewriteNonLinearPatternsNew (e : Expr) : UnifyM Expr := do
+--   let localCtx ← getLCtx
 
 
 
@@ -423,8 +434,12 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
   | _ => throwUnsupportedSyntax
 
 
+set_option maxRecDepth 50000
+
 -- Example usage:
 -- #derive_subgenerator (fun (e : term) => typing Γ e τ)
+
+#derive_subgenerator (fun (x : Nat) => lookup Γ x τ)
 
 -- #derive_subgenerator (fun (tree : Tree) => nonempty tree)
 
