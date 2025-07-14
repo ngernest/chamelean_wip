@@ -118,8 +118,15 @@ mutual
     | (u, p) :: ps => do
       let caseRHS ← emitPatterns ps equalities constraints
       let caseLHS ← convertPatternToTerm p
-      let case ← `(Term.matchAltExpr| | $caseLHS => $caseRHS)
-      let cases : TSyntaxArray ``Parser.Term.matchAlt := #[]
+
+      -- If the pattern-match succeeds, use the RHS computed in `caseRHS`
+      let nonTrivialCase ← `(Term.matchAltExpr| | $caseLHS => $caseRHS)
+
+      -- Otherwise, just return `None` (by doing `OptionT.fail`)
+      let trivialCase ← `(Term.matchAltExpr| | _ => $failFn)
+
+      -- Create the actual pattern-match
+      let cases := #[nonTrivialCase, trivialCase]
       mkMatchExpr (mkIdent u) cases
 
   /-- Produces the code for an equality check -/
