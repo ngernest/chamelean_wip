@@ -37,7 +37,8 @@ def mkInitialUnifyState (inputNames : List Name) (outputName : Name) (outputType
   { constraints := constraints
     equalities := ∅
     patterns := []
-    unknowns := unknowns }
+    unknowns := unknowns
+    outputName := outputName }
 
 /-- Converts a expression `e` to a *constructor expression* `C r1 … rn`,
     where `C` is a constructor and the `ri` are arguments,
@@ -148,10 +149,21 @@ mutual
     -- Update the constraint map so that all unknowns in `undefKnowns` now have a `Fixed` `Range`
     UnifyM.updateMany (undefUnknowns.zip (List.replicate undefUnknowns.length .Fixed))
 
-    -- TODO: figure out how to get `out` (maybe we need to add `out` as a field to `UnifyState`)
-    -- let result ← UnifyM.withConstraints (fun k' => emitResult k' out k'[out]!)
+    -- Produce the
+    let unifyState ← get
+    let outputName := unifyState.outputName
+    let constraints := unifyState.constraints
+    let result ← emitResult constraints outputName (← UnifyM.findCorrespondingRange constraints outputName)
 
-    sorry -- TODO: fill in the rest
+    -- Bind each unknown in `undefUnknowns` to the result of an arbitrary call,
+    -- then return the value computed in `result`
+    let mut doElems := #[]
+    for u in undefUnknowns do
+      doElems := doElems.push (← mkLetBind (mkIdent u) #[arbitraryFn])
+    doElems := doElems.push (← `(doElem| return $result))
+
+    -- Put everything together in one monadic do-block
+    mkDoBlock doElems
 
   /-- Produces the call to the final generator call in the body of the sub-generator -/
   partial def emitFinalCall (unknown : Unknown) : UnifyM (TSyntax `doElem) := sorry

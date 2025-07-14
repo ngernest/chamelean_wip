@@ -56,8 +56,11 @@ structure UnifyState where
       need to be performed -/
   patterns : List (Unknown × Pattern)
 
-  /-- A set of all existing unknowns -/
+  /-- A set of all existing `Unknown`s -/
   unknowns : Std.HashSet Unknown
+
+  /-- The name of the output variable (variable to be generated) -/
+  outputName : Name
 
   deriving Repr
 
@@ -287,7 +290,8 @@ def emptyUnifyState : UnifyState :=
   { constraints := ∅,
     equalities := ∅,
     patterns := [],
-    unknowns := ∅ }
+    unknowns := ∅,
+    outputName := `dummyOutput }
 
 /-- Runs a `UnifyM unit` action using the empty `UnifyState`,
     returning the resultant `UnifyState` in an `Option`  -/
