@@ -100,7 +100,11 @@ instance : ToMessageData UnifyState where
 -- Unification monad (fig. 2 in Generating Good Generators)
 ---------------------------------------------------------------
 
-/-- Under the hood, this means `UnifyM α := UnifyState → Option (α × UnifyState)` -/
+/-- `UnifyM` is a monad for unification + code generation.
+     Note that the definition of `UnifyM` (after unfolding) is:
+     ```
+     UnifyM α := UnifyState → MetaM (Option (α × UnifyState))
+     ``` -/
 abbrev UnifyM (α : Type) := StateT UnifyState (OptionT MetaM) α
 
 namespace UnifyM
