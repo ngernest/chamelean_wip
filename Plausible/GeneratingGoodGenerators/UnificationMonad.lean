@@ -286,7 +286,7 @@ mutual
     | (u1, .Undef _), c2@(.Ctor _ _) => UnifyM.update u1 c2
     | (_, .Unknown u'), c2@(.Ctor _ _) =>
       UnifyM.withConstraints $ fun k => do
-        let r := k.get! u'
+        let r ← UnifyM.findCorrespondingRange k u'
         unifyRC (u', r) c2
     | (u, .Fixed), c2@(.Ctor _ _) => handleMatch u c2
     | (_, c1@(.Ctor _ _)), c2@(.Ctor _ _) => unifyC c1 c2
@@ -310,7 +310,7 @@ mutual
       let ps ← rs.mapM matchAux
       return (.CtorPattern c ps)
     | .Unknown u => UnifyM.withConstraints $ fun k => do
-      let r := k.get! u
+      let r ← UnifyM.findCorrespondingRange k u
       match r with
       | .Undef _ => do
         -- Unknown becomes a pattern variable (bound by the pattern match)

@@ -54,10 +54,10 @@ inductive lookup : List type -> Nat -> type -> Prop where
 inductive typing: List type → term → type → Prop where
 -- | TConst : ∀ n,
 --     typing Γ (.Const n) .Nat
--- | TAdd: ∀ e1 e2,
---     typing Γ e1 .Nat →
---     typing Γ e2 .Nat →
---     typing Γ (.Add e1 e2) .Nat
+| TAdd: ∀ e1 e2,
+    typing Γ e1 .Nat →
+    typing Γ e2 .Nat →
+    typing Γ (.Add e1 e2) .Nat
 -- | TAbs: ∀ e τ1 τ2,
 --     typing (τ1::Γ) e τ2 →
 --     typing Γ (.Abs τ1 e) (.Fun τ1 τ2)
@@ -68,8 +68,7 @@ inductive typing: List type → term → type → Prop where
 --     typing Γ e2 τ1 →
 --     typing Γ e1 (.Fun τ1 τ2) →
 --     typing Γ (.App (.Abs .Nat e1) e2) τ2
-| BogusTAbs : forall e τ1 τ2,
-  typing Γ (.Abs τ1 e) (.Fun τ1 τ2)
+
 
 /-- Non-empty trees (trees that are not just leaves) -/
 inductive nonempty : Tree → Prop where
