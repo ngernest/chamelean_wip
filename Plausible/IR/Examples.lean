@@ -52,8 +52,8 @@ inductive lookup : List type -> Nat -> type -> Prop where
 
 /-- `typing Γ e τ` is the typing judgement `Γ ⊢ e : τ` -/
 inductive typing: List type → term → type → Prop where
-| TConst : ∀ Γ n,
-    typing Γ (.Const n) .Nat
+-- | TConst : ∀ Γ n,
+--     typing Γ (.Const n) .Nat
 -- | TAdd: ∀ Γ e1 e2,
 --     typing Γ e1 .Nat →
 --     typing Γ e2 .Nat →
@@ -68,12 +68,12 @@ inductive typing: List type → term → type → Prop where
 --     typing Γ e2 τ1 →
 --     typing Γ e1 (.Fun τ1 τ2) →
 --     typing Γ (.App (.Abs .Nat e1) e2) τ2
--- | Bogus : ∀ Γ e τ1,
---     typing Γ (.Abs τ1 e) τ1
+| Bogus : ∀ Γ e τ1 τ2,
+    typing Γ (.Abs τ1 e) (.Fun τ1 τ2)
 
 /-- Variant of the `Var` typing rule in which `τ` appears non-linearly -/
 inductive typingAlt : List type → term → type → Prop where
-  | VarNonlinear : ∀ Γ x τ, typingAlt (τ :: Γ) (.Var Nat.zero) τ
+  | VarNonlinear : ∀ Γ τ, typingAlt (τ :: Γ) (.Var Nat.zero) τ
 
 
 

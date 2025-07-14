@@ -211,7 +211,14 @@ mutual
     let unifyState ← get
     let outputName := unifyState.outputName
     let updatedConstraints := unifyState.constraints
-    let result ← emitResult updatedConstraints outputName (← UnifyM.findCorrespondingRange updatedConstraints outputName)
+    let rangeForOutput ← UnifyM.findCorrespondingRange updatedConstraints outputName
+
+    logWarning "entered finalAssembly"
+    logWarning m!"rangeForOutput = {rangeForOutput}"
+
+    IO.eprintln "right before calling emitResult"
+
+    let result ← emitResult updatedConstraints outputName rangeForOutput
 
     -- Bind each unknown in `undefUnknowns` to the result of an arbitrary call,
     -- then return the value computed in `result`
@@ -251,10 +258,18 @@ mutual
     | .Unknown u' => emitResult k u' (← UnifyM.findCorrespondingRange k u')
     | .Fixed => `($(mkIdent u))
     | .Ctor c rs => do
-      logWarning m!"Entered recursive case of emitResult with range = {range}"
+      logWarning m!"Entered recursive case of emitResult"
+      logWarning m!"k = {k.toList}"
       let ctorIdent := mkIdent c
-      let ctorArgs ← Array.mapM (fun r => emitResult k u r) rs.toArray
-      `($ctorIdent $ctorArgs*)
+
+      -- TODO: figure out why the commented-out recursive call to `mapM` loops infinitely for `TAbs`
+      -- let ctorArgs ← List.mapM (fun r => emitResult k u r) rs
+      -- `($ctorIdent $ctorArgs*)
+      let ctorArgsBogus ←
+        match rs with
+        | [] => `([])
+        | r :: _ => emitResult k u r
+      `($ctorIdent $ctorArgsBogus)
     | .Undef ty => throwError m!"Error: unknown {u} has a range of (Undef {ty}) in {k.toList}"
 
 end
@@ -333,7 +348,6 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
 
     let finalState ← get
     logWarning m!"finalState = {finalState}"
-
 
     emitPatterns finalState.patterns finalState.equalities.toList finalState.constraints)
 
@@ -415,4 +429,4 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
 set_option maxRecDepth 50000
 
 -- Example usage:
-#derive_subgenerator (fun (e : term) => typingAlt Γ e τ)
+#derive_subgenerator (fun (e : term) => typing Γ e τ)
