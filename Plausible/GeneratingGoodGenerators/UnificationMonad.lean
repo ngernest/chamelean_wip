@@ -153,7 +153,7 @@ namespace UnifyM
       (u, { s with unknowns := us.union { u }})
 
   /-- Runs a `UnifyM` computation, returning the result in the `MetaM` monad -/
-  def runInMetaM {α : Type} (action : UnifyM α) (st : UnifyState) : MetaM (Option (α × UnifyState)) := do
+  def runInMetaM (action : UnifyM α) (st : UnifyState) : MetaM (Option (α × UnifyState)) := do
     OptionT.run (StateT.run action st)
 
   /-- Finds the `Range` corresponding to an `Unknown` `u` in the
