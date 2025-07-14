@@ -111,7 +111,7 @@ def convertPatternToTerm (pattern : Pattern) : MetaM (TSyntax `term) :=
 mutual
 
   /-- Produces the code for a pattern match on an unknown -/
-  partial def emitPatterns (patterns : List (Unknown × Pattern)) (equalities : List (Unknown × Unknown)) (constraints : UnknownMap) : MetaM (TSyntax `term) :=
+  partial def emitPatterns (patterns : List (Unknown × Pattern)) (equalities : List (Unknown × Unknown)) (constraints : UnknownMap) : UnifyM (TSyntax `term) :=
     match patterns with
     | [] => emitEqualities equalities constraints
     | (u, p) :: ps => do
@@ -122,7 +122,7 @@ mutual
       mkMatchExpr (mkIdent u) cases
 
   /-- Produces the code for an equality check -/
-  partial def emitEqualities (equalities : List (Unknown × Unknown)) (constraints : UnknownMap) : MetaM (TSyntax `term) :=
+  partial def emitEqualities (equalities : List (Unknown × Unknown)) (constraints : UnknownMap) : UnifyM (TSyntax `term) :=
     match equalities with
     | [] => sorry -- figure out how to get `S e`
     | (u1, u2) :: eqs => do
@@ -130,20 +130,25 @@ mutual
       `(if ($(mkIdent u1) == $(mkIdent u2)) then $trueBranch else $failFn)
 
   /-- Produces the code for the body of a sub-generator which processes hypotheses -/
-  partial def emitHypothesis (hypotheses : List (Name × List Unknown)) (constraints : UnknownMap) : MetaM (TSyntax `term) :=
+  partial def emitHypothesis (hypotheses : List (Name × List Unknown)) (constraints : UnknownMap) : UnifyM (TSyntax `term) :=
     match hypotheses with
     | [] => finalAssembly constraints
     | _ => sorry
 
   /-- Assembles the body of the generator (this function is called when all hypotheses have ben processed by `emitHypotheses`) -/
-  partial def finalAssembly (constraints : ConstriantMap) : MetaM (TSyntax `term) :=
-    sorry
+  partial def finalAssembly (constraints : ConstriantMap) : UnifyM (TSyntax `term) := do
+    let undefUnknowns ← UnifyM.withConstraints (fun k =>
+      return Std.HashMap.fold (fun acc u r =>
+        match r with
+        | .Undef _ => r :: acc
+        | _ => acc) [] k)
+    sorry -- TODO: fill in the rest
 
   /-- Produces the call to the final generator call in the body of the sub-generator -/
-  partial def emitFinalCall (unknown : Unknown) : MetaM (TSyntax `doElem) := sorry
+  partial def emitFinalCall (unknown : Unknown) : UnifyM (TSyntax `doElem) := sorry
 
   /-- Produces a term corresponding to the value being generated -/
-  partial def emitResult (k : UnknownMap) (u : Unknown) (range : Range) : MetaM (TSyntax `term) :=
+  partial def emitResult (k : UnknownMap) (u : Unknown) (range : Range) : UnifyM (TSyntax `term) :=
     match range with
     | .Unknown u' => emitResult k u' k[u']!
     | .Fixed => `($(mkIdent u))
