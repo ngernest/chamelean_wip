@@ -114,7 +114,9 @@ mutual
   partial def emitEqualities (equalities : List (Unknown × Unknown)) (constraints : UnknownMap) : MetaM (TSyntax `term) :=
     match equalities with
     | [] => sorry -- figure out how to get `S e`
-    | (u1, u2) :: eqs => sorry
+    | (u1, u2) :: eqs => do
+      let trueBranch ← emitEqualities eqs constraints
+      `(if ($(mkIdent u1) == $(mkIdent u2)) then $trueBranch else $failFn)
 
   /-- Produces the code for the body of a sub-generator which processes hypotheses -/
   partial def emitHypothesis (hypotheses : List (Name × List Unknown)) (constraints : UnknownMap) : MetaM (TSyntax `term) :=
