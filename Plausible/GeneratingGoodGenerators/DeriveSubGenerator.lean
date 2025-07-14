@@ -143,7 +143,7 @@ mutual
   /-- Produces the code for the body of a sub-generator which processes hypotheses -/
   partial def emitHypotheses (hypotheses : List (Name × List Unknown)) (constraints : UnknownMap) : UnifyM (TSyntax `term) :=
     match hypotheses with
-    | [] => finalAssembly constraints
+    | [] => finalAssembly
     | (ctorName, ctorArgs) :: remainingHyps => do
       /- If all of the constructor's args don't have a `Range` of the form `Undef τ`,
         we can simply produce the expression
@@ -186,8 +186,11 @@ mutual
           -- We then put everything together in one big monadic do-block
           mkDoBlock doElems
 
-  /-- Assembles the body of the generator (this function is called when all hypotheses have ben processed by `emitHypotheses`) -/
-  partial def finalAssembly (constraints : UnknownMap) : UnifyM (TSyntax `term) := do
+  /-- Assembles the body of the generator (this function is called when all hypotheses have been processed by `emitHypotheses`)
+
+      (Note that this function doesn't take in an explicit `constraints` argument (unlike the pseudocode in the paper),
+      since we fetch the `constraints` map via a `get` call in the State monad) -/
+  partial def finalAssembly : UnifyM (TSyntax `term) := do
     -- Find all unknowns whose ranges are `Undef`
     let undefUnknowns ← UnifyM.findUnknownsWithUndefRanges
 
@@ -197,7 +200,8 @@ mutual
     -- Construct the final expression that will be produced by the generator
     let unifyState ← get
     let outputName := unifyState.outputName
-    let result ← emitResult constraints outputName (← UnifyM.findCorrespondingRange constraints outputName)
+    let updatedConstraints := unifyState.constraints
+    let result ← emitResult updatedConstraints outputName (← UnifyM.findCorrespondingRange updatedConstraints outputName)
 
     -- Bind each unknown in `undefUnknowns` to the result of an arbitrary call,
     -- then return the value computed in `result`
@@ -239,7 +243,7 @@ mutual
       let ctorIdent := mkIdent c
       let ctorArgs ← Array.mapM (fun r => emitResult k u r) rs.toArray
       `($ctorIdent $ctorArgs*)
-    | .Undef ty => throwError m!"encountered Range of (Undef {ty}) in emitResult"
+    | .Undef ty => throwError m!"Error: unknown {u} has a range of (Undef {ty}) in {k.toList}"
 
 end
 
@@ -252,7 +256,7 @@ end
     - The name and type of the output (value to be generated)
     - The names of inputs (arguments to the generator)
     - An array of unknowns (the arguments to the inductive relation) -/
-def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Expr) (inputNames : List Name) (unknowns : Array Unknown) : UnifyM Unit := do
+def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Expr) (inputNames : List Name) (unknowns : Array Unknown) : UnifyM (TSyntax `term) := do
   let ctorInfo ← getConstInfoCtor ctorName
   let ctorType := ctorInfo.type
 
@@ -316,7 +320,10 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
       unify r1 r2
 
     let finalState ← get
-    logInfo m!"finalState = {finalState}")
+    logInfo m!"finalState = {finalState}"
+
+
+    emitPatterns finalState.patterns finalState.equalities.toList finalState.constraints)
 
 
 
@@ -382,7 +389,11 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
 
     for ctorName in inductiveVal.ctors do
       -- Process everything within the scope of the telescope
-      let _ ← liftTermElabM (UnifyM.runInMetaM (processCtorInContext ctorName outputName outputType inputNames.toList allUnknowns) emptyUnifyState)
+      let derivationResult ← liftTermElabM $ UnifyM.runInMetaM
+        (processCtorInContext ctorName outputName outputType inputNames.toList allUnknowns) emptyUnifyState
+      match derivationResult with
+      | some (generator, _) => logInfo m!" derived generator:\n```\n{generator}\n```"
+      | none => logInfo m!"derived generator:\n```\nreturn none\n```"
 
 
 
@@ -390,8 +401,8 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
 
 
 -- Example usage:
-#derive_subgenerator (fun (e : term) => typing Γ e τ)
--- #derive_subgenerator (fun (tree : Tree) => goodTree in1 in2 tree)
+-- #derive_subgenerator (fun (e : term) => typing Γ e τ)
+#derive_subgenerator (fun (tree : Tree) => nonempty tree)
 
 
 /-- Example initial constraint map from Section 4.2 of GGG -/
