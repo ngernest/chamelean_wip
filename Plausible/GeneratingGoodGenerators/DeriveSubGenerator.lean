@@ -246,7 +246,7 @@ mutual
 
   /-- Produces a term corresponding to the value being generated -/
   partial def emitResult (k : UnknownMap) (u : Unknown) (range : Range) : UnifyM (TSyntax `term) := do
-    logWarning m!"emitResult called with unknown {u}, range {range}"
+    logError m!"emitResult called with unknown {u}, range {range}"
     match range with
     | .Unknown u' => emitResult k u' (← UnifyM.findCorrespondingRange k u')
     | .Fixed => `($(mkIdent u))
@@ -415,4 +415,4 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
 set_option maxRecDepth 50000
 
 -- Example usage:
--- #derive_subgenerator (fun (e : term) => typing Γ e τ)
+#derive_subgenerator (fun (e : term) => typingAlt Γ e τ)
