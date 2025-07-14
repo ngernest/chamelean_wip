@@ -125,7 +125,8 @@ abbrev UnifyM (α : Type) := StateT UnifyState (OptionT MetaM) α
 namespace UnifyM
 
   /-- `update u r` sets the range of the unknown `u` to be `r` -/
-  def update (u : Unknown) (r : Range) : UnifyM Unit :=
+  def update (u : Unknown) (r : Range) : UnifyM Unit := do
+    logInfo m!"Updating {u} to have range ({r})"
     modify $ fun s =>
       let k := s.constraints
       { s with constraints := k.insert u r }
@@ -212,7 +213,8 @@ namespace UnifyM
 
   /-- Updates the `constraint` map so that for each `u ∈ unknowns`,
       we have the binding `u ↦ Fixed` in `constraints` -/
-  def fixRanges (unknowns : List Unknown) : UnifyM Unit :=
+  def fixRanges (unknowns : List Unknown) : UnifyM Unit := do
+    logInfo m!"fixing ranges for {unknowns}"
     updateMany (unknowns.zip (List.replicate unknowns.length .Fixed))
 
 
@@ -225,7 +227,9 @@ end UnifyM
 
 mutual
   /-- Top-level unification function which unifies the ranges mapped to by two unknowns -/
-  partial def unify : Range → Range → UnifyM Unit
+  partial def unify (range1 : Range) (range2: Range) : UnifyM Unit := do
+    logInfo m!"Calling unify with {range1}, {range2}"
+    match range1, range2 with
     | .Unknown u1, .Unknown u2 =>
       if u1 == u2 then
         return ()
@@ -250,17 +254,17 @@ mutual
   partial def unifyR : Unknown × Range → Unknown × Range → UnifyM Unit
     -- If the range of an unknown (e.g. `u1`) is undefined,
     -- we update `u1` to point to the range of `u2`
-    | (u1, .Undef _), (_, r2) => UnifyM.update u1 r2
-    | (_, r1), (u2, .Undef _) => UnifyM.update u2 r1
-    | (_, u1'@(.Unknown _)), (_, r2) => unify u1' r2
-    | (_, r1), (_, u2'@(.Unknown _)) => unify r1 u2'
+    | (u1, .Undef _), (u2, _) => UnifyM.update u1 (.Unknown u2)
+    | (u1, _), (u2, .Undef _) => UnifyM.update u2 (.Unknown u1)
+    | (_, u1'@(.Unknown _)), (u2, _) => unify u1' (.Unknown u2)
+    | (u1, _), (_, u2'@(.Unknown _)) => unify (.Unknown u1) u2'
     | (_, c1@(.Ctor _ _)), (_, c2@(.Ctor _ _)) => unifyC c1 c2
     | (u1, .Fixed), (u2, .Fixed) => do
-      logInfo m!"registering equality {u1} = {u2}"
+      logInfo m!"Registering equality {u1} = {u2}"
       -- Assert that whatever the values of `u1` and `u2` are, they are equal
       -- Record this equality check using `equality`, then update `u1`'s range to the other
       UnifyM.registerEquality u1 u2
-      UnifyM.update u1 .Fixed
+      UnifyM.update u1 (.Unknown u2)
     | (u1, .Fixed), (_, c2@(.Ctor _ _)) => handleMatch u1 c2
     | (_, c1@(.Ctor _ _)), (u2, .Fixed) => handleMatch u2 c1
 

@@ -245,6 +245,28 @@ mutual
 
 end
 
+-- def rewriteNonLinearPatterns (args : Array Expr) : UnifyM (Array Expr) := do
+--   let localCtx ← getLCtx
+--   let mut exprs := #[]
+--   for arg in args do
+--     match arg with
+--     | .fvar fvarId =>
+--       let existingName ← fvarId.getUserName
+--       if names.contains existingName then
+--         let freshName := localCtx.getUnusedName existingName
+--         names := names.push freshName
+--       else
+--         names := names.push existingName
+--     | .const existingName _ =>
+--       if names.contains existingName then
+--         let freshName := localCtx.getUnusedName existingName
+--         names := names.push freshName
+--       else
+--         names := names.push existingName
+--     | _ => throwError m!"arg {arg} is not an FVarId nor a const"
+--   return exprs
+
+
 
 /-- Function that handles the bulk of the generator derivation algorithm for a single constructor:
     processes the entire type of the constructor within the same `LocalContext` (the one produced by `forallTelescopeReducing`)
@@ -295,9 +317,12 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
 
     logInfo m!"unknownArgsAndRanges = {unknownArgsAndRanges}"
 
-    -- Now convert expressions while staying in the same context
+    -- Compute the appropriate `Range` for each argument in the constructor's conclusion
     let conclusionArgs := conclusion.getAppArgs
     let conclusionRanges ← conclusionArgs.mapM convertExprToRangeInCurrentContext
+
+    -- let rewrittenConclusion ← rewriteNonLinearPatterns conclusionArgs
+    -- logInfo m!"rewrittenConclusion = {rewrittenConclusion}"
 
     let conclusionArgsAndRanges := conclusionArgs.zip conclusionRanges
 
@@ -403,9 +428,7 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
 
 -- #derive_subgenerator (fun (tree : Tree) => nonempty tree)
 
-
--- TODO: figure out why `UnifyR` isn't being called with `(in1, Fixed) (in2, Fixed)`
-#derive_subgenerator (fun (t : Tree) => goodTree in1 in2 t)
+-- #derive_subgenerator (fun (t : Tree) => goodTree in1 in2 t)
 
 
 /-- Example initial constraint map from Section 4.2 of GGG -/
