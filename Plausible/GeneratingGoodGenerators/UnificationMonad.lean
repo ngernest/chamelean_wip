@@ -126,7 +126,7 @@ namespace UnifyM
 
   /-- `update u r` sets the range of the unknown `u` to be `r` -/
   def update (u : Unknown) (r : Range) : UnifyM Unit := do
-    logInfo m!"Updating {u} to have range ({r})"
+    -- logInfo m!"Updating {u} to have range ({r})"
     modify $ fun s =>
       let k := s.constraints
       { s with constraints := k.insert u r }
@@ -177,7 +177,7 @@ namespace UnifyM
     modifyGet $ fun s =>
       let us := s.unknowns
       let u := freshUnknown us
-      (u, { s with unknowns := us.union { u }})
+      (u, { s with unknowns := us.union { u } })
 
   /-- Runs a `UnifyM` computation, returning the result in the `MetaM` monad -/
   def runInMetaM (action : UnifyM α) (st : UnifyState) : MetaM (Option (α × UnifyState)) := do
@@ -298,8 +298,8 @@ mutual
     logInfo m!"handleMatch called with unknown {unknown}, range {range}"
     match unknown, range with
     | u, .Ctor c rs => do
-      let p ← rs.mapM matchAux
-      UnifyM.addPattern u (Pattern.CtorPattern c p)
+      let ps ← rs.mapM matchAux
+      UnifyM.addPattern u (Pattern.CtorPattern c ps)
     | u, r => throwError m!"handleMatch called, unable to match unknown {u} with range {r} which is not in constructor form"
 
   /-- `matchAux` traverses a `Range` and converts it into a

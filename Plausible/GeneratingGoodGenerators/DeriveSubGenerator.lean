@@ -135,6 +135,14 @@ mutual
     match equalities with
     | [] => UnifyM.withHypotheses (fun hyps => emitHypotheses hyps constraints)
     | (u1, u2) :: eqs => do
+      /- We produce the expression
+        ```lean
+        match DecOpt.decOpt ($u1 = $u2) $initSize with
+        | some true => $trueCaseRHS
+        | _ => OptionT.fail
+        ```
+        where we invoke the checker provided by the `DecOpt` typeclass to determine whether `u1 = u2` -/
+
       let scrutinee ← `($decOptFn ($(mkIdent u1) == $(mkIdent u2)) $initSizeIdent)
       let trueCaseRHS ← emitEqualities eqs constraints
       let trueCase ← `(Term.matchAltExpr | | $(mkIdent ``some) $(mkIdent ``true) => $trueCaseRHS)
@@ -240,7 +248,7 @@ mutual
   partial def emitResult (k : UnknownMap) (u : Unknown) (range : Range) : UnifyM (TSyntax `term) := do
     logInfo m!"emitResult called with unknown {u}, range {range}"
     match range with
-    | .Unknown u' => emitResult k u' k[u']!
+    | .Unknown u' => emitResult k u' (← UnifyM.findCorrespondingRange k u')
     | .Fixed => `($(mkIdent u))
     | .Ctor c rs => do
       logInfo m!"Entered recursive case of emitResult with range = {range}"
@@ -437,9 +445,9 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
 set_option maxRecDepth 50000
 
 -- Example usage:
--- #derive_subgenerator (fun (e : term) => typing Γ e τ)
+#derive_subgenerator (fun (e : term) => typing Γ e τ)
 
-#derive_subgenerator (fun (x : Nat) => lookup Γ x τ)
+-- #derive_subgenerator (fun (x : Nat) => lookup Γ x τ)
 
 -- #derive_subgenerator (fun (tree : Tree) => nonempty tree)
 
