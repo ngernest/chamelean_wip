@@ -275,7 +275,7 @@ mutual
           unify r1 r2
       else
         failure
-    | _, _ => panic! "Case not handled in unifyC"
+    | _, _ => throwError m!"unifyC, unable to unify r1 = {r1}, r2 = {r2} which are not both constructors"
 
   /-- Unifies an `(Unknown, Range)` pair with a `Range` -/
   partial def unifyRC : Unknown × Range → Range → UnifyM Unit
@@ -286,7 +286,7 @@ mutual
         unifyRC (u', r) c2
     | (u, .Fixed), c2@(.Ctor _ _) => handleMatch u c2
     | (_, c1@(.Ctor _ _)), c2@(.Ctor _ _) => unifyC c1 c2
-    | _, _ => panic! "reached catch-all case in unifyRC"
+    | (u, r), r' => throwError m!"unifyRC called, unable to unify (unknown {u}, range {r}) with range {r'}"
 
   /-- Corresponds to `match` in the pseudocode
      (we call this `handleMatch` since `match` is a reserved keyword in Lean) -/
@@ -294,11 +294,13 @@ mutual
     | u, .Ctor c rs => do
       let p ← rs.mapM matchAux
       UnifyM.addPattern u (Pattern.CtorPattern c p)
-    | _, _ => panic! "reached catch-all case in handleMatch"
+    | u, r => throwError m!"handleMatch called, unable to match unknown {u} with range {r} which is not in constructor form"
 
   /-- `matchAux` traverses a `Range` and converts it into a
       pattern which can be used in a `match` expression -/
-  partial def matchAux : Range → UnifyM Pattern
+  partial def matchAux (range : Range) : UnifyM Pattern := do
+    logInfo m!"matchAux called with range = {range}"
+    match range with
     | .Ctor c rs => do
       -- Recursively handle ranges
       let ps ← rs.mapM matchAux
@@ -325,7 +327,7 @@ mutual
       | .Ctor c rs => do
         let ps ← rs.mapM matchAux
         return (.CtorPattern c ps)
-    | _ => panic! "reached catch-all case in matchAux"
+    | _ => throwError m!"matchAux called with unexpected range {range}"
 
 end
 
