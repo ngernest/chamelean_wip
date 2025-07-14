@@ -126,7 +126,7 @@ namespace UnifyM
 
   /-- `update u r` sets the range of the unknown `u` to be `r` -/
   def update (u : Unknown) (r : Range) : UnifyM Unit := do
-    -- logInfo m!"Updating {u} to have range ({r})"
+    -- logWarning m!"Updating {u} to have range ({r})"
     modify $ fun s =>
       let k := s.constraints
       { s with constraints := k.insert u r }
@@ -214,7 +214,7 @@ namespace UnifyM
   /-- Updates the `constraint` map so that for each `u ∈ unknowns`,
       we have the binding `u ↦ Fixed` in `constraints` -/
   def fixRanges (unknowns : List Unknown) : UnifyM Unit := do
-    logInfo m!"fixing ranges for {unknowns}"
+    logWarning m!"fixing ranges for {unknowns}"
     updateMany (unknowns.zip (List.replicate unknowns.length .Fixed))
 
 
@@ -228,7 +228,7 @@ end UnifyM
 mutual
   /-- Top-level unification function which unifies the ranges mapped to by two unknowns -/
   partial def unify (range1 : Range) (range2: Range) : UnifyM Unit := do
-    logInfo m!"Calling unify with {range1}, {range2}"
+    logWarning m!"Calling unify with {range1}, {range2}"
     match range1, range2 with
     | .Unknown u1, .Unknown u2 =>
       if u1 == u2 then
@@ -236,7 +236,7 @@ mutual
       else UnifyM.withConstraints $ fun k => do
         let r1 ← UnifyM.findCorrespondingRange k u1
         let r2 ← UnifyM.findCorrespondingRange k u2
-        logInfo m!"Calling unifyR ({u1}, {r1}) ({u2}, {r2})"
+        logWarning m!"Calling unifyR ({u1}, {r1}) ({u2}, {r2})"
         unifyR (u1, r1) (u2, r2)
     | c1@(.Ctor _ _), c2@(.Ctor _ _) =>
       unifyC c1 c2
@@ -260,7 +260,7 @@ mutual
     | (u1, _), (_, u2'@(.Unknown _)) => unify (.Unknown u1) u2'
     | (_, c1@(.Ctor _ _)), (_, c2@(.Ctor _ _)) => unifyC c1 c2
     | (u1, .Fixed), (u2, .Fixed) => do
-      logInfo m!"Registering equality {u1} = {u2}"
+      logWarning m!"Registering equality {u1} = {u2}"
       -- Assert that whatever the values of `u1` and `u2` are, they are equal
       -- Record this equality check using `equality`, then update `u1`'s range to the other
       UnifyM.registerEquality u1 u2
@@ -295,7 +295,7 @@ mutual
   /-- Corresponds to `match` in the pseudocode
      (we call this `handleMatch` since `match` is a reserved keyword in Lean) -/
   partial def handleMatch (unknown : Unknown) (range : Range) : UnifyM Unit := do
-    logInfo m!"handleMatch called with unknown {unknown}, range {range}"
+    logWarning m!"handleMatch called with unknown {unknown}, range {range}"
     match unknown, range with
     | u, .Ctor c rs => do
       let ps ← rs.mapM matchAux
@@ -305,7 +305,7 @@ mutual
   /-- `matchAux` traverses a `Range` and converts it into a
       pattern which can be used in a `match` expression -/
   partial def matchAux (range : Range) : UnifyM Pattern := do
-    logInfo m!"matchAux called with range = {range}"
+    logWarning m!"matchAux called with range = {range}"
     match range with
     | .Ctor c rs => do
       -- Recursively handle ranges

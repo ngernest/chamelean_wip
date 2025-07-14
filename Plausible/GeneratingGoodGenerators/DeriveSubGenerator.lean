@@ -246,45 +246,18 @@ mutual
 
   /-- Produces a term corresponding to the value being generated -/
   partial def emitResult (k : UnknownMap) (u : Unknown) (range : Range) : UnifyM (TSyntax `term) := do
-    logInfo m!"emitResult called with unknown {u}, range {range}"
+    logWarning m!"emitResult called with unknown {u}, range {range}"
     match range with
     | .Unknown u' => emitResult k u' (← UnifyM.findCorrespondingRange k u')
     | .Fixed => `($(mkIdent u))
     | .Ctor c rs => do
-      logInfo m!"Entered recursive case of emitResult with range = {range}"
+      logWarning m!"Entered recursive case of emitResult with range = {range}"
       let ctorIdent := mkIdent c
       let ctorArgs ← Array.mapM (fun r => emitResult k u r) rs.toArray
       `($ctorIdent $ctorArgs*)
     | .Undef ty => throwError m!"Error: unknown {u} has a range of (Undef {ty}) in {k.toList}"
 
 end
-
--- def rewriteNonLinearPatterns (args : Array Expr) : UnifyM (Array Name) := do
---   let localCtx ← getLCtx
---   let mut names := #[]
---   for arg in args do
---     let argTy ← inferType arg
---     match arg with
---     | .fvar fvarId =>
---       let existingName ← fvarId.getUserName
---       if names.contains existingName then
---         let freshName := localCtx.getUnusedName existingName
---         names := names.push freshName
---       else
---         names := names.push existingName
---     | .const existingName _ =>
---       if names.contains existingName then
---         let freshName := localCtx.getUnusedName existingName
---         names := names.push freshName
---       else
---         names := names.push existingName
---     | _ => throwError m!"arg {arg} is not an FVarId nor a const"
---   return names
-
-
--- def rewriteNonLinearPatternsNew (e : Expr) : UnifyM Expr := do
---   let localCtx ← getLCtx
-
 
 
 /-- Function that handles the bulk of the generator derivation algorithm for a single constructor:
@@ -301,8 +274,8 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
 
   -- Stay within the forallTelescope scope for all processing
   forallTelescopeReducing ctorType (cleanupAnnotations := true) (fun forAllVarsAndHyps conclusion => do
-    logInfo m!"Processing constructor {ctorName}"
-    logInfo m!"conclusion = {conclusion}"
+    logWarning m!"Processing constructor {ctorName}"
+    logWarning m!"conclusion = {conclusion}"
 
     -- Universally-quantified variables `x : τ` are represented using `(some x, τ)`
     -- Hypotheses are represented using `(none, hyp)` (first component is `none` since a hypothesis doesn't have a name)
@@ -320,12 +293,12 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
       | some name => (name, ty)
       | none => none)
 
-    logInfo m!"forAllVars = {forAllVars}"
-    logInfo m!"inputNames = {inputNames}"
+    logWarning m!"forAllVars = {forAllVars}"
+    logWarning m!"inputNames = {inputNames}"
 
     -- Creates the initial `UnifyState` needed for the unification algorithm
     let initialUnifyState := mkInitialUnifyState inputNames outputName outputType forAllVars.toList
-    logInfo m!"initialUnifyState = {initialUnifyState}"
+    logWarning m!"initialUnifyState = {initialUnifyState}"
 
     -- Update the state in `UnifyM` to be `initialUnifyState`
     set initialUnifyState
@@ -334,19 +307,16 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
     let unknownRanges ← unknowns.mapM processCorrespondingRange
     let unknownArgsAndRanges := unknowns.zip unknownRanges
 
-    logInfo m!"unknownArgsAndRanges = {unknownArgsAndRanges}"
+    logWarning m!"unknownArgsAndRanges = {unknownArgsAndRanges}"
 
     -- Compute the appropriate `Range` for each argument in the constructor's conclusion
     let conclusionArgs := conclusion.getAppArgs
     let conclusionRanges ← conclusionArgs.mapM convertExprToRangeInCurrentContext
 
-    -- let rewrittenConclusion ← rewriteNonLinearPatterns conclusionArgs
-    -- logInfo m!"rewrittenConclusion = {rewrittenConclusion}"
-
     let conclusionArgsAndRanges := conclusionArgs.zip conclusionRanges
 
-    logInfo m!"conclusion = {conclusion}"
-    logInfo m!"conclusionArgsAndRanges = {conclusionArgsAndRanges}"
+    logWarning m!"conclusion = {conclusion}"
+    logWarning m!"conclusionArgsAndRanges = {conclusionArgsAndRanges}"
 
     -- Extract hypotheses (which correspond to pairs in `forAllVarsAndHypsWithTypes` where the first component is `none`)
     -- let hypotheses := forAllVarsAndHypsWithTypes.filterMap (fun (nameOpt, tyExpr) =>
@@ -358,11 +328,11 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
 
     -- TODO: figure out how to handle repeated unknowns in `conclusionArgsAndRanges`
     for ((u1, r1), (u2, r2)) in conclusionArgsAndRanges.zip unknownArgsAndRanges do
-      logInfo m!"Unifying ({u1} ↦ {r1}) with ({u2} ↦ {r2})"
+      logWarning m!"Unifying ({u1} ↦ {r1}) with ({u2} ↦ {r2})"
       unify r1 r2
 
     let finalState ← get
-    logInfo m!"finalState = {finalState}"
+    logWarning m!"finalState = {finalState}"
 
 
     emitPatterns finalState.patterns finalState.equalities.toList finalState.constraints)
@@ -380,19 +350,19 @@ def getCtorArgsInContext (ctorName : Name) (localCtx : LocalContext) : MetaM (Ar
   let ctorType := ctorInfo.type
 
   let (forAllVars, ctorTypeBody) := extractForAllBinders ctorType
-  logInfo m!"inside getCtorArgsInContext"
-  logInfo m!"forAllVars = {forAllVars}"
+  logWarning m!"inside getCtorArgsInContext"
+  logWarning m!"forAllVars = {forAllVars}"
 
   let ctorTypeComponents ← getComponentsOfArrowType ctorTypeBody
 
   withLCtx' localCtx do
     forallTelescopeReducing ctorType (cleanupAnnotations := true) $ fun boundVars body => do
-      logInfo m!"boundVars = {boundVars}"
-      logInfo m!"body = {body}"
-      logInfo m!"ctorTypeComponents = {ctorTypeComponents}"
+      logWarning m!"boundVars = {boundVars}"
+      logWarning m!"body = {body}"
+      logWarning m!"ctorTypeComponents = {ctorTypeComponents}"
       let lctx ← getLCtx
       let exprsInContext := lctx.getFVars
-      logInfo m!"exprsInContext = {exprsInContext}"
+      logWarning m!"exprsInContext = {exprsInContext}"
       return (forAllVars, ctorTypeComponents, lctx)
 
 /-- Command for deriving a sub-generator for one construtctor of an inductive relation (per figure 4 of GGG) -/
@@ -445,23 +415,4 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
 set_option maxRecDepth 50000
 
 -- Example usage:
-#derive_subgenerator (fun (e : term) => typing Γ e τ)
-
--- #derive_subgenerator (fun (x : Nat) => lookup Γ x τ)
-
--- #derive_subgenerator (fun (tree : Tree) => nonempty tree)
-
--- #derive_subgenerator (fun (t : Tree) => goodTree in1 in2 t)
-
-
-/-- Example initial constraint map from Section 4.2 of GGG -/
-def bstInitialConstraints := Std.HashMap.ofList [
-  (`hi, .Undef (mkConst `Nat)),
-  (`tree, .Undef (mkConst `Tree)),
-  (`in2, .Fixed),
-  (`l, .Undef (mkConst `Tree)),
-  (`x, .Undef (mkConst `Nat)),
-  (`lo, .Undef (mkConst `Nat)),
-  (`r, .Undef (mkConst `Tree)),
-  (`in1, Range.Fixed)
-]
+-- #derive_subgenerator (fun (e : term) => typing Γ e τ)
