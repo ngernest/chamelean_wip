@@ -390,8 +390,8 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
       let derivationResult ← liftTermElabM $ UnifyM.runInMetaM
         (processCtorInContext ctorName outputName outputType inputNames.toList allUnknowns) emptyUnifyState
       match derivationResult with
-      | some (generator, _) => logInfo m!" derived generator:\n```\n{generator}\n```"
-      | none => logInfo m!"derived generator:\n```\nreturn none\n```"
+      | some (generator, _) => logInfo m!"Derived generator:\n```\n{generator}\n```"
+      | none => logInfo m!"Derived generator:\n```\nreturn none\n```"
 
 
 
@@ -401,7 +401,7 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
 -- Example usage:
 -- #derive_subgenerator (fun (e : term) => typing Γ e τ)
 
-#derive_subgenerator (fun (tree : Tree) => nonempty tree)
+-- #derive_subgenerator (fun (tree : Tree) => nonempty tree)
 -- #derive_subgenerator (fun (tree : Tree) => goodTree in1 in2 tree)
 
 

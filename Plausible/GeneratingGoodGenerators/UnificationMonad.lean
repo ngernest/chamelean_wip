@@ -78,15 +78,23 @@ partial def toMessageDataRange (range : Range) : MessageData :=
   | .Undef tyExpr => m!"Undef {tyExpr}"
   | .Ctor c rs =>
     let rendredCtorArgs := toMessageDataRange <$> rs
-    m!"Ctor {c} {rendredCtorArgs}"
+    m!"Ctor ({c} {rendredCtorArgs})"
   | .Unknown u => m!"Unknown {u}"
   | .Fixed => m!"Fixed"
 
 instance : ToMessageData Range where
   toMessageData := toMessageDataRange
 
+/-- Pretty-prints a `Pattern` as a `MessageData` -/
+partial def toMessageDataPattern (p : Pattern) : MessageData :=
+  match p with
+  | .UnknownPattern u => m!"UnknownPattern {u}"
+  | .CtorPattern c ps =>
+    let renderedCtorArgs := toMessageDataPattern <$> ps
+    m!"CtorPattern ({c} {renderedCtorArgs})"
+
 instance : ToMessageData Pattern where
-  toMessageData pattern := repr pattern
+  toMessageData pattern := toMessageDataPattern pattern
 
 instance : ToMessageData UnifyState where
   toMessageData unifyState :=
@@ -195,6 +203,8 @@ namespace UnifyM
     UnifyM.withConstraints
       (fun k => return Std.HashMap.fold accumulateUndefUnknowns [] k)
     where
+      /-- `accumulateUndefUnknowns acc u r` produces `u :: acc` if `r = Undef τ` for some type `τ`,
+           and produces `acc` otherwise -/
       accumulateUndefUnknowns (acc : List Unknown) (u : Unknown) (r : Range) :=
         match r with
         | .Undef _ => u :: acc
