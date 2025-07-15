@@ -457,10 +457,4 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
 
 
 
-
-
-inductive SameHead : List Nat → List Nat → Prop where
-| HeadMatch : ∀ x xs ys, SameHead (x::xs) (x::ys)
-
--- #derive_subgenerator (fun (xs : List Nat) => SameHead xs ys)
-#derive_subgenerator (fun (e : term) => typing Γ e τ)
+-- #derive_subgenerator (fun (e : term) => typing Γ e τ)

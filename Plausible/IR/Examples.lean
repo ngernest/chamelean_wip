@@ -79,7 +79,7 @@ inductive typingAlt : List type → term → type → Prop where
 inductive nonempty : Tree → Prop where
   | NonEmpty : forall x l r, nonempty (.Node x l r)
 
-/-- Complete trees (aka perfect treees) are binary trees whose leaves are all at the same depth -/
+/-- Complete trees (aka perfect trees) are binary trees whose leaves are all at the same depth -/
 inductive complete : Nat → Tree → Prop where
   | CompleteLeaf : complete 0 .Leaf
   | CompleteNode : forall n x l r,
@@ -87,6 +87,6 @@ inductive complete : Nat → Tree → Prop where
     complete n r ->
     complete (.succ n) (.Node x l r)
 
-/-- Example with non-linear patterns -/
+/-- Example with non-linear patterns, taken from Generating Good Generators -/
 inductive goodTree : Nat → Nat → Tree → Prop where
   | GoodLeaf : forall n, goodTree n n .Leaf
