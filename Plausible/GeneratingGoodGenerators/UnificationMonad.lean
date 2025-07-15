@@ -15,6 +15,11 @@ open Lean Idents
 abbrev Unknown := Name
 deriving instance Repr, BEq for Unknown
 
+/-- `Ord` instance for `Unknown`s
+    (which just uses the `Ord` instance for their underlying string representations) -/
+instance : Ord Unknown where
+  compare u1 u2 := compare u1.toString u2.toString
+
 /-- *Ranges* represent sets of potential values that a variable can take on during generation -/
 inductive Range
   /-- Undefined value, parameterized by a type `ty` (represented as a Lean `Expr`)
@@ -64,7 +69,7 @@ structure UnifyState where
 
   /-- The list of hypotheses in the constructor's type (excluding the constructor's conclusion)
       - Each hypothesis is represented as a pair consisting of `(constructor name, list of constructor args)` -/
-  hypotheses : List (Unknown × (List Unknown))
+  hypotheses : List (Unknown × List Unknown)
 
   deriving Repr
 
@@ -98,8 +103,11 @@ instance : ToMessageData Pattern where
 
 instance : ToMessageData UnifyState where
   toMessageData unifyState :=
-    let constraints :=
-      unifyState.constraints.toList.map $ fun (u, r) => m!"{u} ↦ {r}"
+    let constraints := unifyState.constraints.toList
+    -- Sort the constraints map based on the ordering of its keys
+    let sortedConstraints := List.mergeSort constraints (fun (u1, _) (u2, _) => Ordering.isLE (compare u1 u2))
+    let formattedConstraints :=
+      sortedConstraints.map $ fun (u, r) => m!"{u} ↦ {r}"
     let equalities :=
       unifyState.equalities.toList.map $ fun (u1, u2) => m!"{u1} = {u2}"
     let patterns :=
@@ -107,7 +115,7 @@ instance : ToMessageData UnifyState where
     let unknowns :=
       unifyState.unknowns.toList.map $ fun u => m!"{u}"
 
-    m!"⟨\n  constraints := {constraints},\n  equalities := {equalities},\n  patterns := {patterns},\n  unknowns := {unknowns}\n⟩"
+    m!"⟨\n  constraints := {formattedConstraints},\n  equalities := {equalities},\n  patterns := {patterns},\n  unknowns := {unknowns}\n⟩"
 
 
 
