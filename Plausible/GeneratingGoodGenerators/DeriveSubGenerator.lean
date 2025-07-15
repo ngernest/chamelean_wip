@@ -62,10 +62,18 @@ def convertToCtorExpr (e : Expr) : MetaM (Option (Name × Array Expr)) :=
     for arg in args do
       -- Figure out whether `argType` is `Type u` for some universe `u`
       let argType ← inferType arg
-      -- TODO: handle case where `argType` is a typeclass instance (e.g. `LT Nat`)
       logWarning m!"arg {arg} has type {argType}"
       if argType.isSort then
         logWarning m!"{argType} has some higher-universe sort"
+      else if argType.isApp then
+        -- Handle case where `argType` is a typeclass instance (e.g. `LT Nat`)
+        let (typeCtorName, _) := argType.getAppFnArgs
+        let env ← getEnv
+        if Lean.isClass env typeCtorName then
+          logWarning m!"{argType} is a typeclass instance for {typeCtorName}"
+        else
+          actualArgs := actualArgs.push arg
+          logWarning m!"encountered type expression {argType} which is not a typeclass instance"
       else
         actualArgs := actualArgs.push arg
     logWarning m!"ctor {ctorName} has actual args {actualArgs}"

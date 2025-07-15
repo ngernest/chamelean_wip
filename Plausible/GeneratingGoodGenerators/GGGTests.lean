@@ -5,7 +5,7 @@ import Plausible.IR.Examples
 info: Derived generator:
 ```
 match Γ_1 with
-| ((List.cons type) τ) Γ =>
+| (List.cons τ) Γ =>
   match DecOpt.decOpt (τ == τ_1) initSize with
   | Option.some Bool.true => do
     return Nat.zero
@@ -51,9 +51,9 @@ inductive SameHead : List Nat → List Nat → Prop where
 info: Derived generator:
 ```
 match ys_1 with
-| ((List.cons Nat) x) ys => do
+| (List.cons x) ys => do
   let xs ← Arbitrary.arbitrary
-  return List.cons (Nat) x xs
+  return List.cons x xs
 | _ => OptionT.fail
 ```
 -/
