@@ -341,26 +341,6 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
     emitPatterns finalState.patterns finalState.equalities.toList finalState.constraints)
 
 
-
-/-- Takes the name of a constructor and the existing `LocalContext`,
-    and returns a triple consisting of:
-    1. The names & types of universally quantified variables
-    2. The components of the body of the constructor's arrow type (which mentions the universally quantified variables)
-    3. An updated `LocalContext` populated with all the univerally quantified variables
-       (this is needed for pretty-printing purposes) -/
-def getCtorArgsInContext (ctorName : Name) (localCtx : LocalContext) : MetaM (Array (Name × Expr) × Array Expr × LocalContext) := do
-  let ctorInfo ← getConstInfoCtor ctorName
-  let ctorType := ctorInfo.type
-
-  let (forAllVars, ctorTypeBody) := extractForAllBinders ctorType
-
-  let ctorTypeComponents ← getComponentsOfArrowType ctorTypeBody
-
-  withLCtx' localCtx do
-    forallTelescopeReducing ctorType (cleanupAnnotations := true) $ fun _ _ => do
-      let lctx ← getLCtx
-      return (forAllVars, ctorTypeComponents, lctx)
-
 /-- Command for deriving a sub-generator for one construtctor of an inductive relation (per figure 4 of GGG) -/
 syntax (name := derive_subgenerator) "#derive_subgenerator" "(" "fun" "(" ident ":" term ")" "=>" term ")" : command
 
