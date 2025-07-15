@@ -216,7 +216,7 @@ mutual
     logWarning "entered finalAssembly"
     logWarning m!"rangeForOutput = {rangeForOutput}"
 
-    IO.eprintln "right before calling emitResult"
+    logWarning "right before calling emitResult"
 
     let result ← emitResult updatedConstraints outputName rangeForOutput
 
@@ -253,7 +253,7 @@ mutual
 
   /-- Produces a term corresponding to the value being generated -/
   partial def emitResult (k : UnknownMap) (u : Unknown) (range : Range) : UnifyM (TSyntax `term) := do
-    logError m!"emitResult called with unknown {u}, range {range}"
+    logWarning m!"emitResult called with unknown {u}, range {range}"
     match range with
     | .Unknown u' => emitResult k u' (← UnifyM.findCorrespondingRange k u')
     | .Fixed => `($(mkIdent u))
@@ -263,15 +263,15 @@ mutual
       let ctorIdent := mkIdent c
 
       -- TODO: figure out why the commented-out recursive call to `mapM` loops infinitely for `TAbs`
-      -- let ctorArgs ← Array.mapM (fun r => emitResult k u r) rs.toArray
-      -- `($ctorIdent $ctorArgs*)
-      let ctorArgsBogus ←
-        match rs with
-        | [] => `([])
-        | r :: rss =>
-          logWarning m!"Omitting tail {rss}"
-          emitResult k u r
-      `($ctorIdent $ctorArgsBogus)
+      let ctorArgs ← Array.mapM (fun r => emitResult k u r) rs.toArray
+      `($ctorIdent $ctorArgs*)
+      -- let ctorArgsBogus ←
+      --   match rs with
+      --   | [] => `([])
+      --   | r :: rss =>
+      --     logWarning m!"Omitting tail {rss}"
+      --     emitResult k u r
+      -- `($ctorIdent $ctorArgsBogus)
     | .Undef ty => throwError m!"Error: unknown {u} has a range of (Undef {ty}) in {k.toList}"
 
 end
@@ -286,6 +286,10 @@ end
     - The names of inputs (arguments to the generator)
     - An array of unknowns (the arguments to the inductive relation) -/
 def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Expr) (inputNames : List Name) (unknowns : Array Unknown) : UnifyM (TSyntax `term) := do
+  logWarning "inside processCtorInContext"
+  logWarning m!"inputNames = {inputNames}"
+  logWarning m!"unknowns = {unknowns}"
+
   let ctorInfo ← getConstInfoCtor ctorName
   let ctorType := ctorInfo.type
 
@@ -321,6 +325,8 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
     set initialUnifyState
 
     -- Get the ranges corresponding to each of the unknowns
+    logWarning m!"unknowns = {unknowns}"
+    logWarning m!"about to call processCorrespondingRange on {unknowns}"
     let unknownRanges ← unknowns.mapM processCorrespondingRange
     let unknownArgsAndRanges := unknowns.zip unknownRanges
     logWarning m!"unknownArgsAndRanges = {unknownArgsAndRanges}"
@@ -389,7 +395,7 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
   | `(#derive_subgenerator ( fun ( $var:ident : $outputTypeSyntax:term ) => $body:term )) => do
 
     -- Parse the body of the lambda for an application of the inductive relation
-    let (inductiveSyntax, argNames) ← parseInductiveApp body
+    let (inductiveSyntax, argIdents) ← parseInductiveApp body
     let inductiveName := inductiveSyntax.getId
 
     -- Figure out the name and type of the value we wish to generate (the "output")
@@ -398,36 +404,63 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
 
     -- Find the index of the argument in the inductive application for the value we wish to generate
     -- (i.e. find `i` s.t. `args[i] == targetVar`)
-    let outputIdxOpt := findTargetVarIndex outputName argNames
+    let outputIdxOpt := findTargetVarIndex outputName argIdents
     if let .none := outputIdxOpt then
       throwError "cannot find index of value to be generated"
     let outputIdx := Option.get! outputIdxOpt
 
-    -- Each argument to the inductive relation (except the one at `outputIdx`)
-    -- is treated as an input
-    let inputNames := TSyntax.getId <$> Array.eraseIdx! argNames outputIdx
-
-    -- Each argument to the inductive relation (as specified by the user) is treated as an unknown
-    -- (including the output variable)
-    let allUnknowns := TSyntax.getId <$> argNames
-
     -- Obtain Lean's `InductiveVal` data structure, which contains metadata about the inductive relation
     let inductiveVal ← getConstInfoInduct inductiveName
 
-    for ctorName in inductiveVal.ctors do
-      -- Process everything within the scope of the telescope
-      let derivationResult ← liftTermElabM $ UnifyM.runInMetaM
-        (processCtorInContext ctorName outputName outputType inputNames.toList allUnknowns) emptyUnifyState
-      match derivationResult with
-      | some (generator, _) => logInfo m!"Derived generator:\n```\n{generator}\n```"
-      | none => logInfo m!"Derived generator:\n```\nreturn none\n```"
+    -- Determine the type for each argument to the inductive
+    let (_, _, inductiveTypeComponents) ← liftTermElabM $ decomposeType inductiveVal.type
+
+    -- To obtain the type of each arg to the inductive, we pop the last element (`Prop`) from `inductiveTypeComponents`
+    let inductiveType := inductiveTypeComponents.pop
+    logWarning m!"inductiveTypeComponents = {inductiveType}"
+
+    -- Each argument to the inductive relation (as specified by the user) is treated as an unknown
+    -- (including the output variable)
+    let argNames := (fun ident => ident.getId) <$> argIdents
+
+    logWarning m!"original unknowns = {argNames}"
+    let argTypes := inductiveTypeComponents
+    let argNamesTypes := argNames.zip argTypes
+
+    liftTermElabM $ withLocalDeclsDND argNamesTypes $ fun _ => do
+      let mut localCtx ← getLCtx
+      let mut freshUnknowns := #[]
+      for argName in argNames do
+        let freshArgName := localCtx.getUnusedUserName argName
+        localCtx := localCtx.renameUserName argName freshArgName
+        freshUnknowns := freshUnknowns.push freshArgName
+
+      logWarning m!"freshUnknowns = {freshUnknowns}"
+
+      let freshenedOutputName := freshUnknowns[outputIdx]!
+
+      -- Each argument to the inductive relation (except the one at `outputIdx`)
+      -- is treated as an input
+      let freshenedInputNamesExcludingOutput := (Array.eraseIdx! freshUnknowns outputIdx).toList
+
+      for ctorName in inductiveVal.ctors do
+        -- Process everything within the scope of the telescope
+        let derivationResult ← UnifyM.runInMetaM
+          (processCtorInContext ctorName freshenedOutputName outputType freshenedInputNamesExcludingOutput freshUnknowns) emptyUnifyState
+        match derivationResult with
+        | some (generator, _) => logInfo m!"Derived generator:\n```\n{generator}\n```"
+        | none => logInfo m!"Derived generator:\n```\nreturn none\n```"
 
 
 
   | _ => throwUnsupportedSyntax
 
 
+
+
+
 inductive SameHead : List Nat → List Nat → Prop where
 | HeadMatch : ∀ x xs ys, SameHead (x::xs) (x::ys)
 
-#derive_subgenerator (fun (xs : List Nat) => SameHead xs ys)
+-- #derive_subgenerator (fun (xs : List Nat) => SameHead xs ys)
+#derive_subgenerator (fun (e : term) => typing Γ e τ)

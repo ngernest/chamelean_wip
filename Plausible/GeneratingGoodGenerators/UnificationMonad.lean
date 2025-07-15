@@ -126,7 +126,7 @@ namespace UnifyM
 
   /-- `update u r` sets the range of the unknown `u` to be `r` -/
   def update (u : Unknown) (r : Range) : UnifyM Unit := do
-    -- logWarning m!"Updating {u} to have range ({r})"
+    logWarning m!"Updating {u} to have range ({r})"
     modify $ fun s =>
       let k := s.constraints
       { s with constraints := k.insert u r }

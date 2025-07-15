@@ -3,14 +3,11 @@ import Plausible.GeneratingGoodGenerators.DeriveSubGenerator
 /--
 info: Derived generator:
 ```
-match Γ with
-| ((List.cons type) u_6) u_7 =>
-  match DecOpt.decOpt (u_7 == Γ) initSize with
-  | Option.some Bool.true =>
-    match DecOpt.decOpt (u_6 == τ) initSize with
-    | Option.some Bool.true => do
-      return Nat.zero
-    | _ => OptionT.fail
+match Γ_1 with
+| ((List.cons type) τ) Γ =>
+  match DecOpt.decOpt (τ == τ_1) initSize with
+  | Option.some Bool.true => do
+    return Nat.zero
   | _ => OptionT.fail
 | _ => OptionT.fail
 ```
@@ -34,7 +31,7 @@ do
 /--
 info: Derived generator:
 ```
-match DecOpt.decOpt (in1 == in2) initSize with
+match DecOpt.decOpt (in1_1 == in2_1) initSize with
 | Option.some Bool.true => do
   return Tree.Leaf
 | _ => OptionT.fail
