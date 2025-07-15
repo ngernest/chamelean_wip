@@ -213,11 +213,6 @@ mutual
     let updatedConstraints := unifyState.constraints
     let rangeForOutput ← UnifyM.findCorrespondingRange updatedConstraints outputName
 
-    logWarning "entered finalAssembly"
-    logWarning m!"rangeForOutput = {rangeForOutput}"
-
-    logWarning "right before calling emitResult"
-
     let result ← emitResult updatedConstraints outputName rangeForOutput
 
     -- Bind each unknown in `undefUnknowns` to the result of an arbitrary call,
@@ -253,25 +248,13 @@ mutual
 
   /-- Produces a term corresponding to the value being generated -/
   partial def emitResult (k : UnknownMap) (u : Unknown) (range : Range) : UnifyM (TSyntax `term) := do
-    logWarning m!"emitResult called with unknown {u}, range {range}"
     match range with
     | .Unknown u' => emitResult k u' (← UnifyM.findCorrespondingRange k u')
     | .Fixed => `($(mkIdent u))
     | .Ctor c rs => do
-      logWarning m!"Entered recursive case of emitResult with Ctor {c} {rs}"
-      logWarning m!"k = {k.toList}"
       let ctorIdent := mkIdent c
-
-      -- TODO: figure out why the commented-out recursive call to `mapM` loops infinitely for `TAbs`
       let ctorArgs ← Array.mapM (fun r => emitResult k u r) rs.toArray
       `($ctorIdent $ctorArgs*)
-      -- let ctorArgsBogus ←
-      --   match rs with
-      --   | [] => `([])
-      --   | r :: rss =>
-      --     logWarning m!"Omitting tail {rss}"
-      --     emitResult k u r
-      -- `($ctorIdent $ctorArgsBogus)
     | .Undef ty => throwError m!"Error: unknown {u} has a range of (Undef {ty}) in {k.toList}"
 
 end
@@ -282,22 +265,17 @@ end
 
     Takes as argument:
     - The constructor name `ctorName`
-    - The name and type of the output (value to be generated)
-    - The names of inputs (arguments to the generator)
-    - An array of unknowns (the arguments to the inductive relation) -/
+    - The name (`outputName`) and type (`outputType`) of the output (value to be generated)
+    - The names of inputs `inputNames` (arguments to the generator)
+    - An array of `unknowns` (the arguments to the inductive relation)
+    - Note: `unknowns == inputNames ∪ { outputName }`, i.e. `unknowns` contains all args to the inductive relation
+      listed in order, which coincides with `inputNames ∪ { outputName }` -/
 def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Expr) (inputNames : List Name) (unknowns : Array Unknown) : UnifyM (TSyntax `term) := do
-  logWarning "inside processCtorInContext"
-  logWarning m!"inputNames = {inputNames}"
-  logWarning m!"unknowns = {unknowns}"
-
   let ctorInfo ← getConstInfoCtor ctorName
   let ctorType := ctorInfo.type
 
   -- Stay within the forallTelescope scope for all processing
   forallTelescopeReducing ctorType (cleanupAnnotations := true) (fun forAllVarsAndHyps conclusion => do
-    logWarning m!"Processing constructor {ctorName}"
-    logWarning m!"conclusion = {conclusion}"
-
     -- Universally-quantified variables `x : τ` are represented using `(some x, τ)`
     -- Hypotheses are represented using `(none, hyp)` (first component is `none` since a hypothesis doesn't have a name)
     let forAllVarsAndHypsWithTypes ← forAllVarsAndHyps.mapM (fun fvar => do
@@ -314,31 +292,20 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
       | some name => (name, ty)
       | none => none)
 
-    logWarning m!"forAllVars = {forAllVars}"
-    logWarning m!"inputNames = {inputNames}"
-
     -- Creates the initial `UnifyState` needed for the unification algorithm
     let initialUnifyState := mkInitialUnifyState inputNames outputName outputType forAllVars.toList
-    logWarning m!"initialUnifyState = {initialUnifyState}"
 
     -- Update the state in `UnifyM` to be `initialUnifyState`
     set initialUnifyState
 
     -- Get the ranges corresponding to each of the unknowns
-    logWarning m!"unknowns = {unknowns}"
-    logWarning m!"about to call processCorrespondingRange on {unknowns}"
     let unknownRanges ← unknowns.mapM processCorrespondingRange
     let unknownArgsAndRanges := unknowns.zip unknownRanges
-    logWarning m!"unknownArgsAndRanges = {unknownArgsAndRanges}"
 
     -- Compute the appropriate `Range` for each argument in the constructor's conclusion
     let conclusionArgs := conclusion.getAppArgs
     let conclusionRanges ← conclusionArgs.mapM convertExprToRangeInCurrentContext
-
     let conclusionArgsAndRanges := conclusionArgs.zip conclusionRanges
-
-    logWarning m!"conclusion = {conclusion}"
-    logWarning m!"conclusionArgsAndRanges = {conclusionArgsAndRanges}"
 
     -- Extract hypotheses (which correspond to pairs in `forAllVarsAndHypsWithTypes` where the first component is `none`)
     -- let hypotheses := forAllVarsAndHypsWithTypes.filterMap (fun (nameOpt, tyExpr) =>
@@ -349,8 +316,7 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
     --   let hypRange ← convertExprToRangeInCurrentContext hyp
 
     -- TODO: figure out how to handle repeated unknowns in `conclusionArgsAndRanges`
-    for ((u1, r1), (u2, r2)) in conclusionArgsAndRanges.zip unknownArgsAndRanges do
-      logWarning m!"Unifying ({u1} ↦ {r1}) with ({u2} ↦ {r2})"
+    for ((_u1, r1), (_u2, r2)) in conclusionArgsAndRanges.zip unknownArgsAndRanges do
       unify r1 r2
 
     let finalState ← get
@@ -371,19 +337,12 @@ def getCtorArgsInContext (ctorName : Name) (localCtx : LocalContext) : MetaM (Ar
   let ctorType := ctorInfo.type
 
   let (forAllVars, ctorTypeBody) := extractForAllBinders ctorType
-  logWarning m!"inside getCtorArgsInContext"
-  logWarning m!"forAllVars = {forAllVars}"
 
   let ctorTypeComponents ← getComponentsOfArrowType ctorTypeBody
 
   withLCtx' localCtx do
-    forallTelescopeReducing ctorType (cleanupAnnotations := true) $ fun boundVars body => do
-      logWarning m!"boundVars = {boundVars}"
-      logWarning m!"body = {body}"
-      logWarning m!"ctorTypeComponents = {ctorTypeComponents}"
+    forallTelescopeReducing ctorType (cleanupAnnotations := true) $ fun _ _ => do
       let lctx ← getLCtx
-      let exprsInContext := lctx.getFVars
-      logWarning m!"exprsInContext = {exprsInContext}"
       return (forAllVars, ctorTypeComponents, lctx)
 
 /-- Command for deriving a sub-generator for one construtctor of an inductive relation (per figure 4 of GGG) -/
@@ -403,7 +362,7 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
     let outputType ← liftTermElabM $ elabTerm outputTypeSyntax none
 
     -- Find the index of the argument in the inductive application for the value we wish to generate
-    -- (i.e. find `i` s.t. `args[i] == targetVar`)
+    -- (i.e. find `i` s.t. `argIdents[i] == outputName`)
     let outputIdxOpt := findTargetVarIndex outputName argIdents
     if let .none := outputIdxOpt then
       throwError "cannot find index of value to be generated"
@@ -415,28 +374,28 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
     -- Determine the type for each argument to the inductive
     let (_, _, inductiveTypeComponents) ← liftTermElabM $ decomposeType inductiveVal.type
 
-    -- To obtain the type of each arg to the inductive, we pop the last element (`Prop`) from `inductiveTypeComponents`
-    let inductiveType := inductiveTypeComponents.pop
-    logWarning m!"inductiveTypeComponents = {inductiveType}"
-
-    -- Each argument to the inductive relation (as specified by the user) is treated as an unknown
-    -- (including the output variable)
+    -- To obtain the type of each arg to the inductive,
+    -- we pop the last element (`Prop`) from `inductiveTypeComponents`
+    let argTypes := inductiveTypeComponents.pop
     let argNames := (fun ident => ident.getId) <$> argIdents
-
-    logWarning m!"original unknowns = {argNames}"
-    let argTypes := inductiveTypeComponents
     let argNamesTypes := argNames.zip argTypes
 
+    -- Add the name & type of each argument to the inductive relation to the ambient `LocalContext`
+    -- (as a local declaration)
     liftTermElabM $ withLocalDeclsDND argNamesTypes $ fun _ => do
       let mut localCtx ← getLCtx
       let mut freshUnknowns := #[]
+
+      -- For each arg to the inductive relation (as specified to the user),
+      -- create a fresh name (to avoid clashing with names that may appear in constructors
+      -- of the inductive relation). Note that this requires updating the ambient `LocalContext`
       for argName in argNames do
         let freshArgName := localCtx.getUnusedUserName argName
         localCtx := localCtx.renameUserName argName freshArgName
         freshUnknowns := freshUnknowns.push freshArgName
 
-      logWarning m!"freshUnknowns = {freshUnknowns}"
-
+      -- Since the `output` also appears as an argument to the inductive relation,
+      -- we also need to freshen its name
       let freshenedOutputName := freshUnknowns[outputIdx]!
 
       -- Each argument to the inductive relation (except the one at `outputIdx`)
@@ -444,7 +403,6 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
       let freshenedInputNamesExcludingOutput := (Array.eraseIdx! freshUnknowns outputIdx).toList
 
       for ctorName in inductiveVal.ctors do
-        -- Process everything within the scope of the telescope
         let derivationResult ← UnifyM.runInMetaM
           (processCtorInContext ctorName freshenedOutputName outputType freshenedInputNamesExcludingOutput freshUnknowns) emptyUnifyState
         match derivationResult with
@@ -457,4 +415,4 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
 
 
 
--- #derive_subgenerator (fun (e : term) => typing Γ e τ)
+#derive_subgenerator (fun (e : term) => typing Γ e τ)
