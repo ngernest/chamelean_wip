@@ -258,17 +258,19 @@ mutual
     | .Unknown u' => emitResult k u' (← UnifyM.findCorrespondingRange k u')
     | .Fixed => `($(mkIdent u))
     | .Ctor c rs => do
-      logWarning m!"Entered recursive case of emitResult"
+      logWarning m!"Entered recursive case of emitResult with Ctor {c} {rs}"
       logWarning m!"k = {k.toList}"
       let ctorIdent := mkIdent c
 
       -- TODO: figure out why the commented-out recursive call to `mapM` loops infinitely for `TAbs`
-      -- let ctorArgs ← List.mapM (fun r => emitResult k u r) rs
+      -- let ctorArgs ← Array.mapM (fun r => emitResult k u r) rs.toArray
       -- `($ctorIdent $ctorArgs*)
       let ctorArgsBogus ←
         match rs with
         | [] => `([])
-        | r :: _ => emitResult k u r
+        | r :: rss =>
+          logWarning m!"Omitting tail {rss}"
+          emitResult k u r
       `($ctorIdent $ctorArgsBogus)
     | .Undef ty => throwError m!"Error: unknown {u} has a range of (Undef {ty}) in {k.toList}"
 
@@ -321,7 +323,6 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
     -- Get the ranges corresponding to each of the unknowns
     let unknownRanges ← unknowns.mapM processCorrespondingRange
     let unknownArgsAndRanges := unknowns.zip unknownRanges
-
     logWarning m!"unknownArgsAndRanges = {unknownArgsAndRanges}"
 
     -- Compute the appropriate `Range` for each argument in the constructor's conclusion
@@ -426,7 +427,7 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
   | _ => throwUnsupportedSyntax
 
 
-set_option maxRecDepth 50000
+inductive SameHead : List Nat → List Nat → Prop where
+| HeadMatch : ∀ x xs ys, SameHead (x::xs) (x::ys)
 
--- Example usage:
-#derive_subgenerator (fun (e : term) => typing Γ e τ)
+#derive_subgenerator (fun (xs : List Nat) => SameHead xs ys)

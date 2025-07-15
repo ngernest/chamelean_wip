@@ -75,8 +75,6 @@ inductive typing: List type → term → type → Prop where
 inductive typingAlt : List type → term → type → Prop where
   | VarNonlinear : ∀ Γ τ, typingAlt (τ :: Γ) (.Var Nat.zero) τ
 
-
-
 /-- Non-empty trees (trees that are not just leaves) -/
 inductive nonempty : Tree → Prop where
   | NonEmpty : forall x l r, nonempty (.Node x l r)
