@@ -101,6 +101,15 @@ partial def convertExprToRangeInCurrentContext (e : Expr) : UnifyM Range :=
       | .const u _ => processCorrespondingRange u
       | _ => throwError m!"Cannot convert expression {e} to Range"
 
+/-- Converts a `TSyntax term` to a `Range` of the form `Ctor ...` -/
+partial def convertTermToRange (term : TSyntax `term) : UnifyM Range :=
+  match term with
+  | `($ctor:ident $args:term*) => do
+    let argRanges ← Array.toList <$> args.mapM convertTermToRange
+    return (.Ctor ctor.getId argRanges)
+  | `($ctor:ident) => return (.Unknown ctor.getId)
+  | _ => throwError m!"unable to convert {term} to a Range"
+
 /-- Converts a `Pattern` to a `TSyntax term` -/
 def convertPatternToTerm (pattern : Pattern) : MetaM (TSyntax `term) :=
   match pattern with
@@ -308,14 +317,21 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
     let conclusionArgsAndRanges := conclusionArgs.zip conclusionRanges
 
     -- Extract hypotheses (which correspond to pairs in `forAllVarsAndHypsWithTypes` where the first component is `none`)
-    -- let hypotheses := forAllVarsAndHypsWithTypes.filterMap (fun (nameOpt, tyExpr) =>
-    --   match nameOpt with
-    --   | none => tyExpr
-    --   | some _ => none)
-    -- for hyp in hypotheses do
-    --   let hypRange ← convertExprToRangeInCurrentContext hyp
+    let hypotheses := forAllVarsAndHypsWithTypes.filterMap (fun (nameOpt, tyExpr) =>
+      match nameOpt with
+      | none => tyExpr
+      | some _ => none)
+    let localCtx ← getLCtx
+    for hypExpr in hypotheses do
+      let hypTerm ← delabExprInLocalContext localCtx hypExpr
+      -- Convert the `TSyntax` representation of the hypothesis to a `Range`
+      -- If that fails, convert the `Expr` representation of the hypothesis to a `Range`
+      -- (the latter is needed to handle hypotheses which use infix operators)
+      let hypRange ←
+        try convertTermToRange hypTerm
+        catch _ => convertExprToRangeInCurrentContext hypExpr
+      logWarning m!"hypothesis {hypTerm} has range {hypRange}"
 
-    -- TODO: figure out how to handle repeated unknowns in `conclusionArgsAndRanges`
     for ((_u1, r1), (_u2, r2)) in conclusionArgsAndRanges.zip unknownArgsAndRanges do
       unify r1 r2
 
@@ -414,5 +430,6 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
   | _ => throwUnsupportedSyntax
 
 
+-- #derive_subgenerator (fun (e : term) => typing Γ e τ)
 
-#derive_subgenerator (fun (e : term) => typing Γ e τ)
+#derive_subgenerator (fun (tree : Tree) => bst in1 in2 tree)
