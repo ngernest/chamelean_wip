@@ -115,7 +115,9 @@ instance : ToMessageData UnifyState where
     let unknowns :=
       unifyState.unknowns.toList.map $ fun u => m!"{u}"
 
-    m!"⟨\n  constraints := {formattedConstraints},\n  equalities := {equalities},\n  patterns := {patterns},\n  unknowns := {unknowns}\n⟩"
+    let hyps := unifyState.hypotheses.map $ fun hyp => m!"{hyp}"
+
+    m!"⟨\n  constraints := \n{formattedConstraints},\n  equalities := {equalities},\n  patterns := {patterns},\n  unknowns := {unknowns}\n, hypotheses := {hyps}\n⟩"
 
 
 

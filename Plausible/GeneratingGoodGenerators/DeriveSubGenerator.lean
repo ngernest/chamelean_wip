@@ -30,31 +30,50 @@ def mkInitialUnknownMap (inputNames: List Name) (outputName : Name) (outputType 
   let forAllVarsConstraints := (fun (x, ty) => (x, .Undef ty)) <$> filteredForAllVariables
   Std.HashMap.ofList $ inputConstraints ++ outputConstraints ++ forAllVarsConstraints
 
-/-- Creates the initial `UnifyState` where the constraint map is created using `mkInitialUnknownMap` -/
-def mkInitialUnifyState (inputNames : List Name) (outputName : Name) (outputType : Expr) (forAllVariables : List (Name × Expr)) : UnifyState :=
+/-- Creates the initial `UnifyState` corresponding to a constructor of an inductive relation
+   - `inputNames`: the names of all inputs to the generator
+   - `outputName`, `outputType`: name & type of the output (variable to be generated)
+   - `forAllVariables`: the names & types for universally-quantified variables in the constructor's type
+   - `hypotheses`: the hypotheses for the constructor (represented as a constructor name applied to some list of arguments) -/
+def mkInitialUnifyState (inputNames : List Name) (outputName : Name) (outputType : Expr) (forAllVariables : List (Name × Expr))
+  (hypotheses : List (Unknown × List Unknown)): UnifyState :=
   let forAllVarNames := Prod.fst <$> forAllVariables
   let constraints := mkInitialUnknownMap inputNames outputName outputType forAllVariables
   let unknowns := Std.HashSet.ofList (outputName :: (inputNames ++ forAllVarNames))
-  -- TODO: fill in `hypotheses` here
   { constraints := constraints
     equalities := ∅
     patterns := []
     unknowns := unknowns
     outputName := outputName,
-    hypotheses := [] }
+    hypotheses := hypotheses }
 
 /-- Converts a expression `e` to a *constructor expression* `C r1 … rn`,
     where `C` is a constructor and the `ri` are arguments,
     returning `some (C, #[r1, …, rn])`
     - If `e` is not an application, this function returns `none`  -/
-def convertToCtorExpr (e : Expr) : Option (Name × Array Expr) :=
+def convertToCtorExpr (e : Expr) : MetaM (Option (Name × Array Expr)) :=
   if e.isConst then
     -- Nullary constructors are identified by name
-    some (e.constName!, #[])
-  else if e.isApp then
+    return some (e.constName!, #[])
+  else if e.isApp then do
     -- Constructors with arguments
-    some e.getAppFnArgs
-  else none
+    let (ctorName, args) := e.getAppFnArgs
+    let mut actualArgs := #[]
+    for arg in args do
+      -- Figure out whether `argType` is `Type u` for some universe `u`
+      let argType ← inferType arg
+      -- TODO: handle case where `argType` is a typeclass instance (e.g. `LT Nat`)
+      logWarning m!"arg {arg} has type {argType}"
+      if argType.isSort then
+        logWarning m!"{argType} has some higher-universe sort"
+      else
+        actualArgs := actualArgs.push arg
+    logWarning m!"ctor {ctorName} has actual args {actualArgs}"
+    return some (ctorName, actualArgs)
+  else
+    return none
+
+
 
 /-- Takes an unknown `u`, and finds the `Range` `r` that corresponds to
     `u` in the `constraints` map.
@@ -81,8 +100,8 @@ def processCorrespondingRange (u : Unknown) : UnifyM Range :=
 
 /-- Converts an `Expr` to a `Range`, using the ambient `LocalContext` to find the user-facing names
     corresponding to `FVarId`s -/
-partial def convertExprToRangeInCurrentContext (e : Expr) : UnifyM Range :=
-  match convertToCtorExpr e with
+partial def convertExprToRangeInCurrentContext (e : Expr) : UnifyM Range := do
+  match (← convertToCtorExpr e) with
   | some (f, args) => do
     let argRanges ← args.toList.mapM convertExprToRangeInCurrentContext
     return (Range.Ctor f argRanges)
@@ -100,6 +119,7 @@ partial def convertExprToRangeInCurrentContext (e : Expr) : UnifyM Range :=
       match e with
       | .const u _ => processCorrespondingRange u
       | _ => throwError m!"Cannot convert expression {e} to Range"
+
 
 /-- Converts a `TSyntax term` to a `Range` of the form `Ctor ...` -/
 partial def convertTermToRange (term : TSyntax `term) : UnifyM Range :=
@@ -268,6 +288,17 @@ mutual
 
 end
 
+/-- Converts a `Range` that is either an `Unknown` or `Ctor` to
+    a constructor expression of the type `(Unknown × List Unknown)`
+    (constructor name applied to arguments which are all variables, i.e. unknowns) -/
+def convertRangeToCtorAppForm (r : Range) : UnifyM (Unknown × List Unknown) :=
+  match r with
+  | .Unknown u => return (u, [])
+  | .Ctor c rs => do
+    let (unknownArgs, _) ← List.unzip <$> rs.mapM convertRangeToCtorAppForm
+    return (c, unknownArgs)
+  | _ => throwError m!"Unable to convert {r} to a constructor expression"
+
 
 /-- Function that handles the bulk of the generator derivation algorithm for a single constructor:
     processes the entire type of the constructor within the same `LocalContext` (the one produced by `forallTelescopeReducing`)
@@ -301,27 +332,14 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
       | some name => (name, ty)
       | none => none)
 
-    -- Creates the initial `UnifyState` needed for the unification algorithm
-    let initialUnifyState := mkInitialUnifyState inputNames outputName outputType forAllVars.toList
-
-    -- Update the state in `UnifyM` to be `initialUnifyState`
-    set initialUnifyState
-
-    -- Get the ranges corresponding to each of the unknowns
-    let unknownRanges ← unknowns.mapM processCorrespondingRange
-    let unknownArgsAndRanges := unknowns.zip unknownRanges
-
-    -- Compute the appropriate `Range` for each argument in the constructor's conclusion
-    let conclusionArgs := conclusion.getAppArgs
-    let conclusionRanges ← conclusionArgs.mapM convertExprToRangeInCurrentContext
-    let conclusionArgsAndRanges := conclusionArgs.zip conclusionRanges
-
-    -- Extract hypotheses (which correspond to pairs in `forAllVarsAndHypsWithTypes` where the first component is `none`)
+        -- Extract hypotheses (which correspond to pairs in `forAllVarsAndHypsWithTypes` where the first component is `none`)
     let hypotheses := forAllVarsAndHypsWithTypes.filterMap (fun (nameOpt, tyExpr) =>
       match nameOpt with
       | none => tyExpr
       | some _ => none)
     let localCtx ← getLCtx
+
+    let mut hypsForUnifyState := #[]
     for hypExpr in hypotheses do
       let hypTerm ← delabExprInLocalContext localCtx hypExpr
       -- Convert the `TSyntax` representation of the hypothesis to a `Range`
@@ -331,6 +349,28 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
         try convertTermToRange hypTerm
         catch _ => convertExprToRangeInCurrentContext hypExpr
       logWarning m!"hypothesis {hypTerm} has range {hypRange}"
+
+      -- Convert each hypothesis' range to a form of a constructor application
+      -- (constructor name applied to some list of variables)
+      let hypInCtorAppForm ← convertRangeToCtorAppForm hypRange
+      hypsForUnifyState := hypsForUnifyState.push hypInCtorAppForm
+
+    -- Creates the initial `UnifyState` needed for the unification algorithm
+    let initialUnifyState := mkInitialUnifyState inputNames outputName outputType forAllVars.toList hypsForUnifyState.toList
+
+    -- Update the state in `UnifyM` to be `initialUnifyState`
+    set initialUnifyState
+
+    logWarning m!"initialState = {initialUnifyState}"
+
+    -- Get the ranges corresponding to each of the unknowns
+    let unknownRanges ← unknowns.mapM processCorrespondingRange
+    let unknownArgsAndRanges := unknowns.zip unknownRanges
+
+    -- Compute the appropriate `Range` for each argument in the constructor's conclusion
+    let conclusionArgs := conclusion.getAppArgs
+    let conclusionRanges ← conclusionArgs.mapM convertExprToRangeInCurrentContext
+    let conclusionArgsAndRanges := conclusionArgs.zip conclusionRanges
 
     for ((_u1, r1), (_u2, r2)) in conclusionArgsAndRanges.zip unknownArgsAndRanges do
       unify r1 r2
