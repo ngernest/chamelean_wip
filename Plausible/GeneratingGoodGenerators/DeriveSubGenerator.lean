@@ -46,6 +46,7 @@ def mkInitialUnifyState (inputNames : List Name) (outputName : Name) (outputType
     unknowns := unknowns
     outputName := outputName
     outputType := outputType
+    inputNames := inputNames
     hypotheses := hypotheses }
 
 /-- Converts a expression `e` to a *constructor expression* `C r1 … rn`,
@@ -288,7 +289,7 @@ mutual
     logWarning m!"inside emitFinalCall, unknown = {unknown}, outputName = {outputName}"
 
     -- Determine if a recursive call to `auxArb` is needed, i.e. if the `range` corresponding to `unknown`
-    -- is `.Undef ty`, where `ty` is the same type as the `outputType`
+    -- is `.Undef ty`, where `ty` is the same type as the `outputType` (with type equality determined by `Meta.isDefEq`)
     let range ← UnifyM.findCorrespondingRange unifyState.constraints unknown
     let recursiveCallNeeded ←
       (match range with
@@ -297,9 +298,12 @@ mutual
       | _ => pure false)
 
     if unknown == outputName || recursiveCallNeeded then
-      -- Produce a call to `aux_arb` (recursively generate a value for the unknown)
-      -- TODO: handle other arguments that need to be supplied to `auxArb`
-      mkLetBind lhs #[auxArbFn, initSizeIdent, mkIdent `size']
+      -- Produce a recursive call to `auxArb` (recursively generate a value for the unknown)
+      -- Each `input` in `inputNames` is an argument for `auxArb`
+      let argsForRecursiveCall := Lean.mkIdent <$> unifyState.inputNames.toArray
+
+      -- Produce a monadic let-bind expression of the form `let $lhs ← auxArb initSize size' $argsForRecursiveCall`
+      mkLetBind lhs (#[auxArbFn, initSizeIdent, mkIdent `size'] ++ argsForRecursiveCall)
     else do
       -- Generate a value for the unknown via a call to `arbitraryST`, passing in the final hypothesis
       -- as an argument to `arbitraryST`

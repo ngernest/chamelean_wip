@@ -70,6 +70,9 @@ structure UnifyState where
   /-- The type of the output variable (variable to be generated) -/
   outputType : Expr
 
+  /-- All inputs (top-level arguments) to the generator -/
+  inputNames : List Name
+
   /-- The list of hypotheses in the constructor's type (excluding the constructor's conclusion)
       - Each hypothesis is represented as a pair consisting of `(constructor name, list of constructor args)` -/
   hypotheses : List (Unknown × List Unknown)
@@ -397,6 +400,7 @@ def emptyUnifyState : UnifyState :=
     unknowns := ∅,
     outputName := `dummyOutput,
     outputType := mkConst `dummyOutputType
+    inputNames := []
     hypotheses := [] }
 
 /-- Runs a `UnifyM unit` action using the empty `UnifyState`,
