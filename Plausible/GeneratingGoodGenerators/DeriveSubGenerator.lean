@@ -222,6 +222,7 @@ mutual
         let mut doElems := #[]
 
         -- `undefUnknowns` is a list of all `Unknown`s that have a `Range` of the form `Undef τ`, with length `n`
+        -- TODO: maybe only look for unknowns in `ctorArgs` (need to refactor `findUnknownsWithUndefRanges` to take in an explicit argument)
         let undefUnknowns ← UnifyM.findUnknownsWithUndefRanges
 
         logWarning m!"emitHypotheses ({ctorName} {ctorArgs}), unknowns {undefUnknowns} have Undef range"
