@@ -154,6 +154,13 @@ namespace UnifyM
     let unifyState ← get
     f unifyState.hypotheses
 
+  /-- Applies a function `f` to the set of `unknowns` stored in `UnifyState`
+      - This function allows us to fetch the `hypotheses` field without needing
+        a seperate `get` call inside the State monad -/
+  def withUnknowns (f : Std.HashSet Unknown → UnifyM α) : UnifyM α := do
+    let unifyState ← get
+    f unifyState.unknowns
+
   /-- Directly applies a function `f` to the `constraint` map in the state  -/
   def modifyConstraints (f : UnknownMap → UnknownMap) : UnifyM Unit :=
     modify $ fun s => { s with constraints := f s.constraints }
@@ -208,17 +215,16 @@ namespace UnifyM
       | .Undef _ => return true
       | _ => return false)
 
-  /-- Returns all `Unknown`s that are mapped to `Undef τ` for some type `τ` in the `constraints` map -/
-  def findUnknownsWithUndefRanges : UnifyM (List Unknown) :=
-    UnifyM.withConstraints
-      (fun k => return Std.HashMap.fold accumulateUndefUnknowns [] k)
-    where
-      /-- `accumulateUndefUnknowns acc u r` produces `u :: acc` if `r = Undef τ` for some type `τ`,
-           and produces `acc` otherwise -/
-      accumulateUndefUnknowns (acc : List Unknown) (u : Unknown) (r : Range) :=
-        match r with
-        | .Undef _ => u :: acc
-        | _ => acc
+  /-- `findUnknownsWithUndefRanges unknowns` returns all `u ∈ unknowns`
+      such that `u ↦ Undef τ` for some type `τ` in the `constraints` map stored within `UnifyState` -/
+  def findUnknownsWithUndefRanges (unknowns : List Unknown) : UnifyM (List Unknown) := do
+    let state ← get
+    let k := state.constraints
+    List.foldlM (fun acc u => do
+      let r ← findCorrespondingRange k u
+      match r with
+      | .Undef _ => return (u :: acc)
+      | _ => return acc) [] unknowns
 
   /-- Updates the `constraint` map so that for each `u ∈ unknowns`,
       we have the binding `u ↦ Fixed` in `constraints` -/

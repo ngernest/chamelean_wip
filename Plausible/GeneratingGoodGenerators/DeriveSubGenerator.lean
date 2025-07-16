@@ -176,7 +176,7 @@ mutual
       let cases := #[nonTrivialCase, trivialCase]
       mkMatchExpr (mkIdent u) cases
 
-  /-- Produces the code for an equality check -/
+  /-- Produces the code for an equality check according to a list of `equalities` and a particular set of `constraints` -/
   partial def emitEqualities (equalities : List (Unknown × Unknown)) (constraints : UnknownMap) : UnifyM (TSyntax `term) :=
     match equalities with
     | [] => UnifyM.withHypotheses (fun hyps => emitHypotheses hyps constraints)
@@ -196,11 +196,11 @@ mutual
       let cases := #[trueCase, catchAllCase]
       mkMatchExprWithScrutineeTerm scrutinee cases
 
-  /-- Produces the code for the body of a sub-generator which processes hypotheses -/
+  /-- Produces the code for the body of a sub-generator which processes a list of `hypotheses` under a particular set of `constraints` -/
   partial def emitHypotheses (hypotheses : List (Name × List Unknown)) (constraints : UnknownMap) : UnifyM (TSyntax `term) :=
     match hypotheses with
     | [] => finalAssembly
-    | (ctorName, ctorArgs) :: remainingHyps => do
+    | hypothesis@(ctorName, ctorArgs) :: remainingHyps => do
       /- If all of the constructor's args don't have a `Range` of the form `Undef τ`,
         we can simply produce the expression
         ```lean
@@ -221,9 +221,8 @@ mutual
       else
         let mut doElems := #[]
 
-        -- `undefUnknowns` is a list of all `Unknown`s that have a `Range` of the form `Undef τ`, with length `n`
-        -- TODO: maybe only look for unknowns in `ctorArgs` (need to refactor `findUnknownsWithUndefRanges` to take in an explicit argument)
-        let undefUnknowns ← UnifyM.findUnknownsWithUndefRanges
+        -- `undefUnknowns` is a list of all `Unknown`s in `ctorArgs` that have a `Range` of the form `Undef τ`, with length `n`
+        let undefUnknowns ← UnifyM.findUnknownsWithUndefRanges ctorArgs
 
         logWarning m!"emitHypotheses ({ctorName} {ctorArgs}), unknowns {undefUnknowns} have Undef range"
 
@@ -235,8 +234,10 @@ mutual
             let letBindExpr ← mkLetBind (mkIdent u) #[arbitraryFn]
             doElems := doElems.push letBindExpr
 
-          -- For the `finalUnknown`, we generate it by using the expression returned by `emitFinalCall`
-          doElems := doElems.push (← emitFinalCall finalUnknown)
+          logWarning m!"finalUnknown = {finalUnknown}"
+
+          -- To generate the `finalUnknown`, we pass the `finalUnknown` and the current `hypothesis` to `emitFinalCall`
+          doElems := doElems.push (← emitFinalCall finalUnknown hypothesis)
 
           -- We then update all `u ∈ undefUnknowns` to have a fixed range in `constraints`,
           -- and handle the remaining hypotheses via a recursive call to `emitHypotheses` with the updated `constraints`
@@ -253,7 +254,7 @@ mutual
       since we fetch the `constraints` map via a `get` call in the State monad) -/
   partial def finalAssembly : UnifyM (TSyntax `term) := do
     -- Find all unknowns whose ranges are `Undef`
-    let undefUnknowns ← UnifyM.findUnknownsWithUndefRanges
+    let undefUnknowns ← UnifyM.withUnknowns (fun allUnknowns => UnifyM.findUnknownsWithUndefRanges allUnknowns.toList)
 
     -- Update the constraint map so that all unknowns in `undefKnowns` now have a `Fixed` `Range`
     UnifyM.fixRanges undefUnknowns
@@ -276,8 +277,10 @@ mutual
     -- Put everything together in one monadic do-block
     mkDoBlock doElems
 
-  /-- Produces the call to the final generator call in the body of the sub-generator -/
-  partial def emitFinalCall (unknown : Unknown) : UnifyM (TSyntax `doElem) := do
+  /-- Produces a let-bind expression which generates an `unknown` subject to a `hypothesis`
+      in the body of the sub-generator
+      (this is the final call to a generator when processing one particular hypothesis of a constructor) -/
+  partial def emitFinalCall (unknown : Unknown) (hypothesis : Unknown × List Unknown): UnifyM (TSyntax `doElem) := do
     let unifyState ← get
     let outputName := unifyState.outputName
     let lhs := mkIdent unknown
@@ -285,17 +288,15 @@ mutual
       -- Produce a call to `aux_arb` (recursively generate a value for the unknown)
       -- TODO: handle other arguments that need to be supplied to `aux_arb`
       mkLetBind lhs #[auxArbFn, initSizeIdent, mkIdent `size']
-    else
+    else do
       -- Generate a value for the unknown via a call to `arbitraryST`, passing in the final hypothesis
       -- as an argument to `arbitraryST`
       let unknownIdent := mkIdent unknown
-      match unifyState.hypotheses.getLast? with
-      | none => throwError m!"encountered empty list of hypotheses in emitFinalCall, state = {unifyState}"
-      | some (ctorName, ctorArgs) => do
-        let ctorArgsArr := Lean.mkIdent <$> ctorArgs.toArray
-        let constraint ← `((fun $unknownIdent => $(mkIdent ctorName) $ctorArgsArr*))
-        let rhsTerms := #[(arbitrarySTFn : TSyntax `term), constraint]
-        mkLetBind lhs rhsTerms
+      let (ctorName, ctorArgs) := hypothesis
+      let ctorArgsArr := Lean.mkIdent <$> ctorArgs.toArray
+      let constraint ← `((fun $unknownIdent => $(mkIdent ctorName) $ctorArgsArr*))
+      let rhsTerms := #[(arbitrarySTFn : TSyntax `term), constraint]
+      mkLetBind lhs rhsTerms
 
   /-- Produces a term corresponding to the value being generated -/
   partial def emitResult (k : UnknownMap) (u : Unknown) (range : Range) : UnifyM (TSyntax `term) := do
