@@ -63,17 +63,21 @@ def convertToCtorExpr (e : Expr) : MetaM (Option (Name × Array Expr)) :=
       -- Figure out whether `argType` is `Type u` for some universe `u`
       let argType ← inferType arg
       logWarning m!"arg {arg} has type {argType}"
+      -- If `argType` is `Type u` or `Sort u`, then we know `arg` itself must be a type
+      -- (i.e. it is part of an explicit type application), so we can omit it from `actualArgs`
       if argType.isSort then
-        logWarning m!"{argType} has some higher-universe sort"
+        continue
       else if argType.isApp then
-        -- Handle case where `argType` is a typeclass instance (e.g. `LT Nat`)
+        -- Handle case where `argType` is a typeclass instance
+        -- (e.g. `LT Nat` is supplied as an argument to `<`)
+        -- Typeclass instance arguments which are explicit type applications
+        -- can be omitted from `actualArgs`
         let (typeCtorName, _) := argType.getAppFnArgs
         let env ← getEnv
         if Lean.isClass env typeCtorName then
-          logWarning m!"{argType} is a typeclass instance for {typeCtorName}"
+          continue
         else
           actualArgs := actualArgs.push arg
-          logWarning m!"encountered type expression {argType} which is not a typeclass instance"
       else
         actualArgs := actualArgs.push arg
     logWarning m!"ctor {ctorName} has actual args {actualArgs}"
@@ -340,7 +344,7 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
       | some name => (name, ty)
       | none => none)
 
-        -- Extract hypotheses (which correspond to pairs in `forAllVarsAndHypsWithTypes` where the first component is `none`)
+    -- Extract hypotheses (which correspond to pairs in `forAllVarsAndHypsWithTypes` where the first component is `none`)
     let hypotheses := forAllVarsAndHypsWithTypes.filterMap (fun (nameOpt, tyExpr) =>
       match nameOpt with
       | none => tyExpr
