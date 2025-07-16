@@ -64,12 +64,12 @@ inductive typing: List type → term → type → Prop where
 -- | TVar: ∀ Γ x τ,
 --     lookup Γ x τ →
 --     typing Γ (.Var x) τ
--- | TApp: ∀ Γ e1 e2 τ1 τ2,
---     typing Γ e2 τ1 →
---     typing Γ e1 (.Fun τ1 τ2) →
---     typing Γ (.App (.Abs .Nat e1) e2) τ2
-| Bogus : ∀ Γ e τ1 τ2,
-    typing Γ (.Abs τ1 e) (.Fun τ1 τ2)
+| TApp: ∀ Γ e1 e2 τ1 τ2,
+    typing Γ e2 τ1 →
+    typing Γ e1 (.Fun τ1 τ2) →
+    typing Γ (.App (.Abs .Nat e1) e2) τ2
+-- | Bogus : ∀ Γ e τ1 τ2,
+--     typing Γ (.Abs τ1 e) (.Fun τ1 τ2)
 
 /-- Variant of the `Var` typing rule in which `τ` appears non-linearly -/
 inductive typingAlt : List type → term → type → Prop where

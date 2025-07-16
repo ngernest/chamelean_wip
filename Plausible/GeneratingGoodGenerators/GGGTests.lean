@@ -59,3 +59,30 @@ match ys_1 with
 -/
 #guard_msgs(info, drop warning) in
 #derive_subgenerator (fun (xs : List Nat) => SameHead xs ys)
+
+/-- The BST inductive relation, but only includes the `Node` constructor -/
+inductive NonLeafBST : Nat → Nat → Tree → Prop where
+| BstNode: ∀ lo hi x l r,
+  lo < x →
+  x < hi →
+  NonLeafBST lo x l →
+  NonLeafBST x hi r →
+  NonLeafBST lo hi (.Node x l r)
+
+/--
+info: Derived generator:
+```
+do
+  let x ← ArbitrarySuchThat.arbitraryST (fun x => LT.lt in1_1 x)
+  match DecOpt.decOpt (LT.lt x in2_1) initSize with
+    | Option.some Bool.true => do
+      let l ← aux_arb initSize size' in1_1 in2_1
+      do
+        let r ← aux_arb initSize size' in1_1 in2_1
+        do
+          return Tree.Node x l r
+    | _ => OptionT.fail
+```
+-/
+#guard_msgs(info, drop warning) in
+#derive_subgenerator (fun (tree : Tree) => NonLeafBST in1 in2 tree)
