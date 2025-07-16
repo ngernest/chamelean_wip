@@ -36,7 +36,7 @@ inductive Range
 
   /-- A `Range` can be a constructor `C` fully applied to a list of `Range`s -/
   | Ctor (ctor : Name) (rs : List Range)
-  deriving Repr, Inhabited
+  deriving Repr, Inhabited, BEq
 
 
 /-- A `Pattern` is either an unknown or a fully-applied constructor -/
@@ -66,6 +66,9 @@ structure UnifyState where
 
   /-- The name of the output variable (variable to be generated) -/
   outputName : Name
+
+  /-- The type of the output variable (variable to be generated) -/
+  outputType : Expr
 
   /-- The list of hypotheses in the constructor's type (excluding the constructor's conclusion)
       - Each hypothesis is represented as a pair consisting of `(constructor name, list of constructor args)` -/
@@ -231,6 +234,42 @@ namespace UnifyM
   def fixRanges (unknowns : List Unknown) : UnifyM Unit := do
     updateMany (unknowns.zip (List.replicate unknowns.length .Fixed))
 
+  /-- `findCanonicalUnknown k u` finds the *canonical* representation of the unknown `u` based on the `ConstraintMap` `k`.
+      Specifically:
+      - If `u ↦ Unknown u'` in `k`, then we recursively look up the canonical rerpesentation of `u'` by traversing
+        the unification graph formed by the `constraints` map in `UnifyState`
+      - If `u ↦ r` (where `r` is any `Range` that is not some `Unknown`), then `u` is its own canonical representation
+
+      This function is used to handle cases in `constraints` where an unknown maps to another unknown.  -/
+  partial def findCanonicalUnknown (k : UnknownMap) (u : Unknown) : UnifyM Unknown := do
+    let r ← findCorrespondingRange k u
+    match r with
+    | .Unknown u' => findCanonicalUnknown k u'
+    | _ => return u
+
+  /-- Updates the list of `hypotheses` in `UnifyState` with the result of unification,
+      updating `Unknown`s in `hypotheses` that appear in constructor argument positions
+      with their canonical representations (as determined by `findCanonicalUnknown`) -/
+  def updateHypothesesWithUnificationResult : UnifyM Unit := do
+    let state ← get
+    let k := state.constraints
+    let hypotheses := state.hypotheses
+
+    let mut newHypotheses := #[]
+    for (ctorName, ctorArgs) in hypotheses do
+      let mut newArgs := #[]
+      for arg in ctorArgs do
+        let canonicalUnknown ← findCanonicalUnknown k arg
+        if arg != canonicalUnknown then
+          newArgs := newArgs.push canonicalUnknown
+        else
+          newArgs := newArgs.push arg
+      newHypotheses := newHypotheses.push (ctorName, newArgs.toList)
+
+    logWarning m!"hypotheses after unification = {newHypotheses}"
+
+    modify $ fun s => { s with hypotheses := newHypotheses.toList }
+
 
 end UnifyM
 
@@ -357,6 +396,7 @@ def emptyUnifyState : UnifyState :=
     patterns := [],
     unknowns := ∅,
     outputName := `dummyOutput,
+    outputType := mkConst `dummyOutputType
     hypotheses := [] }
 
 /-- Runs a `UnifyM unit` action using the empty `UnifyState`,

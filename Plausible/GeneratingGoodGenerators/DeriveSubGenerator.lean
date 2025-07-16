@@ -44,7 +44,8 @@ def mkInitialUnifyState (inputNames : List Name) (outputName : Name) (outputType
     equalities := ∅
     patterns := []
     unknowns := unknowns
-    outputName := outputName,
+    outputName := outputName
+    outputType := outputType
     hypotheses := hypotheses }
 
 /-- Converts a expression `e` to a *constructor expression* `C r1 … rn`,
@@ -284,9 +285,20 @@ mutual
     let unifyState ← get
     let outputName := unifyState.outputName
     let lhs := mkIdent unknown
-    if unknown == outputName then
+    logWarning m!"inside emitFinalCall, unknown = {unknown}, outputName = {outputName}"
+
+    -- Determine if a recursive call to `auxArb` is needed, i.e. if the `range` corresponding to `unknown`
+    -- is `.Undef ty`, where `ty` is the same type as the `outputType`
+    let range ← UnifyM.findCorrespondingRange unifyState.constraints unknown
+    let recursiveCallNeeded ←
+      (match range with
+      | .Undef ty =>
+        Meta.isDefEq ty unifyState.outputType
+      | _ => pure false)
+
+    if unknown == outputName || recursiveCallNeeded then
       -- Produce a call to `aux_arb` (recursively generate a value for the unknown)
-      -- TODO: handle other arguments that need to be supplied to `aux_arb`
+      -- TODO: handle other arguments that need to be supplied to `auxArb`
       mkLetBind lhs #[auxArbFn, initSizeIdent, mkIdent `size']
     else do
       -- Generate a value for the unknown via a call to `arbitraryST`, passing in the final hypothesis
@@ -398,8 +410,13 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
     for ((_u1, r1), (_u2, r2)) in conclusionArgsAndRanges.zip unknownArgsAndRanges do
       unify r1 r2
 
+    -- Update the list of hypotheses with the result of unificaiton
+    -- (i.e. constructor arguments in hypotheses are updated with the canonical
+    -- representation of each argument as determined by the unification algorithm)
+    UnifyM.updateHypothesesWithUnificationResult
+
     let finalState ← get
-    logWarning m!"finalState = {finalState}"
+    logWarning m!"finalState after updating hypotheses = {finalState}"
 
     emitPatterns finalState.patterns finalState.equalities.toList finalState.constraints)
 
