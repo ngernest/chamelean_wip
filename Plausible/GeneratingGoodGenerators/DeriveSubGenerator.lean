@@ -154,9 +154,9 @@ def convertPatternToTerm (pattern : Pattern) : MetaM (TSyntax `term) :=
   match pattern with
   | .UnknownPattern name => return (mkIdent name)
   | .CtorPattern ctorName args => do
-    let ctorSyntax := mkIdent ctorName
+    let ctorIdent := mkIdent ctorName
     let argSyntaxes ← args.mapM convertPatternToTerm
-    argSyntaxes.foldlM (fun acc arg => `($acc $arg)) ctorSyntax
+    argSyntaxes.foldlM (fun acc arg => `($acc $arg)) ctorIdent
 
 mutual
 
@@ -493,7 +493,8 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
 
   | _ => throwUnsupportedSyntax
 
+-- #derive_subgenerator (fun (tree : Tree) => bst in1 in2 tree)
 
--- #derive_subgenerator (fun (e : term) => typing Γ e τ)
+-- TODO: figure out how to assemble the entire generator function with all constructors
 
-#derive_subgenerator (fun (tree : Tree) => bst in1 in2 tree)
+-- #derive_subgenerator (fun (e : term) => typing G e t)

@@ -38,12 +38,23 @@ inductive Range
   | Ctor (ctor : Name) (rs : List Range)
   deriving Repr, Inhabited, BEq
 
-
 /-- A `Pattern` is either an unknown or a fully-applied constructor -/
 inductive Pattern
   | UnknownPattern : Unknown -> Pattern
   | CtorPattern : Name -> List Pattern -> Pattern
   deriving Repr, Inhabited
+
+/-- A *constructor expression* (`ConstructorExpr`) is either a variable (represented by its `Name`),
+    or a constructor (identified by its `Name`) applied to some list of arguments,
+    each of which are themselves `ConstructorExpr`s
+
+    - Note: this type is isomorphic to `Pattern`, but we define a separate type to avoid confusing
+    `ConstructorExpr` with `Pattern` since they are used in different parts of the algorithm -/
+inductive ConstructorExpr
+  | Variable : Name -> ConstructorExpr
+  | Ctor : Name -> List ConstructorExpr -> ConstructorExpr
+  deriving Repr, BEq
+
 
 /-- An `UnknownMap` maps `Unknown`s to `Range`s -/
 abbrev UnknownMap := Std.HashMap Unknown Range
@@ -75,7 +86,7 @@ structure UnifyState where
 
   /-- The list of hypotheses in the constructor's type (excluding the constructor's conclusion)
       - Each hypothesis is represented as a pair consisting of `(constructor name, list of constructor args)` -/
-  hypotheses : List (Unknown × List Unknown)
+  hypotheses : List (Name × List Unknown)
 
   deriving Repr
 
@@ -106,6 +117,17 @@ partial def toMessageDataPattern (p : Pattern) : MessageData :=
 
 instance : ToMessageData Pattern where
   toMessageData pattern := toMessageDataPattern pattern
+
+/-- Pretty-prints a `ConstructorExpr` as a `MessageData` -/
+partial def toMessageDataConstructorExpr (ctorExpr : ConstructorExpr) : MessageData :=
+  match ctorExpr with
+  | .Variable x => m!"Variable {x}"
+  | .Ctor c args =>
+    let renderedArgs := toMessageDataConstructorExpr <$> args
+    m!"Ctor ({c} {renderedArgs})"
+
+instance : ToMessageData ConstructorExpr where
+  toMessageData := toMessageDataConstructorExpr
 
 instance : ToMessageData UnifyState where
   toMessageData unifyState :=
