@@ -62,7 +62,6 @@ def convertToCtorExpr (e : Expr) : MetaM (Option (Name × Array Expr)) :=
     for arg in args do
       -- Figure out whether `argType` is `Type u` for some universe `u`
       let argType ← inferType arg
-      logWarning m!"arg {arg} has type {argType}"
       -- If `argType` is `Type u` or `Sort u`, then we know `arg` itself must be a type
       -- (i.e. it is part of an explicit type application), so we can omit it from `actualArgs`
       if argType.isSort then
@@ -80,7 +79,6 @@ def convertToCtorExpr (e : Expr) : MetaM (Option (Name × Array Expr)) :=
           actualArgs := actualArgs.push arg
       else
         actualArgs := actualArgs.push arg
-    logWarning m!"ctor {ctorName} has actual args {actualArgs}"
     return some (ctorName, actualArgs)
   else
     return none
@@ -123,18 +121,25 @@ partial def convertExprToRangeInCurrentContext (e : Expr) : UnifyM Range := do
       match localCtx.findFVar? e with
       | some localDecl =>
         let u := localDecl.userName
-        processCorrespondingRange u
+        return (.Unknown u)
+        -- let r ← processCorrespondingRange u
+        -- logWarning m!"unknown {u} has range {r}"
+        -- return r
       | none =>
         let namesInContext := (fun e => getUserNameInContext! localCtx e.fvarId!) <$> localCtx.getFVars
         throwError m!"{e} missing from LocalContext, which only contains {namesInContext}"
     else
       match e with
-      | .const u _ => processCorrespondingRange u
+      | .const u _ => return (.Unknown u)
+        -- do
+        -- let r ← processCorrespondingRange u
+        -- logWarning m!"unknown {u} has range {r}"
+        -- return r
       | _ => throwError m!"Cannot convert expression {e} to Range"
 
 
 /-- Converts a `TSyntax term` to a `Range` of the form `Ctor ...` -/
-partial def convertTermToRange (term : TSyntax `term) : UnifyM Range :=
+partial def convertTermToRange (term : TSyntax `term) : UnifyM Range := do
   match term with
   | `($ctor:ident $args:term*) => do
     let argRanges ← Array.toList <$> args.mapM convertTermToRange
@@ -205,6 +210,7 @@ mutual
         ```
         where we invoke the checker for the hypothesis and pattern-match based on its result -/
       if (← List.allM (fun u => not <$> UnifyM.hasUndefRange u) ctorArgs) then
+        logWarning m!"emitHypotheses ({ctorName} {ctorArgs}), all unknowns don't have Undef range"
         let ctorArgsArr := Lean.mkIdent <$> ctorArgs.toArray
         let hypothesisCheck ← `($decOptFn ($(mkIdent ctorName) $ctorArgsArr*) $initSizeIdent)
         let trueCaseRHS ← emitHypotheses remainingHyps constraints
@@ -217,6 +223,9 @@ mutual
 
         -- `undefUnknowns` is a list of all `Unknown`s that have a `Range` of the form `Undef τ`, with length `n`
         let undefUnknowns ← UnifyM.findUnknownsWithUndefRanges
+
+        logWarning m!"emitHypotheses ({ctorName} {ctorArgs}), unknowns {undefUnknowns} have Undef range"
+
         match unsnoc undefUnknowns with
         | none => throwError "Unreachable case: by construction, there must exist at least one unknown with an `Undef` Range"
         | some (undefUnknownsPrefix, finalUnknown) =>
