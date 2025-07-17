@@ -1,6 +1,5 @@
 import Lean
 import Std
-import Plausible.IR.Examples
 import Plausible.IR.Prelude
 import Plausible.New.Idents
 import Plausible.IR.KeyValueStore

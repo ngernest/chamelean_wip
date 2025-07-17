@@ -7,7 +7,6 @@ import Plausible.New.DeriveConstrainedProducers
 import Plausible.New.SubGenerators
 import Plausible.New.DeriveArbitrary
 import Plausible.New.Debug
-import Plausible.IR.Examples
 
 
 open Lean Elab Command Meta Term Parser
@@ -138,16 +137,3 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
 
 -- Example usage:
 -- #derive_subgenerator (fun (tree : Tree) => bst in1 in2 tree)
-
-
-/-- Example initial constraint map from Section 4.2 of GGG -/
-def bstInitialConstraints := Std.HashMap.ofList [
-  (`hi, .Undef (mkConst `Nat)),
-  (`tree, .Undef (mkConst `Tree)),
-  (`in2, .Fixed),
-  (`l, .Undef (mkConst `Tree)),
-  (`x, .Undef (mkConst `Nat)),
-  (`lo, .Undef (mkConst `Nat)),
-  (`r, .Undef (mkConst `Tree)),
-  (`in1, Range.Fixed)
-]

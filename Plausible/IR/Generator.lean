@@ -1,6 +1,5 @@
 import Lean
 import Std
-import Plausible.IR.Examples
 import Plausible.IR.Extractor
 import Plausible.IR.Prelude
 import Plausible.IR.Prototype

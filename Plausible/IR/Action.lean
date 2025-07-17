@@ -1,5 +1,4 @@
 import Lean
-import Plausible.IR.Examples
 import Plausible.IR.Extractor
 import Plausible.IR.Prelude
 import Plausible.New.Debug
