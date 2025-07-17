@@ -36,7 +36,7 @@ def mkInitialUnknownMap (inputNames: List Name) (outputName : Name) (outputType 
    - `forAllVariables`: the names & types for universally-quantified variables in the constructor's type
    - `hypotheses`: the hypotheses for the constructor (represented as a constructor name applied to some list of arguments) -/
 def mkInitialUnifyState (inputNames : List Name) (outputName : Name) (outputType : Expr) (forAllVariables : List (Name × Expr))
-  (hypotheses : List (Unknown × List Unknown)): UnifyState :=
+  (hypotheses : List (Name × List ConstructorExpr)): UnifyState :=
   let forAllVarNames := Prod.fst <$> forAllVariables
   let constraints := mkInitialUnknownMap inputNames outputName outputType forAllVariables
   let unknowns := Std.HashSet.ofList (outputName :: (inputNames ++ forAllVarNames))
@@ -198,8 +198,14 @@ mutual
       let cases := #[trueCase, catchAllCase]
       mkMatchExprWithScrutineeTerm scrutinee cases
 
+  /-- Determines if all unknowns in a `ConstructorExpr` have `Range`s of the form `Undef τ` for some type `τ` -/
+  partial def allUnknownsHaveUndefRanges (ctorExpr : ConstructorExpr) : UnifyM Bool :=
+    match ctorExpr with
+    | .Unknown u => not <$> UnifyM.hasUndefRange u
+    | .Ctor _ args => List.allM allUnknownsHaveUndefRanges args
+
   /-- Produces the code for the body of a sub-generator which processes a list of `hypotheses` under a particular set of `constraints` -/
-  partial def emitHypotheses (hypotheses : List (Name × List Unknown)) (constraints : UnknownMap) : UnifyM (TSyntax `term) :=
+  partial def emitHypotheses (hypotheses : List (Name × List ConstructorExpr)) (constraints : UnknownMap) : UnifyM (TSyntax `term) :=
     match hypotheses with
     | [] => finalAssembly
     | hypothesis@(ctorName, ctorArgs) :: remainingHyps => do
@@ -211,9 +217,9 @@ mutual
         | _ => OptionT.fail
         ```
         where we invoke the checker for the hypothesis and pattern-match based on its result -/
-      if (← List.allM (fun u => not <$> UnifyM.hasUndefRange u) ctorArgs) then
+      if (← List.allM allUnknownsHaveUndefRanges ctorArgs) then
         logWarning m!"emitHypotheses ({ctorName} {ctorArgs}), all unknowns don't have Undef range"
-        let ctorArgsArr := Lean.mkIdent <$> ctorArgs.toArray
+        let ctorArgsArr ← UnifyM.convertConstructorExprsToTSyntaxTerms ctorArgs.toArray
         let hypothesisCheck ← `($decOptFn ($(mkIdent ctorName) $ctorArgsArr*) $initSizeIdent)
         let trueCaseRHS ← emitHypotheses remainingHyps constraints
         let trueCase ← `(Term.matchAltExpr| | $(mkIdent ``some) $(mkIdent ``true) => $trueCaseRHS)
@@ -223,8 +229,10 @@ mutual
       else
         let mut doElems := #[]
 
+        -- Accumulate all unknowns contained in `ctorArgs`
+        let unknownsInCtorArgs := List.flatMap UnifyM.collectUnknownsInConstructorExpr ctorArgs
         -- `undefUnknowns` is a list of all `Unknown`s in `ctorArgs` that have a `Range` of the form `Undef τ`, with length `n`
-        let undefUnknowns ← UnifyM.findUnknownsWithUndefRanges ctorArgs
+        let undefUnknowns ← UnifyM.findUnknownsWithUndefRanges unknownsInCtorArgs
 
         logWarning m!"emitHypotheses ({ctorName} {ctorArgs}), unknowns {undefUnknowns} have Undef range"
 
@@ -327,15 +335,25 @@ mutual
 
 end
 
-/-- Converts a `Range` that is either an `Unknown` or `Ctor` to
-    a constructor expression of the type `(Unknown × List Unknown)`
-    (constructor name applied to arguments which are all variables, i.e. unknowns) -/
-def convertRangeToCtorAppForm (r : Range) : UnifyM (Unknown × List Unknown) :=
+/-- Converts a `Range` to a `ConstructorExpr`
+    (helper function used by `convertRangeToCtorAppForm`) -/
+def convertRangeToConstructorExpr (r : Range) : UnifyM ConstructorExpr :=
   match r with
-  | .Unknown u => return (u, [])
-  | .Ctor c rs => do
-    let (unknownArgs, _) ← List.unzip <$> rs.mapM convertRangeToCtorAppForm
-    return (c, unknownArgs)
+  | .Unknown u => return (.Unknown u)
+  | .Ctor ctorName args => do
+    let updatedArgs ← args.mapM convertRangeToConstructorExpr
+    return (.Ctor ctorName updatedArgs)
+  | _ => throwError m!"Unable to convert {r} to a constructor expression"
+
+/-- Converts a `Range` that is either an `Unknown` or `Ctor` to
+    a term in *constructor application form*, represented as a pair of type `(Name × List ConstructorExpr)`
+    (constructor name applied to zero or more arguments which may themselves be `ConstructorExpr`s) -/
+def convertRangeToCtorAppForm (r : Range) : UnifyM (Name × List ConstructorExpr) :=
+  match r with
+  | Range.Unknown u => return (u, [])
+  | Range.Ctor c rs => do
+    let args ← rs.mapM convertRangeToConstructorExpr
+    return (c, args)
   | _ => throwError m!"Unable to convert {r} to a constructor expression"
 
 

@@ -51,7 +51,7 @@ inductive Pattern
     - Note: this type is isomorphic to `Pattern`, but we define a separate type to avoid confusing
     `ConstructorExpr` with `Pattern` since they are used in different parts of the algorithm -/
 inductive ConstructorExpr
-  | Variable : Name -> ConstructorExpr
+  | Unknown : Name -> ConstructorExpr
   | Ctor : Name -> List ConstructorExpr -> ConstructorExpr
   deriving Repr, BEq
 
@@ -85,8 +85,9 @@ structure UnifyState where
   inputNames : List Name
 
   /-- The list of hypotheses in the constructor's type (excluding the constructor's conclusion)
-      - Each hypothesis is represented as a pair consisting of `(constructor name, list of constructor args)` -/
-  hypotheses : List (Name × List Unknown)
+      Each hypothesis is represented as a pair `(constructor name, constructor args)`
+      i.e. a constructor name applied to a list of arguments, each of which are `ConstructorExpr`s -/
+  hypotheses : List (Name × List ConstructorExpr)
 
   deriving Repr
 
@@ -121,7 +122,7 @@ instance : ToMessageData Pattern where
 /-- Pretty-prints a `ConstructorExpr` as a `MessageData` -/
 partial def toMessageDataConstructorExpr (ctorExpr : ConstructorExpr) : MessageData :=
   match ctorExpr with
-  | .Variable x => m!"Variable {x}"
+  | .Unknown x => m!"Unknown {x}"
   | .Ctor c args =>
     let renderedArgs := toMessageDataConstructorExpr <$> args
     m!"Ctor ({c} {renderedArgs})"
@@ -178,7 +179,7 @@ namespace UnifyM
   /-- Applies a function `f` to the list of `hypotheses` stored in `UnifyState`
       - This function allows us to fetch the `hypotheses` field without needing
         a seperate `get` call inside the State monad -/
-  def withHypotheses (f : List (Unknown × List Unknown) → UnifyM α) : UnifyM α := do
+  def withHypotheses (f : List (Name × List ConstructorExpr) → UnifyM α) : UnifyM α := do
     let unifyState ← get
     f unifyState.hypotheses
 
@@ -272,6 +273,22 @@ namespace UnifyM
     | .Unknown u' => findCanonicalUnknown k u'
     | _ => return u
 
+  /-- `updateConstructorArg k ctorArg` uses the `UnknownMap` `k` to rewrite any unknowns that appear in the
+      `ConstructorExpr` `ctorArg`, substituting each `Unknown` with its canonical representation
+      (determined by calling `findCanonicalUnknown`)
+      - See `updateHypothesesWithUnificationResult` for an example of how this function is used -/
+  partial def updateConstructorArg (k : UnknownMap) (ctorArg : ConstructorExpr) : UnifyM ConstructorExpr := do
+    match ctorArg with
+    | .Unknown arg =>
+      let canonicalUnknown ← findCanonicalUnknown k arg
+      if arg != canonicalUnknown then
+        return (.Unknown canonicalUnknown)
+      else
+        return (.Unknown arg)
+    | .Ctor ctorName args =>
+      let updatedArgs ← args.mapM (updateConstructorArg k)
+      return (.Ctor ctorName updatedArgs)
+
   /-- Updates the list of `hypotheses` in `UnifyState` with the result of unification,
       updating `Unknown`s in `hypotheses` that appear in constructor argument positions
       with their canonical representations (as determined by `findCanonicalUnknown`) -/
@@ -284,16 +301,33 @@ namespace UnifyM
     for (ctorName, ctorArgs) in hypotheses do
       let mut newArgs := #[]
       for arg in ctorArgs do
-        let canonicalUnknown ← findCanonicalUnknown k arg
-        if arg != canonicalUnknown then
-          newArgs := newArgs.push canonicalUnknown
-        else
-          newArgs := newArgs.push arg
+        let updatedArg ← updateConstructorArg k arg
+        newArgs := newArgs.push updatedArg
+
       newHypotheses := newHypotheses.push (ctorName, newArgs.toList)
 
     logWarning m!"hypotheses after unification = {newHypotheses}"
 
     modify $ fun s => { s with hypotheses := newHypotheses.toList }
+
+  /-- Converts an array of `ConstructorExpr`s to one single `TSyntaxArray term`-/
+  partial def convertConstructorExprsToTSyntaxTerms (ctorExprs : Array ConstructorExpr) : UnifyM (TSyntaxArray `term) :=
+    ctorExprs.mapM (fun ctorExpr => do
+      match ctorExpr with
+      | .Unknown u => `($(Lean.mkIdent u))
+      | .Ctor c args =>
+        let argTerms ← convertConstructorExprsToTSyntaxTerms args.toArray
+        `($(mkIdent c) $argTerms*))
+
+  /-- Accumulates all the `Unknown`s -/
+  partial def collectUnknownsInConstructorExpr (ctorExpr : ConstructorExpr) : List Unknown :=
+    match ctorExpr with
+    | .Unknown u => [u]
+    | .Ctor c args =>
+      let unknowns := List.flatMap collectUnknownsInConstructorExpr args
+      c :: unknowns
+
+
 
 
 end UnifyM
