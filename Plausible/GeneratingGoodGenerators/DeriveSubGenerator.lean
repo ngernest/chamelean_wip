@@ -290,7 +290,7 @@ mutual
   /-- Produces a let-bind expression which generates an `unknown` subject to a `hypothesis`
       in the body of the sub-generator
       (this is the final call to a generator when processing one particular hypothesis of a constructor) -/
-  partial def emitFinalCall (unknown : Unknown) (hypothesis : Unknown × List Unknown): UnifyM (TSyntax `doElem) := do
+  partial def emitFinalCall (unknown : Unknown) (hypothesis : Name × List ConstructorExpr): UnifyM (TSyntax `doElem) := do
     let unifyState ← get
     let outputName := unifyState.outputName
     let lhs := mkIdent unknown
@@ -317,7 +317,7 @@ mutual
       -- as an argument to `arbitraryST`
       let unknownIdent := mkIdent unknown
       let (ctorName, ctorArgs) := hypothesis
-      let ctorArgsArr := Lean.mkIdent <$> ctorArgs.toArray
+      let ctorArgsArr ← UnifyM.convertConstructorExprsToTSyntaxTerms ctorArgs.toArray
       let constraint ← `((fun $unknownIdent => $(mkIdent ctorName) $ctorArgsArr*))
       let rhsTerms := #[(arbitrarySTFn : TSyntax `term), constraint]
       mkLetBind lhs rhsTerms
