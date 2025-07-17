@@ -440,6 +440,8 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
     for ((_u1, r1), (_u2, r2)) in conclusionArgsAndRanges.zip unknownArgsAndRanges do
       unify r1 r2
 
+    -- TODO: maybe we also need to call `unify` on `hypsForUnifyState`?
+
     -- Update the list of hypotheses with the result of unificaiton
     -- (i.e. constructor arguments in hypotheses are updated with the canonical
     -- representation of each argument as determined by the unification algorithm)

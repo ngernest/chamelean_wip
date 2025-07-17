@@ -320,7 +320,7 @@ namespace UnifyM
         let argTerms ← convertConstructorExprsToTSyntaxTerms args.toArray
         `($(mkIdent c) $argTerms*))
 
-  /-- Accumulates all the `Unknown`s -/
+  /-- Accumulates all the `Unknown`s in a `ConstructorExpr` -/
   partial def collectUnknownsInConstructorExpr (ctorExpr : ConstructorExpr) : UnifyM (List Unknown) := do
     logWarning m!"collectUnknownsInConstructorExpr {ctorExpr}"
     match ctorExpr with
