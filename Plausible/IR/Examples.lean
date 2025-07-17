@@ -67,7 +67,7 @@ inductive typing: List type → term → type → Prop where
 | TApp: ∀ Γ e1 e2 τ1 τ2,
     typing Γ e2 τ1 →
     typing Γ e1 (.Fun τ1 τ2) →
-    typing Γ (.App (.Abs .Nat e1) e2) τ2
+    typing Γ (.App e1 e2) τ2
 -- | Bogus : ∀ Γ e τ1 τ2,
 --     typing Γ (.Abs τ1 e) (.Fun τ1 τ2)
 

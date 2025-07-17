@@ -199,16 +199,20 @@ mutual
       mkMatchExprWithScrutineeTerm scrutinee cases
 
   /-- Determines if all unknowns in a `ConstructorExpr` have `Range`s of the form `Undef τ` for some type `τ` -/
-  partial def allUnknownsHaveUndefRanges (ctorExpr : ConstructorExpr) : UnifyM Bool :=
+  partial def allUnknownsHaveUndefRanges (ctorExpr : ConstructorExpr) : UnifyM Bool := do
+    logWarning m!"Checking if unknowns in {ctorExpr} have Undef Ranges"
     match ctorExpr with
     | .Unknown u => not <$> UnifyM.hasUndefRange u
-    | .Ctor _ args => List.allM allUnknownsHaveUndefRanges args
+    | .Ctor c args =>
+      logWarning m!"entered Ctor case of allUnknownsHaveUndefRanges with {ctorExpr}"
+      List.allM allUnknownsHaveUndefRanges args
 
   /-- Produces the code for the body of a sub-generator which processes a list of `hypotheses` under a particular set of `constraints` -/
-  partial def emitHypotheses (hypotheses : List (Name × List ConstructorExpr)) (constraints : UnknownMap) : UnifyM (TSyntax `term) :=
+  partial def emitHypotheses (hypotheses : List (Name × List ConstructorExpr)) (constraints : UnknownMap) : UnifyM (TSyntax `term) := do
     match hypotheses with
     | [] => finalAssembly
     | hypothesis@(ctorName, ctorArgs) :: remainingHyps => do
+      logWarning m!"inEmitHypotheses, head of list is ({ctorName} {ctorArgs})"
       /- If all of the constructor's args don't have a `Range` of the form `Undef τ`,
         we can simply produce the expression
         ```lean
@@ -230,7 +234,7 @@ mutual
         let mut doElems := #[]
 
         -- Accumulate all unknowns contained in `ctorArgs`
-        let unknownsInCtorArgs := List.flatMap UnifyM.collectUnknownsInConstructorExpr ctorArgs
+        let unknownsInCtorArgs ← List.flatMapM UnifyM.collectUnknownsInConstructorExpr ctorArgs
         -- `undefUnknowns` is a list of all `Unknown`s in `ctorArgs` that have a `Range` of the form `Undef τ`, with length `n`
         let undefUnknowns ← UnifyM.findUnknownsWithUndefRanges unknownsInCtorArgs
 
@@ -305,7 +309,11 @@ mutual
         Meta.isDefEq ty unifyState.outputType
       | _ => pure false)
 
+    logInfo m!"recursiveCallNeeded = {recursiveCallNeeded}"
+
     if unknown == outputName || recursiveCallNeeded then
+      logInfo m!"entered true branch of emitFinalCall"
+
       -- Produce a recursive call to `auxArb` (recursively generate a value for the unknown)
       -- Each `input` in `inputNames` is an argument for `auxArb`
       let argsForRecursiveCall := Lean.mkIdent <$> unifyState.inputNames.toArray
@@ -515,4 +523,4 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
 
 -- TODO: figure out how to assemble the entire generator function with all constructors
 
--- #derive_subgenerator (fun (e : term) => typing G e t)
+#derive_subgenerator (fun (e : term) => typing G e t)

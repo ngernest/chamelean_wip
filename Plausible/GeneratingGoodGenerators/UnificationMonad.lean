@@ -233,11 +233,12 @@ namespace UnifyM
   def findCorrespondingRange (k : UnknownMap) (u : Unknown) : UnifyM Range :=
     match k[u]? with
     | some r => return r
-    | none => throwError m!"unable to find {u} in {k.toList}"
+    | none => throwError m!"unable to find {u} in UnknownMap {k.toList}"
 
   /-- Determines if an unknown `u` has a `Range` of `Undef τ` for some type `τ`
       in the constraints map -/
-  def hasUndefRange (u : Unknown) : UnifyM Bool :=
+  def hasUndefRange (u : Unknown) : UnifyM Bool := do
+    logWarning m!"Checking if unknown {u} has an Undef Range"
     UnifyM.withConstraints (fun k => do
       let r ← findCorrespondingRange k u
       match r with
@@ -320,12 +321,13 @@ namespace UnifyM
         `($(mkIdent c) $argTerms*))
 
   /-- Accumulates all the `Unknown`s -/
-  partial def collectUnknownsInConstructorExpr (ctorExpr : ConstructorExpr) : List Unknown :=
+  partial def collectUnknownsInConstructorExpr (ctorExpr : ConstructorExpr) : UnifyM (List Unknown) := do
+    logWarning m!"collectUnknownsInConstructorExpr {ctorExpr}"
     match ctorExpr with
-    | .Unknown u => [u]
+    | .Unknown u => return [u]
     | .Ctor c args =>
-      let unknowns := List.flatMap collectUnknownsInConstructorExpr args
-      c :: unknowns
+      let unknowns ← List.flatMapM collectUnknownsInConstructorExpr args
+      return c :: unknowns
 
 
 
