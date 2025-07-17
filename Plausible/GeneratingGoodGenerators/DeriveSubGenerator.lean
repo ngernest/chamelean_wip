@@ -373,9 +373,11 @@ def convertRangeToCtorAppForm (r : Range) : UnifyM (Name × List ConstructorExpr
     - The name (`outputName`) and type (`outputType`) of the output (value to be generated)
     - The names of inputs `inputNames` (arguments to the generator)
     - An array of `unknowns` (the arguments to the inductive relation)
-    - Note: `unknowns == inputNames ∪ { outputName }`, i.e. `unknowns` contains all args to the inductive relation
-      listed in order, which coincides with `inputNames ∪ { outputName }` -/
-def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Expr) (inputNames : List Name) (unknowns : Array Unknown) : UnifyM (TSyntax `term) := do
+      + Note: `unknowns == inputNames ∪ { outputName }`, i.e. `unknowns` contains all args to the inductive relation
+        listed in order, which coincides with `inputNames ∪ { outputName }`
+    - The name of the inductive relation we are targeting (`inductiveName`) -/
+def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Expr) (inputNames : List Name)
+  (unknowns : Array Unknown) (inductiveName : Name) : UnifyM (TSyntax `term) := do
   let ctorInfo ← getConstInfoCtor ctorName
   let ctorType := ctorInfo.type
 
@@ -404,7 +406,14 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
       | some _ => none)
     let localCtx ← getLCtx
 
-    let mut hypsForUnifyState := #[]
+    -- Stores the representation of hypotheses in *constructor application* form
+    -- (constructor name applied to some list of arguments, which are themselves `ConstructorExpr`s)
+    let mut hypsInCtorAppForm := #[]
+
+    -- `hypCtorAndRanges` stores the type constructor in each hypothesis as well as the ranges corresponding to
+    -- the arguments in each hypothesis
+    let mut hypCtorAndRanges := #[]
+
     for hypExpr in hypotheses do
       let hypTerm ← delabExprInLocalContext localCtx hypExpr
       -- Convert the `TSyntax` representation of the hypothesis to a `Range`
@@ -415,13 +424,15 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
         catch _ => convertExprToRangeInCurrentContext hypExpr
       logWarning m!"hypothesis {hypTerm} has range {hypRange}"
 
-      -- Convert each hypothesis' range to a form of a constructor application
-      -- (constructor name applied to some list of variables)
-      let hypInCtorAppForm ← convertRangeToCtorAppForm hypRange
-      hypsForUnifyState := hypsForUnifyState.push hypInCtorAppForm
+      -- Convert each hypothesis' range to a constructor application
+      -- (constructor name applied to some list of arguments, which are themselves `ConstructorExpr`s)
+      let hypInCtorAppForm@(hypCtor, _) ← convertRangeToCtorAppForm hypRange
+      hypsInCtorAppForm := hypsInCtorAppForm.push hypInCtorAppForm
+
+      hypCtorAndRanges := hypCtorAndRanges.push (hypCtor, hypRange)
 
     -- Creates the initial `UnifyState` needed for the unification algorithm
-    let initialUnifyState := mkInitialUnifyState inputNames outputName outputType forAllVars.toList hypsForUnifyState.toList
+    let initialUnifyState := mkInitialUnifyState inputNames outputName outputType forAllVars.toList hypsInCtorAppForm.toList
 
     -- Update the state in `UnifyM` to be `initialUnifyState`
     set initialUnifyState
@@ -440,12 +451,28 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
     for ((_u1, r1), (_u2, r2)) in conclusionArgsAndRanges.zip unknownArgsAndRanges do
       unify r1 r2
 
-    -- TODO: maybe we also need to call `unify` on `hypsForUnifyState`?
-
-    -- Update the list of hypotheses with the result of unificaiton
+    -- Update the list of hypotheses with the result of unification
     -- (i.e. constructor arguments in hypotheses are updated with the canonical
     -- representation of each argument as determined by the unification algorithm)
     UnifyM.updateHypothesesWithUnificationResult
+
+    -- TODO: if you uncomment this,we get an infinite loop when trying to derive a subgenerator for TApp
+    -- logWarning m!"Beginning to unify arguments in hypotheses with conclusion args..."
+    -- for (_, hypRange) in hypCtorAndRanges do
+    --     match hypRange with
+    --     | .Ctor hypCtorName hypArgRanges =>
+    --       logWarning m!"Attempting to unify args in hypothesis ({hypCtorName} {hypRange})"
+    --       if hypCtorName == inductiveName then
+    --         for ((conclusionArg, conclusionRange), hypArgRange) in conclusionArgsAndRanges.zip hypArgRanges.toArray do
+    --           logWarning m!"conclusionArg = {conclusionArg}, conclusionRange = {conclusionRange}, hypArgRange = {hypArgRange}"
+    --           unify conclusionRange hypArgRange
+    --       else
+    --         logWarning m!"hypCtorName {hypCtorName} doesn't match inductiveName {inductiveName}, skipping..."
+    --         continue
+    --     | _ =>
+    --       logWarning m!"skipping over {hypRange}"
+    --       continue
+
 
     let finalState ← get
     logWarning m!"finalState after updating hypotheses = {finalState}"
@@ -512,7 +539,7 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
 
       for ctorName in inductiveVal.ctors do
         let derivationResult ← UnifyM.runInMetaM
-          (processCtorInContext ctorName freshenedOutputName outputType freshenedInputNamesExcludingOutput freshUnknowns) emptyUnifyState
+          (processCtorInContext ctorName freshenedOutputName outputType freshenedInputNamesExcludingOutput freshUnknowns inductiveName) emptyUnifyState
         match derivationResult with
         | some (generator, _) => logInfo m!"Derived generator:\n```\n{generator}\n```"
         | none => logInfo m!"Derived generator:\n```\nreturn none\n```"

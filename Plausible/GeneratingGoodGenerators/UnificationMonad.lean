@@ -341,7 +341,7 @@ end UnifyM
 
 mutual
   /-- Top-level unification function which unifies the ranges mapped to by two unknowns -/
-  partial def unify (range1 : Range) (range2: Range) : UnifyM Unit := do
+  partial def unify (range1 : Range) (range2 : Range) : UnifyM Unit := do
     match range1, range2 with
     | .Unknown u1, .Unknown u2 =>
       if u1 == u2 then
@@ -388,9 +388,11 @@ mutual
       if c1 == c2 && rs1.length == rs2.length then
         for (r1, r2) in (List.zip rs1 rs2) do
           unify r1 r2
-      else
-        failure
-    | _, _ => throwError m!"unifyC, unable to unify r1 = {r1}, r2 = {r2} which are not both constructors"
+      else do
+        let st ← get
+        let constraints := st.constraints
+        throwError m!"unifyC: unable to unify {r1} with {r2}, constraints = {constraints.toList}"
+    | _, _ => throwError m!"unifyC: unable to unify r1 = {r1}, r2 = {r2} which are not both constructors"
 
   /-- Unifies an `(Unknown, Range)` pair with a `Range` -/
   partial def unifyRC : Unknown × Range → Range → UnifyM Unit
