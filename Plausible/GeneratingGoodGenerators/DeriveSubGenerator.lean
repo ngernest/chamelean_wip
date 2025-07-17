@@ -456,7 +456,7 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
     -- representation of each argument as determined by the unification algorithm)
     UnifyM.updateHypothesesWithUnificationResult
 
-    -- TODO: if you uncomment this,we get an infinite loop when trying to derive a subgenerator for TApp
+    -- TODO: if you uncomment this, we get an infinite loop when trying to derive a subgenerator for TApp
     -- logWarning m!"Beginning to unify arguments in hypotheses with conclusion args..."
     -- for (_, hypRange) in hypCtorAndRanges do
     --     match hypRange with
