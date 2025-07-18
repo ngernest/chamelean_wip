@@ -313,6 +313,21 @@ namespace UnifyM
 
     modify $ fun s => { s with hypotheses := newHypotheses.toList }
 
+  /-- Extends the current state with the contents of the fields in `newState`
+      (Note that the `outputName` and `outputType` of `newStates` are used) -/
+  def extendState (newState : UnifyState) : UnifyM Unit := do
+    modify $ fun s => { s with
+      constraints := s.constraints.union newState.constraints
+      equalities := s.equalities.union newState.equalities
+      patterns := s.patterns ++ newState.patterns
+      unknowns := s.unknowns.union newState.unknowns
+      outputName := newState.outputName
+      outputType := newState.outputType
+      inputNames := s.inputNames ++ newState.inputNames
+      hypotheses := s.hypotheses ++ newState.hypotheses
+    }
+
+
   /-- Converts an array of `ConstructorExpr`s to one single `TSyntaxArray term`-/
   partial def convertConstructorExprsToTSyntaxTerms (ctorExprs : Array ConstructorExpr) : UnifyM (TSyntaxArray `term) :=
     ctorExprs.mapM (fun ctorExpr => do

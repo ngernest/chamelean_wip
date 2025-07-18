@@ -124,19 +124,12 @@ partial def convertExprToRangeInCurrentContext (e : Expr) : UnifyM Range := do
       | some localDecl =>
         let u := localDecl.userName
         return (.Unknown u)
-        -- let r ← processCorrespondingRange u
-        -- logWarning m!"unknown {u} has range {r}"
-        -- return r
       | none =>
         let namesInContext := (fun e => getUserNameInContext! localCtx e.fvarId!) <$> localCtx.getFVars
         throwError m!"{e} missing from LocalContext, which only contains {namesInContext}"
     else
       match e with
       | .const u _ => return (.Unknown u)
-        -- do
-        -- let r ← processCorrespondingRange u
-        -- logWarning m!"unknown {u} has range {r}"
-        -- return r
       | _ => throwError m!"Cannot convert expression {e} to Range"
 
 
@@ -156,8 +149,11 @@ partial def convertTermToRange (term : TSyntax `term) : UnifyM Range := do
       logWarning m!"{name} is a constructor!"
       let unknown ← UnifyM.registerFreshUnknown
       let ctorRange := Range.Ctor name []
-      handleMatch unknown ctorRange
-      logWarning m!"Adding a match between {unknown} and {ctorRange}"
+      -- Add a constraint stipulating that `unknown ↦ ctorRange` in `constraints`
+      UnifyM.update unknown ctorRange
+      logWarning m!"Adding a constraint: {unknown} ↦ {ctorRange}"
+      let state ← get
+      logWarning m!"current state = {state}"
       return (.Unknown unknown)
     else
       return (.Unknown name)
@@ -448,12 +444,13 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
     -- Creates the initial `UnifyState` needed for the unification algorithm
     let initialUnifyState := mkInitialUnifyState inputNames outputName outputType forAllVars.toList hypsInCtorAppForm.toList
 
-    -- Update the state in `UnifyM` to be `initialUnifyState`
+    -- Extend the current state with the contents of `initialUnifyState`
     -- TODO: need to change this to a `UnifyM` function for taking the unino of two states together (i.e. just do set union / list append for all the fields)
     -- TODO: ^^ implement this funciton
-    set initialUnifyState
+    UnifyM.extendState initialUnifyState
 
-    logWarning m!"initialState = {initialUnifyState}"
+    let state ← get
+    logWarning m!"after extending with initialUnifyState = {state}"
 
     -- Get the ranges corresponding to each of the unknowns
     let unknownRanges ← unknowns.mapM processCorrespondingRange
@@ -570,6 +567,6 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
 -- #derive_subgenerator (fun (tree : Tree) => bst in1 in2 tree)
 -- #derive_subgenerator (fun (e : term) => typing G e t)
 
-#derive_subgenerator (fun (tree : Tree) => LeftLeaning tree)
+-- #derive_subgenerator (fun (tree : Tree) => LeftLeaning tree)
 
--- #derive_subgenerator (fun (xs : List Nat) => Sorted xs)
+#derive_subgenerator (fun (xs : List Nat) => Sorted xs)
