@@ -39,3 +39,20 @@ inductive ScheduleStep where
 /-- A schedule is a pair consisting of an ordered list of `ScheduleStep`s,
     and the sort of schedule we're dealing with -/
 abbrev Schedule := (List ScheduleStep) × ScheduleSort
+
+
+/-- Each `ScheduleStep` is associated with a `Density`, which represents a failure mode of a generator -/
+inductive Density
+  /-- Invokes a call to a checker -/
+  | Checking
+
+  /-- A call to `ArbitrarySuchThat`, followed by a pattern-match on the generated value
+      (this happens when we want the output of the generator to have a certain shape) -/
+  | Backtracking
+
+  /-- a call to `ArbitrarySuchThat` ??? -/
+  | Partial
+
+  /-- Unconstrained generation, i.e. calls to `arbitrary` -/
+  | Total
+  deriving Repr, BEq
