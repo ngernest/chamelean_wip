@@ -154,7 +154,11 @@ partial def convertTermToRange (term : TSyntax `term) : UnifyM Range := do
     let constInfo ← getConstInfo name
     if constInfo.isCtor then
       logWarning m!"{name} is a constructor!"
-      return (.Ctor name [])
+      let unknown ← UnifyM.registerFreshUnknown
+      let ctorRange := Range.Ctor name []
+      handleMatch unknown ctorRange
+      logWarning m!"Adding a match between {unknown} and {ctorRange}"
+      return (.Unknown unknown)
     else
       return (.Unknown name)
   | _ => throwError m!"unable to convert {term} to a Range"
@@ -445,6 +449,8 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
     let initialUnifyState := mkInitialUnifyState inputNames outputName outputType forAllVars.toList hypsInCtorAppForm.toList
 
     -- Update the state in `UnifyM` to be `initialUnifyState`
+    -- TODO: need to change this to a `UnifyM` function for taking the unino of two states together (i.e. just do set union / list append for all the fields)
+    -- TODO: ^^ implement this funciton
     set initialUnifyState
 
     logWarning m!"initialState = {initialUnifyState}"
@@ -565,3 +571,5 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
 -- #derive_subgenerator (fun (e : term) => typing G e t)
 
 #derive_subgenerator (fun (tree : Tree) => LeftLeaning tree)
+
+-- #derive_subgenerator (fun (xs : List Nat) => Sorted xs)
