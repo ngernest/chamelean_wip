@@ -90,3 +90,9 @@ inductive complete : Nat → Tree → Prop where
 /-- Example with non-linear patterns, taken from Generating Good Generators -/
 inductive goodTree : Nat → Nat → Tree → Prop where
   | GoodLeaf : forall n, goodTree n n .Leaf
+
+/-- An inductive relation for left-leaning trees where all right children have to be leaves -/
+inductive LeftLeaning : Tree → Prop where
+  | LeftSubTreeOnly : ∀ x l,
+    LeftLeaning .Leaf →
+    LeftLeaning (.Node x l .Leaf)

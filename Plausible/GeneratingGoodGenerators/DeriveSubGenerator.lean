@@ -309,10 +309,10 @@ mutual
         Meta.isDefEq ty unifyState.outputType
       | _ => pure false)
 
-    logInfo m!"recursiveCallNeeded = {recursiveCallNeeded}"
+    logWarning m!"recursiveCallNeeded = {recursiveCallNeeded}"
 
     if unknown == outputName || recursiveCallNeeded then
-      logInfo m!"entered true branch of emitFinalCall"
+      logWarning m!"entered true branch of emitFinalCall"
 
       -- Produce a recursive call to `auxArb` (recursively generate a value for the unknown)
       -- Each `input` in `inputNames` is an argument for `auxArb`
@@ -548,8 +548,11 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
 
   | _ => throwUnsupportedSyntax
 
--- #derive_subgenerator (fun (tree : Tree) => bst in1 in2 tree)
+
 
 -- TODO: figure out how to assemble the entire generator function with all constructors
 
-#derive_subgenerator (fun (e : term) => typing G e t)
+-- #derive_subgenerator (fun (tree : Tree) => bst in1 in2 tree)
+-- #derive_subgenerator (fun (e : term) => typing G e t)
+
+#derive_subgenerator (fun (tree : Tree) => LeftLeaning tree)
