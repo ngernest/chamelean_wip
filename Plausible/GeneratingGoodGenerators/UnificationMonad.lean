@@ -224,6 +224,10 @@ namespace UnifyM
       let u := freshUnknown us
       (u, { s with unknowns := us.union { u } })
 
+  /-- Inserts an unknown `u` into the set of existing `unknowns` in `UnifyState` -/
+  def insertUnknown (u : Unknown) : UnifyM Unit := do
+    modify $ fun s => { s with unknowns := s.unknowns.insert u}
+
   /-- Runs a `UnifyM` computation, returning the result in the `MetaM` monad -/
   def runInMetaM (action : UnifyM α) (st : UnifyState) : MetaM (Option (α × UnifyState)) := do
     OptionT.run (StateT.run action st)
@@ -244,6 +248,16 @@ namespace UnifyM
       match r with
       | .Undef _ => return true
       | _ => return false)
+
+  /-- Determines whether a `Range` is fixed with respect to the constraint map `k` -/
+  partial def hasFixedRange (k : UnknownMap) (r : Range) : UnifyM Bool :=
+    match r with
+    | .Undef _ => return false
+    | .Fixed => return true
+    | .Unknown u => do
+      let range ← findCorrespondingRange k u
+      hasFixedRange k range
+    | .Ctor _ rs => rs.allM (hasFixedRange k)
 
   /-- `findUnknownsWithUndefRanges unknowns` returns all `u ∈ unknowns`
       such that `u ↦ Undef τ` for some type `τ` in the `constraints` map stored within `UnifyState` -/
