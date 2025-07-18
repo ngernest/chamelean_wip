@@ -142,11 +142,21 @@ partial def convertExprToRangeInCurrentContext (e : Expr) : UnifyM Range := do
 
 /-- Converts a `TSyntax term` to a `Range` of the form `Ctor ...` -/
 partial def convertTermToRange (term : TSyntax `term) : UnifyM Range := do
+  logWarning m!"converting term {term} to Range"
   match term with
   | `($ctor:ident $args:term*) => do
     let argRanges ← Array.toList <$> args.mapM convertTermToRange
     return (.Ctor ctor.getId argRanges)
-  | `($ctor:ident) => return (.Unknown ctor.getId)
+  | `($ctor:ident) =>
+    -- Use `getConstInfo` to determine if the identifier is a variable name or
+    -- a nullary constructor of an inductive type
+    let name := ctor.getId
+    let constInfo ← getConstInfo name
+    if constInfo.isCtor then
+      logWarning m!"{name} is a constructor!"
+      return (.Ctor name [])
+    else
+      return (.Unknown name)
   | _ => throwError m!"unable to convert {term} to a Range"
 
 /-- Converts a `Pattern` to a `TSyntax term` -/
@@ -451,11 +461,6 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
     for ((_u1, r1), (_u2, r2)) in conclusionArgsAndRanges.zip unknownArgsAndRanges do
       unify r1 r2
 
-    -- Update the list of hypotheses with the result of unification
-    -- (i.e. constructor arguments in hypotheses are updated with the canonical
-    -- representation of each argument as determined by the unification algorithm)
-    UnifyM.updateHypothesesWithUnificationResult
-
     -- TODO: if you uncomment this, we get an infinite loop when trying to derive a subgenerator for TApp
     -- logWarning m!"Beginning to unify arguments in hypotheses with conclusion args..."
     -- for (_, hypRange) in hypCtorAndRanges do
@@ -473,6 +478,10 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
     --       logWarning m!"skipping over {hypRange}"
     --       continue
 
+    -- Update the list of hypotheses with the result of unification
+    -- (i.e. constructor arguments in hypotheses are updated with the canonical
+    -- representation of each argument as determined by the unification algorithm)
+    UnifyM.updateHypothesesWithUnificationResult
 
     let finalState ← get
     logWarning m!"finalState after updating hypotheses = {finalState}"

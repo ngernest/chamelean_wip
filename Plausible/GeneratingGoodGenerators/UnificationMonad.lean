@@ -279,6 +279,7 @@ namespace UnifyM
       (determined by calling `findCanonicalUnknown`)
       - See `updateHypothesesWithUnificationResult` for an example of how this function is used -/
   partial def updateConstructorArg (k : UnknownMap) (ctorArg : ConstructorExpr) : UnifyM ConstructorExpr := do
+    logWarning m!"updating ctorArg {ctorArg}"
     match ctorArg with
     | .Unknown arg =>
       let canonicalUnknown ← findCanonicalUnknown k arg
@@ -294,6 +295,7 @@ namespace UnifyM
       updating `Unknown`s in `hypotheses` that appear in constructor argument positions
       with their canonical representations (as determined by `findCanonicalUnknown`) -/
   def updateHypothesesWithUnificationResult : UnifyM Unit := do
+    logWarning m!"inside updateHypothesesWithUnificationResult"
     let state ← get
     let k := state.constraints
     let hypotheses := state.hypotheses
