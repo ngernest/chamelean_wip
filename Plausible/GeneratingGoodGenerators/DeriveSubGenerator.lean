@@ -113,6 +113,7 @@ def processCorrespondingRange (u : Unknown) : UnifyM Range :=
 /-- Converts an `Expr` to a `Range`, using the ambient `LocalContext` to find the user-facing names
     corresponding to `FVarId`s -/
 partial def convertExprToRangeInCurrentContext (e : Expr) : UnifyM Range := do
+  logWarning m!"converting expr {e} to Range"
   match (← convertToCtorExpr e) with
   | some (f, args) => do
     let argRanges ← args.toList.mapM convertExprToRangeInCurrentContext
@@ -132,14 +133,49 @@ partial def convertExprToRangeInCurrentContext (e : Expr) : UnifyM Range := do
       | .const u _ => return (.Unknown u)
       | _ => throwError m!"Cannot convert expression {e} to Range"
 
+partial def convertHypothesisExprToRange (e : Expr) : UnifyM Range := do
+  logWarning m!"convertHypothesisExprToRange {e}"
+  match (← convertToCtorExpr e) with
+  | some (f, args) => do
+    logWarning m!"in App case of convertHypothesisExprToRange with {f} {args}"
+    let argRanges ← args.toList.mapM convertHypothesisExprToRange
+    let ctorRange := Range.Ctor f argRanges
+    let unknown ← UnifyM.registerFreshUnknown
+    logWarning m!"Adding a constraint: {unknown} ↦ {ctorRange}"
+    UnifyM.update unknown ctorRange
+    let state ← get
+    logWarning m!"updated state = {state}"
+    return (.Unknown unknown)
+  | none =>
+    if e.isFVar then do
+      let localCtx ← getLCtx
+      match localCtx.findFVar? e with
+      | some localDecl =>
+        let u := localDecl.userName
+        return (.Unknown u)
+      | none =>
+        let namesInContext := (fun e => getUserNameInContext! localCtx e.fvarId!) <$> localCtx.getFVars
+        throwError m!"{e} missing from LocalContext, which only contains {namesInContext}"
+    else
+      match e with
+      | .const u _ => return (.Unknown u)
+      | _ => throwError m!"Cannot convert expression {e} to Range"
 
-/-- Converts a `TSyntax term` to a `Range` of the form `Ctor ...` -/
-partial def convertTermToRange (term : TSyntax `term) : UnifyM Range := do
+
+/-- Converts a hypothesis (reprented as a `TSyntax term`) to a `Range` -/
+partial def convertHypothesisTermToRange (term : TSyntax `term) : UnifyM Range := do
   logWarning m!"converting term {term} to Range"
   match term with
   | `($ctor:ident $args:term*) => do
-    let argRanges ← Array.toList <$> args.mapM convertTermToRange
-    return (.Ctor ctor.getId argRanges)
+    let argRanges ← Array.toList <$> args.mapM convertHypothesisTermToRange
+    let ctorRange := .Ctor ctor.getId argRanges
+    let unknown ← UnifyM.registerFreshUnknown
+    -- Add a constraint stipulating that `unknown ↦ ctorRange` in `constraints`
+    UnifyM.update unknown ctorRange
+    logWarning m!"Adding a constraint: {unknown} ↦ {ctorRange}"
+    let state ← get
+    logWarning m!"updated state = {state}"
+    return (.Unknown unknown)
   | `($ctor:ident) =>
     -- Use `getConstInfo` to determine if the identifier is a variable name or
     -- a nullary constructor of an inductive type
@@ -153,7 +189,7 @@ partial def convertTermToRange (term : TSyntax `term) : UnifyM Range := do
       UnifyM.update unknown ctorRange
       logWarning m!"Adding a constraint: {unknown} ↦ {ctorRange}"
       let state ← get
-      logWarning m!"current state = {state}"
+      logWarning m!"updated state = {state}"
       return (.Unknown unknown)
     else
       return (.Unknown name)
@@ -430,8 +466,8 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
       -- If that fails, convert the `Expr` representation of the hypothesis to a `Range`
       -- (the latter is needed to handle hypotheses which use infix operators)
       let hypRange ←
-        try convertTermToRange hypTerm
-        catch _ => convertExprToRangeInCurrentContext hypExpr
+        try convertHypothesisTermToRange hypTerm
+        catch _ => convertHypothesisExprToRange hypExpr
       logWarning m!"hypothesis {hypTerm} has range {hypRange}"
 
       -- Convert each hypothesis' range to a constructor application
@@ -465,21 +501,21 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
       unify r1 r2
 
     -- TODO: if you uncomment this, we get an infinite loop when trying to derive a subgenerator for TApp
-    -- logWarning m!"Beginning to unify arguments in hypotheses with conclusion args..."
-    -- for (_, hypRange) in hypCtorAndRanges do
-    --     match hypRange with
-    --     | .Ctor hypCtorName hypArgRanges =>
-    --       logWarning m!"Attempting to unify args in hypothesis ({hypCtorName} {hypRange})"
-    --       if hypCtorName == inductiveName then
-    --         for ((conclusionArg, conclusionRange), hypArgRange) in conclusionArgsAndRanges.zip hypArgRanges.toArray do
-    --           logWarning m!"conclusionArg = {conclusionArg}, conclusionRange = {conclusionRange}, hypArgRange = {hypArgRange}"
-    --           unify conclusionRange hypArgRange
-    --       else
-    --         logWarning m!"hypCtorName {hypCtorName} doesn't match inductiveName {inductiveName}, skipping..."
-    --         continue
-    --     | _ =>
-    --       logWarning m!"skipping over {hypRange}"
-    --       continue
+    logWarning m!"Beginning to unify arguments in hypotheses with conclusion args..."
+    for (_, hypRange) in hypCtorAndRanges do
+        match hypRange with
+        | .Ctor hypCtorName hypArgRanges =>
+          logWarning m!"Attempting to unify args in hypothesis ({hypCtorName} {hypRange})"
+          if hypCtorName == inductiveName then
+            for ((conclusionArg, conclusionRange), hypArgRange) in conclusionArgsAndRanges.zip hypArgRanges.toArray do
+              logWarning m!"conclusionArg = {conclusionArg}, conclusionRange = {conclusionRange}, hypArgRange = {hypArgRange}"
+              unify conclusionRange hypArgRange
+          else
+            logWarning m!"hypCtorName {hypCtorName} doesn't match inductiveName {inductiveName}, skipping..."
+            continue
+        | _ =>
+          logWarning m!"skipping over {hypRange}"
+          continue
 
     -- Update the list of hypotheses with the result of unification
     -- (i.e. constructor arguments in hypotheses are updated with the canonical
@@ -565,8 +601,8 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
 -- TODO: figure out how to assemble the entire generator function with all constructors
 
 -- #derive_subgenerator (fun (tree : Tree) => bst in1 in2 tree)
--- #derive_subgenerator (fun (e : term) => typing G e t)
+#derive_subgenerator (fun (e : term) => typing G e t)
 
 -- #derive_subgenerator (fun (tree : Tree) => LeftLeaning tree)
 
-#derive_subgenerator (fun (xs : List Nat) => Sorted xs)
+-- #derive_subgenerator (fun (xs : List Nat) => Sorted xs)

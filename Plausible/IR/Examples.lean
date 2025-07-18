@@ -97,12 +97,10 @@ inductive LeftLeaning : Tree → Prop where
     LeftLeaning .Leaf →
     LeftLeaning (.Node x l .Leaf)
 
-/-- Determines whether a list is sorted
+/- Determines whether a list is sorted
     (example taken from Computing Correctly, section 6.3) -/
-inductive Sorted : List Nat → Prop where
-  -- | SortedNil : Sorted []
-  -- | SortedSingleton : ∀ x, Sorted [x]
-  | SortedCons : ∀ x y l,
-    x <= y →
-    Sorted (y :: l) →
-    Sorted (x :: y :: l)
+-- inductive Sorted : List Nat → Prop where
+--   | SortedCons : ∀ x y l,
+--     x <= y →
+--     Sorted (List.cons y l) →
+--     Sorted (List.cons x (List.cons y l))
