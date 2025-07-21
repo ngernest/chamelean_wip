@@ -16,6 +16,7 @@ inductive RangeMode
 
   /-- A partially instantiated range which needs pattern matching -/
   | ModePartlyDef (pattern : Pattern)
+
   deriving Repr, Inhabited
 
 /-- Notion of *compatibility* from Computing Correctly (section 4), used to handle situations
