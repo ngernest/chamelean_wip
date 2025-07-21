@@ -271,9 +271,36 @@ namespace UnifyM
       | _ => return acc) [] unknowns
 
   /-- Updates the `constraint` map so that for each `u ∈ unknowns`,
-      we have the binding `u ↦ Fixed` in `constraints` -/
+      we have the binding `u ↦ Fixed` in the `UnknownMap` `constraints`
+      - Note: this doesn't handle chains of `Unknown`s in `constraints` -/
   def fixRanges (unknowns : List Unknown) : UnifyM Unit := do
     updateMany (unknowns.zip (List.replicate unknowns.length .Fixed))
+
+  /-- `fixRangeHandleUnknownChains u` updates the `constraint` map
+      so that we have the binding `u ↦ Fixed` in the `UnknownMap` `constraints`
+      - This handles chains of `Unknown`s in the `UnknownMap`,
+        i.e. cases where `u ↦ Unknown u'` where `u'` is another key in
+        the `UnknownMap` (in this case, we recursively fix
+        the range corresponding to `u'`)
+
+      - This function corresponds to `fixVariable` / `fixRange` in the QuickChick codebase -/
+  partial def fixRangeHandleUnknownChains (u : Unknown) : UnifyM Unit := do
+    let s ← get
+    let k := s.constraints
+    let r ← findCorrespondingRange k u
+    fixRange u r
+      where
+        fixRange (u : Unknown) (r : Range) : UnifyM Unit :=
+          match r with
+          | .Fixed => return ()
+          | .Undef _ => update u .Fixed
+          | .Unknown u' => do
+            let s ← get
+            let r' ← findCorrespondingRange s.constraints u'
+            fixRange u' r'
+          | .Ctor _ rs =>
+            for range in rs do
+              fixRange `unusedParameter range
 
   /-- `findCanonicalUnknown k u` finds the *canonical* representation of the unknown `u` based on the `ConstraintMap` `k`.
       Specifically:
