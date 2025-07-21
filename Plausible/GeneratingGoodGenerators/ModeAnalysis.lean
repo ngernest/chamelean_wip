@@ -1,7 +1,8 @@
 import Lean
 import Plausible.GeneratingGoodGenerators.UnificationMonad
+import Plausible.New.TSyntaxCombinators
 
-open Lean
+open Lean Meta
 
 /-- Corresponds to the `range_mode` type in the QuickChick code -/
 inductive RangeMode
@@ -63,6 +64,34 @@ partial def convertToPattern (parent : Unknown) (r : Range) : UnifyM Pattern :=
       else do
         UnifyM.insertUnknown parent
         return .UnknownPattern parent
+
+mutual
+  /-- Instantiates a single range `r`, taking in a continuation which receives the isntantiated range to produce a term
+      - Corresponds to `instantiate_range_cont` in the QuickChick codebase -/
+  partial def instantiateRangeCPS (parent : Unknown) (r : Range) (cont : Range → UnifyM (TSyntax `term)) : UnifyM (TSyntax `term) :=
+    match r with
+    | .Ctor c rs =>
+      instantiateTopLevelRangesCPS rs [] (fun rs' => cont (.Ctor c rs'))
+    | .Undef _ => do
+      -- TODO: investigate how to create the let-bind expression here
+      UnifyM.fixRangeHandleUnknownChains parent
+      cont (.Unknown parent)
+    | .Unknown u => do
+      UnifyM.withConstraints (fun k => do
+        let r ← UnifyM.findCorrespondingRange k u
+        instantiateRangeCPS u r cont
+      )
+    | .Fixed => cont (.Unknown parent)
+
+  /-- Variant of `instantiateRangeCPS` that operates on a list of `Range`s at once
+      - Corresponds to `instantiate_toplevel_ranges_cont` in the QuickChick codebase
+   -/
+  partial def instantiateTopLevelRangesCPS (rs : List Range) (acc : List Range) (cont : List Range → UnifyM (TSyntax `term)) : UnifyM (TSyntax `term) :=
+    match rs with
+    | [] => cont (List.reverse acc)
+    | r :: rs' => instantiateRangeCPS `unusedParameter r (fun range => instantiateTopLevelRangesCPS rs' (range::acc) cont)
+end
+
 
 /-- Handles the case where a `Range` is partially instantiated:
     When this happens, we convert the range to a pattern, then wrap it in `ModePartlyDef`
