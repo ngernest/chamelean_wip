@@ -18,13 +18,37 @@ inductive RangeMode
   | ModePartlyDef (pattern : Pattern)
   deriving Repr, Inhabited
 
-/-- Notion of *compatibility* from Computing Correctly, used to handle situations
-    when a hypothesis is recursive occurrence of the inductive relation  -/
+/-- Notion of *compatibility* from Computing Correctly (section 4), used to handle situations
+    when a hypothesis is a recursive occurrence of the inductive relation we're targeting -/
 inductive Compatibility
+  /-- Every argument to the inductive relation in the hypothesis
+      is compatible with its corresponding argument in the top-level inductive relation we're targeting
+      (no variables need additional instantiation)
+
+      - For `Compatible`, we can just make a recursive call to the producer function -/
   | Compatible
+
+  /-- There exists some incompatible argument that is more instantiated than expected.
+      This only happens when deriving a producer, because all arguments need to be
+      instantiated when deriving a checker. For this case, we just invoke a checker
+      (via the `DecOpt` instance for the inductive relation). -/
   | Incompatible
+
+  /-- Every argument to the inductive relation in the hypothesis is compatible with
+      its corresponding arugment in the top-level inductive relation,
+      but some variables need additional instantiation.
+
+      For `PartCompatible`, we make an `arbitrarySuchThat` call (a call to a constrained prdoucer). -/
   | PartCompatible
+
+  /-- Every argument to the inductive relation in the hypothesis is compatible with
+      its corresponding arugment in the top-level inductive relation,
+      but some variables need additional instantiation.
+
+      For `InstCompatible`, we produce the variable and make a recursive call to
+      the checker/producer function we're deriving. -/
   | InstCompatible
+
   deriving BEq, Repr, Inhabited
 
 /-- Determines whether a `mode` is compatible given a boolean indicating
