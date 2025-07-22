@@ -6,11 +6,13 @@ open Lean
 inductive Source
   | NonRec : Expr → Source
   | Rec : String → List Expr → Source
+  deriving Repr
 
 /-- Producers are either enumerators or generators -/
-inductive ProducerSort where
+inductive ProducerSort
   | Enumerator
   | Generator
+  deriving Repr
 
 inductive ScheduleSort
   /-- tuple of produced outputs from conclusion of constructor -/
@@ -19,6 +21,9 @@ inductive ScheduleSort
   /-- checkers need not bother with conclusion of constructor,
       only hypotheses need be checked and conclusion of constructor follows-/
   | CheckerSchedule
+
+  deriving Repr
+
 
 /-- A single step in a generator schedule -/
 inductive ScheduleStep
@@ -36,9 +41,11 @@ inductive ScheduleStep
     fresh variable followed by a pattern match -/
   | Match : Source → Expr → ScheduleStep
 
+  deriving Repr
+
 /-- A schedule is a pair consisting of an ordered list of `ScheduleStep`s,
-    and the sort of schedule we're dealing with -/
-abbrev Schedule := (List ScheduleStep) × ScheduleSort
+    and the sort of schedule we're dealing with (the latter is the "conclusion" of the schedule) -/
+abbrev Schedule := List ScheduleStep × ScheduleSort
 
 
 /-- Each `ScheduleStep` is associated with a `Density`, which represents a failure mode of a generator -/
