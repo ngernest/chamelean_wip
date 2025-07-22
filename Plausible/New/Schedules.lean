@@ -3,16 +3,16 @@ import Batteries
 open Lean
 
 /-- A source is the thing we wish to check/generate/enumerate -/
-inductive Source where
+inductive Source
   | NonRec : Expr → Source
   | Rec : String → List Expr → Source
 
 /-- Producers are either enumerators or generators -/
-inductive ProducerSort : Type where
+inductive ProducerSort where
   | Enumerator
   | Generator
 
-inductive ScheduleSort : Type where
+inductive ScheduleSort
   /-- tuple of produced outputs from conclusion of constructor -/
   | ProducerSchedule : Bool → ProducerSort → Expr → ScheduleSort
 
@@ -21,7 +21,7 @@ inductive ScheduleSort : Type where
   | CheckerSchedule
 
 /-- A single step in a generator schedule -/
-inductive ScheduleStep where
+inductive ScheduleStep
   /-- Unconstrained generation -/
   | Unconstrained : String → Source → ProducerSort → ScheduleStep
 

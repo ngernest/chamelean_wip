@@ -24,8 +24,8 @@ info: Derived generator:
 ```
 do
   let r ← Arbitrary.arbitrary
-  let x ← Arbitrary.arbitrary
   let l ← Arbitrary.arbitrary
+  let x ← Arbitrary.arbitrary
   return Tree.Node x l r
 ```
 -/
