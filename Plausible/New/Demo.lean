@@ -1,18 +1,13 @@
-import Plausible.New.DeriveArbitrarySuchThat
-import Plausible.New.Arbitrary
-import Plausible.New.Enum
-import Plausible.New.DeriveArbitrary
-import Plausible.New.DeriveEnum
-import Plausible.New.ArbitrarySizedSuchThat
+import Plausible
 
--- Binary trees
-inductive Tree
-  | Leaf : Tree
-  | Node : Nat → Tree → Tree → Tree
-  deriving Arbitrary, Enum
+-- `#derive_generator` derives a generator for random `Tree`s that satisfy the `bst` & `balanced` inductive relations respectively
+#derive_generator (fun (t : Tree) => bst lo hi t)
+#derive_generator (fun (t : Tree) => balanced n t)
 
-inductive Permutation : List Nat → List Nat → Prop where
-  | Trans : forall l1 l2 l3,
-    Permutation l1 l2 ->
-    Permutation l2 l3 ->
-    Permutation l1 l3
+-- `#derive_enumerator` derives a (deterministic) enumerator of trees satisfying `bst` & `balanced`
+#derive_enumerator (fun (t : Tree) => bst lo hi t)
+#derive_enumerator (fun (t : Tree) => balanced n t)
+
+-- `#derive_checker` derives (boolean functions) which check whether the `bst` & `balanced` predicates are satisfied
+#derive_checker (bst lo hi t)
+#derive_checker (balanced n t)

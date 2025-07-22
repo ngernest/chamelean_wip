@@ -19,7 +19,8 @@ inductive balanced : Nat → Tree → Prop where
   balanced n l → balanced n r →
   balanced (.succ n) (.Node x l r)
 
-/-- `bst lo hi t` describes whether a tree `t` is a BST that contains values strictly within `lo` and `hi` -/
+/-- `bst lo hi t` describes whether a tree `t` is a Binary Search Tree containing
+    values strictly within `lo` and `hi` -/
 inductive bst : Nat → Nat → Tree → Prop where
 | BstLeaf: ∀ lo hi, bst lo hi .Leaf
 | BstNode: ∀ lo hi x l r,
