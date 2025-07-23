@@ -31,8 +31,8 @@ def variablesInConstructorExpr (ctorExpr : ConstructorExpr) : List Name :=
   | .Unknown u => [u]
   | .Ctor _ args => List.eraseDups $ args.flatMap variablesInConstructorExpr
 
--- #eval show MetaM _ from do
---   extractVariablesInHypothesis (← `(typing Γ (type.Abs τ1 e) (type.Fun τ1 τ2)))
+def isRecCall (binding : List Name) (hyp : Name × List ConstructorExpr) : Bool :=
+  sorry
 
 /-- Determines whether inputs & outputs of a generator appear under the same constructor in a hypothesis `hyp`
     - Example: consider the `TApp` constructor for STLC (when we are generating `e` such that `typing Γ e τ` holds):
