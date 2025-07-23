@@ -39,8 +39,13 @@ def flatMapWithContext (f : α → List α -> List β) (xs : List α) : List β 
 
 /-- Variant of `List.filterMap` where the function `f` also takes in the index of the
     current element in the list -/
-def filterMapi (f : Nat → α → Option β) (xs : List α) : List β :=
+def filterMapWithIndex (f : Nat → α → Option β) (xs : List α) : List β :=
   xs.zipIdx.filterMap (Function.uncurry $ flip f)
+
+/-- Variant of `List.filterMapM` where the function `f` also takes in the index of the
+    current element in the list -/
+def filterMapMWithIndex [Monad m] (f : Nat → α → m (Option β)) (xs : List α) : m (List β) :=
+  xs.zipIdx.filterMapM (Function.uncurry $ flip f)
 
 /-- `mkInitialContextForInductiveRelation inputTypes inputNames`
     creates the initial `LocalContext` where each `(x, τ)` in `Array.zip inputTypes inputNames`
