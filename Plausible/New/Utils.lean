@@ -6,9 +6,11 @@ import Batteries.Data.List.Basic
 open Lean Meta LocalContext Std
 open Plausible.IR
 
-/-- Monad instance for List (this is not in the Lean standard library).
-    (Note that MathLib4 does have a Monad instance for List, but we wish to avoid having Chamelean rely on Mathlib
-    as a dependency, so we reproduce the Monad instance for Lists here instead.) -/
+/-- Monad instance for List.
+    Note that:
+    - The Lean standard library does not have a Monad instance for List (see https://leanprover-community.github.io/archive/stream/270676-lean4/topic/Option.20do.20notation.20regression.3F.html#231433226)
+    - MathLib4 does have a Monad instance for List, but we wish to avoid having Chamelean rely on Mathlib
+    as a dependency, so we reproduce the Monad instance for Lists here instead. -/
 instance : Monad List where
   pure x := [x]
   bind xs f := xs.flatMap f
@@ -17,14 +19,14 @@ instance : Monad List where
    where `xs' = xs[0..=n-2]` and `x = xs[n - 1]` (where `n` is the length of `xs`).
    - If `xs` is empty, this function returns `none`
    - If `xs = #[x]`, this function returns `some (#[], x)`
-   - Note: this function is the same as `unsnoc` in the Haskell's `Data.List` library -/
+   - Note: this function is the same as `unsnoc` in Haskell's `Data.List` library -/
 def unsnoc (xs : List α) : Option (List α × α) :=
   match xs.getLast? with
   | none => none
   | some x => some (xs.take (xs.length - 1), x)
 
 /-- Variant of `List.flatMap` where the function `f` expects two arguments:
-    the current argument of the list and all *other* elements in the list excluding the current one.
+    the current argument of the list and all *other* elements in the list (in order) excluding the current one.
     Intuitively, this is a version of `flatMap` where each element is processed
     by `f` with contextual information from the other elements. -/
 def flatMapWithContext (f : α → List α -> List β) (xs : List α) : List β :=
@@ -34,6 +36,11 @@ def flatMapWithContext (f : α → List α -> List β) (xs : List α) : List β 
         match l with
         | [] => []
         | hd :: tl => f hd (List.reverse acc ++ tl) ++ aux (hd :: acc) tl
+
+/-- Variant of `List.filterMap` where the function `f` also takes in the index of the
+    current element in the list -/
+def filterMapi (f : Nat → α → Option β) (xs : List α) : List β :=
+  xs.zipIdx.filterMap (Function.uncurry $ flip f)
 
 /-- `mkInitialContextForInductiveRelation inputTypes inputNames`
     creates the initial `LocalContext` where each `(x, τ)` in `Array.zip inputTypes inputNames`
