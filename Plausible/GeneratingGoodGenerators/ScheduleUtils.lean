@@ -31,8 +31,23 @@ def variablesInConstructorExpr (ctorExpr : ConstructorExpr) : List Name :=
   | .Unknown u => [u]
   | .Ctor _ args => List.eraseDups $ args.flatMap variablesInConstructorExpr
 
-def isRecCall (binding : List Name) (hyp : Name × List ConstructorExpr) : Bool :=
-  sorry
+-- TODO: complete this function
+
+/-- Given a hypothesis `hyp`, along with `binding` (a list of variables that we are binding with a call to a generator), plus `recCall` (a pair contianing the name of the inductive and a list of output argument indices),
+    this function checks whether the generator we're using is recursive.
+
+    For example, if we're trying to produce a call to the generator [(e, tau) <- typing gamma _ _], then
+    we would have `binding = [e,tau]`, `hyp = typing gamma e tau`. -/
+def isRecCall (binding : List Name) (hyp : Name × List ConstructorExpr) (recCall : Name × List Nat) : MetaM Bool := do
+  let (ctorName, args) := hyp
+  let outputPos ← filterMapMWithIndex (fun i arg =>
+    let vars := variablesInConstructorExpr arg
+    if vars.isEmpty then pure none
+    else if List.all vars (. ∈ binding) then pure (some i)
+    else if List.any vars (. ∈ binding) then throwError m!"Arguments to hypothesis {hyp} contain both fixed and yet-to-be-bound variables (not allowed)"
+    else pure none) args
+  let (inductiveName, outputIdxes) := recCall
+  return (ctorName == inductiveName && List.mergeSort outputIdxes == List.mergeSort outputPos)
 
 /-- Determines whether inputs & outputs of a generator appear under the same constructor in a hypothesis `hyp`
     - Example: consider the `TApp` constructor for STLC (when we are generating `e` such that `typing Γ e τ` holds):
