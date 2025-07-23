@@ -6,6 +6,13 @@ import Batteries.Data.List.Basic
 open Lean Meta LocalContext Std
 open Plausible.IR
 
+/-- Monad instance for List (this is not in the Lean standard library).
+    (Note that MathLib4 does have a Monad instance for List, but we wish to avoid having Chamelean rely on Mathlib
+    as a dependency, so we reproduce the Monad instance for Lists here instead.) -/
+instance : Monad List where
+  pure x := [x]
+  bind xs f := xs.flatMap f
+
 /-- Decomposes an list `xs` into a pair `(xs', x)`
    where `xs' = xs[0..=n-2]` and `x = xs[n - 1]` (where `n` is the length of `xs`).
    - If `xs` is empty, this function returns `none`
@@ -15,6 +22,18 @@ def unsnoc (xs : List α) : Option (List α × α) :=
   match xs.getLast? with
   | none => none
   | some x => some (xs.take (xs.length - 1), x)
+
+/-- Variant of `List.flatMap` where the function `f` expects two arguments:
+    the current argument of the list and all *other* elements in the list excluding the current one.
+    Intuitively, this is a version of `flatMap` where each element is processed
+    by `f` with contextual information from the other elements. -/
+def flatMapWithContext (f : α → List α -> List β) (xs : List α) : List β :=
+  aux [] xs
+    where
+      aux (acc : List α) (l : List α) : List β :=
+        match l with
+        | [] => []
+        | hd :: tl => f hd (List.reverse acc ++ tl) ++ aux (hd :: acc) tl
 
 /-- `mkInitialContextForInductiveRelation inputTypes inputNames`
     creates the initial `LocalContext` where each `(x, τ)` in `Array.zip inputTypes inputNames`

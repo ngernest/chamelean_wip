@@ -1,5 +1,6 @@
 import Lean
 import Plausible.IR.Examples
+import Plausible.New.Utils
 import Plausible.GeneratingGoodGenerators.UnificationMonad
 import Plausible.GeneratingGoodGenerators.DeriveSubGenerator
 
