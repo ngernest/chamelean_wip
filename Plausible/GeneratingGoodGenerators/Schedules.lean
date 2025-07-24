@@ -13,13 +13,13 @@ abbrev HypothesisExpr := Name × List ConstructorExpr
 inductive Source
   | NonRec : HypothesisExpr → Source
   | Rec : Name → List ConstructorExpr → Source
-  deriving Repr
+  deriving Repr, Ord
 
 /-- Producers are either enumerators or generators -/
 inductive ProducerSort
   | Enumerator
   | Generator
-  deriving Repr
+  deriving Repr, Ord
 
 /-- The sort of function we are deriving based on an inductive relation:
     determines whether we are deriving a (constrained) generator, enumerator or a checker. -/
@@ -27,26 +27,26 @@ inductive DeriveSort
   | Generator
   | Enumerator
   | Checker
-  deriving Repr, BEq
+  deriving Repr, BEq, Ord
 
 inductive ScheduleSort
   /-- tuple of produced outputs from conclusion of constructor -/
-  | ProducerSchedule : Bool → ProducerSort → Expr → ScheduleSort
+  | ProducerSchedule : Bool → ProducerSort → (Name × ConstructorExpr) → ScheduleSort
 
   /-- checkers need not bother with conclusion of constructor,
       only hypotheses need be checked and conclusion of constructor follows-/
   | CheckerSchedule
 
-  deriving Repr
+  deriving Repr, Ord
 
 
 /-- A single step in a generator schedule -/
 inductive ScheduleStep
   /-- Unconstrained generation -/
-  | Unconstrained : String → Source → ProducerSort → ScheduleStep
+  | Unconstrained : Name → Source → ProducerSort → ScheduleStep
 
   /-- Generate a value such that a predicate is satisfied -/
-  | SuchThat : List (String × Expr) → Source → ProducerSort → ScheduleStep
+  | SuchThat : List (Name × ConstructorExpr) → Source → ProducerSort → ScheduleStep
 
   /-- Check whether some proposition holds
      (the bool is the desired truth value of the proposition we're checking) -/
@@ -56,7 +56,7 @@ inductive ScheduleStep
     fresh variable followed by a pattern match -/
   | Match : Name → Pattern → ScheduleStep
 
-  deriving Repr
+  deriving Repr, Ord
 
 /-- A schedule is a pair consisting of an ordered list of `ScheduleStep`s,
     and the sort of schedule we're dealing with (the latter is the "conclusion" of the schedule) -/

@@ -20,6 +20,8 @@ deriving instance Repr, BEq for Unknown
 instance : Ord Unknown where
   compare u1 u2 := compare u1.toString u2.toString
 
+
+
 /-- *Ranges* represent sets of potential values that a variable can take on during generation -/
 inductive Range
   /-- Undefined value, parameterized by a type `ty` (represented as a Lean `Expr`)
@@ -42,7 +44,7 @@ inductive Range
 inductive Pattern
   | UnknownPattern : Unknown -> Pattern
   | CtorPattern : Name -> List Pattern -> Pattern
-  deriving Repr, Inhabited
+  deriving Repr, Inhabited, Ord
 
 /-- A *constructor expression* (`ConstructorExpr`) is either a variable (represented by its `Name`),
     or a constructor (identified by its `Name`) applied to some list of arguments,
@@ -53,7 +55,7 @@ inductive Pattern
 inductive ConstructorExpr
   | Unknown : Name -> ConstructorExpr
   | Ctor : Name -> List ConstructorExpr -> ConstructorExpr
-  deriving Repr, BEq, Inhabited
+  deriving Repr, BEq, Inhabited, Ord
 
 /-- Converts a `Pattern` to an equivalent `ConstructorExpr` -/
 partial def constructorExprOfPattern (pattern : Pattern) : ConstructorExpr :=
