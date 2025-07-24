@@ -31,8 +31,6 @@ def variablesInConstructorExpr (ctorExpr : ConstructorExpr) : List Name :=
   | .Unknown u => [u]
   | .Ctor _ args => List.eraseDups $ args.flatMap variablesInConstructorExpr
 
--- TODO: complete this function
-
 /-- Given a hypothesis `hyp`, along with `binding` (a list of variables that we are binding with a call to a generator), plus `recCall` (a pair contianing the name of the inductive and a list of output argument indices),
     this function checks whether the generator we're using is recursive.
 
@@ -48,6 +46,17 @@ def isRecCall (binding : List Name) (hyp : Name × List ConstructorExpr) (recCal
     else pure none) args
   let (inductiveName, outputIdxes) := recCall
   return (ctorName == inductiveName && List.mergeSort outputIdxes == List.mergeSort outputPos)
+
+/-- Given a list of `hypotheses`, creates an association list mapping each hypothesis to a list of variable names.
+    This list is then sorted in ascending order based on the length of the variable name list.
+    (This is a heuristic, since we would like to work w/ hypotheses that have fewer variables first (fewer generation options to deal with).) -/
+def mkSortedHypothesesVariablesMap (hypotheses : List (Name × List ConstructorExpr)) : List ((Name × List ConstructorExpr) × List Name) :=
+  let hypVarMap := hypotheses.map (fun h@(_, ctorArgs) =>
+    (h, ctorArgs.flatMap variablesInConstructorExpr))
+  List.mergeSort hypVarMap (le := fun (_, vars1) (_, vars2) => vars1.length <= vars2.length)
+
+-- def collectCheckSteps (boundVars : List Name) (checkedHypotheses : List Nat)
+
 
 /-- Determines whether inputs & outputs of a generator appear under the same constructor in a hypothesis `hyp`
     - Example: consider the `TApp` constructor for STLC (when we are generating `e` such that `typing Γ e τ` holds):
