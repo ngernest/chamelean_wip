@@ -156,3 +156,27 @@ def handleConstraintedOutputs (hyp : HypothesisExpr) (outputVars : List Name) : 
         pure (none, arg, none))
 
   return (patternMatches.filterMap id, (ctorName, args'), newOutputs.filterMap id)
+
+/-- Converts a list of `ScheduleStep`s to normal form -/
+def normalizeSchedule (steps : List ScheduleStep) : List ScheduleStep :=
+  -- `unconstrainedBlock` is a list of `ScheduleStep`s consisting only of unconstrianed generation
+  -- (i.e. calls to `arbitrary`)
+  let rec normalize (steps : List ScheduleStep) (unconstrainedBlock : List ScheduleStep) : List ScheduleStep :=
+    match steps with
+    | [] =>
+      -- if we run out of steps, we can just sort the `unconstrainedBlock`
+      -- according to the comparison function on `scheduleStep`s
+      List.mergeSort (le := compareBlocks) unconstrainedBlock
+    | step@(.Unconstrained _ _ _) :: steps =>
+      -- If we encounter a step consisting of unconstrained generation,
+      -- we cons it onto `unconstrainedBlock` & continue
+      normalize steps (step::unconstrainedBlock)
+    | step :: steps =>
+      -- If we encounter any step that's not unconstrained generation,
+      -- the current block of unconstrained generation is over,
+      -- so we need to cons it (after sorting) to the head of the list of `step` and continue
+      List.mergeSort (le := compareBlocks) unconstrainedBlock ++ step :: normalize steps []
+  normalize steps []
+    where
+      -- Comparison function on blocks of `ScheduleSteps`
+      compareBlocks b1 b2 := Ordering.isLE $ Ord.compare b1 b2
