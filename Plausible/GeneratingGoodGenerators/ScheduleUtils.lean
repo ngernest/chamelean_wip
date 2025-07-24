@@ -8,6 +8,14 @@ import Plausible.GeneratingGoodGenerators.DeriveSubGenerator
 open Lean Meta
 open Plausible.IR
 
+/-- Helper function for splitting a list of triples into a triple of lists -/
+def splitThreeLists (abcs : List (α × β × γ)) : List α × List β × List γ :=
+  match abcs with
+  | [] => ([], [], [])
+  | (a,b,c) :: xs =>
+    let (as, bs, cs) := splitThreeLists xs
+    (a::as, b::bs, c::cs)
+
 /-- Extracts all the unique variable names that appear in a hypothesis of a constructor for an inductive relation
     (this looks underneath constructor applications).
 
@@ -106,3 +114,45 @@ partial def outputsNotConstrainedByFunctionApplication (hyp : HypothesisExpr) (o
         match arg with
         | .Unknown u => u ∈ outputVars
         | .Ctor _ args => List.any args (aux b)
+
+
+/-- If we have a hypothesis that we're generating an argument for,
+     and that argument is a constructor application where all of its args are outputs,
+     then we just need to produce a backtracking check
+
+     e.g. if we're trying to generate `TFun t1 t2 <- typing G e (TFun t1 t2)`,
+     we have to do:
+     ```
+       v_t1t2 <- typing G e v_t1t2
+       match v_t1t2 with
+       | TFun t1 t2 => ...
+       | _ => none
+     ```
+     assuming t1 and t2 are *unfixed* (not an input and not generated yet)
+
+     The triple that is output consists of:
+     - the list of pattern-matches that need to be produced
+       (since TT can handle multiple outputs, each of which may need to be constrained by a pattern)
+     - the updated thing we're generating for (e.g. `typing G e v_t1t2` in the example above), ie the RHS of the let-bind
+     - the updated output list (e.g. `v_t1t2` in the example above), ie the LHS of the let-bind -/
+def handleConstraintedOutputs (hyp : HypothesisExpr) (outputVars : List Name) : MetaM (List ScheduleStep × HypothesisExpr × List Name) := do
+  let (ctorName, ctorArgs) := hyp
+
+  let (patternMatches, args', newOutputs) ← splitThreeLists <$> ctorArgs.mapM (fun arg =>
+    let variables := variablesInConstructorExpr arg
+    match arg with
+    | .Ctor _ _ =>
+      if !variables.isEmpty && List.all variables (. ∈ outputVars) then do
+        let localCtx ← getLCtx
+        let newName := localCtx.getUnusedName (Name.mkStr1 ("v" ++ String.intercalate "_" (Name.getString! <$> variables)))
+        let newMatch := ScheduleStep.Match newName (patternOfConstructorExpr arg)
+        pure (some newMatch, .Unknown newName, some newName)
+      else
+        pure (none, arg, none)
+    | .Unknown v =>
+      if v ∈ outputVars then
+        pure (none, arg, some v)
+      else
+        pure (none, arg, none))
+
+  return (patternMatches.filterMap id, (ctorName, args'), newOutputs.filterMap id)

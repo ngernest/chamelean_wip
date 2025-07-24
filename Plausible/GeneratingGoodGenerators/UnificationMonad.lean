@@ -53,7 +53,19 @@ inductive Pattern
 inductive ConstructorExpr
   | Unknown : Name -> ConstructorExpr
   | Ctor : Name -> List ConstructorExpr -> ConstructorExpr
-  deriving Repr, BEq
+  deriving Repr, BEq, Inhabited
+
+/-- Converts a `Pattern` to an equivalent `ConstructorExpr` -/
+partial def constructorExprOfPattern (pattern : Pattern) : ConstructorExpr :=
+  match pattern with
+  | .UnknownPattern u => .Unknown u
+  | .CtorPattern ctorName args => .Ctor ctorName (constructorExprOfPattern <$> args)
+
+/-- Converts a `ConstructorExpr` to an equivalent `Pattern` -/
+partial def patternOfConstructorExpr (ctorExpr : ConstructorExpr) : Pattern :=
+  match ctorExpr with
+  | .Unknown u => .UnknownPattern u
+  | .Ctor ctorName args => .CtorPattern ctorName (patternOfConstructorExpr <$> args)
 
 
 /-- An `UnknownMap` maps `Unknown`s to `Range`s -/

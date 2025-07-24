@@ -54,7 +54,7 @@ inductive ScheduleStep
 
   /-- Used when you decompose a constructor constrained arg into a
     fresh variable followed by a pattern match -/
-  | Match : Source → Expr → ScheduleStep
+  | Match : Name → Pattern → ScheduleStep
 
   deriving Repr
 
