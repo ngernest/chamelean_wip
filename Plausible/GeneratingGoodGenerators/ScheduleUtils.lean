@@ -31,12 +31,17 @@ def variablesInConstructorExpr (ctorExpr : ConstructorExpr) : List Name :=
   | .Unknown u => [u]
   | .Ctor _ args => List.eraseDups $ args.flatMap variablesInConstructorExpr
 
+/-- A `HypothesisExpr` is a datatype representing a hypothesis for a
+    constructor of an inductive relation, consisting of a constructor name
+    applied to some list of arguments, each of which are `ConstructorExpr`s -/
+abbrev HypothesisExpr := Name × List ConstructorExpr
+
 /-- Given a hypothesis `hyp`, along with `binding` (a list of variables that we are binding with a call to a generator), plus `recCall` (a pair contianing the name of the inductive and a list of output argument indices),
     this function checks whether the generator we're using is recursive.
 
     For example, if we're trying to produce a call to the generator [(e, tau) <- typing gamma _ _], then
     we would have `binding = [e,tau]`, `hyp = typing gamma e tau`. -/
-def isRecCall (binding : List Name) (hyp : Name × List ConstructorExpr) (recCall : Name × List Nat) : MetaM Bool := do
+def isRecCall (binding : List Name) (hyp : HypothesisExpr) (recCall : Name × List Nat) : MetaM Bool := do
   let (ctorName, args) := hyp
   let outputPos ← filterMapMWithIndex (fun i arg =>
     let vars := variablesInConstructorExpr arg
@@ -50,12 +55,12 @@ def isRecCall (binding : List Name) (hyp : Name × List ConstructorExpr) (recCal
 /-- Given a list of `hypotheses`, creates an association list mapping each hypothesis to a list of variable names.
     This list is then sorted in ascending order based on the length of the variable name list.
     (This is a heuristic, since we would like to work w/ hypotheses that have fewer variables first (fewer generation options to deal with).) -/
-def mkSortedHypothesesVariablesMap (hypotheses : List (Name × List ConstructorExpr)) : List ((Name × List ConstructorExpr) × List Name) :=
+def mkSortedHypothesesVariablesMap (hypotheses : List HypothesisExpr) : List (HypothesisExpr × List Name) :=
   let hypVarMap := hypotheses.map (fun h@(_, ctorArgs) =>
     (h, ctorArgs.flatMap variablesInConstructorExpr))
   List.mergeSort hypVarMap (le := fun (_, vars1) (_, vars2) => vars1.length <= vars2.length)
 
--- def collectCheckSteps (boundVars : List Name) (checkedHypotheses : List Nat)
+-- def collectCheckSteps (boundVars : List Name) (checkedHypotheses : List Nat) (sortedHypotheses : )
 
 
 /-- Determines whether inputs & outputs of a generator appear under the same constructor in a hypothesis `hyp`
@@ -71,7 +76,7 @@ def mkSortedHypothesesVariablesMap (hypotheses : List (Name × List ConstructorE
     whereas `τ2` is an input to the generator (since it appears in the conclusion of `TApp`).
     Since `τ1, τ2` both appear under the same `.Fun` constructor,
     `outputInputNotUnderSameConstructor (.Fun τ1 τ2) [τ2]` returns `false`.  -/
-def outputInputNotUnderSameConstructor (hyp : Name × List ConstructorExpr) (outputVars : List Name) : Bool :=
+def outputInputNotUnderSameConstructor (hyp : HypothesisExpr) (outputVars : List Name) : Bool :=
   let (_, args) := hyp
   not $ List.any args (fun arg =>
     let vars := variablesInConstructorExpr arg
@@ -82,7 +87,7 @@ def outputInputNotUnderSameConstructor (hyp : Name × List ConstructorExpr) (out
 /-- Determines whether the variables in `outputVars` are constrained by a function application in the hypothesis `hyp`.
     This function is necessary since we can't output something and then assert that it equals the output of a (non-constructor) function
     (since we don't have access to the function). -/
-partial def outputsNotConstrainedByFunctionApplication (hyp : Name × List ConstructorExpr) (outputVars : List Name) : Bool :=
+partial def outputsNotConstrainedByFunctionApplication (hyp : HypothesisExpr) (outputVars : List Name) : Bool :=
   let (_, args) := hyp
   not $ List.any args (fun arg => aux false arg)
     where
