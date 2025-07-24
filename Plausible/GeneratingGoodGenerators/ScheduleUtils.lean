@@ -1,6 +1,7 @@
 import Lean
 import Plausible.IR.Examples
 import Plausible.New.Utils
+import Plausible.GeneratingGoodGenerators.Schedules
 import Plausible.GeneratingGoodGenerators.UnificationMonad
 import Plausible.GeneratingGoodGenerators.DeriveSubGenerator
 
@@ -31,11 +32,6 @@ def variablesInConstructorExpr (ctorExpr : ConstructorExpr) : List Name :=
   | .Unknown u => [u]
   | .Ctor _ args => List.eraseDups $ args.flatMap variablesInConstructorExpr
 
-/-- A `HypothesisExpr` is a datatype representing a hypothesis for a
-    constructor of an inductive relation, consisting of a constructor name
-    applied to some list of arguments, each of which are `ConstructorExpr`s -/
-abbrev HypothesisExpr := Name × List ConstructorExpr
-
 /-- Given a hypothesis `hyp`, along with `binding` (a list of variables that we are binding with a call to a generator), plus `recCall` (a pair contianing the name of the inductive and a list of output argument indices),
     this function checks whether the generator we're using is recursive.
 
@@ -60,7 +56,22 @@ def mkSortedHypothesesVariablesMap (hypotheses : List HypothesisExpr) : List (Hy
     (h, ctorArgs.flatMap variablesInConstructorExpr))
   List.mergeSort hypVarMap (le := fun (_, vars1) (_, vars2) => vars1.length <= vars2.length)
 
--- def collectCheckSteps (boundVars : List Name) (checkedHypotheses : List Nat) (sortedHypotheses : )
+/- After we generate some variables, look at the hypotheses and see if any of them only contain fixed variables
+    (if yes, then we need to check that hypothesis)
+    - `checked_hypotheses` contains the hypotheses that have been checked so far  -/
+def collectCheckSteps (boundVars : List Name) (checkedHypotheses : List Nat) (sortedHypotheses : List (HypothesisExpr × List Name)) (deriveSort : DeriveSort) (recCall : Name × List Nat) : List (Nat × Source) :=
+  let (inductiveName, inputArgs) := recCall
+  filterMapWithIndex (fun i (hyp, vars) =>
+    if i ∉ checkedHypotheses && List.all vars (. ∈ boundVars) then
+      let (ctorName, ctorArgs) := hyp
+      let src :=
+        if deriveSort == .Checker && inputArgs.isEmpty then
+          if ctorName == inductiveName then .Rec `aux_dec ctorArgs
+          else .NonRec hyp
+        else .NonRec hyp
+      some (i, src)
+    else none
+  ) sortedHypotheses
 
 
 /-- Determines whether inputs & outputs of a generator appear under the same constructor in a hypothesis `hyp`

@@ -1,11 +1,18 @@
 import Lean
 import Batteries
+import Plausible.GeneratingGoodGenerators.UnificationMonad
+
 open Lean
+
+/-- A `HypothesisExpr` is a datatype representing a hypothesis for a
+    constructor of an inductive relation, consisting of a constructor name
+    applied to some list of arguments, each of which are `ConstructorExpr`s -/
+abbrev HypothesisExpr := Name × List ConstructorExpr
 
 /-- A source is the thing we wish to check/generate/enumerate -/
 inductive Source
-  | NonRec : Expr → Source
-  | Rec : String → List Expr → Source
+  | NonRec : HypothesisExpr → Source
+  | Rec : Name → List ConstructorExpr → Source
   deriving Repr
 
 /-- Producers are either enumerators or generators -/
@@ -13,6 +20,14 @@ inductive ProducerSort
   | Enumerator
   | Generator
   deriving Repr
+
+/-- The sort of function we are deriving based on an inductive relation:
+    determines whether we are deriving a (constrained) generator, enumerator or a checker. -/
+inductive DeriveSort
+  | Generator
+  | Enumerator
+  | Checker
+  deriving Repr, BEq
 
 inductive ScheduleSort
   /-- tuple of produced outputs from conclusion of constructor -/
