@@ -29,7 +29,7 @@ def unsnoc (xs : List α) : Option (List α × α) :=
     the current argument of the list and all *other* elements in the list (in order) excluding the current one.
     Intuitively, this is a version of `flatMap` where each element is processed
     by `f` with contextual information from the other elements. -/
-def flatMapWithContext (f : α → List α -> List β) (xs : List α) : List β :=
+def flatMapWithContext (xs : List α) (f : α → List α -> List β) : List β :=
   aux [] xs
     where
       aux (acc : List α) (l : List α) : List β :=

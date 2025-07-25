@@ -67,7 +67,12 @@ def mkSortedHypothesesVariablesMap (hypotheses : List HypothesisExpr) : List (Hy
 /- After we generate some variables, look at the hypotheses and see if any of them only contain fixed variables
     (if yes, then we need to check that hypothesis)
     - `checked_hypotheses` contains the hypotheses that have been checked so far  -/
-def collectCheckSteps (boundVars : List Name) (checkedHypotheses : List Nat) (sortedHypotheses : List (HypothesisExpr × List Name)) (deriveSort : DeriveSort) (recCall : Name × List Nat) : List (Nat × Source) :=
+def collectCheckSteps
+  (boundVars : List Name)
+  (checkedHypotheses : List Nat)
+  (sortedHypotheses : List (HypothesisExpr × List Name))
+  (deriveSort : DeriveSort)
+  (recCall : Name × List Nat) : List (Nat × Source) :=
   let (inductiveName, inputArgs) := recCall
   filterMapWithIndex (fun i (hyp, vars) =>
     if i ∉ checkedHypotheses && List.all vars (. ∈ boundVars) then
@@ -180,3 +185,27 @@ def normalizeSchedule (steps : List ScheduleStep) : List ScheduleStep :=
     where
       -- Comparison function on blocks of `ScheduleSteps`
       compareBlocks b1 b2 := Ordering.isLE $ Ord.compare b1 b2
+
+/- Depth-first enumeration of all possible schedules -/
+-- def dfs
+--   (variables : List (Name × Expr))
+--   (boundVars : List Name)
+--   (remainingVars : List Name)
+--   (checkedHypotheses : List Nat)
+--   (scheduleSoFar : List ScheduleStep)
+--   (sortedHypotheses : List (HypothesisExpr × List Name))
+--   (deriveSort : DeriveSort)
+--   (recCall : Name × List Nat)
+--   : MetaM (List (List ScheduleStep)) :=
+--   match remainingVars with
+--   | [] => return [List.reverse scheduleSoFar]
+--   | _ =>
+--     let unconstrainedProdPaths :=
+--       flatMapWithContext remainingVars (fun v remainingVars' =>
+--         let (newCheckedIdxs, newCheckedHyps) :=
+--           List.unzip (collectCheckSteps (v::boundVars) checkedHypotheses sortedHypotheses deriveSort recCall)
+--         let ty := Option.get! (List.lookup v variables)
+
+--         newCheckedHyps
+--       )
+--     sorry
