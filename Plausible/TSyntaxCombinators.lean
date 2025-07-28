@@ -3,8 +3,10 @@ Copyright (c) 2025 Ernest Ng. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Ernest Ng
 -/
-import Lean
-open Lean Elab Command Meta Term Parser
+import Lean.Expr
+import Lean.Meta
+open Lean Meta Parser
+
 
 /-!
 # Combinators for `TSyntax`

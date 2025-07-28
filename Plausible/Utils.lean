@@ -3,7 +3,6 @@ Copyright (c) 2025 Ernest Ng. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Ernest Ng
 -/
-import Lean
 import Batteries.Data.List.Basic
 
 /-!
@@ -14,7 +13,7 @@ generators (i.e. `Arbitrary` instances).
 
 -/
 
-open Lean Meta
+open Lean
 
 /-- Decomposes an array `arr` into a pair `(xs, x)`
    where `xs = arr[0..=n-2]` and `x = arr[n - 1]` (where `n` is the length of `arr`).

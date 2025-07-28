@@ -3,7 +3,6 @@ Copyright (c) 2025 Ernest Ng. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Ernest Ng
 -/
-import Lean
 import Plausible.Gen
 
 import Plausible.Arbitrary
@@ -17,7 +16,7 @@ these are used in the body of derived generators (when deriving `Arbitrary` inst
 
 -/
 
-open Lean Meta Std
+open Lean
 open Plausible
 
 

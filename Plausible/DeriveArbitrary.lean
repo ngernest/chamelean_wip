@@ -3,13 +3,14 @@ Copyright (c) 2025 Ernest Ng. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Ernest Ng
 -/
-import Lean
+import Lean.Elab
+
 import Plausible.Idents
 import Plausible.TSyntaxCombinators
 import Plausible.Arbitrary
 import Plausible.Utils
 
-open Lean Elab Command Meta Term Parser
+open Lean Elab Command Meta Parser
 
 /-!
 
