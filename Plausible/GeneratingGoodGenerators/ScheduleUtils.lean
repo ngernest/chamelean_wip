@@ -187,25 +187,44 @@ def normalizeSchedule (steps : List ScheduleStep) : List ScheduleStep :=
       compareBlocks b1 b2 := Ordering.isLE $ Ord.compare b1 b2
 
 /- Depth-first enumeration of all possible schedules -/
--- def dfs
---   (variables : List (Name × Expr))
---   (boundVars : List Name)
---   (remainingVars : List Name)
---   (checkedHypotheses : List Nat)
---   (scheduleSoFar : List ScheduleStep)
---   (sortedHypotheses : List (HypothesisExpr × List Name))
---   (deriveSort : DeriveSort)
---   (recCall : Name × List Nat)
---   : MetaM (List (List ScheduleStep)) :=
---   match remainingVars with
---   | [] => return [List.reverse scheduleSoFar]
---   | _ =>
---     let unconstrainedProdPaths :=
---       flatMapWithContext remainingVars (fun v remainingVars' =>
---         let (newCheckedIdxs, newCheckedHyps) :=
---           List.unzip (collectCheckSteps (v::boundVars) checkedHypotheses sortedHypotheses deriveSort recCall)
---         let ty := Option.get! (List.lookup v variables)
-
---         newCheckedHyps
---       )
---     sorry
+partial def dfs
+  (variables : List (Name × Expr))
+  (boundVars : List Name)
+  (remainingVars : List Name)
+  (checkedHypotheses : List Nat)
+  (scheduleSoFar : List ScheduleStep)
+  (sortedHypotheses : List (HypothesisExpr × List Name))
+  (deriveSort : DeriveSort)
+  (recCall : Name × List Nat)
+  (prodSort : ProducerSort)
+  : MetaM (List (List ScheduleStep)) :=
+  match remainingVars with
+  | [] => return [List.reverse scheduleSoFar]
+  | _ => do
+    let unconstrainedProdPaths ←
+      flatMapMWithContext remainingVars (fun v remainingVars' => do
+        let (newCheckedIdxs, newCheckedHyps) :=
+          List.unzip (collectCheckSteps (v::boundVars) checkedHypotheses sortedHypotheses deriveSort recCall)
+        let ty := Option.get! (List.lookup v variables)
+        let (ctorName, ctorArgs) := ty.getAppFnArgs
+        let src ←
+          if ctorName == Prod.fst recCall
+            then Source.Rec `rec <$> ctorArgs.toList.mapM exprToConstructorExpr
+          else
+            let hypothesisExpr ← exprToHypothesisExpr ty
+            match hypothesisExpr with
+            | none => throwError m!"unable to convert Expr {ty} to a HypothesisExpr"
+            | some hypExpr => pure (Source.NonRec hypExpr)
+        let unconstrainedProdStep := ScheduleStep.Unconstrained v src prodSort
+        -- TODO: handle negated propositions in `ScheduleStep.Check`
+        let checks := List.reverse $ (fun src => ScheduleStep.Check src true) <$> newCheckedHyps
+        dfs variables (v::boundVars) remainingVars'
+          (newCheckedIdxs ++ checkedHypotheses)
+          (checks ++ unconstrainedProdStep :: scheduleSoFar)
+          sortedHypotheses
+          deriveSort
+          recCall
+          prodSort
+      )
+    -- TODO: define `remaining_hypotheses`
+    sorry

@@ -29,13 +29,27 @@ def unsnoc (xs : List α) : Option (List α × α) :=
     the current argument of the list and all *other* elements in the list (in order) excluding the current one.
     Intuitively, this is a version of `flatMap` where each element is processed
     by `f` with contextual information from the other elements. -/
-def flatMapWithContext (xs : List α) (f : α → List α -> List β) : List β :=
+def flatMapWithContext (xs : List α) (f : α → List α → List β) : List β :=
   aux [] xs
     where
       aux (acc : List α) (l : List α) : List β :=
         match l with
         | [] => []
         | hd :: tl => f hd (List.reverse acc ++ tl) ++ aux (hd :: acc) tl
+
+/-- Variant of `flatMapWithContext` where the function `f` is monadic
+    and returns `m (List β)` -/
+def flatMapMWithContext [Monad m] (xs : List α) (f : α → List α → m (List β)) : m (List β) :=
+  aux [] xs
+    where
+      aux (acc : List α) (l : List α) : m (List β) :=
+        match l with
+        | [] => return []
+        | hd :: tl => do
+            let xs ← f hd (List.reverse acc ++ tl)
+            let ys ← aux (hd :: acc) tl
+            return (xs ++ ys)
+
 
 /-- Variant of `List.filterMap` where the function `f` also takes in the index of the
     current element in the list -/

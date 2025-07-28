@@ -78,3 +78,47 @@ inductive Density
   /-- Unconstrained generation, i.e. calls to `arbitrary` -/
   | Total
   deriving Repr, BEq
+
+
+----------------------------------------------
+-- Conversion from `Expr` to `HypothesisExpr`
+----------------------------------------------
+
+
+/-- Convert an `Expr` to a `ConstructorExpr` -/
+partial def exprToConstructorExpr (e : Expr) : MetaM ConstructorExpr := do
+  match e with
+  | .fvar id =>
+    let localDecl ← FVarId.getDecl id
+    return ConstructorExpr.Unknown localDecl.userName
+  | .const name _ =>
+    -- Check if this is a constructor
+    let env ← getEnv
+    if env.isConstructor name then
+      return ConstructorExpr.Ctor name []
+    else
+      return ConstructorExpr.Unknown name
+  | .app f arg => do
+    let fExpr ← exprToConstructorExpr f
+    let argExpr ← exprToConstructorExpr arg
+    match fExpr with
+    | ConstructorExpr.Ctor name args =>
+      return ConstructorExpr.Ctor name (args ++ [argExpr])
+    | ConstructorExpr.Unknown name =>
+      -- Treat as constructor application if we encounter an application
+      return ConstructorExpr.Ctor name [argExpr]
+  | _ =>
+    -- For other expression types (literals, lambdas, etc.), generate a placeholder name
+    return ConstructorExpr.Unknown `unknown
+
+/-- Converts an `Expr` to an `Option HypothesisExpr` -/
+def exprToHypothesisExpr (e : Expr) : MetaM (Option HypothesisExpr) := do
+  let (ctorName, args) := e.getAppFnArgs
+
+  let env ← getEnv
+  -- Only proceed if `ctorName` is actually a constructor
+  if env.isConstructor ctorName then
+    let constructorArgs ← args.mapM exprToConstructorExpr
+    return some (ctorName, constructorArgs.toList)
+  else
+    return none
