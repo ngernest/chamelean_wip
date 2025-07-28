@@ -68,6 +68,11 @@ def filterMapWithIndex (f : Nat → α → Option β) (xs : List α) : List β :
 def filterMapMWithIndex [Monad m] (f : Nat → α → m (Option β)) (xs : List α) : m (List β) :=
   xs.zipIdx.filterMapM (Function.uncurry $ flip f)
 
+/-- Variant of `List.filter` where the predicate `p` takes in the index of
+    the element as its first argument -/
+def filterWithIndex (p : Nat → α → Bool) (xs : List α) : List α :=
+  Prod.fst <$> xs.zipIdx.filter (Function.uncurry $ flip p)
+
 /-- `mkInitialContextForInductiveRelation inputTypes inputNames`
     creates the initial `LocalContext` where each `(x, τ)` in `Array.zip inputTypes inputNames`
     is given the declaration `x : τ` in the resultant context.
