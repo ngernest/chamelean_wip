@@ -1,4 +1,5 @@
 import Lean
+import Batteries
 import Plausible.IR.Examples
 import Plausible.New.Utils
 import Plausible.GeneratingGoodGenerators.Schedules
@@ -226,5 +227,26 @@ partial def dfs
           recCall
           prodSort
       )
-    -- TODO: define `remaining_hypotheses`
+
+    let remainingHypotheses := filterMapWithIndex (fun i hyp => if i ∈ checkedHypotheses then none else some (i, hyp)) sortedHypotheses
+
+    -- let constrainedProdPaths ← remainingHypotheses.flatMapM (fun (i, hyp, hypVars) => do
+    --   guard (i ∉ checkedHypotheses)
+    --   let remainingVarsSet := NameSet.ofList remainingVars
+    --   let hypVarsSet := NameSet.ofList hypVars
+    --   let outputSet := remainingVarsSet ∩ hypVarsSet
+    --   let remainingVars' := (remainingVarsSet \ outputSet).toList
+    --   let outputVars := outputSet.toList
+    --   guard !outputVars.isEmpty
+    --   guard (outputInputNotUnderSameConstructor hyp outputVars)
+    --   guard (outputsNotConstrainedByFunctionApplication hyp outputVars)
+
+    --   let (newMatches, hyp', newOutputs) ← handleConstraintedOutputs hyp outputVars
+    --   let typedOutputs := List.map id newOutputs
+
+    --   -- TODO: finish the body of the continuation
+    --   sorry
+    --   -- dfs variables (outputVars ++ boundVars) remainingVars' (i :: newCheckedIdxs ++ checkedHypotheses) (checks ++ newMatches ++ constrainedProdStep) :: scheduleSoFar)
+    -- )
+
     sorry
