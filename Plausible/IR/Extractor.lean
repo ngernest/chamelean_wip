@@ -29,7 +29,7 @@ def containsNonTrivialFuncApp (e : Expr) (inductiveRelationName : Name) : MetaM 
       let fn := subExpr.getAppFn
       if fn.isConst then
         let constName := fn.constName!
-        if constName.getRoot != inductiveRelationName then do
+        if constName.getRoot != inductiveRelationName.getRoot then do
           let info ← getConstInfo constName
           return !info.isCtor
         else
@@ -383,7 +383,7 @@ def processConstructorUnifyArgs (ctorName : Name) (ctorType: Expr) (inputVars : 
 
     let conclusion_args := conclusion.getAppArgs
     let final_arg_in_conclusion ← Option.getDM (conclusion_args.toList.getLast?)
-      (throwError "conclusion_args is an unexpected empty list")
+      (throwError m!"conclusion_args is an unexpected empty list, conclusion = {conclusion}, originalConclusion = {originalConclusion}")
 
     for hyp in hypotheses do
       if ← isHypothesisOfInductiveConstructor_inNamespace hyp inductiveRelationName.getRoot then
