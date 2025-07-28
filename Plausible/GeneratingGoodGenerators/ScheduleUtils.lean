@@ -198,6 +198,7 @@ partial def dfs
   (deriveSort : DeriveSort)
   (recCall : Name × List Nat)
   (prodSort : ProducerSort)
+  (fixed : List Name)
   : MetaM (List (List ScheduleStep)) :=
   match remainingVars with
   | [] => return [List.reverse scheduleSoFar]
@@ -227,6 +228,7 @@ partial def dfs
           deriveSort
           recCall
           prodSort
+          fixed
       )
 
     let remainingHypotheses := filterMapWithIndex (fun i hyp => if i ∈ checkedHypotheses then none else some (i, hyp)) sortedHypotheses
@@ -270,7 +272,14 @@ partial def dfs
         deriveSort
         recCall
         prodSort
+        fixed
     )
+
+    let remainingVars := List.filter (. ∉ fixed) (Prod.fst <$> vars)
+    let (newCheckedIdxs, newCheckedHyps) := List.unzip $
+      collectCheckSteps fixed [] sortedHypotheses deriveSort recCall
+    let firstChecks := List.reverse $ (fun src => ScheduleStep.Check src true) <$> newCheckedHyps
+    let schedules := dfs vars fixed remainingVars newCheckedIdxs firstChecks sortedHypotheses deriveSort recCall prodSort fixed
 
     -- TODO: finish body of `dfs`
     sorry
