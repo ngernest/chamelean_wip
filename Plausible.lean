@@ -10,9 +10,6 @@ import Plausible.Testable
 import Plausible.Functions
 import Plausible.Attr
 import Plausible.Tactic
-
--- New files containing the `Arbitrary` typeclass and
--- functionality for `Deriving Arbitrary`
 import Plausible.Idents
 import Plausible.TSyntaxCombinators
 import Plausible.Arbitrary
