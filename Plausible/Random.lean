@@ -68,7 +68,7 @@ protected def RandT.up {α : Type u} {m : Type u → Type w} {m' : Type (max u v
     {g : Type} [RandomGen g] [Monad m] [Monad m']
     (m_up : ∀ {α}, m α → m' (ULift α)) (x : RandGT g m α) :
     RandGT g m' (ULift.{v} α) := do
-  let ⟨val, gen⟩ ←  m_up <| x.run ⟨(← get).down⟩
+  let ⟨val, gen⟩ ← m_up <| x.run ⟨(← get).down⟩
   set <| ULift.up gen.down
   return ⟨val⟩
 
@@ -137,7 +137,7 @@ def randBound (α : Type u) [LE α] [BoundedRandom m α] (lo hi : α) (h : lo �
 Generate a random `Fin`.
 -/
 def randFin {n : Nat} [RandomGen g] : RandGT g m (Fin n.succ) :=
-  fun ⟨g⟩ => return randNat g 0 n |>.map (Fin.ofNat' _) ULift.up
+  fun ⟨g⟩ => return randNat g 0 n |>.map (Fin.ofNat _) ULift.up
 
 instance {n : Nat} : Random m (Fin n.succ) where
   random := randFin
