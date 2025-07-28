@@ -189,7 +189,7 @@ def normalizeSchedule (steps : List ScheduleStep) : List ScheduleStep :=
 
 /- Depth-first enumeration of all possible schedules -/
 partial def dfs
-  (variables : List (Name × Expr))
+  (vars : List (Name × Expr))
   (boundVars : List Name)
   (remainingVars : List Name)
   (checkedHypotheses : List Nat)
@@ -206,7 +206,8 @@ partial def dfs
       flatMapMWithContext remainingVars (fun v remainingVars' => do
         let (newCheckedIdxs, newCheckedHyps) :=
           List.unzip (collectCheckSteps (v::boundVars) checkedHypotheses sortedHypotheses deriveSort recCall)
-        let ty := Option.get! (List.lookup v variables)
+        let ty ← Option.getDM (List.lookup v vars)
+          (throwError m!"key {v} missing from association list {vars}")
         let (ctorName, ctorArgs) := ty.getAppFnArgs
         let src ←
           if ctorName == Prod.fst recCall
@@ -219,7 +220,7 @@ partial def dfs
         let unconstrainedProdStep := ScheduleStep.Unconstrained v src prodSort
         -- TODO: handle negated propositions in `ScheduleStep.Check`
         let checks := List.reverse $ (fun src => ScheduleStep.Check src true) <$> newCheckedHyps
-        dfs variables (v::boundVars) remainingVars'
+        dfs vars (v::boundVars) remainingVars'
           (newCheckedIdxs ++ checkedHypotheses)
           (checks ++ unconstrainedProdStep :: scheduleSoFar)
           sortedHypotheses
@@ -230,23 +231,46 @@ partial def dfs
 
     let remainingHypotheses := filterMapWithIndex (fun i hyp => if i ∈ checkedHypotheses then none else some (i, hyp)) sortedHypotheses
 
-    -- let constrainedProdPaths ← remainingHypotheses.flatMapM (fun (i, hyp, hypVars) => do
-    --   guard (i ∉ checkedHypotheses)
-    --   let remainingVarsSet := NameSet.ofList remainingVars
-    --   let hypVarsSet := NameSet.ofList hypVars
-    --   let outputSet := remainingVarsSet ∩ hypVarsSet
-    --   let remainingVars' := (remainingVarsSet \ outputSet).toList
-    --   let outputVars := outputSet.toList
-    --   guard !outputVars.isEmpty
-    --   guard (outputInputNotUnderSameConstructor hyp outputVars)
-    --   guard (outputsNotConstrainedByFunctionApplication hyp outputVars)
+    let constrainedProdPaths ← remainingHypotheses.flatMapM (fun (i, hyp, hypVars) => do
+      guard (i ∉ checkedHypotheses)
+      let remainingVarsSet := NameSet.ofList remainingVars
+      let hypVarsSet := NameSet.ofList hypVars
+      let outputSet := remainingVarsSet ∩ hypVarsSet
+      let remainingVars' := (remainingVarsSet \ outputSet).toList
+      let outputVars := outputSet.toList
 
-    --   let (newMatches, hyp', newOutputs) ← handleConstraintedOutputs hyp outputVars
-    --   let typedOutputs := List.map id newOutputs
+      guard !outputVars.isEmpty
+      guard (outputInputNotUnderSameConstructor hyp outputVars)
+      guard (outputsNotConstrainedByFunctionApplication hyp outputVars)
 
-    --   -- TODO: finish the body of the continuation
-    --   sorry
-    --   -- dfs variables (outputVars ++ boundVars) remainingVars' (i :: newCheckedIdxs ++ checkedHypotheses) (checks ++ newMatches ++ constrainedProdStep) :: scheduleSoFar)
-    -- )
+      let (newMatches, hyp', newOutputs) ← handleConstraintedOutputs hyp outputVars
+      let typedOutputs ← newOutputs.mapM
+        (fun v => do
+          let tyExpr ← Option.getDM (List.lookup v vars)
+            (throwError m!"key {v} missing from association list {vars}")
+          let constructorExpr ← exprToConstructorExpr tyExpr
+          pure (v, constructorExpr))
+      let (hypCtor, hypArgs) := hyp'
+      let constrainingRelation ←
+        if (← isRecCall outputVars hyp recCall) then
+          let inputArgs := filterWithIndex (fun i _ => i ∉ (Prod.snd recCall)) hypArgs
+          pure (Source.Rec `rec inputArgs)
+        else
+          pure (Source.NonRec hyp')
+      let constrainedProdStep := ScheduleStep.SuchThat typedOutputs constrainingRelation prodSort
+      let (newCheckedIdxs, newCheckedHyps) := List.unzip $
+        collectCheckSteps (outputVars ++ boundVars) (i::checkedHypotheses) sortedHypotheses deriveSort recCall
+      -- TODO: handle negated propositions in `ScheduleStep.Check`
+      let checks := List.reverse $ (fun src => ScheduleStep.Check src true) <$> newCheckedHyps
 
+      dfs vars (outputVars ++ boundVars) remainingVars'
+        (i :: newCheckedIdxs ++ checkedHypotheses)
+        (checks ++ newMatches ++ constrainedProdStep :: scheduleSoFar)
+        sortedHypotheses
+        deriveSort
+        recCall
+        prodSort
+    )
+
+    -- TODO: finish body of `dfs`
     sorry
