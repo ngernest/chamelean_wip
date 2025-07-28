@@ -5,7 +5,7 @@ Authors: Henrik Böving, Simon Hudon
 -/
 import Lean.Elab.Tactic.Config
 import Plausible.Sampleable
-import Batteries
+import Batteries.Tactic.Lint
 
 
 /-!
