@@ -6,14 +6,21 @@ import Batteries.Data.List.Basic
 open Lean Meta LocalContext Std
 open Plausible.IR
 
-/-- Monad instance for List.
+/-- `Monad` instance for List.
     Note that:
     - The Lean standard library does not have a Monad instance for List (see https://leanprover-community.github.io/archive/stream/270676-lean4/topic/Option.20do.20notation.20regression.3F.html#231433226)
     - MathLib4 does have a Monad instance for List, but we wish to avoid having Chamelean rely on Mathlib
-    as a dependency, so we reproduce the Monad instance for Lists here instead. -/
+    as a dependency, so we reproduce instance here instead. -/
 instance : Monad List where
   pure x := [x]
   bind xs f := xs.flatMap f
+
+/-- `Alternative` instance for List.
+     - MathLib4 does have an `Alternative` instance for List, but we wish to avoid having Chamelean rely on Mathlib
+    as a dependency, so we reproduce the instance here instead. -/
+instance : Alternative List where
+  failure := List.nil
+  orElse l l' := List.append l (l' ())
 
 /-- Decomposes an list `xs` into a pair `(xs', x)`
    where `xs' = xs[0..=n-2]` and `x = xs[n - 1]` (where `n` is the length of `xs`).
