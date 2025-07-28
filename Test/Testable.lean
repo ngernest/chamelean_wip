@@ -24,4 +24,5 @@ instance : SampleableExt MyType :=
     let xyDiff ← SampleableExt.interpSample Nat
     return ⟨x, x + xyDiff, by omega⟩
 
-#eval Testable.check (cfg := { quiet := true }) <| ∀ a b : MyType, a.y ≤ b.x → a.x ≤ b.y
+#eval Testable.check <| ∀ a b : MyType, a.y ≤ b.x → a.x ≤ b.y
+
