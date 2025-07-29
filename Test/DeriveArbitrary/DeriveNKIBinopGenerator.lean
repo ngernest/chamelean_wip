@@ -7,6 +7,8 @@ open Plausible Gen
 
 set_option guard_msgs.diff true
 
+/-- Binary operators for the NKI language,
+    adapted from https://github.com/leanprover/KLR/blob/main/KLR/NKI/Basic.lean -/
 inductive BinOp where
   -- logical
   | land | lor
@@ -39,33 +41,17 @@ info: Try this generator: instance : Plausible.ArbitrarySized BinOp where
       match size with
       | Nat.zero =>
         Plausible.Gen.oneOfWithDefault (pure BinOp.land)
-          [Plausible.Gen.thunkGen (fun _ => pure BinOp.land), Plausible.Gen.thunkGen (fun _ => pure BinOp.lor),
-            Plausible.Gen.thunkGen (fun _ => pure BinOp.eq), Plausible.Gen.thunkGen (fun _ => pure BinOp.ne),
-            Plausible.Gen.thunkGen (fun _ => pure BinOp.lt), Plausible.Gen.thunkGen (fun _ => pure BinOp.le),
-            Plausible.Gen.thunkGen (fun _ => pure BinOp.gt), Plausible.Gen.thunkGen (fun _ => pure BinOp.ge),
-            Plausible.Gen.thunkGen (fun _ => pure BinOp.add), Plausible.Gen.thunkGen (fun _ => pure BinOp.sub),
-            Plausible.Gen.thunkGen (fun _ => pure BinOp.mul), Plausible.Gen.thunkGen (fun _ => pure BinOp.div),
-            Plausible.Gen.thunkGen (fun _ => pure BinOp.mod), Plausible.Gen.thunkGen (fun _ => pure BinOp.pow),
-            Plausible.Gen.thunkGen (fun _ => pure BinOp.floor), Plausible.Gen.thunkGen (fun _ => pure BinOp.lshift),
-            Plausible.Gen.thunkGen (fun _ => pure BinOp.rshift), Plausible.Gen.thunkGen (fun _ => pure BinOp.or),
-            Plausible.Gen.thunkGen (fun _ => pure BinOp.xor), Plausible.Gen.thunkGen (fun _ => pure BinOp.and)]
+          [(pure BinOp.land), (pure BinOp.lor), (pure BinOp.eq), (pure BinOp.ne), (pure BinOp.lt), (pure BinOp.le),
+            (pure BinOp.gt), (pure BinOp.ge), (pure BinOp.add), (pure BinOp.sub), (pure BinOp.mul), (pure BinOp.div),
+            (pure BinOp.mod), (pure BinOp.pow), (pure BinOp.floor), (pure BinOp.lshift), (pure BinOp.rshift),
+            (pure BinOp.or), (pure BinOp.xor), (pure BinOp.and)]
       | Nat.succ size' =>
         Plausible.Gen.frequency (pure BinOp.land)
-          [(1, Plausible.Gen.thunkGen (fun _ => pure BinOp.land)),
-            (1, Plausible.Gen.thunkGen (fun _ => pure BinOp.lor)), (1, Plausible.Gen.thunkGen (fun _ => pure BinOp.eq)),
-            (1, Plausible.Gen.thunkGen (fun _ => pure BinOp.ne)), (1, Plausible.Gen.thunkGen (fun _ => pure BinOp.lt)),
-            (1, Plausible.Gen.thunkGen (fun _ => pure BinOp.le)), (1, Plausible.Gen.thunkGen (fun _ => pure BinOp.gt)),
-            (1, Plausible.Gen.thunkGen (fun _ => pure BinOp.ge)), (1, Plausible.Gen.thunkGen (fun _ => pure BinOp.add)),
-            (1, Plausible.Gen.thunkGen (fun _ => pure BinOp.sub)),
-            (1, Plausible.Gen.thunkGen (fun _ => pure BinOp.mul)),
-            (1, Plausible.Gen.thunkGen (fun _ => pure BinOp.div)),
-            (1, Plausible.Gen.thunkGen (fun _ => pure BinOp.mod)),
-            (1, Plausible.Gen.thunkGen (fun _ => pure BinOp.pow)),
-            (1, Plausible.Gen.thunkGen (fun _ => pure BinOp.floor)),
-            (1, Plausible.Gen.thunkGen (fun _ => pure BinOp.lshift)),
-            (1, Plausible.Gen.thunkGen (fun _ => pure BinOp.rshift)),
-            (1, Plausible.Gen.thunkGen (fun _ => pure BinOp.or)), (1, Plausible.Gen.thunkGen (fun _ => pure BinOp.xor)),
-            (1, Plausible.Gen.thunkGen (fun _ => pure BinOp.and)), ]
+          [(1, (pure BinOp.land)), (1, (pure BinOp.lor)), (1, (pure BinOp.eq)), (1, (pure BinOp.ne)),
+            (1, (pure BinOp.lt)), (1, (pure BinOp.le)), (1, (pure BinOp.gt)), (1, (pure BinOp.ge)),
+            (1, (pure BinOp.add)), (1, (pure BinOp.sub)), (1, (pure BinOp.mul)), (1, (pure BinOp.div)),
+            (1, (pure BinOp.mod)), (1, (pure BinOp.pow)), (1, (pure BinOp.floor)), (1, (pure BinOp.lshift)),
+            (1, (pure BinOp.rshift)), (1, (pure BinOp.or)), (1, (pure BinOp.xor)), (1, (pure BinOp.and)), ]
     fun size => aux_arb size
 -/
 #guard_msgs(info, drop warning) in

@@ -40,12 +40,11 @@ info: Try this generator: instance : Plausible.ArbitrarySized Foo where
             let boolField_0 ← Plausible.Arbitrary.arbitrary
             let natField_0 ← Plausible.Arbitrary.arbitrary
             return Foo.mk stringField_0 boolField_0 natField_0)
-          [Plausible.Gen.thunkGen
-              (fun _ => do
-                let stringField_0 ← Plausible.Arbitrary.arbitrary
-                let boolField_0 ← Plausible.Arbitrary.arbitrary
-                let natField_0 ← Plausible.Arbitrary.arbitrary
-                return Foo.mk stringField_0 boolField_0 natField_0)]
+          [(do
+              let stringField_0 ← Plausible.Arbitrary.arbitrary
+              let boolField_0 ← Plausible.Arbitrary.arbitrary
+              let natField_0 ← Plausible.Arbitrary.arbitrary
+              return Foo.mk stringField_0 boolField_0 natField_0)]
       | Nat.succ size' =>
         Plausible.Gen.frequency
           (do
@@ -54,12 +53,11 @@ info: Try this generator: instance : Plausible.ArbitrarySized Foo where
             let natField_0 ← Plausible.Arbitrary.arbitrary
             return Foo.mk stringField_0 boolField_0 natField_0)
           [(1,
-              Plausible.Gen.thunkGen
-                (fun _ => do
-                  let stringField_0 ← Plausible.Arbitrary.arbitrary
-                  let boolField_0 ← Plausible.Arbitrary.arbitrary
-                  let natField_0 ← Plausible.Arbitrary.arbitrary
-                  return Foo.mk stringField_0 boolField_0 natField_0)),
+              (do
+                let stringField_0 ← Plausible.Arbitrary.arbitrary
+                let boolField_0 ← Plausible.Arbitrary.arbitrary
+                let natField_0 ← Plausible.Arbitrary.arbitrary
+                return Foo.mk stringField_0 boolField_0 natField_0)),
             ]
     fun size => aux_arb size
 -/

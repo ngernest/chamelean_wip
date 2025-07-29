@@ -54,16 +54,15 @@ info: Try this generator: instance : Plausible.ArbitrarySized type where
   arbitrarySized :=
     let rec aux_arb (size : Nat) : Plausible.Gen type :=
       match size with
-      | Nat.zero => Plausible.Gen.oneOfWithDefault (pure type.Nat) [Plausible.Gen.thunkGen (fun _ => pure type.Nat)]
+      | Nat.zero => Plausible.Gen.oneOfWithDefault (pure type.Nat) [(pure type.Nat)]
       | Nat.succ size' =>
         Plausible.Gen.frequency (pure type.Nat)
-          [(1, Plausible.Gen.thunkGen (fun _ => pure type.Nat)),
+          [(1, (pure type.Nat)),
             (Nat.succ size',
-              Plausible.Gen.thunkGen
-                (fun _ => do
-                  let a_0 ← aux_arb size'
-                  let a_1 ← aux_arb size'
-                  return type.Fun a_0 a_1))]
+              (do
+                let a_0 ← aux_arb size'
+                let a_1 ← aux_arb size'
+                return type.Fun a_0 a_1))]
     fun size => aux_arb size
 -/
 #guard_msgs(info, drop warning) in
@@ -79,47 +78,40 @@ info: Try this generator: instance : Plausible.ArbitrarySized term where
           (do
             let a_0 ← Plausible.Arbitrary.arbitrary
             return term.Const a_0)
-          [Plausible.Gen.thunkGen
-              (fun _ => do
-                let a_0 ← Plausible.Arbitrary.arbitrary
-                return term.Const a_0),
-            Plausible.Gen.thunkGen
-              (fun _ => do
-                let a_0 ← Plausible.Arbitrary.arbitrary
-                return term.Var a_0)]
+          [(do
+              let a_0 ← Plausible.Arbitrary.arbitrary
+              return term.Const a_0),
+            (do
+              let a_0 ← Plausible.Arbitrary.arbitrary
+              return term.Var a_0)]
       | Nat.succ size' =>
         Plausible.Gen.frequency
           (do
             let a_0 ← Plausible.Arbitrary.arbitrary
             return term.Const a_0)
           [(1,
-              Plausible.Gen.thunkGen
-                (fun _ => do
-                  let a_0 ← Plausible.Arbitrary.arbitrary
-                  return term.Const a_0)),
+              (do
+                let a_0 ← Plausible.Arbitrary.arbitrary
+                return term.Const a_0)),
             (1,
-              Plausible.Gen.thunkGen
-                (fun _ => do
-                  let a_0 ← Plausible.Arbitrary.arbitrary
-                  return term.Var a_0)),
+              (do
+                let a_0 ← Plausible.Arbitrary.arbitrary
+                return term.Var a_0)),
             (Nat.succ size',
-              Plausible.Gen.thunkGen
-                (fun _ => do
-                  let a_0 ← aux_arb size'
-                  let a_1 ← aux_arb size'
-                  return term.Add a_0 a_1)),
+              (do
+                let a_0 ← aux_arb size'
+                let a_1 ← aux_arb size'
+                return term.Add a_0 a_1)),
             (Nat.succ size',
-              Plausible.Gen.thunkGen
-                (fun _ => do
-                  let a_0 ← aux_arb size'
-                  let a_1 ← aux_arb size'
-                  return term.App a_0 a_1)),
+              (do
+                let a_0 ← aux_arb size'
+                let a_1 ← aux_arb size'
+                return term.App a_0 a_1)),
             (Nat.succ size',
-              Plausible.Gen.thunkGen
-                (fun _ => do
-                  let a_0 ← Plausible.Arbitrary.arbitrary
-                  let a_1 ← aux_arb size'
-                  return term.Abs a_0 a_1))]
+              (do
+                let a_0 ← Plausible.Arbitrary.arbitrary
+                let a_1 ← aux_arb size'
+                return term.Abs a_0 a_1))]
     fun size => aux_arb size
 -/
 #guard_msgs(info, drop warning) in

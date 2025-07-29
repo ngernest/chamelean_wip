@@ -7,8 +7,8 @@ open Plausible Gen
 
 set_option guard_msgs.diff true
 
--- Note: the `float` constructor has been removed for now since there is currently
--- no `Arbitrary` instance for floats
+/-- A datatype representing values in the NKI language, adapted from
+    https://github.com/leanprover/KLR/blob/main/KLR/NKI/Basic.lean -/
 inductive Value where
   | none
   | bool (value : Bool)
@@ -39,50 +39,42 @@ info: Try this generator: instance : Plausible.ArbitrarySized Value where
       match size with
       | Nat.zero =>
         Plausible.Gen.oneOfWithDefault (pure Value.none)
-          [Plausible.Gen.thunkGen (fun _ => pure Value.none),
-            Plausible.Gen.thunkGen
-              (fun _ => do
-                let value_0 ← Plausible.Arbitrary.arbitrary
-                return Value.bool value_0),
-            Plausible.Gen.thunkGen
-              (fun _ => do
-                let value_0 ← Plausible.Arbitrary.arbitrary
-                return Value.int value_0),
-            Plausible.Gen.thunkGen
-              (fun _ => do
-                let value_0 ← Plausible.Arbitrary.arbitrary
-                return Value.string value_0),
-            Plausible.Gen.thunkGen (fun _ => pure Value.ellipsis),
-            Plausible.Gen.thunkGen
-              (fun _ => do
-                let shape_0 ← Plausible.Arbitrary.arbitrary
-                let dtype_0 ← Plausible.Arbitrary.arbitrary
-                return Value.tensor shape_0 dtype_0)]
+          [(pure Value.none),
+            (do
+              let value_0 ← Plausible.Arbitrary.arbitrary
+              return Value.bool value_0),
+            (do
+              let value_0 ← Plausible.Arbitrary.arbitrary
+              return Value.int value_0),
+            (do
+              let value_0 ← Plausible.Arbitrary.arbitrary
+              return Value.string value_0),
+            (pure Value.ellipsis),
+            (do
+              let shape_0 ← Plausible.Arbitrary.arbitrary
+              let dtype_0 ← Plausible.Arbitrary.arbitrary
+              return Value.tensor shape_0 dtype_0)]
       | Nat.succ size' =>
         Plausible.Gen.frequency (pure Value.none)
-          [(1, Plausible.Gen.thunkGen (fun _ => pure Value.none)),
+          [(1, (pure Value.none)),
             (1,
-              Plausible.Gen.thunkGen
-                (fun _ => do
-                  let value_0 ← Plausible.Arbitrary.arbitrary
-                  return Value.bool value_0)),
+              (do
+                let value_0 ← Plausible.Arbitrary.arbitrary
+                return Value.bool value_0)),
             (1,
-              Plausible.Gen.thunkGen
-                (fun _ => do
-                  let value_0 ← Plausible.Arbitrary.arbitrary
-                  return Value.int value_0)),
+              (do
+                let value_0 ← Plausible.Arbitrary.arbitrary
+                return Value.int value_0)),
             (1,
-              Plausible.Gen.thunkGen
-                (fun _ => do
-                  let value_0 ← Plausible.Arbitrary.arbitrary
-                  return Value.string value_0)),
-            (1, Plausible.Gen.thunkGen (fun _ => pure Value.ellipsis)),
+              (do
+                let value_0 ← Plausible.Arbitrary.arbitrary
+                return Value.string value_0)),
+            (1, (pure Value.ellipsis)),
             (1,
-              Plausible.Gen.thunkGen
-                (fun _ => do
-                  let shape_0 ← Plausible.Arbitrary.arbitrary
-                  let dtype_0 ← Plausible.Arbitrary.arbitrary
-                  return Value.tensor shape_0 dtype_0)),
+              (do
+                let shape_0 ← Plausible.Arbitrary.arbitrary
+                let dtype_0 ← Plausible.Arbitrary.arbitrary
+                return Value.tensor shape_0 dtype_0)),
             ]
     fun size => aux_arb size
 -/

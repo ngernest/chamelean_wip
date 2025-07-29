@@ -39,12 +39,11 @@ info: Try this generator: instance : Plausible.ArbitrarySized DummyInductive whe
             let a_0 ← Plausible.Arbitrary.arbitrary
             let a_1 ← Plausible.Arbitrary.arbitrary
             return DummyInductive.FromBitVec n_0 a_0 a_1)
-          [Plausible.Gen.thunkGen
-              (fun _ => do
-                let n_0 ← Plausible.Arbitrary.arbitrary
-                let a_0 ← Plausible.Arbitrary.arbitrary
-                let a_1 ← Plausible.Arbitrary.arbitrary
-                return DummyInductive.FromBitVec n_0 a_0 a_1)]
+          [(do
+              let n_0 ← Plausible.Arbitrary.arbitrary
+              let a_0 ← Plausible.Arbitrary.arbitrary
+              let a_1 ← Plausible.Arbitrary.arbitrary
+              return DummyInductive.FromBitVec n_0 a_0 a_1)]
       | Nat.succ size' =>
         Plausible.Gen.frequency
           (do
@@ -53,12 +52,11 @@ info: Try this generator: instance : Plausible.ArbitrarySized DummyInductive whe
             let a_1 ← Plausible.Arbitrary.arbitrary
             return DummyInductive.FromBitVec n_0 a_0 a_1)
           [(1,
-              Plausible.Gen.thunkGen
-                (fun _ => do
-                  let n_0 ← Plausible.Arbitrary.arbitrary
-                  let a_0 ← Plausible.Arbitrary.arbitrary
-                  let a_1 ← Plausible.Arbitrary.arbitrary
-                  return DummyInductive.FromBitVec n_0 a_0 a_1)),
+              (do
+                let n_0 ← Plausible.Arbitrary.arbitrary
+                let a_0 ← Plausible.Arbitrary.arbitrary
+                let a_1 ← Plausible.Arbitrary.arbitrary
+                return DummyInductive.FromBitVec n_0 a_0 a_1)),
             ]
     fun size => aux_arb size
 -/

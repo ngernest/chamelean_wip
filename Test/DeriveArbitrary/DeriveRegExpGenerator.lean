@@ -42,38 +42,31 @@ info: Try this generator: instance : Plausible.ArbitrarySized RegExp where
       match size with
       | Nat.zero =>
         Plausible.Gen.oneOfWithDefault (pure RegExp.EmptySet)
-          [Plausible.Gen.thunkGen (fun _ => pure RegExp.EmptySet),
-            Plausible.Gen.thunkGen (fun _ => pure RegExp.EmptyStr),
-            Plausible.Gen.thunkGen
-              (fun _ => do
-                let a_0 ← Plausible.Arbitrary.arbitrary
-                return RegExp.Char a_0)]
+          [(pure RegExp.EmptySet), (pure RegExp.EmptyStr),
+            (do
+              let a_0 ← Plausible.Arbitrary.arbitrary
+              return RegExp.Char a_0)]
       | Nat.succ size' =>
         Plausible.Gen.frequency (pure RegExp.EmptySet)
-          [(1, Plausible.Gen.thunkGen (fun _ => pure RegExp.EmptySet)),
-            (1, Plausible.Gen.thunkGen (fun _ => pure RegExp.EmptyStr)),
+          [(1, (pure RegExp.EmptySet)), (1, (pure RegExp.EmptyStr)),
             (1,
-              Plausible.Gen.thunkGen
-                (fun _ => do
-                  let a_0 ← Plausible.Arbitrary.arbitrary
-                  return RegExp.Char a_0)),
+              (do
+                let a_0 ← Plausible.Arbitrary.arbitrary
+                return RegExp.Char a_0)),
             (Nat.succ size',
-              Plausible.Gen.thunkGen
-                (fun _ => do
-                  let a_0 ← aux_arb size'
-                  let a_1 ← aux_arb size'
-                  return RegExp.App a_0 a_1)),
+              (do
+                let a_0 ← aux_arb size'
+                let a_1 ← aux_arb size'
+                return RegExp.App a_0 a_1)),
             (Nat.succ size',
-              Plausible.Gen.thunkGen
-                (fun _ => do
-                  let a_0 ← aux_arb size'
-                  let a_1 ← aux_arb size'
-                  return RegExp.Union a_0 a_1)),
+              (do
+                let a_0 ← aux_arb size'
+                let a_1 ← aux_arb size'
+                return RegExp.Union a_0 a_1)),
             (Nat.succ size',
-              Plausible.Gen.thunkGen
-                (fun _ => do
-                  let a_0 ← aux_arb size'
-                  return RegExp.Star a_0))]
+              (do
+                let a_0 ← aux_arb size'
+                return RegExp.Star a_0))]
     fun size => aux_arb size
 -/
 #guard_msgs(info, drop warning) in
