@@ -22,9 +22,6 @@ open Plausible
 
 namespace Idents
 
-/-- Ident for the `Gen.thunkGen` function -/
-def thunkGenFn : Ident := mkIdent ``Gen.thunkGen
-
 /-- Ident for the `Gen.frequency` function -/
 def frequencyFn : Ident := mkIdent ``Gen.frequency
 

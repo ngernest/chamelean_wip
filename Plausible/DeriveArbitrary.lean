@@ -193,30 +193,31 @@ def mkArbitrarySizedInstance (targetTypeName : Name) : CommandElabM (TSyntax `co
   -- Just use the first non-recursive generator as the default generator
   let defaultGenerator := nonRecursiveGenerators[0]!
 
+  -- Explicitly parenthesize the body of each sub-generator for clarity
+  let nonRecursiveGens ←
+    Array.mapM (fun generatorBody => `( ($generatorBody) )) nonRecursiveGenerators
+
   -- Turn each generator into a thunked function and associate each generator with its weight
   -- (1 for non-recursive generators, `.succ size'` for recursive generators)
-  let thunkedNonRecursiveGenerators ←
-    Array.mapM (fun generatorBody => `($thunkGenFn (fun _ => $generatorBody))) nonRecursiveGenerators
+  let mut weightedNonRecursiveGenerators := #[]
+  for generator in nonRecursiveGenerators do
+    let weightedGen ← `((1, ($generator)))
+    weightedNonRecursiveGenerators := weightedNonRecursiveGenerators.push weightedGen
 
-  let mut weightedThunkedNonRecursiveGens := #[]
-  for thunkedGen in thunkedNonRecursiveGenerators do
-    let thunkedGen ← `((1, $thunkedGen))
-    weightedThunkedNonRecursiveGens := weightedThunkedNonRecursiveGens.push thunkedGen
-
-  let mut weightedThunkedRecursiveGens := #[]
+  let mut weightedRecursiveGenerators := #[]
   for recursiveGen in recursiveGenerators do
-    let thunkedWeightedGen ← `(($succIdent $freshSize', $thunkGenFn (fun _ => $recursiveGen)))
-    weightedThunkedRecursiveGens := weightedThunkedRecursiveGens.push thunkedWeightedGen
+    let thunkedWeightedGen ← `(($succIdent $freshSize', ($recursiveGen)))
+    weightedRecursiveGenerators := weightedRecursiveGenerators.push thunkedWeightedGen
 
   -- Create the cases for the pattern-match on the size argument
   -- If `size = 0`, pick one of the thunked non-recursive generators
   let mut caseExprs := #[]
-  let zeroCase ← `(Term.matchAltExpr| | $zeroIdent => $oneOfWithDefaultGenCombinatorFn $defaultGenerator [$thunkedNonRecursiveGenerators,*])
+  let zeroCase ← `(Term.matchAltExpr| | $zeroIdent => $oneOfWithDefaultGenCombinatorFn $defaultGenerator [$nonRecursiveGens,*])
   caseExprs := caseExprs.push zeroCase
 
   -- If `size = .succ size'`, pick a generator (it can be non-recursive or recursive)
-  let mut allThunkedWeightedGenerators ← `([$weightedThunkedNonRecursiveGens,*, $weightedThunkedRecursiveGens,*])
-  let succCase ← `(Term.matchAltExpr| | $succIdent $freshSize' => $frequencyFn $defaultGenerator $allThunkedWeightedGenerators)
+  let mut allWeightedGenerators ← `([$weightedNonRecursiveGenerators,*, $weightedRecursiveGenerators,*])
+  let succCase ← `(Term.matchAltExpr| | $succIdent $freshSize' => $frequencyFn $defaultGenerator $allWeightedGenerators)
   caseExprs := caseExprs.push succCase
 
   -- Create function argument for the generator size

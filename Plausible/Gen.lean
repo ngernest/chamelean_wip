@@ -120,10 +120,6 @@ def frequency (default : Gen α) (gs : List (Nat × Gen α)) : Gen α := do
 def sized (f : Nat → Gen α) : Gen α :=
   Gen.getSize >>= f
 
-/-- Delays the evaluation of a generator by taking in a function `f : Unit → Gen α` -/
-def thunkGen (f : Unit → Gen α) : Gen α :=
-  f ()
-
 variable {α : Type u}
 
 /-- Create an `Array` of examples using `x`. The size is controlled
