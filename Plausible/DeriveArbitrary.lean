@@ -53,7 +53,7 @@ set_option trace.plausible.deriving.arbitrary true
 
 namespace Plausible
 
-open Arbitrary Idents
+open Arbitrary
 
 /-- Takes the name of a constructor for an algebraic data type and returns an array
     containing `(argument_name, argument_type)` pairs.
@@ -100,10 +100,11 @@ def mkArbitraryFueledInstance (targetTypeName : Name) : CommandElabM (TSyntax `c
   -- Fetch the ambient local context, which we need to produce user-accessible fresh names
   let localCtx ← liftTermElabM $ getLCtx
 
-  -- Produce a fresh name for the `size` argument for the lambda
+  -- Produce `Ident`s name for the `size` argument for the lambda
   -- at the end of the generator function, as well as the `aux_arb` inner helper function
-  let freshSizeIdent := mkIdent $ localCtx.getUnusedName `size
+  let freshSize := mkIdent $ localCtx.getUnusedName `size
   let freshSize' := mkIdent $ localCtx.getUnusedName `size'
+  let auxArb := mkIdent `aux_arb
 
   let mut nonRecursiveGenerators := #[]
   let mut recursiveGenerators := #[]
@@ -128,14 +129,14 @@ def mkArbitraryFueledInstance (targetTypeName : Name) : CommandElabM (TSyntax `c
       to the `LocalContext` later in this function, ensuring that the `LocalContext`
       remains updated.)
     -/
-    let freshArgNames := genFreshNames (existingNames := ctorArgNames) (namePrefixes := ctorArgNames)
+    let freshArgNames := Idents.genFreshNames (existingNames := ctorArgNames) (namePrefixes := ctorArgNames)
     let freshArgNamesTypes := Array.zip freshArgNames ctorArgTypes
     let freshArgIdents := Lean.mkIdent <$> freshArgNames
     let freshArgIdentsTypes := Array.zip freshArgIdents ctorArgTypes
 
     if ctorArgNamesTypes.isEmpty then
       -- Constructor is nullary, we can just use a generator of the form `pure ...`
-      let pureGen ← `($pureFn $ctorIdent)
+      let pureGen ← `($(Lean.mkIdent `pure) $ctorIdent)
       nonRecursiveGenerators := nonRecursiveGenerators.push pureGen
     else
       -- Add all the freshened names for the constructor to the local context,
@@ -149,7 +150,7 @@ def mkArbitraryFueledInstance (targetTypeName : Name) : CommandElabM (TSyntax `c
           if !ctorIsRecursive then
             -- Call `arbitrary` to generate a random value for each of the arguments
             for freshIdent in freshArgIdents do
-              let bindExpr ← mkLetBind freshIdent #[arbitraryFn]
+              let bindExpr ← mkLetBind freshIdent #[(mkIdent ``Arbitrary.arbitrary)]
               doElems := doElems.push bindExpr
           else
             -- For recursive constructors, we need to examine each argument to see which of them require
@@ -160,9 +161,9 @@ def mkArbitraryFueledInstance (targetTypeName : Name) : CommandElabM (TSyntax `c
               -- otherwise generate a value using `arbitrary`
               let bindExpr ←
                 if argType.getAppFn.constName == targetTypeName then
-                  mkLetBind freshIdent #[auxArbFn, freshSize']
+                  mkLetBind freshIdent #[(mkIdent `aux_arb), freshSize']
                 else
-                  mkLetBind freshIdent #[arbitraryFn]
+                  mkLetBind freshIdent #[(mkIdent ``Arbitrary.arbitrary)]
               doElems := doElems.push bindExpr
 
           -- Create an expression `return C x1 ... xn` at the end of the generator, where
@@ -195,33 +196,33 @@ def mkArbitraryFueledInstance (targetTypeName : Name) : CommandElabM (TSyntax `c
 
   let mut weightedRecursiveGenerators := #[]
   for recursiveGen in recursiveGenerators do
-    let thunkedWeightedGen ← `(($succIdent $freshSize', ($recursiveGen)))
+    let thunkedWeightedGen ← ``(($freshSize' + 1, ($recursiveGen)))
     weightedRecursiveGenerators := weightedRecursiveGenerators.push thunkedWeightedGen
 
   -- Create the cases for the pattern-match on the size argument
   -- If `size = 0`, pick one of the thunked non-recursive generators
   let mut caseExprs := #[]
-  let zeroCase ← `(Term.matchAltExpr| | $zeroIdent => $oneOfWithDefaultGenCombinatorFn $defaultGenerator [$nonRecursiveGens,*])
+  let zeroCase ← `(Term.matchAltExpr| | $(mkIdent ``Nat.zero) => $(mkIdent ``Gen.oneOfWithDefault) $defaultGenerator [$nonRecursiveGens,*])
   caseExprs := caseExprs.push zeroCase
 
   -- If `size = .succ size'`, pick a generator (it can be non-recursive or recursive)
   let mut allWeightedGenerators ← `([$weightedNonRecursiveGenerators,*, $weightedRecursiveGenerators,*])
-  let succCase ← `(Term.matchAltExpr| | $succIdent $freshSize' => $frequencyFn $defaultGenerator $allWeightedGenerators)
+  let succCase ← `(Term.matchAltExpr| | $freshSize' + 1 => $(mkIdent ``Gen.frequency) $defaultGenerator $allWeightedGenerators)
   caseExprs := caseExprs.push succCase
 
   -- Create function argument for the generator size
-  let sizeParam ← `(Term.letIdBinder| ($sizeIdent : $natIdent))
-  let matchExpr ← liftTermElabM $ mkMatchExpr sizeIdent caseExprs
+  let sizeParam ← `(Term.letIdBinder| ($freshSize : $(mkIdent `Nat)))
+  let matchExpr ← liftTermElabM $ mkMatchExpr freshSize caseExprs
 
   -- Create an instance of the `ArbitraryFueled` typeclass
-  let targetTypeIdent := mkIdent targetTypeName
-  let generatorType ← `($genTypeConstructor $targetTypeIdent)
+  let targetType := mkIdent targetTypeName
+  let generatorType ← `($(mkIdent ``Plausible.Gen) $targetType)
   let typeClassInstance ←
-    `(instance : $arbitraryFueledTypeclass $targetTypeIdent where
-      $unqualifiedArbitraryFueledFn:ident :=
-        let rec $auxArbFn:ident $sizeParam : $generatorType :=
+    `(instance : $(mkIdent ``ArbitraryFueled) $targetType where
+      $(mkIdent `arbitraryFueled):ident :=
+        let rec $auxArb:ident $sizeParam : $generatorType :=
           $matchExpr
-      fun $freshSizeIdent => $auxArbFn $freshSizeIdent)
+      fun $freshSize => $auxArb $freshSize)
 
   -- Pretty-print the derived generator
   let genFormat ← liftCoreM (PrettyPrinter.ppCommand typeClassInstance)

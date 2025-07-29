@@ -19,68 +19,7 @@ these are used in the body of derived generators (when deriving `Arbitrary` inst
 open Lean
 open Plausible
 
-
 namespace Idents
-
-/-- Ident for the `Gen.frequency` function -/
-def frequencyFn : Ident := mkIdent ``Gen.frequency
-
-/-- Ident for the `Gen.oneOfWithDefault` function -/
-def oneOfWithDefaultGenCombinatorFn : Ident := mkIdent ``Gen.oneOfWithDefault
-
-/-- Ident for the inner `aux_arb` function that appears in derived generators -/
-def auxArbFn : Ident := mkIdent `aux_arb
-
-/-- Ident for the `pure` function -/
-def pureFn : Ident := mkIdent `pure
-
-/-- Ident for the `some` `Option` constructor -/
-def someFn : Ident := mkIdent ``some
-
-/-- Ident for the `true` boolean literal -/
-def trueIdent : Ident := mkIdent ``true
-
-/-- Ident for the `false` boolean literal -/
-def falseIdent : Ident := mkIdent ``false
-
--- Idents for size arguments to generators
-/-- Ident for the `initSize` parameter used in generators -/
-def initSizeIdent : Ident := mkIdent `initSize
-
-/-- Ident for the `size` parameter used in generators -/
-def sizeIdent : Ident := mkIdent `size
-
-/-- Ident for the `ArbitraryFueled` typeclass -/
-def arbitraryFueledTypeclass : Ident := mkIdent ``ArbitraryFueled
-
--- Idents for typeclass functions
-/-- Ident for the `Arbitrary.arbitrary` function -/
-def arbitraryFn : Ident := mkIdent ``Arbitrary.arbitrary
-
-/-- Ident for the `ArbitraryFueled.arbitraryFueled` function -/
-def arbitraryFueledFn : Ident := mkIdent ``ArbitraryFueled.arbitraryFueled
-
-/-- Ident for the unqualified `arbitraryFueled` function -/
-def unqualifiedArbitraryFueledFn : Ident := mkIdent `arbitraryFueled
-
--- Idents for commonly-used types / constructors / type constructors
-/-- Ident for the `Bool` type -/
-def boolIdent : Ident := mkIdent ``Bool
-
-/-- Ident for the `Nat` type -/
-def natIdent : Ident := mkIdent ``Nat
-
-/-- Ident for the `Nat.zero` constructor -/
-def zeroIdent : Ident := mkIdent ``Nat.zero
-
-/-- Ident for the `Nat.succ` constructor -/
-def succIdent : Ident := mkIdent ``Nat.succ
-
-/-- Ident for the `Option` type constructor -/
-def optionTypeConstructor : Ident := mkIdent `Option
-
-/-- Ident for the `Plausible.Gen` type constructor -/
-def genTypeConstructor : Ident := mkIdent ``Plausible.Gen
 
 /-- `genFreshName existingNames namePrefix` produces a fresh name with the prefix `namePrefix`
      that is guaranteed to be not within `existingNames`.
