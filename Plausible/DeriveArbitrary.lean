@@ -23,7 +23,7 @@ for inductive types.
 but every `ArbitrarySized` instance automatically results in an `Arbitrary` instance,
 as detailed in `Arbitrary.lean`.)
 
-users can write `deriving Arbitrary` after an inductive type definition, e.g.
+Example usage:
 
 ```lean
 -- Datatype for binary trees
@@ -32,12 +32,6 @@ inductive Tree
   | Node : Nat → Tree → Tree → Tree
   deriving Arbitrary
 ```
-
-At compile time, a generator for random inhabitants of `Tree` is derived.
-
-Alternatively, instead of writing `deriving Arbitrary`,
-users can also write `deriving instance Arbitrary for T1, ..., Tn`
-as a top-level command to derive `Arbitrary` instances for types `T1, ..., Tn` simultaneously.
 
 To sample from a derived generator, users can simply call `Arbitrary.runArbitrary`, specify the type
 for the desired generated values and provide some Nat to act as the generator's size parameter (10 in the example below):

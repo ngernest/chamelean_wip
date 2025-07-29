@@ -70,7 +70,7 @@ Choose a `Nat` between `0` and `getSize`.
 -/
 def chooseNat : Gen Nat := do choose Nat 0 (← getSize) (by omega)
 
-/-
+/-!
 The following section defines various combinators for generators, which are used
 in the body of derived generators (for derived `Arbitrary` instances).
 
