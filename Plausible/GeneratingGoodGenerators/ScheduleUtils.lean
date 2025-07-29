@@ -252,7 +252,7 @@ partial def dfs
             (throwError m!"key {v} missing from association list {vars}")
           let constructorExpr ← exprToConstructorExpr tyExpr
           pure (v, constructorExpr))
-      let (hypCtor, hypArgs) := hyp'
+      let (_, hypArgs) := hyp'
       let constrainingRelation ←
         if (← isRecCall outputVars hyp recCall) then
           let inputArgs := filterWithIndex (fun i _ => i ∉ (Prod.snd recCall)) hypArgs
@@ -275,14 +275,18 @@ partial def dfs
         fixed
     )
 
-    let remainingVars := List.filter (. ∉ fixed) (Prod.fst <$> vars)
-    let (newCheckedIdxs, newCheckedHyps) := List.unzip $
-      collectCheckSteps fixed [] sortedHypotheses deriveSort recCall
-    let firstChecks := List.reverse $ (fun src => ScheduleStep.Check src true) <$> newCheckedHyps
-    let schedules ← dfs vars fixed remainingVars newCheckedIdxs firstChecks sortedHypotheses deriveSort recCall prodSort fixed
+    return constrainedProdPaths ++ unconstrainedProdPaths
 
-    let normalizedSchedules := List.eraseDups (normalizeSchedule <$> schedules)
+/-- Computes all possible schedules -/
+def possibleSchedules (vars : List (Name × Expr)) (sortedHypotheses : List (HypothesisExpr × List Name)) (deriveSort : DeriveSort)
+  (recCall : Name × List Nat) (prodSort : ProducerSort) (fixed : List Name) : MetaM (List (List ScheduleStep)) := do
 
+  let remainingVars := List.filter (. ∉ fixed) (Prod.fst <$> vars)
+  let (newCheckedIdxs, newCheckedHyps) := List.unzip $
+    collectCheckSteps fixed [] sortedHypotheses deriveSort recCall
+  let firstChecks := List.reverse $ (fun src => ScheduleStep.Check src true) <$> newCheckedHyps
+  let schedules ← dfs vars fixed remainingVars newCheckedIdxs firstChecks sortedHypotheses deriveSort recCall prodSort fixed
 
-    -- TODO: finish body of `dfs`
-    sorry
+  let normalizedSchedules := List.eraseDups (normalizeSchedule <$> schedules)
+
+  return (List.mergeSort normalizedSchedules (le := fun s1 s2 => s1.length <= s2.length))
