@@ -12,13 +12,13 @@ structure Foo where
   boolField : Bool
   natField : Nat
 
--- Test that we can successfully synthesize instances of `Arbitrary` & `ArbitraryFueled`
+-- Test that we can successfully synthefuel instances of `Arbitrary` & `ArbitraryFueled`
 set_option trace.plausible.deriving.arbitrary true in
 /--
 trace: [plausible.deriving.arbitrary] Derived generator: instance : Plausible.ArbitraryFueled Foo where
       arbitraryFueled :=
-        let rec aux_arb (size : Nat) : Plausible.Gen Foo :=
-          match size with
+        let rec aux_arb (fuel : Nat) : Plausible.Gen Foo :=
+          match fuel with
           | Nat.zero =>
             Plausible.Gen.oneOfWithDefault
               (do
@@ -31,7 +31,7 @@ trace: [plausible.deriving.arbitrary] Derived generator: instance : Plausible.Ar
                   let boolField_0 ← Plausible.Arbitrary.arbitrary
                   let natField_0 ← Plausible.Arbitrary.arbitrary
                   return Foo.mk stringField_0 boolField_0 natField_0)]
-          | size' + 1 =>
+          | fuel' + 1 =>
             Plausible.Gen.frequency
               (do
                 let stringField_0 ← Plausible.Arbitrary.arbitrary
@@ -45,7 +45,7 @@ trace: [plausible.deriving.arbitrary] Derived generator: instance : Plausible.Ar
                     let natField_0 ← Plausible.Arbitrary.arbitrary
                     return Foo.mk stringField_0 boolField_0 natField_0)),
                 ]
-        fun size => aux_arb size
+        fun fuel => aux_arb fuel
 -/
 #guard_msgs in
 deriving instance Arbitrary for Foo

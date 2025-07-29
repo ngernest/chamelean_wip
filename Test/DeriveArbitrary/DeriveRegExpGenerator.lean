@@ -23,41 +23,41 @@ set_option trace.plausible.deriving.arbitrary true in
 /--
 trace: [plausible.deriving.arbitrary] Derived generator: instance : Plausible.ArbitraryFueled RegExp where
       arbitraryFueled :=
-        let rec aux_arb (size : Nat) : Plausible.Gen RegExp :=
-          match size with
+        let rec aux_arb (fuel : Nat) : Plausible.Gen RegExp :=
+          match fuel with
           | Nat.zero =>
             Plausible.Gen.oneOfWithDefault (pure RegExp.EmptySet)
               [(pure RegExp.EmptySet), (pure RegExp.EmptyStr),
                 (do
                   let a_0 ← Plausible.Arbitrary.arbitrary
                   return RegExp.Char a_0)]
-          | size' + 1 =>
+          | fuel' + 1 =>
             Plausible.Gen.frequency (pure RegExp.EmptySet)
               [(1, (pure RegExp.EmptySet)), (1, (pure RegExp.EmptyStr)),
                 (1,
                   (do
                     let a_0 ← Plausible.Arbitrary.arbitrary
                     return RegExp.Char a_0)),
-                (size' + 1,
+                (fuel' + 1,
                   (do
-                    let a_0 ← aux_arb size'
-                    let a_1 ← aux_arb size'
+                    let a_0 ← aux_arb fuel'
+                    let a_1 ← aux_arb fuel'
                     return RegExp.App a_0 a_1)),
-                (size' + 1,
+                (fuel' + 1,
                   (do
-                    let a_0 ← aux_arb size'
-                    let a_1 ← aux_arb size'
+                    let a_0 ← aux_arb fuel'
+                    let a_1 ← aux_arb fuel'
                     return RegExp.Union a_0 a_1)),
-                (size' + 1,
+                (fuel' + 1,
                   (do
-                    let a_0 ← aux_arb size'
+                    let a_0 ← aux_arb fuel'
                     return RegExp.Star a_0))]
-        fun size => aux_arb size
+        fun fuel => aux_arb fuel
 -/
 #guard_msgs in
 deriving instance Arbitrary for RegExp
 
--- Test that we can successfully synthesize instances of `Arbitrary` & `ArbitraryFueled`
+-- Test that we can successfully synthefuel instances of `Arbitrary` & `ArbitraryFueled`
 
 /-- info: instArbitraryFueledRegExp -/
 #guard_msgs in

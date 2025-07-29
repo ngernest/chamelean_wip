@@ -20,8 +20,8 @@ set_option trace.plausible.deriving.arbitrary true in
 /--
 trace: [plausible.deriving.arbitrary] Derived generator: instance : Plausible.ArbitraryFueled Value where
       arbitraryFueled :=
-        let rec aux_arb (size : Nat) : Plausible.Gen Value :=
-          match size with
+        let rec aux_arb (fuel : Nat) : Plausible.Gen Value :=
+          match fuel with
           | Nat.zero =>
             Plausible.Gen.oneOfWithDefault (pure Value.none)
               [(pure Value.none),
@@ -39,7 +39,7 @@ trace: [plausible.deriving.arbitrary] Derived generator: instance : Plausible.Ar
                   let shape_0 ← Plausible.Arbitrary.arbitrary
                   let dtype_0 ← Plausible.Arbitrary.arbitrary
                   return Value.tensor shape_0 dtype_0)]
-          | size' + 1 =>
+          | fuel' + 1 =>
             Plausible.Gen.frequency (pure Value.none)
               [(1, (pure Value.none)),
                 (1,
@@ -61,12 +61,12 @@ trace: [plausible.deriving.arbitrary] Derived generator: instance : Plausible.Ar
                     let dtype_0 ← Plausible.Arbitrary.arbitrary
                     return Value.tensor shape_0 dtype_0)),
                 ]
-        fun size => aux_arb size
+        fun fuel => aux_arb fuel
 -/
 #guard_msgs in
 deriving instance Arbitrary for Value
 
--- Test that we can successfully synthesize instances of `Arbitrary` & `ArbitraryFueled`
+-- Test that we can successfully synthefuel instances of `Arbitrary` & `ArbitraryFueled`
 
 /-- info: instArbitraryFueledValue -/
 #guard_msgs in

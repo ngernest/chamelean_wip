@@ -34,7 +34,7 @@ inductive Tree
 ```
 
 To sample from a derived generator, users can simply call `Arbitrary.runArbitrary`, specify the type
-for the desired generated values and provide some Nat to act as the generator's size parameter (10 in the example below):
+for the desired generated values and provide some Nat to act as the generator's fuel parameter (10 in the example below):
 
 ```lean
 #eval Arbitrary.runArbitrary (α := Tree) 10
@@ -100,10 +100,10 @@ def mkArbitraryFueledInstance (targetTypeName : Name) : CommandElabM (TSyntax `c
   -- Fetch the ambient local context, which we need to produce user-accessible fresh names
   let localCtx ← liftTermElabM $ getLCtx
 
-  -- Produce `Ident`s name for the `size` argument for the lambda
+  -- Produce `Ident`s for the `fuel` argument for the lambda
   -- at the end of the generator function, as well as the `aux_arb` inner helper function
-  let freshSize := mkIdent $ localCtx.getUnusedName `size
-  let freshSize' := mkIdent $ localCtx.getUnusedName `size'
+  let freshFuel := mkIdent $ localCtx.getUnusedName `fuel
+  let freshFuel' := mkIdent $ localCtx.getUnusedName `fuel'
   let auxArb := mkIdent `aux_arb
 
   let mut nonRecursiveGenerators := #[]
@@ -161,7 +161,7 @@ def mkArbitraryFueledInstance (targetTypeName : Name) : CommandElabM (TSyntax `c
               -- otherwise generate a value using `arbitrary`
               let bindExpr ←
                 if argType.getAppFn.constName == targetTypeName then
-                  mkLetBind freshIdent #[(mkIdent `aux_arb), freshSize']
+                  mkLetBind freshIdent #[(mkIdent `aux_arb), freshFuel']
                 else
                   mkLetBind freshIdent #[(mkIdent ``Arbitrary.arbitrary)]
               doElems := doElems.push bindExpr
@@ -188,7 +188,7 @@ def mkArbitraryFueledInstance (targetTypeName : Name) : CommandElabM (TSyntax `c
     Array.mapM (fun generatorBody => `( ($generatorBody) )) nonRecursiveGenerators
 
   -- Turn each generator into a thunked function and associate each generator with its weight
-  -- (1 for non-recursive generators, `.succ size'` for recursive generators)
+  -- (1 for non-recursive generators, `fuel' + 1` for recursive generators)
   let mut weightedNonRecursiveGenerators := #[]
   for generator in nonRecursiveGenerators do
     let weightedGen ← `((1, ($generator)))
@@ -196,23 +196,23 @@ def mkArbitraryFueledInstance (targetTypeName : Name) : CommandElabM (TSyntax `c
 
   let mut weightedRecursiveGenerators := #[]
   for recursiveGen in recursiveGenerators do
-    let thunkedWeightedGen ← ``(($freshSize' + 1, ($recursiveGen)))
+    let thunkedWeightedGen ← ``(($freshFuel' + 1, ($recursiveGen)))
     weightedRecursiveGenerators := weightedRecursiveGenerators.push thunkedWeightedGen
 
-  -- Create the cases for the pattern-match on the size argument
-  -- If `size = 0`, pick one of the thunked non-recursive generators
+  -- Create the cases for the pattern-match on the fuel argument
+  -- If `fuel = 0`, pick one of the thunked non-recursive generators
   let mut caseExprs := #[]
   let zeroCase ← `(Term.matchAltExpr| | $(mkIdent ``Nat.zero) => $(mkIdent ``Gen.oneOfWithDefault) $defaultGenerator [$nonRecursiveGens,*])
   caseExprs := caseExprs.push zeroCase
 
-  -- If `size = .succ size'`, pick a generator (it can be non-recursive or recursive)
+  -- If `fuel = fuel' + 1`, pick a generator (it can be non-recursive or recursive)
   let mut allWeightedGenerators ← `([$weightedNonRecursiveGenerators,*, $weightedRecursiveGenerators,*])
-  let succCase ← `(Term.matchAltExpr| | $freshSize' + 1 => $(mkIdent ``Gen.frequency) $defaultGenerator $allWeightedGenerators)
+  let succCase ← `(Term.matchAltExpr| | $freshFuel' + 1 => $(mkIdent ``Gen.frequency) $defaultGenerator $allWeightedGenerators)
   caseExprs := caseExprs.push succCase
 
-  -- Create function argument for the generator size
-  let sizeParam ← `(Term.letIdBinder| ($freshSize : $(mkIdent `Nat)))
-  let matchExpr ← liftTermElabM $ mkMatchExpr freshSize caseExprs
+  -- Create function argument for the generator fuel
+  let fuelParam ← `(Term.letIdBinder| ($freshFuel : $(mkIdent `Nat)))
+  let matchExpr ← liftTermElabM $ mkMatchExpr freshFuel caseExprs
 
   -- Create an instance of the `ArbitraryFueled` typeclass
   let targetType := mkIdent targetTypeName
@@ -220,9 +220,9 @@ def mkArbitraryFueledInstance (targetTypeName : Name) : CommandElabM (TSyntax `c
   let typeClassInstance ←
     `(instance : $(mkIdent ``ArbitraryFueled) $targetType where
       $(mkIdent `arbitraryFueled):ident :=
-        let rec $auxArb:ident $sizeParam : $generatorType :=
+        let rec $auxArb:ident $fuelParam : $generatorType :=
           $matchExpr
-      fun $freshSize => $auxArb $freshSize)
+      fun $freshFuel => $auxArb $freshFuel)
 
   -- Pretty-print the derived generator
   let genFormat ← liftCoreM (PrettyPrinter.ppCommand typeClassInstance)

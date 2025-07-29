@@ -15,8 +15,8 @@ set_option trace.plausible.deriving.arbitrary true in
 /--
 trace: [plausible.deriving.arbitrary] Derived generator: instance : Plausible.ArbitraryFueled DummyInductive where
       arbitraryFueled :=
-        let rec aux_arb (size : Nat) : Plausible.Gen DummyInductive :=
-          match size with
+        let rec aux_arb (fuel : Nat) : Plausible.Gen DummyInductive :=
+          match fuel with
           | Nat.zero =>
             Plausible.Gen.oneOfWithDefault
               (do
@@ -29,7 +29,7 @@ trace: [plausible.deriving.arbitrary] Derived generator: instance : Plausible.Ar
                   let a_0 ← Plausible.Arbitrary.arbitrary
                   let a_1 ← Plausible.Arbitrary.arbitrary
                   return DummyInductive.FromBitVec n_0 a_0 a_1)]
-          | size' + 1 =>
+          | fuel' + 1 =>
             Plausible.Gen.frequency
               (do
                 let n_0 ← Plausible.Arbitrary.arbitrary
@@ -43,12 +43,12 @@ trace: [plausible.deriving.arbitrary] Derived generator: instance : Plausible.Ar
                     let a_1 ← Plausible.Arbitrary.arbitrary
                     return DummyInductive.FromBitVec n_0 a_0 a_1)),
                 ]
-        fun size => aux_arb size
+        fun fuel => aux_arb fuel
 -/
 #guard_msgs in
 deriving instance Arbitrary for DummyInductive
 
--- Test that we can successfully synthesize instances of `Arbitrary` & `ArbitraryFueled`
+-- Test that we can successfully synthefuel instances of `Arbitrary` & `ArbitraryFueled`
 
 /-- info: instArbitraryFueledDummyInductive -/
 #guard_msgs in

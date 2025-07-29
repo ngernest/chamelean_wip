@@ -18,24 +18,24 @@ set_option trace.plausible.deriving.arbitrary true in
 /--
 trace: [plausible.deriving.arbitrary] Derived generator: instance : Plausible.ArbitraryFueled Tree where
       arbitraryFueled :=
-        let rec aux_arb (size : Nat) : Plausible.Gen Tree :=
-          match size with
+        let rec aux_arb (fuel : Nat) : Plausible.Gen Tree :=
+          match fuel with
           | Nat.zero => Plausible.Gen.oneOfWithDefault (pure Tree.Leaf) [(pure Tree.Leaf)]
-          | size' + 1 =>
+          | fuel' + 1 =>
             Plausible.Gen.frequency (pure Tree.Leaf)
               [(1, (pure Tree.Leaf)),
-                (size' + 1,
+                (fuel' + 1,
                   (do
                     let a_0 ← Plausible.Arbitrary.arbitrary
-                    let a_1 ← aux_arb size'
-                    let a_2 ← aux_arb size'
+                    let a_1 ← aux_arb fuel'
+                    let a_2 ← aux_arb fuel'
                     return Tree.Node a_0 a_1 a_2))]
-        fun size => aux_arb size
+        fun fuel => aux_arb fuel
 -/
 #guard_msgs in
 deriving instance Arbitrary for Tree
 
--- Test that we can successfully synthesize instances of `Arbitrary` & `ArbitraryFueled`
+-- Test that we can successfully synthefuel instances of `Arbitrary` & `ArbitraryFueled`
 
 /-- info: instArbitraryFueledTree -/
 #guard_msgs in

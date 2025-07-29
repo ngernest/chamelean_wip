@@ -27,23 +27,23 @@ set_option trace.plausible.deriving.arbitrary true in
 /--
 trace: [plausible.deriving.arbitrary] Derived generator: instance : Plausible.ArbitraryFueled type where
       arbitraryFueled :=
-        let rec aux_arb (size : Nat) : Plausible.Gen type :=
-          match size with
+        let rec aux_arb (fuel : Nat) : Plausible.Gen type :=
+          match fuel with
           | Nat.zero => Plausible.Gen.oneOfWithDefault (pure type.Nat) [(pure type.Nat)]
-          | size' + 1 =>
+          | fuel' + 1 =>
             Plausible.Gen.frequency (pure type.Nat)
               [(1, (pure type.Nat)),
-                (size' + 1,
+                (fuel' + 1,
                   (do
-                    let a_0 ← aux_arb size'
-                    let a_1 ← aux_arb size'
+                    let a_0 ← aux_arb fuel'
+                    let a_1 ← aux_arb fuel'
                     return type.Fun a_0 a_1))]
-        fun size => aux_arb size
+        fun fuel => aux_arb fuel
 ---
 trace: [plausible.deriving.arbitrary] Derived generator: instance : Plausible.ArbitraryFueled term where
       arbitraryFueled :=
-        let rec aux_arb (size : Nat) : Plausible.Gen term :=
-          match size with
+        let rec aux_arb (fuel : Nat) : Plausible.Gen term :=
+          match fuel with
           | Nat.zero =>
             Plausible.Gen.oneOfWithDefault
               (do
@@ -55,7 +55,7 @@ trace: [plausible.deriving.arbitrary] Derived generator: instance : Plausible.Ar
                 (do
                   let a_0 ← Plausible.Arbitrary.arbitrary
                   return term.Var a_0)]
-          | size' + 1 =>
+          | fuel' + 1 =>
             Plausible.Gen.frequency
               (do
                 let a_0 ← Plausible.Arbitrary.arbitrary
@@ -68,27 +68,27 @@ trace: [plausible.deriving.arbitrary] Derived generator: instance : Plausible.Ar
                   (do
                     let a_0 ← Plausible.Arbitrary.arbitrary
                     return term.Var a_0)),
-                (size' + 1,
+                (fuel' + 1,
                   (do
-                    let a_0 ← aux_arb size'
-                    let a_1 ← aux_arb size'
+                    let a_0 ← aux_arb fuel'
+                    let a_1 ← aux_arb fuel'
                     return term.Add a_0 a_1)),
-                (size' + 1,
+                (fuel' + 1,
                   (do
-                    let a_0 ← aux_arb size'
-                    let a_1 ← aux_arb size'
+                    let a_0 ← aux_arb fuel'
+                    let a_1 ← aux_arb fuel'
                     return term.App a_0 a_1)),
-                (size' + 1,
+                (fuel' + 1,
                   (do
                     let a_0 ← Plausible.Arbitrary.arbitrary
-                    let a_1 ← aux_arb size'
+                    let a_1 ← aux_arb fuel'
                     return term.Abs a_0 a_1))]
-        fun size => aux_arb size
+        fun fuel => aux_arb fuel
 -/
 #guard_msgs in
 deriving instance Arbitrary for type, term
 
--- Test that we can successfully synthesize instances of `Arbitrary` & `ArbitraryFueled`
+-- Test that we can successfully synthefuel instances of `Arbitrary` & `ArbitraryFueled`
 -- for both `type` & `term`
 
 /-- info: instArbitraryFueledType -/
