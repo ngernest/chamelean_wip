@@ -65,27 +65,53 @@ def mkSortedHypothesesVariablesMap (hypotheses : List HypothesisExpr) : List (Hy
     (h, ctorArgs.flatMap variablesInConstructorExpr))
   List.mergeSort hypVarMap (le := fun (_, vars1) (_, vars2) => vars1.length <= vars2.length)
 
+/-- Environment for the `ScheduleM` reader monad -/
+structure ScheduleEnv where
+  /-- List of variables and their types -/
+  vars : List (Name × Expr)
+
+  /-- Hypotheses about the variables in `vars` -/
+  sortedHypotheses : List (HypothesisExpr × List Name)
+
+  /-- Determines whether we're deriving a checker/enumerator/generator -/
+  deriveSort : DeriveSort
+
+  /-- The sort of auxiliary producer (generators / enumerators) invoked by
+      the function being derived. Note that if `deriveSort = Checker`, then
+      `prodSort = Enumerator`, since checkers have to invoke enumerators
+      as discussed in the Computing Correctly paper. -/
+  prodSort : ProducerSort
+
+  /-- A pair contianing the name of the inductive relation and a list of indices for output arguments -/
+  recCall : Name × List Nat
+
+  /-- A list of fixed variables (i.e. inputs to the inductive relation) -/
+  fixed : List Name
+
+/-- A monad for deriving generator schedules. Under the hood,
+    `ScheduleM` is just a reader monad stacked on top of `MetaM`,
+    with `ScheduleEnv` serving as the environment for the reader monad. -/
+abbrev ScheduleM (α : Type) := ReaderT ScheduleEnv MetaM α
+
 /- After we generate some variables, look at the hypotheses and see if any of them only contain fixed variables
     (if yes, then we need to check that hypothesis)
-    - `checked_hypotheses` contains the hypotheses that have been checked so far  -/
-def collectCheckSteps
-  (boundVars : List Name)
-  (checkedHypotheses : List Nat)
-  (sortedHypotheses : List (HypothesisExpr × List Name))
-  (deriveSort : DeriveSort)
-  (recCall : Name × List Nat) : List (Nat × Source) :=
-  let (inductiveName, inputArgs) := recCall
-  filterMapWithIndex (fun i (hyp, vars) =>
+    - `checkedHypotheses` contains the hypotheses that have been checked so far  -/
+def collectCheckSteps (boundVars : List Name) (checkedHypotheses : List Nat) : ScheduleM (List (Nat × Source)) := do
+  let env ← read
+  let (inductiveName, inputArgs) := env.recCall
+
+  let checkSteps := filterMapWithIndex (fun i (hyp, vars) =>
     if i ∉ checkedHypotheses && List.all vars (. ∈ boundVars) then
       let (ctorName, ctorArgs) := hyp
       let src :=
-        if deriveSort == .Checker && inputArgs.isEmpty then
+        if env.deriveSort == .Checker && inputArgs.isEmpty then
           if ctorName == inductiveName then .Rec `aux_dec ctorArgs
           else .NonRec hyp
         else .NonRec hyp
       some (i, src)
-    else none
-  ) sortedHypotheses
+    else none) env.sortedHypotheses
+
+  return checkSteps
 
 
 /-- Determines whether inputs & outputs of a generator appear under the same constructor in a hypothesis `hyp`
@@ -187,32 +213,15 @@ def normalizeSchedule (steps : List ScheduleStep) : List ScheduleStep :=
       -- Comparison function on blocks of `ScheduleSteps`
       compareBlocks b1 b2 := Ordering.isLE $ Ord.compare b1 b2
 
-structure ScheduleEnv where
-  vars : List (Name × Expr)
-  sortedHypotheses : List (HypothesisExpr × List Name)
-  deriveSort : DeriveSort
-  recCall : Name × List Nat
-  prodSort : ProducerSort
-  fixed : List Name
-
-
-abbrev DFS (α : Type) := ReaderT ScheduleEnv MetaM α
-
 /- Depth-first enumeration of all possible schedules -/
-partial def dfs
-  (boundVars : List Name)
-  (remainingVars : List Name)
-  (checkedHypotheses : List Nat)
-  (scheduleSoFar : List ScheduleStep)
-  : DFS (List (List ScheduleStep)) :=
+partial def dfs (boundVars : List Name) (remainingVars : List Name) (checkedHypotheses : List Nat) (scheduleSoFar : List ScheduleStep) : ScheduleM (List (List ScheduleStep)) :=
   match remainingVars with
   | [] => return [List.reverse scheduleSoFar]
   | _ => do
     let env ← read
     let unconstrainedProdPaths ←
       flatMapMWithContext remainingVars (fun v remainingVars' => do
-        let (newCheckedIdxs, newCheckedHyps) :=
-          List.unzip (collectCheckSteps (v::boundVars) checkedHypotheses env.sortedHypotheses env.deriveSort env.recCall)
+        let (newCheckedIdxs, newCheckedHyps) ← List.unzip <$> collectCheckSteps (v::boundVars) checkedHypotheses
         let ty ← Option.getDM (List.lookup v env.vars)
           (throwError m!"key {v} missing from association list {env.vars}")
         let (ctorName, ctorArgs) := ty.getAppFnArgs
@@ -226,7 +235,7 @@ partial def dfs
             | some hypExpr => pure (Source.NonRec hypExpr)
         let unconstrainedProdStep := ScheduleStep.Unconstrained v src env.prodSort
         -- TODO: handle negated propositions in `ScheduleStep.Check`
-        let checks := List.reverse $ (fun src => ScheduleStep.Check src true) <$> newCheckedHyps
+        let checks := List.reverse $ (ScheduleStep.Check . true) <$> newCheckedHyps
         dfs (v::boundVars) remainingVars'
           (newCheckedIdxs ++ checkedHypotheses)
           (checks ++ unconstrainedProdStep :: scheduleSoFar))
@@ -260,10 +269,9 @@ partial def dfs
         else
           pure (Source.NonRec hyp')
       let constrainedProdStep := ScheduleStep.SuchThat typedOutputs constrainingRelation env.prodSort
-      let (newCheckedIdxs, newCheckedHyps) := List.unzip $
-        collectCheckSteps (outputVars ++ boundVars) (i::checkedHypotheses) env.sortedHypotheses env.deriveSort env.recCall
+      let (newCheckedIdxs, newCheckedHyps) ← List.unzip <$> collectCheckSteps (outputVars ++ boundVars) (i::checkedHypotheses)
       -- TODO: handle negated propositions in `ScheduleStep.Check`
-      let checks := List.reverse $ (fun src => ScheduleStep.Check src true) <$> newCheckedHyps
+      let checks := List.reverse $ (ScheduleStep.Check . true) <$> newCheckedHyps
 
       dfs (outputVars ++ boundVars) remainingVars'
         (i :: newCheckedIdxs ++ checkedHypotheses)
@@ -273,16 +281,21 @@ partial def dfs
 
 /-- Computes all possible schedules -/
 def possibleSchedules (vars : List (Name × Expr)) (hypotheses : List HypothesisExpr) (deriveSort : DeriveSort)
-  (recCall : Name × List Nat) (prodSort : ProducerSort) (fixed : List Name) : MetaM (List (List ScheduleStep)) := do
+  (recCall : Name × List Nat) (fixed : List Name) : MetaM (List (List ScheduleStep)) := do
 
   let sortedHypotheses := mkSortedHypothesesVariablesMap hypotheses
 
-  let remainingVars := List.filter (. ∉ fixed) (Prod.fst <$> vars)
-  let (newCheckedIdxs, newCheckedHyps) := List.unzip $
-    collectCheckSteps fixed [] sortedHypotheses deriveSort recCall
-  let firstChecks := List.reverse $ (fun src => ScheduleStep.Check src true) <$> newCheckedHyps
+  let prodSort :=
+    match deriveSort with
+    | .Checker | .Enumerator => ProducerSort.Enumerator
+    | .Generator => ProducerSort.Generator
 
-  let scheduleEnv := ⟨ vars, sortedHypotheses, deriveSort, recCall, prodSort, fixed ⟩
+  let scheduleEnv := ⟨ vars, sortedHypotheses, deriveSort, prodSort, recCall, fixed ⟩
+
+  let remainingVars := List.filter (. ∉ fixed) (Prod.fst <$> vars)
+
+  let (newCheckedIdxs, newCheckedHyps) ← List.unzip <$> ReaderT.run (collectCheckSteps fixed []) scheduleEnv
+  let firstChecks := List.reverse $ (ScheduleStep.Check . true) <$> newCheckedHyps
 
   let schedules ← ReaderT.run (dfs fixed remainingVars newCheckedIdxs firstChecks) scheduleEnv
 
