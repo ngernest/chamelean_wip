@@ -133,36 +133,6 @@ partial def convertExprToRangeInCurrentContext (e : Expr) : UnifyM Range := do
       | .const u _ => return (.Unknown u)
       | _ => throwError m!"Cannot convert expression {e} to Range"
 
--- -- TODO: delete (This function is likely wrong! )
--- partial def convertHypothesisExprToRange (e : Expr) : UnifyM Range := do
---   logWarning m!"convertHypothesisExprToRange {e}"
---   match (← convertToCtorExpr e) with
---   | some (f, args) => do
---     logWarning m!"in App case of convertHypothesisExprToRange with {f} {args}"
---     let argRanges ← args.toList.mapM convertHypothesisExprToRange
---     let ctorRange := Range.Ctor f argRanges
---     let unknown ← UnifyM.registerFreshUnknown
---     logWarning m!"Adding a constraint: {unknown} ↦ {ctorRange}"
---     UnifyM.update unknown ctorRange
---     let state ← get
---     logWarning m!"updated state = {state}"
---     return (.Unknown unknown)
---   | none =>
---     if e.isFVar then do
---       let localCtx ← getLCtx
---       match localCtx.findFVar? e with
---       | some localDecl =>
---         let u := localDecl.userName
---         return (.Unknown u)
---       | none =>
---         let namesInContext := (fun e => getUserNameInContext! localCtx e.fvarId!) <$> localCtx.getFVars
---         throwError m!"{e} missing from LocalContext, which only contains {namesInContext}"
---     else
---       match e with
---       | .const u _ => return (.Unknown u)
---       | _ => throwError m!"Cannot convert expression {e} to Range"
-
-
 /-- Converts a hypothesis (reprented as a `TSyntax term`) to a `Range` -/
 partial def convertHypothesisTermToRange (term : TSyntax `term) : UnifyM Range := do
   logWarning m!"converting term {term} to Range"
@@ -235,7 +205,7 @@ mutual
     logWarning m!"Checking if unknowns in {ctorExpr} have Undef Ranges"
     match ctorExpr with
     | .Unknown u => not <$> UnifyM.hasUndefRange u
-    | .Ctor c args =>
+    | .Ctor _ args =>
       logWarning m!"entered Ctor case of allUnknownsHaveUndefRanges with {ctorExpr}"
       List.allM allUnknownsHaveUndefRanges args
 
@@ -409,7 +379,7 @@ def convertRangeToCtorAppForm (r : Range) : UnifyM (Name × List ConstructorExpr
         listed in order, which coincides with `inputNames ∪ { outputName }`
     - The name of the inductive relation we are targeting (`inductiveName`) -/
 def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Expr) (inputNames : List Name)
-  (unknowns : Array Unknown) (inductiveName : Name) : UnifyM (TSyntax `term) := do
+  (unknowns : Array Unknown) : UnifyM (TSyntax `term) := do
   let ctorInfo ← getConstInfoCtor ctorName
   let ctorType := ctorInfo.type
 
@@ -486,23 +456,6 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
     for ((_u1, r1), (_u2, r2)) in conclusionArgsAndRanges.zip unknownArgsAndRanges do
       unify r1 r2
 
-    -- TODO: if you uncomment this, we get an infinite loop when trying to derive a subgenerator for TApp
-    -- logWarning m!"Beginning to unify arguments in hypotheses with conclusion args..."
-    -- for (_, hypRange) in hypCtorAndRanges do
-    --     match hypRange with
-    --     | .Ctor hypCtorName hypArgRanges =>
-    --       logWarning m!"Attempting to unify args in hypothesis ({hypCtorName} {hypRange})"
-    --       if hypCtorName == inductiveName then
-    --         for ((conclusionArg, conclusionRange), hypArgRange) in conclusionArgsAndRanges.zip hypArgRanges.toArray do
-    --           logWarning m!"conclusionArg = {conclusionArg}, conclusionRange = {conclusionRange}, hypArgRange = {hypArgRange}"
-    --           unify conclusionRange hypArgRange
-    --       else
-    --         logWarning m!"hypCtorName {hypCtorName} doesn't match inductiveName {inductiveName}, skipping..."
-    --         continue
-    --     | _ =>
-    --       logWarning m!"skipping over {hypRange}"
-    --       continue
-
     -- Update the list of hypotheses with the result of unification
     -- (i.e. constructor arguments in hypotheses are updated with the canonical
     -- representation of each argument as determined by the unification algorithm)
@@ -573,7 +526,7 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
 
       for ctorName in inductiveVal.ctors do
         let derivationResult ← UnifyM.runInMetaM
-          (processCtorInContext ctorName freshenedOutputName outputType freshenedInputNamesExcludingOutput freshUnknowns inductiveName) emptyUnifyState
+          (processCtorInContext ctorName freshenedOutputName outputType freshenedInputNamesExcludingOutput freshUnknowns) emptyUnifyState
         match derivationResult with
         | some (generator, _) => logInfo m!"Derived generator:\n```\n{generator}\n```"
         | none => logInfo m!"Derived generator:\n```\nreturn none\n```"
