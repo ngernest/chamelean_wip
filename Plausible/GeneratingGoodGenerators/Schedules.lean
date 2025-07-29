@@ -13,13 +13,13 @@ abbrev HypothesisExpr := Name × List ConstructorExpr
 inductive Source
   | NonRec : HypothesisExpr → Source
   | Rec : Name → List ConstructorExpr → Source
-  deriving Repr, Ord
+  deriving Repr, BEq, Ord
 
 /-- Producers are either enumerators or generators -/
 inductive ProducerSort
   | Enumerator
   | Generator
-  deriving Repr, Ord
+  deriving Repr, BEq, Ord
 
 /-- The sort of function we are deriving based on an inductive relation:
     determines whether we are deriving a (constrained) generator, enumerator or a checker. -/
@@ -37,7 +37,7 @@ inductive ScheduleSort
       only hypotheses need be checked and conclusion of constructor follows-/
   | CheckerSchedule
 
-  deriving Repr, Ord
+  deriving Repr, Ord, BEq
 
 
 /-- A single step in a generator schedule -/
@@ -56,7 +56,7 @@ inductive ScheduleStep
     fresh variable followed by a pattern match -/
   | Match : Name → Pattern → ScheduleStep
 
-  deriving Repr, Ord
+  deriving Repr, BEq, Ord
 
 /-- A schedule is a pair consisting of an ordered list of `ScheduleStep`s,
     and the sort of schedule we're dealing with (the latter is the "conclusion" of the schedule) -/

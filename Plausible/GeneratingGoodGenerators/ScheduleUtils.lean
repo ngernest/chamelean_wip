@@ -279,7 +279,10 @@ partial def dfs
     let (newCheckedIdxs, newCheckedHyps) := List.unzip $
       collectCheckSteps fixed [] sortedHypotheses deriveSort recCall
     let firstChecks := List.reverse $ (fun src => ScheduleStep.Check src true) <$> newCheckedHyps
-    let schedules := dfs vars fixed remainingVars newCheckedIdxs firstChecks sortedHypotheses deriveSort recCall prodSort fixed
+    let schedules ← dfs vars fixed remainingVars newCheckedIdxs firstChecks sortedHypotheses deriveSort recCall prodSort fixed
+
+    let normalizedSchedules := List.eraseDups (normalizeSchedule <$> schedules)
+
 
     -- TODO: finish body of `dfs`
     sorry

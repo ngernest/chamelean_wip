@@ -44,7 +44,7 @@ inductive Range
 inductive Pattern
   | UnknownPattern : Unknown -> Pattern
   | CtorPattern : Name -> List Pattern -> Pattern
-  deriving Repr, Inhabited, Ord
+  deriving Repr, Inhabited, BEq, Ord
 
 /-- A *constructor expression* (`ConstructorExpr`) is either a variable (represented by its `Name`),
     or a constructor (identified by its `Name`) applied to some list of arguments,
