@@ -113,7 +113,6 @@ def collectCheckSteps (boundVars : List Name) (checkedHypotheses : List Nat) : S
 
   return checkSteps
 
-
 /-- Determines whether inputs & outputs of a generator appear under the same constructor in a hypothesis `hyp`
     - Example: consider the `TApp` constructor for STLC (when we are generating `e` such that `typing Γ e τ` holds):
     ```
@@ -171,12 +170,12 @@ def handleConstraintedOutputs (hyp : HypothesisExpr) (outputVars : List Name) : 
   let (ctorName, ctorArgs) := hyp
 
   let (patternMatches, args', newOutputs) ← splitThreeLists <$> ctorArgs.mapM (fun arg =>
-    let variables := variablesInConstructorExpr arg
+    let vars := variablesInConstructorExpr arg
     match arg with
     | .Ctor _ _ =>
-      if !variables.isEmpty && List.all variables (. ∈ outputVars) then do
+      if !vars.isEmpty && List.all vars (. ∈ outputVars) then do
         let localCtx ← getLCtx
-        let newName := localCtx.getUnusedName (Name.mkStr1 ("v" ++ String.intercalate "_" (Name.getString! <$> variables)))
+        let newName := localCtx.getUnusedName (Name.mkStr1 ("v" ++ String.intercalate "_" (Name.getString! <$> vars)))
         let newMatch := ScheduleStep.Match newName (patternOfConstructorExpr arg)
         pure (some newMatch, .Unknown newName, some newName)
       else
