@@ -304,6 +304,9 @@ namespace UnifyM
     let r ← findCorrespondingRange k u
     fixRange u r
       where
+        /-- `fixRange u r` updates the binding for `u` `UnknownMap`
+             so that corresponding range is `Fixed` if `r`
+             is not already `Fixed` -/
         fixRange (u : Unknown) (r : Range) : UnifyM Unit :=
           match r with
           | .Fixed => return ()

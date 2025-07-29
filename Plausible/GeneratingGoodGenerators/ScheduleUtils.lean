@@ -93,7 +93,7 @@ structure ScheduleEnv where
     with `ScheduleEnv` serving as the environment for the reader monad. -/
 abbrev ScheduleM (α : Type) := ReaderT ScheduleEnv MetaM α
 
-/- After we generate some variables, look at the hypotheses and see if any of them only contain fixed variables
+/-- After we generate some variables, look at the hypotheses and see if any of them only contain fixed variables
     (if yes, then we need to check that hypothesis)
     - `checkedHypotheses` contains the hypotheses that have been checked so far  -/
 def collectCheckSteps (boundVars : List Name) (checkedHypotheses : List Nat) : ScheduleM (List (Nat × Source)) := do
@@ -212,7 +212,7 @@ def normalizeSchedule (steps : List ScheduleStep) : List ScheduleStep :=
       -- Comparison function on blocks of `ScheduleSteps`
       compareBlocks b1 b2 := Ordering.isLE $ Ord.compare b1 b2
 
-/- Depth-first enumeration of all possible schedules -/
+/-- Depth-first enumeration of all possible schedules -/
 partial def dfs (boundVars : List Name) (remainingVars : List Name) (checkedHypotheses : List Nat) (scheduleSoFar : List ScheduleStep) : ScheduleM (List (List ScheduleStep)) :=
   match remainingVars with
   | [] => return [List.reverse scheduleSoFar]
