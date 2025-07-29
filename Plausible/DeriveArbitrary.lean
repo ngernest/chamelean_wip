@@ -17,7 +17,7 @@ open Lean Elab Command Meta Parser
 # Deriving Handler for `Arbitrary` typeclass
 
 This file defines a handler which automatically derives `Arbitrary` instances
-for algebraic data types (i.e. simple `inductive` types).
+for inductive types.
 
 (Note that the deriving handler technically derives `ArbitrarySized` instancces,
 but every `ArbitrarySized` instance automatically results in an `Arbitrary` instance,
