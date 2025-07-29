@@ -1,6 +1,5 @@
-import Lean
-import Std
-import Batteries
+import Lean.Expr
+import Lean.LocalContext
 
 import Plausible.GeneratingGoodGenerators.UnificationMonad
 import Plausible.New.DeriveConstrainedProducers
@@ -347,7 +346,7 @@ end
 
 /-- Converts a `Range` to a `ConstructorExpr`
     (helper function used by `convertRangeToCtorAppForm`) -/
-def convertRangeToConstructorExpr (r : Range) : UnifyM ConstructorExpr :=
+partial def convertRangeToConstructorExpr (r : Range) : UnifyM ConstructorExpr :=
   match r with
   | .Unknown u => return (.Unknown u)
   | .Ctor ctorName args => do
@@ -512,7 +511,7 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
       -- create a fresh name (to avoid clashing with names that may appear in constructors
       -- of the inductive relation). Note that this requires updating the ambient `LocalContext`
       for argName in argNames do
-        let freshArgName := localCtx.getUnusedUserName argName
+        let freshArgName := localCtx.getUnusedName argName
         localCtx := localCtx.renameUserName argName freshArgName
         freshUnknowns := freshUnknowns.push freshArgName
 

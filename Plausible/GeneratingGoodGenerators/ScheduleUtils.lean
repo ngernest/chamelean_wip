@@ -1,4 +1,4 @@
-import Lean
+import Lean.Expr
 import Batteries
 import Plausible.IR.Examples
 import Plausible.New.Utils

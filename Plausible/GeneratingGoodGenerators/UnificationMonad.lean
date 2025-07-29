@@ -1,6 +1,6 @@
 
-import Std
-import Lean
+import Std.Data.HashMap
+import Lean.Expr
 import Lean.Exception
 import Plausible.New.Idents
 
