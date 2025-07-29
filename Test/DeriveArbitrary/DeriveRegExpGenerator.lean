@@ -1,6 +1,5 @@
-import Plausible.Gen
+import Plausible.Attr
 import Plausible.Arbitrary
-import Plausible.Gen
 import Plausible.DeriveArbitrary
 
 open Plausible Gen
@@ -19,7 +18,44 @@ inductive RegExp : Type where
   | App : RegExp → RegExp → RegExp
   | Union : RegExp → RegExp → RegExp
   | Star : RegExp → RegExp
-  deriving Repr, Arbitrary
+
+set_option trace.plausible.deriving.arbitrary true in
+/--
+trace: [plausible.deriving.arbitrary] Derived generator: instance : Plausible.ArbitrarySized RegExp where
+      arbitrarySized :=
+        let rec aux_arb (size : Nat) : Plausible.Gen RegExp :=
+          match size with
+          | Nat.zero =>
+            Plausible.Gen.oneOfWithDefault (pure RegExp.EmptySet)
+              [(pure RegExp.EmptySet), (pure RegExp.EmptyStr),
+                (do
+                  let a_0 ← Plausible.Arbitrary.arbitrary
+                  return RegExp.Char a_0)]
+          | Nat.succ size' =>
+            Plausible.Gen.frequency (pure RegExp.EmptySet)
+              [(1, (pure RegExp.EmptySet)), (1, (pure RegExp.EmptyStr)),
+                (1,
+                  (do
+                    let a_0 ← Plausible.Arbitrary.arbitrary
+                    return RegExp.Char a_0)),
+                (Nat.succ size',
+                  (do
+                    let a_0 ← aux_arb size'
+                    let a_1 ← aux_arb size'
+                    return RegExp.App a_0 a_1)),
+                (Nat.succ size',
+                  (do
+                    let a_0 ← aux_arb size'
+                    let a_1 ← aux_arb size'
+                    return RegExp.Union a_0 a_1)),
+                (Nat.succ size',
+                  (do
+                    let a_0 ← aux_arb size'
+                    return RegExp.Star a_0))]
+        fun size => aux_arb size
+-/
+#guard_msgs in
+deriving instance Arbitrary for RegExp
 
 -- Test that we can successfully synthesize instances of `Arbitrary` & `ArbitrarySized`
 
@@ -30,46 +66,3 @@ inductive RegExp : Type where
 /-- info: instArbitraryOfArbitrarySized -/
 #guard_msgs in
 #synth Arbitrary RegExp
-
--- We test the command elaborator frontend in a separate namespace to
--- avoid overlapping typeclass instances for the same type
-namespace CommandElaboratorTest
-
-/--
-info: Try this generator: instance : Plausible.ArbitrarySized RegExp where
-  arbitrarySized :=
-    let rec aux_arb (size : Nat) : Plausible.Gen RegExp :=
-      match size with
-      | Nat.zero =>
-        Plausible.Gen.oneOfWithDefault (pure RegExp.EmptySet)
-          [(pure RegExp.EmptySet), (pure RegExp.EmptyStr),
-            (do
-              let a_0 ← Plausible.Arbitrary.arbitrary
-              return RegExp.Char a_0)]
-      | Nat.succ size' =>
-        Plausible.Gen.frequency (pure RegExp.EmptySet)
-          [(1, (pure RegExp.EmptySet)), (1, (pure RegExp.EmptyStr)),
-            (1,
-              (do
-                let a_0 ← Plausible.Arbitrary.arbitrary
-                return RegExp.Char a_0)),
-            (Nat.succ size',
-              (do
-                let a_0 ← aux_arb size'
-                let a_1 ← aux_arb size'
-                return RegExp.App a_0 a_1)),
-            (Nat.succ size',
-              (do
-                let a_0 ← aux_arb size'
-                let a_1 ← aux_arb size'
-                return RegExp.Union a_0 a_1)),
-            (Nat.succ size',
-              (do
-                let a_0 ← aux_arb size'
-                return RegExp.Star a_0))]
-    fun size => aux_arb size
--/
-#guard_msgs(info, drop warning) in
-#derive_arbitrary RegExp
-
-end CommandElaboratorTest
