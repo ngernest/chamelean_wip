@@ -50,18 +50,18 @@ def initSizeIdent : Ident := mkIdent `initSize
 /-- Ident for the `size` parameter used in generators -/
 def sizeIdent : Ident := mkIdent `size
 
-/-- Ident for the `ArbitrarySized` typeclass -/
-def arbitrarySizedTypeclass : Ident := mkIdent ``ArbitrarySized
+/-- Ident for the `ArbitraryFueled` typeclass -/
+def arbitraryFueledTypeclass : Ident := mkIdent ``ArbitraryFueled
 
 -- Idents for typeclass functions
 /-- Ident for the `Arbitrary.arbitrary` function -/
 def arbitraryFn : Ident := mkIdent ``Arbitrary.arbitrary
 
-/-- Ident for the `ArbitrarySized.arbitrarySized` function -/
-def arbitrarySizedFn : Ident := mkIdent ``ArbitrarySized.arbitrarySized
+/-- Ident for the `ArbitraryFueled.arbitraryFueled` function -/
+def arbitraryFueledFn : Ident := mkIdent ``ArbitraryFueled.arbitraryFueled
 
-/-- Ident for the unqualified `arbitrarySized` function -/
-def unqualifiedArbitrarySizedFn : Ident := mkIdent `arbitrarySized
+/-- Ident for the unqualified `arbitraryFueled` function -/
+def unqualifiedArbitraryFueledFn : Ident := mkIdent `arbitraryFueled
 
 -- Idents for commonly-used types / constructors / type constructors
 /-- Ident for the `Bool` type -/

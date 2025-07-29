@@ -25,8 +25,8 @@ inductive term where
 -- Invoke deriving instance handler for the `Arbitrary` typeclass on `type` and `term`
 set_option trace.plausible.deriving.arbitrary true in
 /--
-trace: [plausible.deriving.arbitrary] Derived generator: instance : Plausible.ArbitrarySized type where
-      arbitrarySized :=
+trace: [plausible.deriving.arbitrary] Derived generator: instance : Plausible.ArbitraryFueled type where
+      arbitraryFueled :=
         let rec aux_arb (size : Nat) : Plausible.Gen type :=
           match size with
           | Nat.zero => Plausible.Gen.oneOfWithDefault (pure type.Nat) [(pure type.Nat)]
@@ -40,8 +40,8 @@ trace: [plausible.deriving.arbitrary] Derived generator: instance : Plausible.Ar
                     return type.Fun a_0 a_1))]
         fun size => aux_arb size
 ---
-trace: [plausible.deriving.arbitrary] Derived generator: instance : Plausible.ArbitrarySized term where
-      arbitrarySized :=
+trace: [plausible.deriving.arbitrary] Derived generator: instance : Plausible.ArbitraryFueled term where
+      arbitraryFueled :=
         let rec aux_arb (size : Nat) : Plausible.Gen term :=
           match size with
           | Nat.zero =>
@@ -88,21 +88,21 @@ trace: [plausible.deriving.arbitrary] Derived generator: instance : Plausible.Ar
 #guard_msgs in
 deriving instance Arbitrary for type, term
 
--- Test that we can successfully synthesize instances of `Arbitrary` & `ArbitrarySized`
+-- Test that we can successfully synthesize instances of `Arbitrary` & `ArbitraryFueled`
 -- for both `type` & `term`
 
-/-- info: instArbitrarySizedType -/
+/-- info: instArbitraryFueledType -/
 #guard_msgs in
-#synth ArbitrarySized type
+#synth ArbitraryFueled type
 
-/-- info: instArbitrarySizedTerm -/
+/-- info: instArbitraryFueledTerm -/
 #guard_msgs in
-#synth ArbitrarySized term
+#synth ArbitraryFueled term
 
-/-- info: instArbitraryOfArbitrarySized -/
+/-- info: instArbitraryOfArbitraryFueled -/
 #guard_msgs in
 #synth Arbitrary type
 
-/-- info: instArbitraryOfArbitrarySized -/
+/-- info: instArbitraryOfArbitraryFueled -/
 #guard_msgs in
 #synth Arbitrary term

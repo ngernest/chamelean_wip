@@ -16,8 +16,8 @@ deriving Repr
 -- Invoke deriving instance handler for the `Arbitrary` typeclass on `type` and `term`
 set_option trace.plausible.deriving.arbitrary true in
 /--
-trace: [plausible.deriving.arbitrary] Derived generator: instance : Plausible.ArbitrarySized Tree where
-      arbitrarySized :=
+trace: [plausible.deriving.arbitrary] Derived generator: instance : Plausible.ArbitraryFueled Tree where
+      arbitraryFueled :=
         let rec aux_arb (size : Nat) : Plausible.Gen Tree :=
           match size with
           | Nat.zero => Plausible.Gen.oneOfWithDefault (pure Tree.Leaf) [(pure Tree.Leaf)]
@@ -35,12 +35,12 @@ trace: [plausible.deriving.arbitrary] Derived generator: instance : Plausible.Ar
 #guard_msgs in
 deriving instance Arbitrary for Tree
 
--- Test that we can successfully synthesize instances of `Arbitrary` & `ArbitrarySized`
+-- Test that we can successfully synthesize instances of `Arbitrary` & `ArbitraryFueled`
 
-/-- info: instArbitrarySizedTree -/
+/-- info: instArbitraryFueledTree -/
 #guard_msgs in
-#synth ArbitrarySized Tree
+#synth ArbitraryFueled Tree
 
-/-- info: instArbitraryOfArbitrarySized -/
+/-- info: instArbitraryOfArbitraryFueled -/
 #guard_msgs in
 #synth Arbitrary Tree

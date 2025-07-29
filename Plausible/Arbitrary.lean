@@ -14,9 +14,9 @@ The `Arbitrary` typeclass represents types for which there exists a
 random generator suitable for property-based testing, similar to
 Haskell QuickCheck's `Arbitrary` typeclass and Rocq/Coq QuickChick's `Gen` typeclass.
 
-The `ArbitrarySized` typeclass is a verison of `Arbitrary` in which
-the generator's internal size parameter is made explicit.
-Every `ArbitrarySized` instance automatically leads to an `Arbitrary` instance.
+The `ArbitraryFueled` typeclass is a verison of `Arbitrary` in which
+fuel for the generator is made explicit.
+Every `ArbitraryFueled` instance automatically leads to an `Arbitrary` instance.
 
 (Note: the `SampleableExt` describes types which have *both* a generator & a shrinker,
 whereas `Arbitrary` describes types which have a generator only.)
@@ -24,7 +24,7 @@ whereas `Arbitrary` describes types which have a generator only.)
 ## Main definitions
 
 * `Arbitrary` typeclass
-* `ArbitrarySized` typeclass
+* `ArbitraryFueled` typeclass
 
 ## References
 
@@ -47,25 +47,27 @@ class Arbitrary (α : Type) where
   /-- A random generator for values of the given type. -/
   arbitrary : Gen α
 
-/-- A typeclass for sized random generation, i.e. a variant of
-    the `Arbitrary` typeclass where the generator's internal size
-    parameter is made explicit.
-    - This typeclass is equivalent to QuickChick's `arbitrarySized` typeclass. -/
-class ArbitrarySized (α : Type) where
+/-- A typeclass for *fueled* random generation, i.e. a variant of
+    the `Arbitrary` typeclass where the fuel for the generator is made explicit.
+    - This typeclass is equivalent to Rocq QuickChick's `arbitrarySized` typeclass
+      (QuickChick uses the `Nat` parameter as both fuel and the generator size,
+       here we use it just for fuel, as Plausible's `Gen` type constructor
+       already internalizes the size parameter.) -/
+class ArbitraryFueled (α : Type) where
   /-- Takes a `Nat` and produces a random generator dependent on the `Nat` parameter
       (which indicates the size of the output) -/
-  arbitrarySized : Nat → Gen α
+  arbitraryFueled : Nat → Gen α
 
-/-- Every `ArbitrarySized` instance gives rise to an `Arbitrary` instance -/
-instance [ArbitrarySized α] : Arbitrary α where
-  arbitrary := Gen.sized ArbitrarySized.arbitrarySized
+/-- Every `ArbitraryFueled` instance gives rise to an `Arbitrary` instance -/
+instance [ArbitraryFueled α] : Arbitrary α where
+  arbitrary := Gen.sized ArbitraryFueled.arbitraryFueled
 
-/-- If we have `Repr`, `ArbitrarySized` & `Shrinkable` instances for a type,
+/-- If we have `Repr`, `ArbitraryFueled` & `Shrinkable` instances for a type,
     then that type gets a `SampleableExt` instance
     - Note: Plausible's `SampleableExt` is analogous to QuickChick's `Arbitrary` typeclass
       (which combines QuickChick's `Gen` and `Shrink` typeclass)-/
-instance [Repr α] [Shrinkable α] [ArbitrarySized α] : SampleableExt α :=
-  SampleableExt.mkSelfContained (Gen.sized ArbitrarySized.arbitrarySized)
+instance [Repr α] [Shrinkable α] [ArbitraryFueled α] : SampleableExt α :=
+  SampleableExt.mkSelfContained (Gen.sized ArbitraryFueled.arbitraryFueled)
 
 /-- Any type which implements Plausible's `SampleableExt` typeclass
     can be made an instance of our `Arbitrary` typeclass -/

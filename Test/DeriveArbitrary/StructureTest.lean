@@ -12,11 +12,11 @@ structure Foo where
   boolField : Bool
   natField : Nat
 
--- Test that we can successfully synthesize instances of `Arbitrary` & `ArbitrarySized`
+-- Test that we can successfully synthesize instances of `Arbitrary` & `ArbitraryFueled`
 set_option trace.plausible.deriving.arbitrary true in
 /--
-trace: [plausible.deriving.arbitrary] Derived generator: instance : Plausible.ArbitrarySized Foo where
-      arbitrarySized :=
+trace: [plausible.deriving.arbitrary] Derived generator: instance : Plausible.ArbitraryFueled Foo where
+      arbitraryFueled :=
         let rec aux_arb (size : Nat) : Plausible.Gen Foo :=
           match size with
           | Nat.zero =>
@@ -50,10 +50,10 @@ trace: [plausible.deriving.arbitrary] Derived generator: instance : Plausible.Ar
 #guard_msgs in
 deriving instance Arbitrary for Foo
 
-/-- info: instArbitrarySizedFoo -/
+/-- info: instArbitraryFueledFoo -/
 #guard_msgs in
-#synth ArbitrarySized Foo
+#synth ArbitraryFueled Foo
 
-/-- info: instArbitraryOfArbitrarySized -/
+/-- info: instArbitraryOfArbitraryFueled -/
 #guard_msgs in
 #synth Arbitrary Foo

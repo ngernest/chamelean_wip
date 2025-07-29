@@ -20,8 +20,8 @@ inductive BinOp where
 
 set_option trace.plausible.deriving.arbitrary true in
 /--
-trace: [plausible.deriving.arbitrary] Derived generator: instance : Plausible.ArbitrarySized BinOp where
-      arbitrarySized :=
+trace: [plausible.deriving.arbitrary] Derived generator: instance : Plausible.ArbitraryFueled BinOp where
+      arbitraryFueled :=
         let rec aux_arb (size : Nat) : Plausible.Gen BinOp :=
           match size with
           | Nat.zero =>
@@ -42,12 +42,12 @@ trace: [plausible.deriving.arbitrary] Derived generator: instance : Plausible.Ar
 #guard_msgs in
 deriving instance Arbitrary for BinOp
 
--- Test that we can successfully synthesize instances of `Arbitrary` & `ArbitrarySized`
+-- Test that we can successfully synthesize instances of `Arbitrary` & `ArbitraryFueled`
 
-/-- info: instArbitrarySizedBinOp -/
+/-- info: instArbitraryFueledBinOp -/
 #guard_msgs in
-#synth ArbitrarySized BinOp
+#synth ArbitraryFueled BinOp
 
-/-- info: instArbitraryOfArbitrarySized -/
+/-- info: instArbitraryOfArbitraryFueled -/
 #guard_msgs in
 #synth Arbitrary BinOp

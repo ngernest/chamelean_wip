@@ -19,8 +19,8 @@ open Lean Elab Command Meta Parser
 This file defines a handler which automatically derives `Arbitrary` instances
 for inductive types.
 
-(Note that the deriving handler technically derives `ArbitrarySized` instancces,
-but every `ArbitrarySized` instance automatically results in an `Arbitrary` instance,
+(Note that the deriving handler technically derives `ArbitraryFueled` instancces,
+but every `ArbitraryFueled` instance automatically results in an `Arbitrary` instance,
 as detailed in `Arbitrary.lean`.)
 
 Example usage:
@@ -47,7 +47,7 @@ set_option trace.plausible.deriving.arbitrary true
 ```
 
 ## Main definitions
-* Deriving handler for `ArbitrarySized` typeclass
+* Deriving handler for `ArbitraryFueled` typeclass
 
 -/
 
@@ -87,12 +87,12 @@ def getCtorArgsNamesAndTypes (ctorName : Name) : MetaM (Array (Name × Expr)) :=
 
     return argNamesAndTypes
 
-/-- Produces an instance of the `ArbitrarySized` typeclass for an inductive type
+/-- Produces an instance of the `ArbitraryFueled` typeclass for an inductive type
     whose name is given by `targetTypeName`.
 
     (Note: the main logic for determining the structure of the derived generator
     is contained in this function.) -/
-def mkArbitrarySizedInstance (targetTypeName : Name) : CommandElabM (TSyntax `command) := do
+def mkArbitraryFueledInstance (targetTypeName : Name) : CommandElabM (TSyntax `command) := do
   -- Obtain Lean's `InductiveVal` data structure, which contains metadata about
   -- the type corresponding to `targetTypeName`
   let inductiveVal ← getConstInfoInduct targetTypeName
@@ -213,12 +213,12 @@ def mkArbitrarySizedInstance (targetTypeName : Name) : CommandElabM (TSyntax `co
   let sizeParam ← `(Term.letIdBinder| ($sizeIdent : $natIdent))
   let matchExpr ← liftTermElabM $ mkMatchExpr sizeIdent caseExprs
 
-  -- Create an instance of the `ArbitrarySized` typeclass
+  -- Create an instance of the `ArbitraryFueled` typeclass
   let targetTypeIdent := mkIdent targetTypeName
   let generatorType ← `($genTypeConstructor $targetTypeIdent)
   let typeClassInstance ←
-    `(instance : $arbitrarySizedTypeclass $targetTypeIdent where
-      $unqualifiedArbitrarySizedFn:ident :=
+    `(instance : $arbitraryFueledTypeclass $targetTypeIdent where
+      $unqualifiedArbitraryFueledFn:ident :=
         let rec $auxArbFn:ident $sizeParam : $generatorType :=
           $matchExpr
       fun $freshSizeIdent => $auxArbFn $freshSizeIdent)
@@ -230,12 +230,12 @@ def mkArbitrarySizedInstance (targetTypeName : Name) : CommandElabM (TSyntax `co
 
   return typeClassInstance
 
-/-- Deriving handler which produces an instance of the `ArbitrarySized` typeclass for
+/-- Deriving handler which produces an instance of the `ArbitraryFueled` typeclass for
     each type specified in `declNames` -/
 def deriveArbitraryInstanceHandler (declNames : Array Name) : CommandElabM Bool := do
   if (← declNames.allM isInductive) then
     for targetTypeName in declNames do
-      let typeClassInstance ← mkArbitrarySizedInstance targetTypeName
+      let typeClassInstance ← mkArbitraryFueledInstance targetTypeName
       elabCommand typeClassInstance
     return true
   else

@@ -21,8 +21,8 @@ inductive RegExp : Type where
 
 set_option trace.plausible.deriving.arbitrary true in
 /--
-trace: [plausible.deriving.arbitrary] Derived generator: instance : Plausible.ArbitrarySized RegExp where
-      arbitrarySized :=
+trace: [plausible.deriving.arbitrary] Derived generator: instance : Plausible.ArbitraryFueled RegExp where
+      arbitraryFueled :=
         let rec aux_arb (size : Nat) : Plausible.Gen RegExp :=
           match size with
           | Nat.zero =>
@@ -57,12 +57,12 @@ trace: [plausible.deriving.arbitrary] Derived generator: instance : Plausible.Ar
 #guard_msgs in
 deriving instance Arbitrary for RegExp
 
--- Test that we can successfully synthesize instances of `Arbitrary` & `ArbitrarySized`
+-- Test that we can successfully synthesize instances of `Arbitrary` & `ArbitraryFueled`
 
-/-- info: instArbitrarySizedRegExp -/
+/-- info: instArbitraryFueledRegExp -/
 #guard_msgs in
-#synth ArbitrarySized RegExp
+#synth ArbitraryFueled RegExp
 
-/-- info: instArbitraryOfArbitrarySized -/
+/-- info: instArbitraryOfArbitraryFueled -/
 #guard_msgs in
 #synth Arbitrary RegExp

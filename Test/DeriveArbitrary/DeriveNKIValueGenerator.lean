@@ -18,8 +18,8 @@ inductive Value where
 
 set_option trace.plausible.deriving.arbitrary true in
 /--
-trace: [plausible.deriving.arbitrary] Derived generator: instance : Plausible.ArbitrarySized Value where
-      arbitrarySized :=
+trace: [plausible.deriving.arbitrary] Derived generator: instance : Plausible.ArbitraryFueled Value where
+      arbitraryFueled :=
         let rec aux_arb (size : Nat) : Plausible.Gen Value :=
           match size with
           | Nat.zero =>
@@ -66,12 +66,12 @@ trace: [plausible.deriving.arbitrary] Derived generator: instance : Plausible.Ar
 #guard_msgs in
 deriving instance Arbitrary for Value
 
--- Test that we can successfully synthesize instances of `Arbitrary` & `ArbitrarySized`
+-- Test that we can successfully synthesize instances of `Arbitrary` & `ArbitraryFueled`
 
-/-- info: instArbitrarySizedValue -/
+/-- info: instArbitraryFueledValue -/
 #guard_msgs in
-#synth ArbitrarySized Value
+#synth ArbitraryFueled Value
 
-/-- info: instArbitraryOfArbitrarySized -/
+/-- info: instArbitraryOfArbitraryFueled -/
 #guard_msgs in
 #synth Arbitrary Value
