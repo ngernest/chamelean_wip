@@ -46,19 +46,14 @@ for the desired generated values and provide some Nat to act as the generator's 
 #eval Arbitrary.runArbitrary (α := Tree) 10
 ```
 
-For debugging purposes, we also provide a command elaborator for the `#derive_arbitrary` command:
+To view the code for the derived generator, users can enable trace messages using the `plausible.deriving.arbitrary` trace class as follows:
 
 ```lean
--- `#derive_arbitrary` derives an instance of `Arbitrary` for `Tree`
-#derive_arbitrary Tree
+set_option trace.plausible.deriving.arbitrary true
 ```
-
-Running this command prints the code for the derived generator to stdout.
-(Note that the definition of the derived generator is already registered at this point.)
 
 ## Main definitions
 * Deriving handler for `ArbitrarySized` typeclass
-* `#derive_arbitrary` command elaborator
 
 -/
 
@@ -227,43 +222,19 @@ def mkArbitrarySizedInstance (targetTypeName : Name) : CommandElabM (TSyntax `co
   -- Create an instance of the `ArbitrarySized` typeclass
   let targetTypeIdent := mkIdent targetTypeName
   let generatorType ← `($genTypeConstructor $targetTypeIdent)
-  `(instance : $arbitrarySizedTypeclass $targetTypeIdent where
+  let typeClassInstance ←
+    `(instance : $arbitrarySizedTypeclass $targetTypeIdent where
       $unqualifiedArbitrarySizedFn:ident :=
         let rec $auxArbFn:ident $sizeParam : $generatorType :=
           $matchExpr
       fun $freshSizeIdent => $auxArbFn $freshSizeIdent)
 
-/-- The command elaborator `#derive_arbirary`, which derives an instance of the `ArbitrarySized` typeclass
-    and prints the code for the derived generator to stdout. -/
-syntax (name := derive_arbitrary) "#derive_arbitrary" term : command
+  -- Pretty-print the derived generator
+  let genFormat ← liftCoreM (PrettyPrinter.ppCommand typeClassInstance)
 
-/-- Command elaborator which derives an instance of the `ArbitrarySized` typeclass -/
-@[command_elab derive_arbitrary]
-def elabDeriveArbitrary : CommandElab := fun stx => do
-  match stx with
-  | `(#derive_arbitrary $targetTypeTerm:term) => do
+  trace[plausible.deriving.arbitrary] m!"Derived generator: {genFormat}"
 
-    let targetTypeIdent ←
-      match targetTypeTerm with
-      | `($tyIdent:ident) => pure tyIdent
-      | _ => throwErrorAt targetTypeTerm "Deriving Arbitrary not supported for parameterized types"
-    let targetTypeName := targetTypeIdent.getId
-
-    let isInductiveType ← isInductive targetTypeName
-    if isInductiveType then
-      let typeClassInstance ← mkArbitrarySizedInstance targetTypeName
-
-      -- Pretty-print the derived generator
-      let genFormat ← liftCoreM (PrettyPrinter.ppCommand typeClassInstance)
-
-      logInfo m!"Try this generator: {genFormat}"
-
-      -- Elaborate the typeclass instance and add it to the local context
-      elabCommand typeClassInstance
-    else
-      throwError "Cannot derive Arbitrary instance for non-inductive types"
-
-  | _ => throwUnsupportedSyntax
+  return typeClassInstance
 
 /-- Deriving handler which produces an instance of the `ArbitrarySized` typeclass for
     each type specified in `declNames` -/
