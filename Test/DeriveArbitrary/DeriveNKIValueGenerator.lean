@@ -39,7 +39,7 @@ trace: [plausible.deriving.arbitrary] Derived generator: instance : Plausible.Ar
                   let shape_0 ← Plausible.Arbitrary.arbitrary
                   let dtype_0 ← Plausible.Arbitrary.arbitrary
                   return Value.tensor shape_0 dtype_0)]
-          | Nat.succ size' =>
+          | size' + 1 =>
             Plausible.Gen.frequency (pure Value.none)
               [(1, (pure Value.none)),
                 (1,

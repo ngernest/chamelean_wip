@@ -30,7 +30,7 @@ trace: [plausible.deriving.arbitrary] Derived generator: instance : Plausible.Ar
                 (pure BinOp.gt), (pure BinOp.ge), (pure BinOp.add), (pure BinOp.sub), (pure BinOp.mul),
                 (pure BinOp.div), (pure BinOp.mod), (pure BinOp.pow), (pure BinOp.floor), (pure BinOp.lshift),
                 (pure BinOp.rshift), (pure BinOp.or), (pure BinOp.xor), (pure BinOp.and)]
-          | Nat.succ size' =>
+          | size' + 1 =>
             Plausible.Gen.frequency (pure BinOp.land)
               [(1, (pure BinOp.land)), (1, (pure BinOp.lor)), (1, (pure BinOp.eq)), (1, (pure BinOp.ne)),
                 (1, (pure BinOp.lt)), (1, (pure BinOp.le)), (1, (pure BinOp.gt)), (1, (pure BinOp.ge)),

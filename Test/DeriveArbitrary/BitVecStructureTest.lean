@@ -29,7 +29,7 @@ trace: [plausible.deriving.arbitrary] Derived generator: instance : Plausible.Ar
                   let a_0 ← Plausible.Arbitrary.arbitrary
                   let a_1 ← Plausible.Arbitrary.arbitrary
                   return DummyInductive.FromBitVec n_0 a_0 a_1)]
-          | Nat.succ size' =>
+          | size' + 1 =>
             Plausible.Gen.frequency
               (do
                 let n_0 ← Plausible.Arbitrary.arbitrary

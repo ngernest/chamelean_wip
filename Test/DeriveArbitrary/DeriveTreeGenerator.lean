@@ -21,10 +21,10 @@ trace: [plausible.deriving.arbitrary] Derived generator: instance : Plausible.Ar
         let rec aux_arb (size : Nat) : Plausible.Gen Tree :=
           match size with
           | Nat.zero => Plausible.Gen.oneOfWithDefault (pure Tree.Leaf) [(pure Tree.Leaf)]
-          | Nat.succ size' =>
+          | size' + 1 =>
             Plausible.Gen.frequency (pure Tree.Leaf)
               [(1, (pure Tree.Leaf)),
-                (Nat.succ size',
+                (size' + 1,
                   (do
                     let a_0 ← Plausible.Arbitrary.arbitrary
                     let a_1 ← aux_arb size'

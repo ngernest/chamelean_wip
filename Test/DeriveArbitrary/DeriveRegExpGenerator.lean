@@ -31,24 +31,24 @@ trace: [plausible.deriving.arbitrary] Derived generator: instance : Plausible.Ar
                 (do
                   let a_0 ← Plausible.Arbitrary.arbitrary
                   return RegExp.Char a_0)]
-          | Nat.succ size' =>
+          | size' + 1 =>
             Plausible.Gen.frequency (pure RegExp.EmptySet)
               [(1, (pure RegExp.EmptySet)), (1, (pure RegExp.EmptyStr)),
                 (1,
                   (do
                     let a_0 ← Plausible.Arbitrary.arbitrary
                     return RegExp.Char a_0)),
-                (Nat.succ size',
+                (size' + 1,
                   (do
                     let a_0 ← aux_arb size'
                     let a_1 ← aux_arb size'
                     return RegExp.App a_0 a_1)),
-                (Nat.succ size',
+                (size' + 1,
                   (do
                     let a_0 ← aux_arb size'
                     let a_1 ← aux_arb size'
                     return RegExp.Union a_0 a_1)),
-                (Nat.succ size',
+                (size' + 1,
                   (do
                     let a_0 ← aux_arb size'
                     return RegExp.Star a_0))]

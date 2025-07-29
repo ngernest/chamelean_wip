@@ -30,10 +30,10 @@ trace: [plausible.deriving.arbitrary] Derived generator: instance : Plausible.Ar
         let rec aux_arb (size : Nat) : Plausible.Gen type :=
           match size with
           | Nat.zero => Plausible.Gen.oneOfWithDefault (pure type.Nat) [(pure type.Nat)]
-          | Nat.succ size' =>
+          | size' + 1 =>
             Plausible.Gen.frequency (pure type.Nat)
               [(1, (pure type.Nat)),
-                (Nat.succ size',
+                (size' + 1,
                   (do
                     let a_0 ← aux_arb size'
                     let a_1 ← aux_arb size'
@@ -55,7 +55,7 @@ trace: [plausible.deriving.arbitrary] Derived generator: instance : Plausible.Ar
                 (do
                   let a_0 ← Plausible.Arbitrary.arbitrary
                   return term.Var a_0)]
-          | Nat.succ size' =>
+          | size' + 1 =>
             Plausible.Gen.frequency
               (do
                 let a_0 ← Plausible.Arbitrary.arbitrary
@@ -68,17 +68,17 @@ trace: [plausible.deriving.arbitrary] Derived generator: instance : Plausible.Ar
                   (do
                     let a_0 ← Plausible.Arbitrary.arbitrary
                     return term.Var a_0)),
-                (Nat.succ size',
+                (size' + 1,
                   (do
                     let a_0 ← aux_arb size'
                     let a_1 ← aux_arb size'
                     return term.Add a_0 a_1)),
-                (Nat.succ size',
+                (size' + 1,
                   (do
                     let a_0 ← aux_arb size'
                     let a_1 ← aux_arb size'
                     return term.App a_0 a_1)),
-                (Nat.succ size',
+                (size' + 1,
                   (do
                     let a_0 ← Plausible.Arbitrary.arbitrary
                     let a_1 ← aux_arb size'

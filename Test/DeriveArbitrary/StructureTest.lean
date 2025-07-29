@@ -31,7 +31,7 @@ trace: [plausible.deriving.arbitrary] Derived generator: instance : Plausible.Ar
                   let boolField_0 ← Plausible.Arbitrary.arbitrary
                   let natField_0 ← Plausible.Arbitrary.arbitrary
                   return Foo.mk stringField_0 boolField_0 natField_0)]
-          | Nat.succ size' =>
+          | size' + 1 =>
             Plausible.Gen.frequency
               (do
                 let stringField_0 ← Plausible.Arbitrary.arbitrary
