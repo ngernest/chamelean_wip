@@ -4,13 +4,17 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Ernest Ng
 -/
 import Lean.Elab
+import Lean.Elab.Deriving.Basic
+import Lean.Elab.Deriving.Util
 
 import Plausible.Idents
 import Plausible.TSyntaxCombinators
 import Plausible.Arbitrary
 import Plausible.Utils
 
-open Lean Elab Command Meta Parser
+open Lean Elab Meta Parser Term
+open Elab.Deriving
+open Elab.Command
 
 /-!
 
@@ -87,18 +91,16 @@ def getCtorArgsNamesAndTypes (ctorName : Name) : MetaM (Array (Name × Expr)) :=
 
     return argNamesAndTypes
 
-/-- Produces an instance of the `ArbitraryFueled` typeclass for an inductive type
-    whose name is given by `targetTypeName`.
+------------------
+-- NEW CODE BELOW
+------------------
 
-    (Note: the main logic for determining the structure of the derived generator
-    is contained in this function.) -/
-def mkArbitraryFueledInstance (targetTypeName : Name) : CommandElabM (TSyntax `command) := do
-  -- Obtain Lean's `InductiveVal` data structure, which contains metadata about
-  -- the type corresponding to `targetTypeName`
-  let inductiveVal ← getConstInfoInduct targetTypeName
+def mkBody (inductiveVal : InductiveVal) : TermElabM Term := do
+  -- Fetch the name of the target type (the type for which we are deriving a generator)
+  let targetTypeName := inductiveVal.name
 
-  -- Fetch the ambient local context, which we need to produce user-accessible fresh names
-  let localCtx ← liftTermElabM $ getLCtx
+  -- Fetch the empty local context
+  let localCtx ← getLCtx
 
   -- Produce `Ident`s for the `fuel` argument for the lambda
   -- at the end of the generator function, as well as the `aux_arb` inner helper function
@@ -111,7 +113,7 @@ def mkArbitraryFueledInstance (targetTypeName : Name) : CommandElabM (TSyntax `c
   for ctorName in inductiveVal.ctors do
     let ctorIdent := mkIdent ctorName
 
-    let ctorArgNamesTypes ← liftTermElabM $ getCtorArgsNamesAndTypes ctorName
+    let ctorArgNamesTypes ← getCtorArgsNamesAndTypes ctorName
     let (ctorArgNames, ctorArgTypes) := Array.unzip ctorArgNamesTypes
 
     /- Produce fresh names for each of the constructor's arguments.
@@ -141,7 +143,7 @@ def mkArbitraryFueledInstance (targetTypeName : Name) : CommandElabM (TSyntax `c
     else
       -- Add all the freshened names for the constructor to the local context,
       -- then produce the body of the sub-generator
-      let (generatorBody, ctorIsRecursive) ← liftTermElabM $
+      let (generatorBody, ctorIsRecursive) ←
         withLocalDeclsDND freshArgNamesTypes (fun _ => do
           let mut doElems := #[]
 
@@ -215,38 +217,52 @@ def mkArbitraryFueledInstance (targetTypeName : Name) : CommandElabM (TSyntax `c
 
   -- Create function argument for the generator fuel
   let fuelParam ← `(Term.letIdBinder| ($freshFuel : $(mkIdent `Nat)))
-  let matchExpr ← liftTermElabM $ mkMatchExpr freshFuel caseExprs
+  let matchExpr ← mkMatchExpr freshFuel caseExprs
 
   -- Create an instance of the `ArbitraryFueled` typeclass
   let targetType := mkIdent targetTypeName
   let generatorType ← `($(mkIdent ``Plausible.Gen) $targetType)
-  let typeClassInstance ←
-    `(instance : $(mkIdent ``ArbitraryFueled) $targetType where
-      $(mkIdent `arbitraryFueled):ident :=
-        let rec $auxArb:ident $fuelParam : $generatorType :=
-          $matchExpr
-      fun $freshFuel => $auxArb $freshFuel)
+  `(let rec $auxArb:ident $fuelParam : $generatorType :=
+      $matchExpr
+    fun $freshFuel => $auxArb $freshFuel)
 
-  -- Pretty-print the derived generator
-  let genFormat ← liftCoreM (PrettyPrinter.ppCommand typeClassInstance)
+def mkAuxFunction (ctx : Deriving.Context) (i : Nat) : TermElabM Command := do
+  let auxFunName := ctx.auxFunNames[i]!
+  let indVal := ctx.typeInfos[i]!
+  let mut body ← mkBody indVal
 
-  trace[plausible.deriving.arbitrary] m!"Derived generator: {genFormat}"
+  let targetType := mkIdent indVal.name
+  let generatorType ← `($(mkIdent ``Plausible.Gen) $targetType)
 
-  return typeClassInstance
+  `(def $(mkIdent auxFunName):ident : $(mkIdent ``Nat) → $generatorType := $body:term)
+
+def mkMutualBlock (ctx : Deriving.Context) : TermElabM Syntax := do
+  let mut auxDefs := #[]
+  for i in *...ctx.typeInfos.size do
+    auxDefs := auxDefs.push (← mkAuxFunction ctx i)
+  `(mutual
+     $auxDefs:command*
+    end)
+
+private def mkArbitraryInstanceCmd (declName : Name) : TermElabM (Array Syntax) := do
+  let ctx ← mkContext "arbitrary" declName
+  let cmds := #[← mkMutualBlock ctx] ++ (← mkInstanceCmds ctx ``ArbitraryFueled #[declName])
+  trace[plausible.deriving.arbitrary] "\n{cmds}"
+  return cmds
 
 /-- Deriving handler which produces an instance of the `ArbitraryFueled` typeclass for
     each type specified in `declNames` -/
-def deriveArbitraryInstanceHandler (declNames : Array Name) : CommandElabM Bool := do
+def mkArbitraryInstanceHandler (declNames : Array Name) : CommandElabM Bool := do
   if (← declNames.allM isInductive) then
-    for targetTypeName in declNames do
-      let typeClassInstance ← mkArbitraryFueledInstance targetTypeName
-      elabCommand typeClassInstance
+    for declName in declNames do
+      let cmds ← liftTermElabM $ mkArbitraryInstanceCmd declName
+      cmds.forM elabCommand
     return true
   else
     throwError "Cannot derive instance of Arbitrary typeclass for non-inductive types"
     return false
 
 initialize
-  registerDerivingHandler ``Arbitrary deriveArbitraryInstanceHandler
+  registerDerivingHandler ``Arbitrary mkArbitraryInstanceHandler
 
 end Plausible
