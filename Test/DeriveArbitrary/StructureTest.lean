@@ -44,34 +44,34 @@ set_option trace.plausible.deriving.arbitrary true in
 /--
 trace: [plausible.deriving.arbitrary] ⏎
     [mutual
-       def arbitraryFoo✝ : Nat → Plausible.Gen Foo :=
-         let rec aux_arb (fuel : Nat) : Plausible.Gen Foo :=
+       def arbitraryFoo✝ : Nat → Plausible.Gen (@Foo✝) :=
+         let rec aux_arb (fuel : Nat) : Plausible.Gen (@Foo✝) :=
            match fuel with
            | Nat.zero =>
              Plausible.Gen.oneOfWithDefault
                (do
-                 let stringField_0 ← Plausible.Arbitrary.arbitrary
-                 let boolField_0 ← Plausible.Arbitrary.arbitrary
-                 let natField_0 ← Plausible.Arbitrary.arbitrary
-                 return Foo.mk stringField_0 boolField_0 natField_0)
+                 let a_0✝ ← Plausible.Arbitrary.arbitrary
+                 let a_0✝¹ ← Plausible.Arbitrary.arbitrary
+                 let a_0✝² ← Plausible.Arbitrary.arbitrary
+                 return Foo.mk a_0✝ a_0✝¹ a_0✝²)
                [(do
-                   let stringField_0 ← Plausible.Arbitrary.arbitrary
-                   let boolField_0 ← Plausible.Arbitrary.arbitrary
-                   let natField_0 ← Plausible.Arbitrary.arbitrary
-                   return Foo.mk stringField_0 boolField_0 natField_0)]
+                   let a_0✝ ← Plausible.Arbitrary.arbitrary
+                   let a_0✝¹ ← Plausible.Arbitrary.arbitrary
+                   let a_0✝² ← Plausible.Arbitrary.arbitrary
+                   return Foo.mk a_0✝ a_0✝¹ a_0✝²)]
            | fuel' + 1 =>
              Plausible.Gen.frequency
                (do
-                 let stringField_0 ← Plausible.Arbitrary.arbitrary
-                 let boolField_0 ← Plausible.Arbitrary.arbitrary
-                 let natField_0 ← Plausible.Arbitrary.arbitrary
-                 return Foo.mk stringField_0 boolField_0 natField_0)
+                 let a_0✝ ← Plausible.Arbitrary.arbitrary
+                 let a_0✝¹ ← Plausible.Arbitrary.arbitrary
+                 let a_0✝² ← Plausible.Arbitrary.arbitrary
+                 return Foo.mk a_0✝ a_0✝¹ a_0✝²)
                [(1,
                    (do
-                     let stringField_0 ← Plausible.Arbitrary.arbitrary
-                     let boolField_0 ← Plausible.Arbitrary.arbitrary
-                     let natField_0 ← Plausible.Arbitrary.arbitrary
-                     return Foo.mk stringField_0 boolField_0 natField_0)),
+                     let a_0✝ ← Plausible.Arbitrary.arbitrary
+                     let a_0✝¹ ← Plausible.Arbitrary.arbitrary
+                     let a_0✝² ← Plausible.Arbitrary.arbitrary
+                     return Foo.mk a_0✝ a_0✝¹ a_0✝²)),
                  ]
          fun fuel => aux_arb fuel
      end,

@@ -19,8 +19,8 @@ set_option trace.plausible.deriving.arbitrary true in
 /--
 trace: [plausible.deriving.arbitrary] ⏎
     [mutual
-       def arbitraryTree✝ : Nat → Plausible.Gen Tree :=
-         let rec aux_arb (fuel : Nat) : Plausible.Gen Tree :=
+       def arbitraryTree✝ : Nat → Plausible.Gen (@Tree✝) :=
+         let rec aux_arb (fuel : Nat) : Plausible.Gen (@Tree✝) :=
            match fuel with
            | Nat.zero => Plausible.Gen.oneOfWithDefault (pure Tree.Leaf) [(pure Tree.Leaf)]
            | fuel' + 1 =>
@@ -28,10 +28,10 @@ trace: [plausible.deriving.arbitrary] ⏎
                [(1, (pure Tree.Leaf)),
                  (fuel' + 1,
                    (do
-                     let a_0 ← Plausible.Arbitrary.arbitrary
-                     let a_1 ← aux_arb fuel'
-                     let a_2 ← aux_arb fuel'
-                     return Tree.Node a_0 a_1 a_2))]
+                     let a_0✝ ← Plausible.Arbitrary.arbitrary
+                     let a_0✝¹ ← aux_arb fuel'
+                     let a_0✝² ← aux_arb fuel'
+                     return Tree.Node a_0✝ a_0✝¹ a_0✝²))]
          fun fuel => aux_arb fuel
      end,
      instance : Plausible.ArbitraryFueled✝ (@Tree✝) :=

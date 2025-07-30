@@ -15,3 +15,4 @@ import Test.DeriveArbitrary.DeriveRegExpGenerator
 import Test.DeriveArbitrary.StructureTest
 import Test.DeriveArbitrary.BitVecStructureTest
 import Test.DeriveArbitrary.MissingNonRecursiveConstructorTest
+import Test.DeriveArbitrary.ParameterizedTypeTest

@@ -24,8 +24,8 @@ set_option trace.plausible.deriving.arbitrary true in
 /--
 trace: [plausible.deriving.arbitrary] ⏎
     [mutual
-       def arbitraryBinOp✝ : Nat → Plausible.Gen BinOp :=
-         let rec aux_arb (fuel : Nat) : Plausible.Gen BinOp :=
+       def arbitraryBinOp✝ : Nat → Plausible.Gen (@BinOp✝) :=
+         let rec aux_arb (fuel : Nat) : Plausible.Gen (@BinOp✝) :=
            match fuel with
            | Nat.zero =>
              Plausible.Gen.oneOfWithDefault (pure BinOp.land)
