@@ -116,9 +116,11 @@ def mkHeaderWithOnlyImplicitBinders (className : Name) (arity : Nat) (indVal : I
     targetType  := targetType
   }
 
+/-- Creates a `Header` for the `ArbitraryFueled` typeclass -/
 def mkArbitraryHeader (indVal : InductiveVal) : TermElabM Header :=
   mkHeaderWithOnlyImplicitBinders ``ArbitraryFueled 1 indVal
 
+/-- Creates the *body* of the generator that appears in the instance of the `ArbitraryFueled` typeclass -/
 def mkBody (header : Header) (inductiveVal : InductiveVal) (generatorType : TSyntax `term) : TermElabM Term := do
   -- Fetch the name of the target type (the type for which we are deriving a generator)
   let targetTypeName := inductiveVal.name
@@ -249,7 +251,7 @@ def mkBody (header : Header) (inductiveVal : InductiveVal) (generatorType : TSyn
     fun $freshFuel => $auxArb $freshFuel)
 
 
-
+/-- Creates the function definition for the derived generator -/
 def mkAuxFunction (ctx : Deriving.Context) (i : Nat) : TermElabM Command := do
   let auxFunName := ctx.auxFunNames[i]!
   let indVal := ctx.typeInfos[i]!
@@ -263,6 +265,7 @@ def mkAuxFunction (ctx : Deriving.Context) (i : Nat) : TermElabM Command := do
 
   `(def $(mkIdent auxFunName):ident $binders:bracketedBinder* : $(mkIdent ``Nat) → $generatorType := $body:term)
 
+/-- Creates a `mutual ... end` block containing the definitions of the derived generators -/
 def mkMutualBlock (ctx : Deriving.Context) : TermElabM Syntax := do
   let mut auxDefs := #[]
   for i in *...ctx.typeInfos.size do
@@ -271,7 +274,8 @@ def mkMutualBlock (ctx : Deriving.Context) : TermElabM Syntax := do
      $auxDefs:command*
     end)
 
-private def mkArbitraryInstanceCmd (declName : Name) : TermElabM (Array Syntax) := do
+/-- Creates an instance of the `ArbitraryFueled` typeclass -/
+private def mkArbitraryFueledInstanceCmd (declName : Name) : TermElabM (Array Syntax) := do
   let ctx ← mkContext "arbitrary" declName
   let cmds := #[← mkMutualBlock ctx] ++ (← mkInstanceCmds ctx ``ArbitraryFueled #[declName])
   trace[plausible.deriving.arbitrary] "\n{cmds}"
@@ -282,7 +286,7 @@ private def mkArbitraryInstanceCmd (declName : Name) : TermElabM (Array Syntax) 
 def mkArbitraryInstanceHandler (declNames : Array Name) : CommandElabM Bool := do
   if (← declNames.allM isInductive) then
     for declName in declNames do
-      let cmds ← liftTermElabM $ mkArbitraryInstanceCmd declName
+      let cmds ← liftTermElabM $ mkArbitraryFueledInstanceCmd declName
       cmds.forM elabCommand
     return true
   else

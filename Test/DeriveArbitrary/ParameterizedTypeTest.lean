@@ -4,14 +4,8 @@ import Plausible.Attr
 
 open Plausible
 
-/-- A variant of a binary tree datatype where the
-    non-recursive `Leaf` constructor is missing.
-
-    We are unable to derive a generator for this type,
-    since it is impossible to construct an inhabitant of this type.
-
-    The test below checks that an appropriate error message is emitted
-    by the deriving handler. -/
+/-- A dummy `inductive` type isomorphic to the polymorphic `List` type,
+    used as an example of a parameterized inductive type -/
 inductive MyList (α : Type) where
   | MyNil : MyList α
   | MyCons : α → MyList α → MyList α
