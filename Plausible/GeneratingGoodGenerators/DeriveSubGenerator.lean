@@ -453,6 +453,9 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
     for ((_u1, r1), (_u2, r2)) in conclusionArgsAndRanges.zip unknownArgsAndRanges do
       unify r1 r2
 
+    -- TODO: Call `possibleSchedules` here to get a naive schedule
+    -- Then use the updated unification result to replace all variables in `possibleSchedules`
+
     -- Update the list of hypotheses with the result of unification
     -- (i.e. constructor arguments in hypotheses are updated with the canonical
     -- representation of each argument as determined by the unification algorithm)
@@ -460,6 +463,9 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
 
     let finalState ← get
     logWarning m!"finalState after updating hypotheses = {finalState}"
+
+    -- TODO: Instead of returning `TSyntax term`, prepend patterns & equality checks to
+    -- the list of `scheduleSteps` returned by `possibleSchedules` (modified by the unifier's results)
 
     emitPatterns finalState.patterns finalState.equalities.toList finalState.constraints)
 
