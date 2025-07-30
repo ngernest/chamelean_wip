@@ -59,7 +59,7 @@ trace: [plausible.deriving.arbitrary] Derived generator: instance : Plausible.Ar
 #guard_msgs in
 deriving instance Arbitrary for RegExp
 
--- Test that we can successfully synthefuel instances of `Arbitrary` & `ArbitraryFueled`
+-- Test that we can successfully synthesize instances of `Arbitrary` & `ArbitraryFueled`
 
 /-- info: instArbitraryFueledRegExp -/
 #guard_msgs in
