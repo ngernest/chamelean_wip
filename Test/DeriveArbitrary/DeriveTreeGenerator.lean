@@ -1,4 +1,7 @@
-import Plausible
+import Plausible.Attr
+import Plausible.Arbitrary
+import Plausible.DeriveArbitrary
+import Plausible.Testable
 
 open Plausible Gen
 
@@ -81,7 +84,7 @@ instance shrinkTree : Shrinkable Tree where
   shrink (t : Tree) :=
     match t with
     | .Leaf => []
-    | .Node _ _ _ => [.Leaf]
+    | .Node _ l r => [.Leaf, l, r]
 
 /-- `SampleableExt` instance for `Tree` -/
 instance : SampleableExt Tree where
