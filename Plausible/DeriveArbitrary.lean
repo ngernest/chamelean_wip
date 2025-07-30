@@ -180,8 +180,11 @@ def mkArbitraryFueledInstance (targetTypeName : Name) : CommandElabM (TSyntax `c
       else
         recursiveGenerators := recursiveGenerators.push generatorBody
 
-  -- Just use the first non-recursive generator as the default generator
-  let defaultGenerator := nonRecursiveGenerators[0]!
+  -- Use the first non-recursive generator as the default generator
+  -- If the target type has no non-recursive constructors, we emit an error message
+  -- saying that we cannot derive a generator for that type
+  let defaultGenerator ← Option.getDM (nonRecursiveGenerators[0]?)
+    (throwError m!"derive Arbitrary failed, {targetTypeName} has no non-recursive constructors")
 
   -- Explicitly parenthesize the body of each sub-generator for clarity
   let nonRecursiveGens ←
