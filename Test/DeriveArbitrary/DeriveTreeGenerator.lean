@@ -80,19 +80,15 @@ def mirror (t : Tree) : Tree :=
   | .Node x l r => .Node x r l
 
 /-- `Shrinkable` instance for `Tree` -/
-instance shrinkTree : Shrinkable Tree where
+instance : Shrinkable Tree where
   shrink (t : Tree) :=
     match t with
     | .Leaf => []
     | .Node _ l r => [.Leaf, l, r]
 
 /-- `SampleableExt` instance for `Tree` -/
-instance : SampleableExt Tree where
-  proxy := Tree
-  proxyRepr := inferInstance
-  shrink := shrinkTree
-  sample := Arbitrary.arbitrary
-  interp := id
+instance : SampleableExt Tree :=
+  SampleableExt.mkSelfContained Arbitrary.arbitrary
 
 -- Mirroring a tree twice should yield the original tree
 -- Test that we can succesfully generate a counterexample to the erroneous property
