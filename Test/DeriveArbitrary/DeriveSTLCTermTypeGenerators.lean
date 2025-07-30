@@ -156,10 +156,10 @@ instance : Shrinkable term where
 
 /-- error: Found a counter-example! -/
 #guard_msgs in
-#eval Testable.check (∀ (term : term), isValue term = true)
+#eval Testable.check (∀ (term : term), isValue term)
   (cfg := {numInst := 10, maxSize := 5, quiet := true})
 
 /-- error: Found a counter-example! -/
 #guard_msgs in
-#eval Testable.check (∀ (ty : type), isFunctionType ty = true)
+#eval Testable.check (∀ (ty : type), isFunctionType ty)
   (cfg := {numInst := 10, maxSize := 5, quiet := true})
