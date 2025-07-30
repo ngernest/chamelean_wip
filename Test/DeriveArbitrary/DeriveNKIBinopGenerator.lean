@@ -1,6 +1,7 @@
 import Plausible.Attr
 import Plausible.Arbitrary
 import Plausible.DeriveArbitrary
+import Plausible.Testable
 
 open Plausible Gen
 
@@ -17,6 +18,7 @@ inductive BinOp where
   | add | sub | mul | div | mod | pow | floor
   -- bitwise
   | lshift | rshift | or | xor | and
+  deriving Repr
 
 set_option trace.plausible.deriving.arbitrary true in
 /--
@@ -51,3 +53,26 @@ deriving instance Arbitrary for BinOp
 /-- info: instArbitraryOfArbitraryFueled -/
 #guard_msgs in
 #synth Arbitrary BinOp
+
+/-- Trivial `Shrinkable` instance for `BinOp`s -/
+instance : Shrinkable BinOp where
+  shrink := fun _ => []
+
+/-- `SampleableExt` instance for `BinOp` -/
+instance : SampleableExt BinOp :=
+  SampleableExt.mkSelfContained Arbitrary.arbitrary
+
+-- To test whether the derived generator can generate counterexamples,
+-- we state an (erroneous) property that states that all binary operators
+-- are logical operators, and see if the generator can refute this property.
+
+/-- Determines whether a `BinOp` is a logical operation -/
+def isLogicalOp (op : BinOp) : Bool :=
+  match op with
+  | .land | .lor => true
+  | _ => false
+
+/-- error: Found a counter-example! -/
+#guard_msgs in
+#eval Testable.check (∀ op : BinOp, isLogicalOp op)
+  (cfg := {numInst := 10, maxSize := 5, quiet := true})
