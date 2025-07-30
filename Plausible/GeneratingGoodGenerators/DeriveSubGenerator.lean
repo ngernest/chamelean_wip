@@ -436,8 +436,6 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
     let initialUnifyState := mkInitialUnifyState inputNames outputName outputType forAllVars.toList hypsInCtorAppForm.toList
 
     -- Extend the current state with the contents of `initialUnifyState`
-    -- TODO: need to change this to a `UnifyM` function for taking the unino of two states together (i.e. just do set union / list append for all the fields)
-    -- TODO: ^^ implement this funciton
     UnifyM.extendState initialUnifyState
 
     let state ← get
