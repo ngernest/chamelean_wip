@@ -74,20 +74,22 @@ open Arbitrary
     that is returned -- it is the caller's responsibility to produce fresh names,
     e.g. using `Idents.genFreshNames`.)
 -/
-def getCtorArgsNamesAndTypes (ctorName : Name) : MetaM (Array (Name × Expr)) := do
+def getCtorArgsNamesAndTypes (header : Header) (indVal : InductiveVal) (ctorName : Name) : MetaM (Array (Name × Expr)) := do
   let ctorInfo ← getConstInfoCtor ctorName
 
   forallTelescopeReducing ctorInfo.type fun args _ => do
     let mut argNamesAndTypes := #[]
-    for arg in args.toList do
+
+    for i in *...args.size do
+      let arg := args[i]!
       let localDecl ← arg.fvarId!.getDecl
-      let mut argName := localDecl.userName
-      -- Check if the name has macro scopes
-      -- If so, remove them so that we can produce a user-accessible name
-      -- (where macro scopes don't appear in the name)
-      if argName.hasMacroScopes then
-        argName := Name.eraseMacroScopes argName
-      argNamesAndTypes := Array.push argNamesAndTypes (argName, localDecl.type)
+      let argType := localDecl.type
+
+      let argName ← if i < indVal.numParams then pure header.argNames[i]! else Core.mkFreshUserName `a
+      if i < indVal.numParams then
+        continue
+      else
+        argNamesAndTypes := argNamesAndTypes.push (argName, argType)
 
     return argNamesAndTypes
 
@@ -95,7 +97,29 @@ def getCtorArgsNamesAndTypes (ctorName : Name) : MetaM (Array (Name × Expr)) :=
 -- NEW CODE BELOW
 ------------------
 
-def mkBody (inductiveVal : InductiveVal) : TermElabM Term := do
+open TSyntax.Compat in
+/-- Variant of `Deriving.Util.mkHeader` where we don't add an explicit binder
+    of the form `($targetName : $targetType)` to the field `binders`
+    (i.e. `binders` contains only implicit binders) -/
+def mkHeaderWithOnlyImplicitBinders (className : Name) (arity : Nat) (indVal : InductiveVal) : TermElabM Header := do
+  let argNames      ← mkInductArgNames indVal
+  let binders       ← mkImplicitBinders argNames
+  let targetType    ← mkInductiveApp indVal argNames
+  let mut targetNames := #[]
+  for _ in [:arity] do
+    targetNames := targetNames.push (← mkFreshUserName `x)
+  let binders      := binders ++ (← mkInstImplicitBinders className indVal argNames)
+  return {
+    binders     := binders
+    argNames    := argNames
+    targetNames := targetNames
+    targetType  := targetType
+  }
+
+def mkArbitraryHeader (indVal : InductiveVal) : TermElabM Header :=
+  mkHeaderWithOnlyImplicitBinders ``ArbitraryFueled 1 indVal
+
+def mkBody (header : Header) (inductiveVal : InductiveVal) (generatorType : TSyntax `term) : TermElabM Term := do
   -- Fetch the name of the target type (the type for which we are deriving a generator)
   let targetTypeName := inductiveVal.name
 
@@ -113,7 +137,7 @@ def mkBody (inductiveVal : InductiveVal) : TermElabM Term := do
   for ctorName in inductiveVal.ctors do
     let ctorIdent := mkIdent ctorName
 
-    let ctorArgNamesTypes ← getCtorArgsNamesAndTypes ctorName
+    let ctorArgNamesTypes ← getCtorArgsNamesAndTypes header inductiveVal ctorName
     let (ctorArgNames, ctorArgTypes) := Array.unzip ctorArgNamesTypes
 
     /- Produce fresh names for each of the constructor's arguments.
@@ -220,21 +244,24 @@ def mkBody (inductiveVal : InductiveVal) : TermElabM Term := do
   let matchExpr ← mkMatchExpr freshFuel caseExprs
 
   -- Create an instance of the `ArbitraryFueled` typeclass
-  let targetType := mkIdent targetTypeName
-  let generatorType ← `($(mkIdent ``Plausible.Gen) $targetType)
   `(let rec $auxArb:ident $fuelParam : $generatorType :=
       $matchExpr
     fun $freshFuel => $auxArb $freshFuel)
 
+
+
 def mkAuxFunction (ctx : Deriving.Context) (i : Nat) : TermElabM Command := do
   let auxFunName := ctx.auxFunNames[i]!
   let indVal := ctx.typeInfos[i]!
-  let mut body ← mkBody indVal
+  let header ← mkArbitraryHeader indVal
+  let mut binders := header.binders
 
-  let targetType := mkIdent indVal.name
+  let targetType ← mkInductiveApp ctx.typeInfos[i]! header.argNames
   let generatorType ← `($(mkIdent ``Plausible.Gen) $targetType)
 
-  `(def $(mkIdent auxFunName):ident : $(mkIdent ``Nat) → $generatorType := $body:term)
+  let mut body ← mkBody header indVal generatorType
+
+  `(def $(mkIdent auxFunName):ident $binders:bracketedBinder* : $(mkIdent ``Nat) → $generatorType := $body:term)
 
 def mkMutualBlock (ctx : Deriving.Context) : TermElabM Syntax := do
   let mut auxDefs := #[]
