@@ -26,65 +26,73 @@ inductive term where
 -- Invoke deriving instance handler for the `Arbitrary` typeclass on `type` and `term`
 set_option trace.plausible.deriving.arbitrary true in
 /--
-trace: [plausible.deriving.arbitrary] Derived generator: instance : Plausible.ArbitraryFueled type where
-      arbitraryFueled :=
-        let rec aux_arb (fuel : Nat) : Plausible.Gen type :=
-          match fuel with
-          | Nat.zero => Plausible.Gen.oneOfWithDefault (pure type.Nat) [(pure type.Nat)]
-          | fuel' + 1 =>
-            Plausible.Gen.frequency (pure type.Nat)
-              [(1, (pure type.Nat)),
-                (fuel' + 1,
-                  (do
-                    let a_0 ← aux_arb fuel'
-                    let a_1 ← aux_arb fuel'
-                    return type.Fun a_0 a_1))]
-        fun fuel => aux_arb fuel
+trace: [plausible.deriving.arbitrary] ⏎
+    [mutual
+       def arbitrarytype✝ : Nat → Plausible.Gen type :=
+         let rec aux_arb (fuel : Nat) : Plausible.Gen type :=
+           match fuel with
+           | Nat.zero => Plausible.Gen.oneOfWithDefault (pure type.Nat) [(pure type.Nat)]
+           | fuel' + 1 =>
+             Plausible.Gen.frequency (pure type.Nat)
+               [(1, (pure type.Nat)),
+                 (fuel' + 1,
+                   (do
+                     let a_0 ← aux_arb fuel'
+                     let a_1 ← aux_arb fuel'
+                     return type.Fun a_0 a_1))]
+         fun fuel => aux_arb fuel
+     end,
+     instance : Plausible.ArbitraryFueled✝ (@type✝) :=
+       ⟨arbitrarytype✝⟩]
 ---
-trace: [plausible.deriving.arbitrary] Derived generator: instance : Plausible.ArbitraryFueled term where
-      arbitraryFueled :=
-        let rec aux_arb (fuel : Nat) : Plausible.Gen term :=
-          match fuel with
-          | Nat.zero =>
-            Plausible.Gen.oneOfWithDefault
-              (do
-                let a_0 ← Plausible.Arbitrary.arbitrary
-                return term.Const a_0)
-              [(do
-                  let a_0 ← Plausible.Arbitrary.arbitrary
-                  return term.Const a_0),
-                (do
-                  let a_0 ← Plausible.Arbitrary.arbitrary
-                  return term.Var a_0)]
-          | fuel' + 1 =>
-            Plausible.Gen.frequency
-              (do
-                let a_0 ← Plausible.Arbitrary.arbitrary
-                return term.Const a_0)
-              [(1,
-                  (do
-                    let a_0 ← Plausible.Arbitrary.arbitrary
-                    return term.Const a_0)),
-                (1,
-                  (do
-                    let a_0 ← Plausible.Arbitrary.arbitrary
-                    return term.Var a_0)),
-                (fuel' + 1,
-                  (do
-                    let a_0 ← aux_arb fuel'
-                    let a_1 ← aux_arb fuel'
-                    return term.Add a_0 a_1)),
-                (fuel' + 1,
-                  (do
-                    let a_0 ← aux_arb fuel'
-                    let a_1 ← aux_arb fuel'
-                    return term.App a_0 a_1)),
-                (fuel' + 1,
-                  (do
-                    let a_0 ← Plausible.Arbitrary.arbitrary
-                    let a_1 ← aux_arb fuel'
-                    return term.Abs a_0 a_1))]
-        fun fuel => aux_arb fuel
+trace: [plausible.deriving.arbitrary] ⏎
+    [mutual
+       def arbitraryterm✝ : Nat → Plausible.Gen term :=
+         let rec aux_arb (fuel : Nat) : Plausible.Gen term :=
+           match fuel with
+           | Nat.zero =>
+             Plausible.Gen.oneOfWithDefault
+               (do
+                 let a_0 ← Plausible.Arbitrary.arbitrary
+                 return term.Const a_0)
+               [(do
+                   let a_0 ← Plausible.Arbitrary.arbitrary
+                   return term.Const a_0),
+                 (do
+                   let a_0 ← Plausible.Arbitrary.arbitrary
+                   return term.Var a_0)]
+           | fuel' + 1 =>
+             Plausible.Gen.frequency
+               (do
+                 let a_0 ← Plausible.Arbitrary.arbitrary
+                 return term.Const a_0)
+               [(1,
+                   (do
+                     let a_0 ← Plausible.Arbitrary.arbitrary
+                     return term.Const a_0)),
+                 (1,
+                   (do
+                     let a_0 ← Plausible.Arbitrary.arbitrary
+                     return term.Var a_0)),
+                 (fuel' + 1,
+                   (do
+                     let a_0 ← aux_arb fuel'
+                     let a_1 ← aux_arb fuel'
+                     return term.Add a_0 a_1)),
+                 (fuel' + 1,
+                   (do
+                     let a_0 ← aux_arb fuel'
+                     let a_1 ← aux_arb fuel'
+                     return term.App a_0 a_1)),
+                 (fuel' + 1,
+                   (do
+                     let a_0 ← Plausible.Arbitrary.arbitrary
+                     let a_1 ← aux_arb fuel'
+                     return term.Abs a_0 a_1))]
+         fun fuel => aux_arb fuel
+     end,
+     instance : Plausible.ArbitraryFueled✝ (@term✝) :=
+       ⟨arbitraryterm✝⟩]
 -/
 #guard_msgs in
 deriving instance Arbitrary for type, term

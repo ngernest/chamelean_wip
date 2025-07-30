@@ -23,38 +23,42 @@ inductive RegExp : Type where
 
 set_option trace.plausible.deriving.arbitrary true in
 /--
-trace: [plausible.deriving.arbitrary] Derived generator: instance : Plausible.ArbitraryFueled RegExp where
-      arbitraryFueled :=
-        let rec aux_arb (fuel : Nat) : Plausible.Gen RegExp :=
-          match fuel with
-          | Nat.zero =>
-            Plausible.Gen.oneOfWithDefault (pure RegExp.EmptySet)
-              [(pure RegExp.EmptySet), (pure RegExp.EmptyStr),
-                (do
-                  let a_0 ← Plausible.Arbitrary.arbitrary
-                  return RegExp.Char a_0)]
-          | fuel' + 1 =>
-            Plausible.Gen.frequency (pure RegExp.EmptySet)
-              [(1, (pure RegExp.EmptySet)), (1, (pure RegExp.EmptyStr)),
-                (1,
-                  (do
-                    let a_0 ← Plausible.Arbitrary.arbitrary
-                    return RegExp.Char a_0)),
-                (fuel' + 1,
-                  (do
-                    let a_0 ← aux_arb fuel'
-                    let a_1 ← aux_arb fuel'
-                    return RegExp.App a_0 a_1)),
-                (fuel' + 1,
-                  (do
-                    let a_0 ← aux_arb fuel'
-                    let a_1 ← aux_arb fuel'
-                    return RegExp.Union a_0 a_1)),
-                (fuel' + 1,
-                  (do
-                    let a_0 ← aux_arb fuel'
-                    return RegExp.Star a_0))]
-        fun fuel => aux_arb fuel
+trace: [plausible.deriving.arbitrary] ⏎
+    [mutual
+       def arbitraryRegExp✝ : Nat → Plausible.Gen RegExp :=
+         let rec aux_arb (fuel : Nat) : Plausible.Gen RegExp :=
+           match fuel with
+           | Nat.zero =>
+             Plausible.Gen.oneOfWithDefault (pure RegExp.EmptySet)
+               [(pure RegExp.EmptySet), (pure RegExp.EmptyStr),
+                 (do
+                   let a_0 ← Plausible.Arbitrary.arbitrary
+                   return RegExp.Char a_0)]
+           | fuel' + 1 =>
+             Plausible.Gen.frequency (pure RegExp.EmptySet)
+               [(1, (pure RegExp.EmptySet)), (1, (pure RegExp.EmptyStr)),
+                 (1,
+                   (do
+                     let a_0 ← Plausible.Arbitrary.arbitrary
+                     return RegExp.Char a_0)),
+                 (fuel' + 1,
+                   (do
+                     let a_0 ← aux_arb fuel'
+                     let a_1 ← aux_arb fuel'
+                     return RegExp.App a_0 a_1)),
+                 (fuel' + 1,
+                   (do
+                     let a_0 ← aux_arb fuel'
+                     let a_1 ← aux_arb fuel'
+                     return RegExp.Union a_0 a_1)),
+                 (fuel' + 1,
+                   (do
+                     let a_0 ← aux_arb fuel'
+                     return RegExp.Star a_0))]
+         fun fuel => aux_arb fuel
+     end,
+     instance : Plausible.ArbitraryFueled✝ (@RegExp✝) :=
+       ⟨arbitraryRegExp✝⟩]
 -/
 #guard_msgs in
 deriving instance Arbitrary for RegExp
