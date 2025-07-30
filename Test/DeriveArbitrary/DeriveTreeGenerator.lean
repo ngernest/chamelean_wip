@@ -43,7 +43,32 @@ deriving instance Arbitrary for Tree
 #guard_msgs in
 #synth Arbitrary Tree
 
--- Test that we can use the derived generator
+
+/-!
+Test that we can use the derived generator to find counterexamples.
+
+We construct a faulty property, which (erroneously) states that
+mirroring a tree does not yield the original tree. (Example taken
+from "Generating Good Generators for Inductive Relations", POPL '18)
+
+```lean
+∀ t : Tree, mirror (mirror t) != t
+```
+
+where `mirror` is defined as follows:
+
+```lean
+def mirror (t : Tree) : Tree :=
+  match t with
+  | .Leaf => .Leaf
+  | .Node x l r => .Node x r l
+```
+
+(This property is faulty, since `mirror` is an involution.)
+
+We then test that the derived generator for `Tree`s succesfully
+generates a counterexample (e.g. `Leaf`) which refutes the property.
+-/
 
 /-- Mirrors a tree, i.e. interchanges the left & right children of all `Node`s -/
 def mirror (t : Tree) : Tree :=
@@ -67,7 +92,7 @@ instance : SampleableExt Tree where
   interp := id
 
 -- Mirroring a tree twice should yield the original tree
---  Test that we can succesfully generate a counterexample to the following (erroneous) property
+-- Test that we can succesfully generate a counterexample to the erroneous property
 
 /-- error: Found a counter-example! -/
 #guard_msgs in
