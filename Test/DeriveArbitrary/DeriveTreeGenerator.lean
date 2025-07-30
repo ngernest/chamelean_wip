@@ -1,6 +1,4 @@
-import Plausible.Arbitrary
-import Plausible.DeriveArbitrary
-import Plausible.Attr
+import Plausible
 
 open Plausible Gen
 
@@ -11,7 +9,7 @@ set_option guard_msgs.diff true
 inductive Tree where
 | Leaf : Tree
 | Node : Nat → Tree → Tree → Tree
-deriving Repr
+deriving BEq, Repr
 
 -- Invoke deriving instance handler for the `Arbitrary` typeclass on `type` and `term`
 set_option trace.plausible.deriving.arbitrary true in
@@ -44,3 +42,34 @@ deriving instance Arbitrary for Tree
 /-- info: instArbitraryOfArbitraryFueled -/
 #guard_msgs in
 #synth Arbitrary Tree
+
+-- Test that we can use the derived generator
+
+/-- Mirrors a tree, i.e. interchanges the left & right children of all `Node`s -/
+def mirror (t : Tree) : Tree :=
+  match t with
+  | .Leaf => .Leaf
+  | .Node x l r => .Node x r l
+
+/-- `Shrinkable` instance for `Tree` -/
+instance shrinkTree : Shrinkable Tree where
+  shrink (t : Tree) :=
+    match t with
+    | .Leaf => []
+    | .Node _ _ _ => [.Leaf]
+
+/-- `SampleableExt` instance for `Tree` -/
+instance : SampleableExt Tree where
+  proxy := Tree
+  proxyRepr := inferInstance
+  shrink := shrinkTree
+  sample := Arbitrary.arbitrary
+  interp := id
+
+-- Mirroring a tree twice should yield the original tree
+--  Test that we can succesfully generate a counterexample to the following (erroneous) property
+
+/-- error: Found a counter-example! -/
+#guard_msgs in
+#eval Testable.check (∀ t : Tree, mirror (mirror t) != t)
+  (cfg := {numInst := 10, maxSize := 5, quiet := true})
