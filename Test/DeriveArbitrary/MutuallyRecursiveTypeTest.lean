@@ -1,6 +1,7 @@
 import Plausible.Arbitrary
 import Plausible.DeriveArbitrary
 import Plausible.Attr
+import Plausible.Testable
 
 open Plausible
 
@@ -34,16 +35,14 @@ to each type in the mutually recursive definition -- this is needed
 in order to convince Lean that the type `Nat → Plausible.Gen NatTree`
 is empty during the derivation process.
 
-
 -/
-
 
 mutual
   /-- A (possibly empty) binary tree -/
   inductive NatTree
     | Empty : NatTree
     | Node : Node → NatTree
-    deriving Nonempty
+    deriving Nonempty, Repr
 
   /-- A child node in a tree, containing a value and two subtrees -/
   structure Node where
@@ -116,3 +115,51 @@ trace: [plausible.deriving.arbitrary] ⏎
 -/
 #guard_msgs in
 deriving instance Arbitrary for NatTree
+
+-- Test that we can successfully synthesize instances of `Arbitrary` & `ArbitraryFueled`
+
+/-- info: instArbitraryFueledNatTree -/
+#guard_msgs in
+#synth ArbitraryFueled NatTree
+
+/-- info: instArbitraryOfArbitraryFueled -/
+#guard_msgs in
+#synth Arbitrary NatTree
+
+/-- `search tree x` recursively searches for a value `x` in `tree`,
+    returning a `Bool` indicating `x`'s membership in `tree`
+
+    (Note that `tree` may not obey the binary search tree
+    invariant, so this algorithm is not the most efficient.) -/
+def search (tree : NatTree) (x : Nat) : Bool :=
+  match tree with
+  | .Empty => false
+  | .Node { value, left, right } =>
+    value == x || search left x || search right x
+
+/-- `Shrinkable` instance for `NatTree` -/
+instance : Shrinkable NatTree where
+  shrink (tree : NatTree) :=
+    match tree with
+    | .Empty => []
+    | .Node _ => [.Empty]
+
+/-- `SampleableExt` instance for `NatTree` -/
+instance : SampleableExt NatTree :=
+  SampleableExt.mkSelfContained Arbitrary.arbitrary
+
+
+/-!
+To test whether the derived generator can generate counterexamples,
+we create an erroneous property `∀ tree : NatTree, search tree 5`,
+and ask Plausible to falsify it.
+
+(This property is false, since there exist trees which don't contain the value 5,
+e.g. the `Empty` tree.)
+
+-/
+
+/-- error: Found a counter-example! -/
+#guard_msgs in
+#eval Testable.check (∀ tree : NatTree, search tree 5)
+  (cfg := {numInst := 10, maxSize := 2, quiet := true})
