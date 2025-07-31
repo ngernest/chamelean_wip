@@ -17,8 +17,6 @@
   ["docBlame", "Plausible.PrintableProp.printProp"],
   ["docBlame", "Plausible.NamedBinder"],
   ["docBlame", "Plausible.Testable.runProp"],
-  ["docBlame", "extractForAllBinders.go"],
-  ["docBlame", "getComponentsOfArrowType.helper"],
   ["unusedArguments", "Plausible.RandT.up"],
   ["unusedArguments", "Plausible.RandT.down"],
   ["unusedArguments", "Plausible.NamedBinder"],
