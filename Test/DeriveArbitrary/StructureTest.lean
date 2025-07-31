@@ -42,37 +42,41 @@ structure Foo where
 -- Test that we can successfully synthesize instances of `Arbitrary` & `ArbitraryFueled`
 set_option trace.plausible.deriving.arbitrary true in
 /--
-trace: [plausible.deriving.arbitrary] Derived generator: instance : Plausible.ArbitraryFueled Foo where
-      arbitraryFueled :=
-        let rec aux_arb (fuel : Nat) : Plausible.Gen Foo :=
-          match fuel with
-          | Nat.zero =>
-            Plausible.Gen.oneOfWithDefault
-              (do
-                let stringField_0 ← Plausible.Arbitrary.arbitrary
-                let boolField_0 ← Plausible.Arbitrary.arbitrary
-                let natField_0 ← Plausible.Arbitrary.arbitrary
-                return Foo.mk stringField_0 boolField_0 natField_0)
-              [(do
-                  let stringField_0 ← Plausible.Arbitrary.arbitrary
-                  let boolField_0 ← Plausible.Arbitrary.arbitrary
-                  let natField_0 ← Plausible.Arbitrary.arbitrary
-                  return Foo.mk stringField_0 boolField_0 natField_0)]
-          | fuel' + 1 =>
-            Plausible.Gen.frequency
-              (do
-                let stringField_0 ← Plausible.Arbitrary.arbitrary
-                let boolField_0 ← Plausible.Arbitrary.arbitrary
-                let natField_0 ← Plausible.Arbitrary.arbitrary
-                return Foo.mk stringField_0 boolField_0 natField_0)
-              [(1,
-                  (do
-                    let stringField_0 ← Plausible.Arbitrary.arbitrary
-                    let boolField_0 ← Plausible.Arbitrary.arbitrary
-                    let natField_0 ← Plausible.Arbitrary.arbitrary
-                    return Foo.mk stringField_0 boolField_0 natField_0)),
-                ]
-        fun fuel => aux_arb fuel
+trace: [plausible.deriving.arbitrary] ⏎
+    [mutual
+       def arbitraryFoo✝ : Nat → Plausible.Gen (@Foo✝) :=
+         let rec aux_arb (fuel : Nat) : Plausible.Gen (@Foo✝) :=
+           match fuel with
+           | Nat.zero =>
+             Plausible.Gen.oneOfWithDefault
+               (do
+                 let a_0✝ ← Plausible.Arbitrary.arbitrary
+                 let a_0✝¹ ← Plausible.Arbitrary.arbitrary
+                 let a_0✝² ← Plausible.Arbitrary.arbitrary
+                 return Foo.mk a_0✝ a_0✝¹ a_0✝²)
+               [(do
+                   let a_0✝ ← Plausible.Arbitrary.arbitrary
+                   let a_0✝¹ ← Plausible.Arbitrary.arbitrary
+                   let a_0✝² ← Plausible.Arbitrary.arbitrary
+                   return Foo.mk a_0✝ a_0✝¹ a_0✝²)]
+           | fuel' + 1 =>
+             Plausible.Gen.frequency
+               (do
+                 let a_0✝ ← Plausible.Arbitrary.arbitrary
+                 let a_0✝¹ ← Plausible.Arbitrary.arbitrary
+                 let a_0✝² ← Plausible.Arbitrary.arbitrary
+                 return Foo.mk a_0✝ a_0✝¹ a_0✝²)
+               [(1,
+                   (do
+                     let a_0✝ ← Plausible.Arbitrary.arbitrary
+                     let a_0✝¹ ← Plausible.Arbitrary.arbitrary
+                     let a_0✝² ← Plausible.Arbitrary.arbitrary
+                     return Foo.mk a_0✝ a_0✝¹ a_0✝²)),
+                 ]
+         fun fuel => aux_arb fuel
+     end,
+     instance : Plausible.ArbitraryFueled✝ (@Foo✝) :=
+       ⟨arbitraryFoo✝⟩]
 -/
 #guard_msgs in
 deriving instance Arbitrary for Foo

@@ -20,50 +20,54 @@ inductive Value where
 
 set_option trace.plausible.deriving.arbitrary true in
 /--
-trace: [plausible.deriving.arbitrary] Derived generator: instance : Plausible.ArbitraryFueled Value where
-      arbitraryFueled :=
-        let rec aux_arb (fuel : Nat) : Plausible.Gen Value :=
-          match fuel with
-          | Nat.zero =>
-            Plausible.Gen.oneOfWithDefault (pure Value.none)
-              [(pure Value.none),
-                (do
-                  let value_0 ← Plausible.Arbitrary.arbitrary
-                  return Value.bool value_0),
-                (do
-                  let value_0 ← Plausible.Arbitrary.arbitrary
-                  return Value.int value_0),
-                (do
-                  let value_0 ← Plausible.Arbitrary.arbitrary
-                  return Value.string value_0),
-                (pure Value.ellipsis),
-                (do
-                  let shape_0 ← Plausible.Arbitrary.arbitrary
-                  let dtype_0 ← Plausible.Arbitrary.arbitrary
-                  return Value.tensor shape_0 dtype_0)]
-          | fuel' + 1 =>
-            Plausible.Gen.frequency (pure Value.none)
-              [(1, (pure Value.none)),
-                (1,
-                  (do
-                    let value_0 ← Plausible.Arbitrary.arbitrary
-                    return Value.bool value_0)),
-                (1,
-                  (do
-                    let value_0 ← Plausible.Arbitrary.arbitrary
-                    return Value.int value_0)),
-                (1,
-                  (do
-                    let value_0 ← Plausible.Arbitrary.arbitrary
-                    return Value.string value_0)),
-                (1, (pure Value.ellipsis)),
-                (1,
-                  (do
-                    let shape_0 ← Plausible.Arbitrary.arbitrary
-                    let dtype_0 ← Plausible.Arbitrary.arbitrary
-                    return Value.tensor shape_0 dtype_0)),
-                ]
-        fun fuel => aux_arb fuel
+trace: [plausible.deriving.arbitrary] ⏎
+    [mutual
+       def arbitraryValue✝ : Nat → Plausible.Gen (@Value✝) :=
+         let rec aux_arb (fuel : Nat) : Plausible.Gen (@Value✝) :=
+           match fuel with
+           | Nat.zero =>
+             Plausible.Gen.oneOfWithDefault (pure Value.none)
+               [(pure Value.none),
+                 (do
+                   let a_0✝ ← Plausible.Arbitrary.arbitrary
+                   return Value.bool a_0✝),
+                 (do
+                   let a_0✝¹ ← Plausible.Arbitrary.arbitrary
+                   return Value.int a_0✝¹),
+                 (do
+                   let a_0✝² ← Plausible.Arbitrary.arbitrary
+                   return Value.string a_0✝²),
+                 (pure Value.ellipsis),
+                 (do
+                   let a_0✝³ ← Plausible.Arbitrary.arbitrary
+                   let a_0✝⁴ ← Plausible.Arbitrary.arbitrary
+                   return Value.tensor a_0✝³ a_0✝⁴)]
+           | fuel' + 1 =>
+             Plausible.Gen.frequency (pure Value.none)
+               [(1, (pure Value.none)),
+                 (1,
+                   (do
+                     let a_0✝ ← Plausible.Arbitrary.arbitrary
+                     return Value.bool a_0✝)),
+                 (1,
+                   (do
+                     let a_0✝¹ ← Plausible.Arbitrary.arbitrary
+                     return Value.int a_0✝¹)),
+                 (1,
+                   (do
+                     let a_0✝² ← Plausible.Arbitrary.arbitrary
+                     return Value.string a_0✝²)),
+                 (1, (pure Value.ellipsis)),
+                 (1,
+                   (do
+                     let a_0✝³ ← Plausible.Arbitrary.arbitrary
+                     let a_0✝⁴ ← Plausible.Arbitrary.arbitrary
+                     return Value.tensor a_0✝³ a_0✝⁴)),
+                 ]
+         fun fuel => aux_arb fuel
+     end,
+     instance : Plausible.ArbitraryFueled✝ (@Value✝) :=
+       ⟨arbitraryValue✝⟩]
 -/
 #guard_msgs in
 deriving instance Arbitrary for Value
