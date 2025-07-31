@@ -195,7 +195,7 @@ def mkBody (header : Header) (inductiveVal : InductiveVal) (generatorType : TSyn
           if !ctorIsRecursive then
             -- Call `arbitrary` to generate a random value for each of the arguments
             for freshIdent in ctorArgIdents do
-              let bindExpr ← mkLetBind freshIdent #[(mkIdent ``Arbitrary.arbitrary)]
+              let bindExpr ← `(doElem| let $freshIdent ← $(mkIdent ``Arbitrary.arbitrary):term)
               doElems := doElems.push bindExpr
           else
             -- For recursive constructors, we need to examine each argument to see which of them require
@@ -206,9 +206,9 @@ def mkBody (header : Header) (inductiveVal : InductiveVal) (generatorType : TSyn
               -- otherwise generate a value using `arbitrary`
               let bindExpr ←
                 if argType.getAppFn.constName == targetTypeName then
-                  mkLetBind freshIdent #[(mkIdent `aux_arb), freshFuel']
+                  `(doElem| let $freshIdent ← $(mkIdent `aux_arb):term $(freshFuel'):term)
                 else
-                  mkLetBind freshIdent #[(mkIdent ``Arbitrary.arbitrary)]
+                  `(doElem| let $freshIdent ← $(mkIdent ``Arbitrary.arbitrary):term)
               doElems := doElems.push bindExpr
 
           -- Create an expression `return C x1 ... xn` at the end of the generator, where
