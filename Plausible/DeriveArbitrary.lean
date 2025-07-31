@@ -183,7 +183,7 @@ def mkBody (header : Header) (inductiveVal : InductiveVal) (generatorType : TSyn
       let pureGen ← `($(Lean.mkIdent `pure) $ctorIdent)
       nonRecursiveGenerators := nonRecursiveGenerators.push pureGen
     else
-      -- Add all the freshened names for the constructor to the local context,
+      -- Add all the constructor's argument names + types to the local context,
       -- then produce the body of the sub-generator
       let (generatorBody, ctorIsRecursive) ←
         withLocalDeclsDND ctorArgNamesTypes (fun _ => do
@@ -191,24 +191,18 @@ def mkBody (header : Header) (inductiveVal : InductiveVal) (generatorType : TSyn
 
           -- Determine whether the constructor has any recursive arguments
           let ctorIsRecursive ← isConstructorRecursive targetTypeName ctorName
-          if !ctorIsRecursive then
-            -- Call `arbitrary` to generate a random value for each of the arguments
-            for freshIdent in ctorArgIdents do
-              let bindExpr ← `(doElem| let $freshIdent ← $(mkIdent ``Arbitrary.arbitrary):term)
-              doElems := doElems.push bindExpr
-          else
-            -- For recursive constructors, we need to examine each argument to see which of them require
-            -- recursive calls to the generator
-            for (freshIdent, argType) in ctorArgIdentsTypes do
-              -- If the argument's type is the same as the target type,
-              -- produce a recursive call to the generator using `aux_arb`,
-              -- otherwise generate a value using `arbitrary`
-              let bindExpr ←
-                if argType.getAppFn.constName == targetTypeName then
-                  `(doElem| let $freshIdent ← $(mkIdent `aux_arb):term $(freshFuel'):term)
-                else
-                  `(doElem| let $freshIdent ← $(mkIdent ``Arbitrary.arbitrary):term)
-              doElems := doElems.push bindExpr
+
+          -- Examine each argument to see which of them require recursive calls to the generator
+          for (freshIdent, argType) in ctorArgIdentsTypes do
+            -- If the argument's type is the same as the target type,
+            -- produce a recursive call to the generator using `aux_arb`,
+            -- otherwise generate a value using `arbitrary`
+            let bindExpr ←
+              if argType.getAppFn.constName == targetTypeName then
+                `(doElem| let $freshIdent ← $(mkIdent `aux_arb):term $(freshFuel'):term)
+              else
+                `(doElem| let $freshIdent ← $(mkIdent ``Arbitrary.arbitrary):term)
+            doElems := doElems.push bindExpr
 
           -- Create an expression `return C x1 ... xn` at the end of the generator, where
           -- `C` is the constructor name and the `xi` are the generated values for the args
