@@ -28,10 +28,10 @@ trace: [plausible.deriving.arbitrary] ⏎
                [(1, (pure Tree.Leaf)),
                  (fuel' + 1,
                    (do
-                     let a_0✝ ← Plausible.Arbitrary.arbitrary
-                     let a_0✝¹ ← aux_arb fuel'
-                     let a_0✝² ← aux_arb fuel'
-                     return Tree.Node a_0✝ a_0✝¹ a_0✝²))]
+                     let a✝ ← Plausible.Arbitrary.arbitrary
+                     let a✝¹ ← aux_arb fuel'
+                     let a✝² ← aux_arb fuel'
+                     return Tree.Node a✝ a✝¹ a✝²))]
          fun fuel => aux_arb fuel
      end,
      instance : Plausible.ArbitraryFueled✝ (@Tree✝) :=

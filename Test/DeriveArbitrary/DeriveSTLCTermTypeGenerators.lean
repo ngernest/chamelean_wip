@@ -37,9 +37,9 @@ trace: [plausible.deriving.arbitrary] ⏎
                [(1, (pure type.Nat)),
                  (fuel' + 1,
                    (do
-                     let a_0✝ ← aux_arb fuel'
-                     let a_0✝¹ ← aux_arb fuel'
-                     return type.Fun a_0✝ a_0✝¹))]
+                     let a✝ ← aux_arb fuel'
+                     let a✝¹ ← aux_arb fuel'
+                     return type.Fun a✝ a✝¹))]
          fun fuel => aux_arb fuel
      end,
      instance : Plausible.ArbitraryFueled✝ (@type✝) :=
@@ -53,42 +53,42 @@ trace: [plausible.deriving.arbitrary] ⏎
            | Nat.zero =>
              Plausible.Gen.oneOfWithDefault
                (do
-                 let a_0✝ ← Plausible.Arbitrary.arbitrary
-                 return term.Const a_0✝)
+                 let a✝ ← Plausible.Arbitrary.arbitrary
+                 return term.Const a✝)
                [(do
-                   let a_0✝ ← Plausible.Arbitrary.arbitrary
-                   return term.Const a_0✝),
+                   let a✝ ← Plausible.Arbitrary.arbitrary
+                   return term.Const a✝),
                  (do
-                   let a_0✝¹ ← Plausible.Arbitrary.arbitrary
-                   return term.Var a_0✝¹)]
+                   let a✝¹ ← Plausible.Arbitrary.arbitrary
+                   return term.Var a✝¹)]
            | fuel' + 1 =>
              Plausible.Gen.frequency
                (do
-                 let a_0✝ ← Plausible.Arbitrary.arbitrary
-                 return term.Const a_0✝)
+                 let a✝ ← Plausible.Arbitrary.arbitrary
+                 return term.Const a✝)
                [(1,
                    (do
-                     let a_0✝ ← Plausible.Arbitrary.arbitrary
-                     return term.Const a_0✝)),
+                     let a✝ ← Plausible.Arbitrary.arbitrary
+                     return term.Const a✝)),
                  (1,
                    (do
-                     let a_0✝¹ ← Plausible.Arbitrary.arbitrary
-                     return term.Var a_0✝¹)),
+                     let a✝¹ ← Plausible.Arbitrary.arbitrary
+                     return term.Var a✝¹)),
                  (fuel' + 1,
                    (do
-                     let a_0✝² ← aux_arb fuel'
-                     let a_0✝³ ← aux_arb fuel'
-                     return term.Add a_0✝² a_0✝³)),
+                     let a✝² ← aux_arb fuel'
+                     let a✝³ ← aux_arb fuel'
+                     return term.Add a✝² a✝³)),
                  (fuel' + 1,
                    (do
-                     let a_0✝⁴ ← aux_arb fuel'
-                     let a_0✝⁵ ← aux_arb fuel'
-                     return term.App a_0✝⁴ a_0✝⁵)),
+                     let a✝⁴ ← aux_arb fuel'
+                     let a✝⁵ ← aux_arb fuel'
+                     return term.App a✝⁴ a✝⁵)),
                  (fuel' + 1,
                    (do
-                     let a_0✝⁶ ← Plausible.Arbitrary.arbitrary
-                     let a_0✝⁷ ← aux_arb fuel'
-                     return term.Abs a_0✝⁶ a_0✝⁷))]
+                     let a✝⁶ ← Plausible.Arbitrary.arbitrary
+                     let a✝⁷ ← aux_arb fuel'
+                     return term.Abs a✝⁶ a✝⁷))]
          fun fuel => aux_arb fuel
      end,
      instance : Plausible.ArbitraryFueled✝ (@term✝) :=

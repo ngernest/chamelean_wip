@@ -7,7 +7,6 @@ import Lean.Elab
 import Lean.Elab.Deriving.Basic
 import Lean.Elab.Deriving.Util
 
-import Plausible.Idents
 import Plausible.TSyntaxCombinators
 import Plausible.Arbitrary
 import Plausible.Utils
@@ -74,8 +73,7 @@ open Arbitrary
     Lean produces macro scopes when we try to access the names for the constructor args.
     In this case, we remove the macro scopes so that the name is user-accessible.
     (This will result in constructor argument names being non-unique in the array
-    that is returned -- it is the caller's responsibility to produce fresh names,
-    e.g. using `Idents.genFreshNames`.)
+    that is returned -- it is the caller's responsibility to produce fresh names.)
 -/
 def getCtorArgsNamesAndTypes (header : Header) (indVal : InductiveVal) (ctorName : Name) : MetaM (Array (Name × Expr)) := do
   let ctorInfo ← getConstInfoCtor ctorName
@@ -177,17 +175,9 @@ def mkBody (header : Header) (inductiveVal : InductiveVal) (generatorType : TSyn
         | C : T1 → ... → Tn
       ```
       in which all the arguments to the constructor `C` don't have explicit names.
-
-      (Note: we use `genFreshNames` instead of `LocalContext.getUnusedName` here
-      to ensure that when there are multiple arguments,
-      every single argument gets a fresh name. All of the fresh names are added
-      to the `LocalContext` later in this function, ensuring that the `LocalContext`
-      remains updated.)
     -/
-    let freshArgNames := Idents.genFreshNames (existingNames := ctorArgNames) (namePrefixes := ctorArgNames)
-    let freshArgNamesTypes := Array.zip freshArgNames ctorArgTypes
-    let freshArgIdents := Lean.mkIdent <$> freshArgNames
-    let freshArgIdentsTypes := Array.zip freshArgIdents ctorArgTypes
+    let ctorArgIdents := Lean.mkIdent <$> ctorArgNames
+    let ctorArgIdentsTypes := Array.zip ctorArgIdents ctorArgTypes
 
     if ctorArgNamesTypes.isEmpty then
       -- Constructor is nullary, we can just use a generator of the form `pure ...`
@@ -197,20 +187,20 @@ def mkBody (header : Header) (inductiveVal : InductiveVal) (generatorType : TSyn
       -- Add all the freshened names for the constructor to the local context,
       -- then produce the body of the sub-generator
       let (generatorBody, ctorIsRecursive) ←
-        withLocalDeclsDND freshArgNamesTypes (fun _ => do
+        withLocalDeclsDND ctorArgNamesTypes (fun _ => do
           let mut doElems := #[]
 
           -- Determine whether the constructor has any recursive arguments
           let ctorIsRecursive ← isConstructorRecursive targetTypeName ctorName
           if !ctorIsRecursive then
             -- Call `arbitrary` to generate a random value for each of the arguments
-            for freshIdent in freshArgIdents do
+            for freshIdent in ctorArgIdents do
               let bindExpr ← mkLetBind freshIdent #[(mkIdent ``Arbitrary.arbitrary)]
               doElems := doElems.push bindExpr
           else
             -- For recursive constructors, we need to examine each argument to see which of them require
             -- recursive calls to the generator
-            for (freshIdent, argType) in freshArgIdentsTypes do
+            for (freshIdent, argType) in ctorArgIdentsTypes do
               -- If the argument's type is the same as the target type,
               -- produce a recursive call to the generator using `aux_arb`,
               -- otherwise generate a value using `arbitrary`
@@ -223,7 +213,7 @@ def mkBody (header : Header) (inductiveVal : InductiveVal) (generatorType : TSyn
 
           -- Create an expression `return C x1 ... xn` at the end of the generator, where
           -- `C` is the constructor name and the `xi` are the generated values for the args
-          let pureExpr ← `(doElem| return $ctorIdent $freshArgIdents*)
+          let pureExpr ← `(doElem| return $ctorIdent $ctorArgIdents*)
           doElems := doElems.push pureExpr
 
           -- Put the body of the generator together

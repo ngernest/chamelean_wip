@@ -66,15 +66,15 @@ trace: [plausible.deriving.arbitrary] ⏎
              Plausible.Gen.oneOfWithDefault (pure NatTree.Empty)
                [(pure NatTree.Empty),
                  (do
-                   let a_0✝ ← Plausible.Arbitrary.arbitrary
-                   return NatTree.Node a_0✝)]
+                   let a✝ ← Plausible.Arbitrary.arbitrary
+                   return NatTree.Node a✝)]
            | fuel' + 1 =>
              Plausible.Gen.frequency (pure NatTree.Empty)
                [(1, (pure NatTree.Empty)),
                  (1,
                    (do
-                     let a_0✝ ← Plausible.Arbitrary.arbitrary
-                     return NatTree.Node a_0✝)),
+                     let a✝ ← Plausible.Arbitrary.arbitrary
+                     return NatTree.Node a✝)),
                  ]
          fun fuel => aux_arb fuel
        partial def arbitraryNode✝ : Nat → Plausible.Gen (@Node✝) :=
@@ -85,28 +85,28 @@ trace: [plausible.deriving.arbitrary] ⏎
            | Nat.zero =>
              Plausible.Gen.oneOfWithDefault
                (do
-                 let a_0✝¹ ← Plausible.Arbitrary.arbitrary
-                 let a_0✝² ← Plausible.Arbitrary.arbitrary
-                 let a_0✝³ ← Plausible.Arbitrary.arbitrary
-                 return Node.mk a_0✝¹ a_0✝² a_0✝³)
+                 let a✝¹ ← Plausible.Arbitrary.arbitrary
+                 let a✝² ← Plausible.Arbitrary.arbitrary
+                 let a✝³ ← Plausible.Arbitrary.arbitrary
+                 return Node.mk a✝¹ a✝² a✝³)
                [(do
-                   let a_0✝¹ ← Plausible.Arbitrary.arbitrary
-                   let a_0✝² ← Plausible.Arbitrary.arbitrary
-                   let a_0✝³ ← Plausible.Arbitrary.arbitrary
-                   return Node.mk a_0✝¹ a_0✝² a_0✝³)]
+                   let a✝¹ ← Plausible.Arbitrary.arbitrary
+                   let a✝² ← Plausible.Arbitrary.arbitrary
+                   let a✝³ ← Plausible.Arbitrary.arbitrary
+                   return Node.mk a✝¹ a✝² a✝³)]
            | fuel' + 1 =>
              Plausible.Gen.frequency
                (do
-                 let a_0✝¹ ← Plausible.Arbitrary.arbitrary
-                 let a_0✝² ← Plausible.Arbitrary.arbitrary
-                 let a_0✝³ ← Plausible.Arbitrary.arbitrary
-                 return Node.mk a_0✝¹ a_0✝² a_0✝³)
+                 let a✝¹ ← Plausible.Arbitrary.arbitrary
+                 let a✝² ← Plausible.Arbitrary.arbitrary
+                 let a✝³ ← Plausible.Arbitrary.arbitrary
+                 return Node.mk a✝¹ a✝² a✝³)
                [(1,
                    (do
-                     let a_0✝¹ ← Plausible.Arbitrary.arbitrary
-                     let a_0✝² ← Plausible.Arbitrary.arbitrary
-                     let a_0✝³ ← Plausible.Arbitrary.arbitrary
-                     return Node.mk a_0✝¹ a_0✝² a_0✝³)),
+                     let a✝¹ ← Plausible.Arbitrary.arbitrary
+                     let a✝² ← Plausible.Arbitrary.arbitrary
+                     let a✝³ ← Plausible.Arbitrary.arbitrary
+                     return Node.mk a✝¹ a✝² a✝³)),
                  ]
          fun fuel => aux_arb fuel
      end,

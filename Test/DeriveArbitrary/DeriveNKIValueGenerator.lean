@@ -29,40 +29,40 @@ trace: [plausible.deriving.arbitrary] ⏎
              Plausible.Gen.oneOfWithDefault (pure Value.none)
                [(pure Value.none),
                  (do
-                   let a_0✝ ← Plausible.Arbitrary.arbitrary
-                   return Value.bool a_0✝),
+                   let a✝ ← Plausible.Arbitrary.arbitrary
+                   return Value.bool a✝),
                  (do
-                   let a_0✝¹ ← Plausible.Arbitrary.arbitrary
-                   return Value.int a_0✝¹),
+                   let a✝¹ ← Plausible.Arbitrary.arbitrary
+                   return Value.int a✝¹),
                  (do
-                   let a_0✝² ← Plausible.Arbitrary.arbitrary
-                   return Value.string a_0✝²),
+                   let a✝² ← Plausible.Arbitrary.arbitrary
+                   return Value.string a✝²),
                  (pure Value.ellipsis),
                  (do
-                   let a_0✝³ ← Plausible.Arbitrary.arbitrary
-                   let a_0✝⁴ ← Plausible.Arbitrary.arbitrary
-                   return Value.tensor a_0✝³ a_0✝⁴)]
+                   let a✝³ ← Plausible.Arbitrary.arbitrary
+                   let a✝⁴ ← Plausible.Arbitrary.arbitrary
+                   return Value.tensor a✝³ a✝⁴)]
            | fuel' + 1 =>
              Plausible.Gen.frequency (pure Value.none)
                [(1, (pure Value.none)),
                  (1,
                    (do
-                     let a_0✝ ← Plausible.Arbitrary.arbitrary
-                     return Value.bool a_0✝)),
+                     let a✝ ← Plausible.Arbitrary.arbitrary
+                     return Value.bool a✝)),
                  (1,
                    (do
-                     let a_0✝¹ ← Plausible.Arbitrary.arbitrary
-                     return Value.int a_0✝¹)),
+                     let a✝¹ ← Plausible.Arbitrary.arbitrary
+                     return Value.int a✝¹)),
                  (1,
                    (do
-                     let a_0✝² ← Plausible.Arbitrary.arbitrary
-                     return Value.string a_0✝²)),
+                     let a✝² ← Plausible.Arbitrary.arbitrary
+                     return Value.string a✝²)),
                  (1, (pure Value.ellipsis)),
                  (1,
                    (do
-                     let a_0✝³ ← Plausible.Arbitrary.arbitrary
-                     let a_0✝⁴ ← Plausible.Arbitrary.arbitrary
-                     return Value.tensor a_0✝³ a_0✝⁴)),
+                     let a✝³ ← Plausible.Arbitrary.arbitrary
+                     let a✝⁴ ← Plausible.Arbitrary.arbitrary
+                     return Value.tensor a✝³ a✝⁴)),
                  ]
          fun fuel => aux_arb fuel
      end,

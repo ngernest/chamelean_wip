@@ -23,28 +23,28 @@ trace: [plausible.deriving.arbitrary] ⏎
            | Nat.zero =>
              Plausible.Gen.oneOfWithDefault
                (do
-                 let a_0✝ ← Plausible.Arbitrary.arbitrary
-                 let a_0✝¹ ← Plausible.Arbitrary.arbitrary
-                 let a_0✝² ← Plausible.Arbitrary.arbitrary
-                 return DummyInductive.FromBitVec a_0✝ a_0✝¹ a_0✝²)
+                 let a✝ ← Plausible.Arbitrary.arbitrary
+                 let a✝¹ ← Plausible.Arbitrary.arbitrary
+                 let a✝² ← Plausible.Arbitrary.arbitrary
+                 return DummyInductive.FromBitVec a✝ a✝¹ a✝²)
                [(do
-                   let a_0✝ ← Plausible.Arbitrary.arbitrary
-                   let a_0✝¹ ← Plausible.Arbitrary.arbitrary
-                   let a_0✝² ← Plausible.Arbitrary.arbitrary
-                   return DummyInductive.FromBitVec a_0✝ a_0✝¹ a_0✝²)]
+                   let a✝ ← Plausible.Arbitrary.arbitrary
+                   let a✝¹ ← Plausible.Arbitrary.arbitrary
+                   let a✝² ← Plausible.Arbitrary.arbitrary
+                   return DummyInductive.FromBitVec a✝ a✝¹ a✝²)]
            | fuel' + 1 =>
              Plausible.Gen.frequency
                (do
-                 let a_0✝ ← Plausible.Arbitrary.arbitrary
-                 let a_0✝¹ ← Plausible.Arbitrary.arbitrary
-                 let a_0✝² ← Plausible.Arbitrary.arbitrary
-                 return DummyInductive.FromBitVec a_0✝ a_0✝¹ a_0✝²)
+                 let a✝ ← Plausible.Arbitrary.arbitrary
+                 let a✝¹ ← Plausible.Arbitrary.arbitrary
+                 let a✝² ← Plausible.Arbitrary.arbitrary
+                 return DummyInductive.FromBitVec a✝ a✝¹ a✝²)
                [(1,
                    (do
-                     let a_0✝ ← Plausible.Arbitrary.arbitrary
-                     let a_0✝¹ ← Plausible.Arbitrary.arbitrary
-                     let a_0✝² ← Plausible.Arbitrary.arbitrary
-                     return DummyInductive.FromBitVec a_0✝ a_0✝¹ a_0✝²)),
+                     let a✝ ← Plausible.Arbitrary.arbitrary
+                     let a✝¹ ← Plausible.Arbitrary.arbitrary
+                     let a✝² ← Plausible.Arbitrary.arbitrary
+                     return DummyInductive.FromBitVec a✝ a✝¹ a✝²)),
                  ]
          fun fuel => aux_arb fuel
      end,

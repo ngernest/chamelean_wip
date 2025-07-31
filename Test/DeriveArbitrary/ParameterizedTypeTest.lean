@@ -25,9 +25,9 @@ trace: [plausible.deriving.arbitrary] ⏎
                [(1, (pure MyList.MyNil)),
                  (fuel' + 1,
                    (do
-                     let a_0✝ ← Plausible.Arbitrary.arbitrary
-                     let a_0✝¹ ← aux_arb fuel'
-                     return MyList.MyCons a_0✝ a_0✝¹))]
+                     let a✝ ← Plausible.Arbitrary.arbitrary
+                     let a✝¹ ← aux_arb fuel'
+                     return MyList.MyCons a✝ a✝¹))]
          fun fuel => aux_arb fuel
      end,
      instance {α✝} [Plausible.Arbitrary✝ α✝] : Plausible.ArbitraryFueled✝ (@MyList✝ α✝) :=

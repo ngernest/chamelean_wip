@@ -32,29 +32,29 @@ trace: [plausible.deriving.arbitrary] ⏎
              Plausible.Gen.oneOfWithDefault (pure RegExp.EmptySet)
                [(pure RegExp.EmptySet), (pure RegExp.EmptyStr),
                  (do
-                   let a_0✝ ← Plausible.Arbitrary.arbitrary
-                   return RegExp.Char a_0✝)]
+                   let a✝ ← Plausible.Arbitrary.arbitrary
+                   return RegExp.Char a✝)]
            | fuel' + 1 =>
              Plausible.Gen.frequency (pure RegExp.EmptySet)
                [(1, (pure RegExp.EmptySet)), (1, (pure RegExp.EmptyStr)),
                  (1,
                    (do
-                     let a_0✝ ← Plausible.Arbitrary.arbitrary
-                     return RegExp.Char a_0✝)),
+                     let a✝ ← Plausible.Arbitrary.arbitrary
+                     return RegExp.Char a✝)),
                  (fuel' + 1,
                    (do
-                     let a_0✝¹ ← aux_arb fuel'
-                     let a_0✝² ← aux_arb fuel'
-                     return RegExp.App a_0✝¹ a_0✝²)),
+                     let a✝¹ ← aux_arb fuel'
+                     let a✝² ← aux_arb fuel'
+                     return RegExp.App a✝¹ a✝²)),
                  (fuel' + 1,
                    (do
-                     let a_0✝³ ← aux_arb fuel'
-                     let a_0✝⁴ ← aux_arb fuel'
-                     return RegExp.Union a_0✝³ a_0✝⁴)),
+                     let a✝³ ← aux_arb fuel'
+                     let a✝⁴ ← aux_arb fuel'
+                     return RegExp.Union a✝³ a✝⁴)),
                  (fuel' + 1,
                    (do
-                     let a_0✝⁵ ← aux_arb fuel'
-                     return RegExp.Star a_0✝⁵))]
+                     let a✝⁵ ← aux_arb fuel'
+                     return RegExp.Star a✝⁵))]
          fun fuel => aux_arb fuel
      end,
      instance : Plausible.ArbitraryFueled✝ (@RegExp✝) :=
