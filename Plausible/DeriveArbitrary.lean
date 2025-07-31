@@ -18,7 +18,7 @@ open Elab.Command
 
 /-!
 
-# Deriving Handler for `Arbitrary` typeclass
+# Deriving Handler for `Arbitrary`
 
 This file defines a handler which automatically derives `Arbitrary` instances
 for inductive types.
@@ -26,6 +26,9 @@ for inductive types.
 (Note that the deriving handler technically derives `ArbitraryFueled` instancces,
 but every `ArbitraryFueled` instance automatically results in an `Arbitrary` instance,
 as detailed in `Arbitrary.lean`.)
+
+Note that the resulting `Arbitrary` and `ArbitraryFueled` instance should be considered
+to be opaque, following the convention for the deriving handler for Mathlib's `Encodable` typeclass.
 
 Example usage:
 
@@ -102,18 +105,18 @@ open TSyntax.Compat in
     of the form `($targetName : $targetType)` to the field `binders`
     (i.e. `binders` contains only implicit binders) -/
 def mkHeaderWithOnlyImplicitBinders (className : Name) (arity : Nat) (indVal : InductiveVal) : TermElabM Header := do
-  let argNames      ← mkInductArgNames indVal
-  let binders       ← mkImplicitBinders argNames
-  let targetType    ← mkInductiveApp indVal argNames
+  let argNames ← mkInductArgNames indVal
+  let binders ← mkImplicitBinders argNames
+  let targetType ← mkInductiveApp indVal argNames
   let mut targetNames := #[]
   for _ in [:arity] do
     targetNames := targetNames.push (← mkFreshUserName `x)
-  let binders      := binders ++ (← mkInstImplicitBinders className indVal argNames)
+  let binders := binders ++ (← mkInstImplicitBinders className indVal argNames)
   return {
-    binders     := binders
-    argNames    := argNames
+    binders := binders
+    argNames := argNames
     targetNames := targetNames
-    targetType  := targetType
+    targetType := targetType
   }
 
 /-- Creates a `Header` for the `ArbitraryFueled` typeclass -/
@@ -258,12 +261,28 @@ def mkAuxFunction (ctx : Deriving.Context) (i : Nat) : TermElabM Command := do
   let header ← mkArbitraryHeader indVal
   let mut binders := header.binders
 
+  -- Determine the type of the generator
+  -- (the `Plausible.Gen` type constructor applied to the name of the `inductive` type, plus any type parameters)
   let targetType ← mkInductiveApp ctx.typeInfos[i]! header.argNames
   let generatorType ← `($(mkIdent ``Plausible.Gen) $targetType)
 
+  -- Create the body of the generator function
   let mut body ← mkBody header indVal generatorType
 
-  `(def $(mkIdent auxFunName):ident $binders:bracketedBinder* : $(mkIdent ``Nat) → $generatorType := $body:term)
+  -- If there are multiple mutually-recursive types, then we need to create
+  -- local `let`-definitions containing typeclass instances so that
+  -- the derived generator typechecks
+  if ctx.usePartial then
+    let letDecls ← mkLocalInstanceLetDecls ctx ``ArbitraryFueled header.argNames
+    body ← mkLet letDecls body
+
+  -- If we are deriving a generator for a bunch of mutually-recursive types,
+  -- the derived generator needs to be marked `partial` (following the implementation
+  -- of the `deriving Repr` handler)
+  if ctx.usePartial then
+    `(partial def $(mkIdent auxFunName):ident $binders:bracketedBinder* : $(mkIdent ``Nat) → $generatorType := $body:term)
+  else
+    `(def $(mkIdent auxFunName):ident $binders:bracketedBinder* : $(mkIdent ``Nat) → $generatorType := $body:term)
 
 /-- Creates a `mutual ... end` block containing the definitions of the derived generators -/
 def mkMutualBlock (ctx : Deriving.Context) : TermElabM Syntax := do
