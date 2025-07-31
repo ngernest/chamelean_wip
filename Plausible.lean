@@ -10,7 +10,6 @@ import Plausible.Testable
 import Plausible.Functions
 import Plausible.Attr
 import Plausible.Tactic
-import Plausible.TSyntaxCombinators
 import Plausible.Arbitrary
 import Plausible.DeriveArbitrary
 import Plausible.Utils

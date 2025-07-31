@@ -7,7 +7,6 @@ import Lean.Elab
 import Lean.Elab.Deriving.Basic
 import Lean.Elab.Deriving.Util
 
-import Plausible.TSyntaxCombinators
 import Plausible.Arbitrary
 import Plausible.Utils
 
@@ -217,7 +216,7 @@ def mkBody (header : Header) (inductiveVal : InductiveVal) (generatorType : TSyn
           doElems := doElems.push pureExpr
 
           -- Put the body of the generator together
-          let generatorBody ← mkDoBlock doElems
+          let generatorBody ← `(do $[$doElems:doElem]*)
           pure (generatorBody, ctorIsRecursive))
 
       if !ctorIsRecursive then
