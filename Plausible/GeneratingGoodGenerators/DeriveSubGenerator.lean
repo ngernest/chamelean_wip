@@ -2,6 +2,7 @@ import Lean.Expr
 import Lean.LocalContext
 
 import Plausible.GeneratingGoodGenerators.UnificationMonad
+import Plausible.GeneratingGoodGenerators.ScheduleUtils
 import Plausible.New.DeriveConstrainedProducers
 import Plausible.New.SubGenerators
 import Plausible.New.DeriveArbitrary
@@ -364,6 +365,12 @@ def convertRangeToCtorAppForm (r : Range) : UnifyM (Name × List ConstructorExpr
     let args ← rs.mapM convertRangeToConstructorExpr
     return (c, args)
   | _ => throwError m!"Unable to convert {r} to a constructor expression"
+
+-- TODO: finish implementing this
+-- def getScheduleSort (conclusion : HypothesisExpr) (outputVars : List Unknown) (deriveSort : DeriveSort) (returnOption : Bool) : UnifyM ScheduleSort :=
+--   match deriveSort with
+--   | .Checker => return .CheckerSchedule
+--   | .Theorem => return .TheoremSchedule
 
 
 /-- Function that handles the bulk of the generator derivation algorithm for a single constructor:

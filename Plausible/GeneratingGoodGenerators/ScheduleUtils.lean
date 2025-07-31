@@ -4,7 +4,6 @@ import Plausible.IR.Examples
 import Plausible.New.Utils
 import Plausible.GeneratingGoodGenerators.Schedules
 import Plausible.GeneratingGoodGenerators.UnificationMonad
-import Plausible.GeneratingGoodGenerators.DeriveSubGenerator
 
 open Lean Meta
 open Plausible.IR

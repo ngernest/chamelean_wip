@@ -3,6 +3,10 @@ import Plausible.GeneratingGoodGenerators.UnificationMonad
 
 open Lean
 
+----------------------------------------------
+-- Type definitions
+----------------------------------------------
+
 /-- A `HypothesisExpr` is a datatype representing a hypothesis for a
     constructor of an inductive relation, consisting of a constructor name
     applied to some list of arguments, each of which are `ConstructorExpr`s -/
@@ -32,13 +36,19 @@ inductive DeriveSort
   | Theorem
   deriving Repr, BEq, Ord
 
+/-- The type of schedule we wish to derive -/
 inductive ScheduleSort
   /-- tuple of produced outputs from conclusion of constructor -/
-  | ProducerSchedule : Bool → ProducerSort → (Name × ConstructorExpr) → ScheduleSort
+  | ProducerSchedule (isConstrained : Bool) (producerSort : ProducerSort) (conclusion : Name × ConstructorExpr)
 
   /-- checkers need not bother with conclusion of constructor,
       only hypotheses need be checked and conclusion of constructor follows-/
   | CheckerSchedule
+
+  /-- In a `TheoremSchedule`, we check the `conclusion` of the theorem, and take in a `Bool`
+      which is true if we need to find a checker by identifying the `DecOpt` instance,
+      and false otherwise (we're currently dealing with a functino that returns `Option Bool`) -/
+  | TheoremSchedule (conclusion : HypothesisExpr) (typeClassUsed : Bool)
 
   deriving Repr, Ord, BEq
 
@@ -81,6 +91,7 @@ inductive Density
   /-- Unconstrained generation, i.e. calls to `arbitrary` -/
   | Total
   deriving Repr, BEq
+
 
 
 ----------------------------------------------
