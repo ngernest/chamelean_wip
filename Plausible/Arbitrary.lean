@@ -62,13 +62,6 @@ class ArbitraryFueled (α : Type) where
 instance [ArbitraryFueled α] : Arbitrary α where
   arbitrary := Gen.sized ArbitraryFueled.arbitraryFueled
 
-/-- If we have `Repr`, `ArbitraryFueled` & `Shrinkable` instances for a type,
-    then that type gets a `SampleableExt` instance
-    - Note: Plausible's `SampleableExt` is analogous to QuickChick's `Arbitrary` typeclass
-      (which combines QuickChick's `Gen` and `Shrink` typeclass)-/
-instance [Repr α] [Shrinkable α] [ArbitraryFueled α] : SampleableExt α :=
-  SampleableExt.mkSelfContained (Gen.sized ArbitraryFueled.arbitraryFueled)
-
 /-- Any type which implements Plausible's `SampleableExt` typeclass
     can be made an instance of our `Arbitrary` typeclass -/
 instance [SampleableExt α] : Arbitrary α where
