@@ -119,9 +119,33 @@ def mkHeaderWithOnlyImplicitBinders (className : Name) (arity : Nat) (indVal : I
     targetType := targetType
   }
 
-/-- Creates a `Header` for the `ArbitraryFueled` typeclass -/
+open TSyntax.Compat in
+/-- Variant of `Deriving.Util.mkInstanceCmds` which is specialized to creating `ArbitraryFueled` instances
+    that have `Arbitrary` inst-implicit binders.
+
+    Note that we can't use `mkInstanceCmds` out of the box,
+    since it expects the inst-implicit binders and the instance we're creating to both belong to the same typeclass. -/
+def mkArbitraryFueledInstanceCmds (ctx : Deriving.Context) (typeNames : Array Name) (useAnonCtor := true) : TermElabM (Array Command) := do
+  let mut instances := #[]
+  for i in [:ctx.typeInfos.size] do
+    let indVal       := ctx.typeInfos[i]!
+    if typeNames.contains indVal.name then
+      let auxFunName   := ctx.auxFunNames[i]!
+      let argNames     ← mkInductArgNames indVal
+      let binders      ← mkImplicitBinders argNames
+      let binders      := binders ++ (← mkInstImplicitBinders ``Arbitrary indVal argNames)  -- this line is changed from
+      let indType      ← mkInductiveApp indVal argNames
+      let type         ← `($(mkCIdent ``ArbitraryFueled) $indType)
+      let mut val      := mkIdent auxFunName
+      if useAnonCtor then
+        val ← `(⟨$val⟩)
+      let instCmd ← `(instance $binders:implicitBinder* : $type := $val)
+      instances := instances.push instCmd
+  return instances
+
+/-- Creates a `Header` for the `Arbitrary` typeclass -/
 def mkArbitraryHeader (indVal : InductiveVal) : TermElabM Header :=
-  mkHeaderWithOnlyImplicitBinders ``ArbitraryFueled 1 indVal
+  mkHeaderWithOnlyImplicitBinders ``Arbitrary 1 indVal
 
 /-- Creates the *body* of the generator that appears in the instance of the `ArbitraryFueled` typeclass -/
 def mkBody (header : Header) (inductiveVal : InductiveVal) (generatorType : TSyntax `term) : TermElabM Term := do
@@ -269,8 +293,8 @@ def mkAuxFunction (ctx : Deriving.Context) (i : Nat) : TermElabM Command := do
   -- Create the body of the generator function
   let mut body ← mkBody header indVal generatorType
 
-  -- If there are multiple mutually-recursive types, then we need to create
-  -- local `let`-definitions containing typeclass instances so that
+  -- For mutually-recursive types, we need to create
+  -- local `let`-definitions containing the relevant `ArbitraryFueled` instances so that
   -- the derived generator typechecks
   if ctx.usePartial then
     let letDecls ← mkLocalInstanceLetDecls ctx ``ArbitraryFueled header.argNames
@@ -296,7 +320,7 @@ def mkMutualBlock (ctx : Deriving.Context) : TermElabM Syntax := do
 /-- Creates an instance of the `ArbitraryFueled` typeclass -/
 private def mkArbitraryFueledInstanceCmd (declName : Name) : TermElabM (Array Syntax) := do
   let ctx ← mkContext "arbitrary" declName
-  let cmds := #[← mkMutualBlock ctx] ++ (← mkInstanceCmds ctx ``ArbitraryFueled #[declName])
+  let cmds := #[← mkMutualBlock ctx] ++ (← mkArbitraryFueledInstanceCmds ctx #[declName])
   trace[plausible.deriving.arbitrary] "\n{cmds}"
   return cmds
 
