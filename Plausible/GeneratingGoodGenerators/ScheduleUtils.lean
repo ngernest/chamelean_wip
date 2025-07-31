@@ -287,7 +287,7 @@ def possibleSchedules (vars : List (Name × Expr)) (hypotheses : List Hypothesis
   let prodSort :=
     match deriveSort with
     | .Checker | .Enumerator => ProducerSort.Enumerator
-    | .Generator => ProducerSort.Generator
+    | .Generator | .Theorem => ProducerSort.Generator
 
   let scheduleEnv := ⟨ vars, sortedHypotheses, deriveSort, prodSort, recCall, fixed ⟩
 

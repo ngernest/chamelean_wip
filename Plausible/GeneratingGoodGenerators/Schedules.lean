@@ -1,5 +1,4 @@
 import Lean
-import Batteries
 import Plausible.GeneratingGoodGenerators.UnificationMonad
 
 open Lean
@@ -22,11 +21,15 @@ inductive ProducerSort
   deriving Repr, BEq, Ord
 
 /-- The sort of function we are deriving based on an inductive relation:
-    determines whether we are deriving a (constrained) generator, enumerator or a checker. -/
+    determines whether we are deriving a (constrained) generator, enumerator or a checker.
+
+    Note: the `Theorem` constructor is used in the artifact of "Testing Theorems, Fully Automatically"
+    for automatically testing whether a theorem holds (we replicate it here for completeness). -/
 inductive DeriveSort
   | Generator
   | Enumerator
   | Checker
+  | Theorem
   deriving Repr, BEq, Ord
 
 inductive ScheduleSort
