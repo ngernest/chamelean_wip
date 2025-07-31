@@ -83,12 +83,20 @@ def mirror (t : Tree) : Tree :=
   | .Leaf => .Leaf
   | .Node x l r => .Node x r l
 
+/-- A shrinker for `Tree`, adapted from Penn CIS 5520 lecture notes
+    https://www.seas.upenn.edu/~cis5520/current/lectures/stub/05-quickcheck/QuickCheck.html -/
+def shrinkTree (t : Tree) : List Tree :=
+    match t with
+    | .Leaf => [] -- empty trees can't be shrunk
+    | .Node x l r =>
+      [.Leaf, l, r]                                         -- left and right trees are smaller
+      ++ (fun l' => .Node x l' r) <$> shrinkTree l          -- shrink left subtree
+      ++ (fun r' => .Node x l r') <$> shrinkTree r          -- shrink right tree
+      ++ (fun x' => .Node x' l r) <$> Shrinkable.shrink x   -- shrink the value
+
 /-- `Shrinkable` instance for `Tree` -/
 instance : Shrinkable Tree where
-  shrink (t : Tree) :=
-    match t with
-    | .Leaf => []
-    | .Node _ l r => [.Leaf, l, r]
+  shrink := shrinkTree
 
 /-- `SampleableExt` instance for `Tree` -/
 instance : SampleableExt Tree :=

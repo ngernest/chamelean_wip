@@ -137,12 +137,20 @@ def search (tree : NatTree) (x : Nat) : Bool :=
   | .Node { value, left, right } =>
     value == x || search left x || search right x
 
-/-- `Shrinkable` instance for `NatTree` -/
-instance : Shrinkable NatTree where
-  shrink (tree : NatTree) :=
+/-- A shrinker for `NatTree`, adapted from Penn CIS 5520 lecture notes
+    https://www.seas.upenn.edu/~cis5520/current/lectures/stub/05-quickcheck/QuickCheck.html -/
+def shrinkNatTree (tree : NatTree) : List NatTree :=
     match tree with
     | .Empty => []
-    | .Node _ => [.Empty]
+    | .Node {value := x, left := l, right := r} =>
+      [.Empty, l, r]                                                            -- left and right trees are smaller
+      ++ (fun l' => NatTree.Node $ Node.mk x l' r) <$> shrinkNatTree l          -- shrink left subtree
+      ++ (fun r' => NatTree.Node $ Node.mk x l r') <$> shrinkNatTree r          -- shrink right tree
+      ++ (fun x' => NatTree.Node $ Node.mk x' l r) <$> Shrinkable.shrink x      -- shrink the value
+
+/-- `Shrinkable` instance for `NatTree` -/
+instance : Shrinkable NatTree where
+  shrink := shrinkNatTree
 
 /-- `SampleableExt` instance for `NatTree` -/
 instance : SampleableExt NatTree :=
