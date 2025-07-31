@@ -47,7 +47,7 @@ inductive ScheduleSort
 
   /-- In a `TheoremSchedule`, we check the `conclusion` of the theorem, and take in a `Bool`
       which is true if we need to find a checker by identifying the `DecOpt` instance,
-      and false otherwise (we're currently dealing with a functino that returns `Option Bool`) -/
+      and false otherwise (we're currently dealing with a function that returns `Option Bool`) -/
   | TheoremSchedule (conclusion : HypothesisExpr) (typeClassUsed : Bool)
 
   deriving Repr, Ord, BEq

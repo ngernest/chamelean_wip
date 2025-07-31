@@ -367,10 +367,11 @@ def convertRangeToCtorAppForm (r : Range) : UnifyM (Name × List ConstructorExpr
   | _ => throwError m!"Unable to convert {r} to a constructor expression"
 
 -- TODO: finish implementing this
--- def getScheduleSort (conclusion : HypothesisExpr) (outputVars : List Unknown) (deriveSort : DeriveSort) (returnOption : Bool) : UnifyM ScheduleSort :=
---   match deriveSort with
---   | .Checker => return .CheckerSchedule
---   | .Theorem => return .TheoremSchedule
+def getScheduleSort (conclusion : HypothesisExpr) (outputVars : List Unknown) (deriveSort : DeriveSort) (returnOption : Bool) : UnifyM ScheduleSort :=
+  match deriveSort with
+  | .Checker => return .CheckerSchedule
+  | .Theorem => return (.TheoremSchedule conclusion (typeClassUsed := true))
+  | _ => sorry
 
 
 /-- Function that handles the bulk of the generator derivation algorithm for a single constructor:
