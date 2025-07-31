@@ -26,36 +26,36 @@ set_option trace.plausible.deriving.arbitrary true in
 trace: [plausible.deriving.arbitrary] ⏎
     [mutual
        def arbitraryRegExp✝ : Nat → Plausible.Gen (@RegExp✝) :=
-         let rec aux_arb (fuel : Nat) : Plausible.Gen (@RegExp✝) :=
-           match fuel with
+         let rec aux_arb (fuel✝ : Nat) : Plausible.Gen (@RegExp✝) :=
+           match fuel✝ with
            | Nat.zero =>
              Plausible.Gen.oneOfWithDefault (pure RegExp.EmptySet)
                [(pure RegExp.EmptySet), (pure RegExp.EmptyStr),
                  (do
                    let a✝ ← Plausible.Arbitrary.arbitrary
                    return RegExp.Char a✝)]
-           | fuel' + 1 =>
+           | fuel'✝ + 1 =>
              Plausible.Gen.frequency (pure RegExp.EmptySet)
                [(1, (pure RegExp.EmptySet)), (1, (pure RegExp.EmptyStr)),
                  (1,
                    (do
                      let a✝ ← Plausible.Arbitrary.arbitrary
                      return RegExp.Char a✝)),
-                 (fuel' + 1,
+                 (fuel'✝ + 1,
                    (do
-                     let a✝¹ ← aux_arb fuel'
-                     let a✝² ← aux_arb fuel'
+                     let a✝¹ ← aux_arb fuel'✝
+                     let a✝² ← aux_arb fuel'✝
                      return RegExp.App a✝¹ a✝²)),
-                 (fuel' + 1,
+                 (fuel'✝ + 1,
                    (do
-                     let a✝³ ← aux_arb fuel'
-                     let a✝⁴ ← aux_arb fuel'
+                     let a✝³ ← aux_arb fuel'✝
+                     let a✝⁴ ← aux_arb fuel'✝
                      return RegExp.Union a✝³ a✝⁴)),
-                 (fuel' + 1,
+                 (fuel'✝ + 1,
                    (do
-                     let a✝⁵ ← aux_arb fuel'
+                     let a✝⁵ ← aux_arb fuel'✝
                      return RegExp.Star a✝⁵))]
-         fun fuel => aux_arb fuel
+         fun fuel✝ => aux_arb fuel✝
      end,
      instance : Plausible.ArbitraryFueled✝ (@RegExp✝) :=
        ⟨arbitraryRegExp✝⟩]

@@ -92,9 +92,8 @@ def getCtorArgsNamesAndTypes (header : Header) (indVal : InductiveVal) (ctorName
 
     return argNamesAndTypes
 
-------------------
--- NEW CODE BELOW
-------------------
+-- Note: the following functions closely follow the implementation of the deriving handler for `Repr` / `BEq`
+-- (see https://github.com/leanprover/lean4/blob/master/src/Lean/Elab/Deriving/Repr.lean).
 
 open TSyntax.Compat in
 /-- Variant of `Deriving.Util.mkHeader` where we don't add an explicit binder
@@ -148,13 +147,10 @@ def mkBody (header : Header) (inductiveVal : InductiveVal) (generatorType : TSyn
   -- Fetch the name of the target type (the type for which we are deriving a generator)
   let targetTypeName := inductiveVal.name
 
-  -- Fetch the empty local context
-  let localCtx ← getLCtx
-
   -- Produce `Ident`s for the `fuel` argument for the lambda
   -- at the end of the generator function, as well as the `aux_arb` inner helper function
-  let freshFuel := mkIdent $ localCtx.getUnusedName `fuel
-  let freshFuel' := mkIdent $ localCtx.getUnusedName `fuel'
+  let freshFuel := Lean.mkIdent (← Core.mkFreshUserName `fuel)
+  let freshFuel' := Lean.mkIdent (← Core.mkFreshUserName `fuel')
   let auxArb := mkIdent `aux_arb
 
   -- Maintain two arrays which will be populated with pairs
@@ -240,7 +236,7 @@ def mkBody (header : Header) (inductiveVal : InductiveVal) (generatorType : TSyn
     (throwError m!"derive Arbitrary failed, {targetTypeName} has no non-recursive constructors")
 
   -- Create the cases for the pattern-match on the fuel argument
-  -- If `fuel = 0`, pick one of the thunked non-recursive generators
+  -- If `fuel = 0`, pick one of the non-recursive generators
   let mut caseExprs := #[]
   let zeroCase ← `(Term.matchAltExpr| | $(mkIdent ``Nat.zero) => $(mkIdent ``Gen.oneOfWithDefault) $defaultGenerator [$nonRecursiveGeneratorsNoWeights,*])
   caseExprs := caseExprs.push zeroCase

@@ -60,15 +60,15 @@ trace: [plausible.deriving.arbitrary] ⏎
        partial def arbitraryNatTree✝ : Nat → Plausible.Gen (@NatTree✝) :=
          let localinst✝ : Plausible.ArbitraryFueled✝ (@NatTree✝) := ⟨arbitraryNatTree✝⟩;
          let localinst✝¹ : Plausible.ArbitraryFueled✝ (@Node✝) := ⟨arbitraryNode✝⟩;
-         let rec aux_arb (fuel : Nat) : Plausible.Gen (@NatTree✝) :=
-           match fuel with
+         let rec aux_arb (fuel✝ : Nat) : Plausible.Gen (@NatTree✝) :=
+           match fuel✝ with
            | Nat.zero =>
              Plausible.Gen.oneOfWithDefault (pure NatTree.Empty)
                [(pure NatTree.Empty),
                  (do
                    let a✝ ← Plausible.Arbitrary.arbitrary
                    return NatTree.Node a✝)]
-           | fuel' + 1 =>
+           | fuel'✝ + 1 =>
              Plausible.Gen.frequency (pure NatTree.Empty)
                [(1, (pure NatTree.Empty)),
                  (1,
@@ -76,12 +76,12 @@ trace: [plausible.deriving.arbitrary] ⏎
                      let a✝ ← Plausible.Arbitrary.arbitrary
                      return NatTree.Node a✝)),
                  ]
-         fun fuel => aux_arb fuel
+         fun fuel✝ => aux_arb fuel✝
        partial def arbitraryNode✝ : Nat → Plausible.Gen (@Node✝) :=
          let localinst✝² : Plausible.ArbitraryFueled✝ (@NatTree✝) := ⟨arbitraryNatTree✝⟩;
          let localinst✝³ : Plausible.ArbitraryFueled✝ (@Node✝) := ⟨arbitraryNode✝⟩;
-         let rec aux_arb (fuel : Nat) : Plausible.Gen (@Node✝) :=
-           match fuel with
+         let rec aux_arb (fuel✝¹ : Nat) : Plausible.Gen (@Node✝) :=
+           match fuel✝¹ with
            | Nat.zero =>
              Plausible.Gen.oneOfWithDefault
                (do
@@ -94,7 +94,7 @@ trace: [plausible.deriving.arbitrary] ⏎
                    let a✝² ← Plausible.Arbitrary.arbitrary
                    let a✝³ ← Plausible.Arbitrary.arbitrary
                    return Node.mk a✝¹ a✝² a✝³)]
-           | fuel' + 1 =>
+           | fuel'✝¹ + 1 =>
              Plausible.Gen.frequency
                (do
                  let a✝¹ ← Plausible.Arbitrary.arbitrary
@@ -108,7 +108,7 @@ trace: [plausible.deriving.arbitrary] ⏎
                      let a✝³ ← Plausible.Arbitrary.arbitrary
                      return Node.mk a✝¹ a✝² a✝³)),
                  ]
-         fun fuel => aux_arb fuel
+         fun fuel✝¹ => aux_arb fuel✝¹
      end,
      instance : Plausible.ArbitraryFueled✝ (@NatTree✝) :=
        ⟨arbitraryNatTree✝⟩]

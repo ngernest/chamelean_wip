@@ -23,8 +23,8 @@ set_option trace.plausible.deriving.arbitrary true in
 trace: [plausible.deriving.arbitrary] ⏎
     [mutual
        def arbitraryValue✝ : Nat → Plausible.Gen (@Value✝) :=
-         let rec aux_arb (fuel : Nat) : Plausible.Gen (@Value✝) :=
-           match fuel with
+         let rec aux_arb (fuel✝ : Nat) : Plausible.Gen (@Value✝) :=
+           match fuel✝ with
            | Nat.zero =>
              Plausible.Gen.oneOfWithDefault (pure Value.none)
                [(pure Value.none),
@@ -42,7 +42,7 @@ trace: [plausible.deriving.arbitrary] ⏎
                    let a✝³ ← Plausible.Arbitrary.arbitrary
                    let a✝⁴ ← Plausible.Arbitrary.arbitrary
                    return Value.tensor a✝³ a✝⁴)]
-           | fuel' + 1 =>
+           | fuel'✝ + 1 =>
              Plausible.Gen.frequency (pure Value.none)
                [(1, (pure Value.none)),
                  (1,
@@ -64,7 +64,7 @@ trace: [plausible.deriving.arbitrary] ⏎
                      let a✝⁴ ← Plausible.Arbitrary.arbitrary
                      return Value.tensor a✝³ a✝⁴)),
                  ]
-         fun fuel => aux_arb fuel
+         fun fuel✝ => aux_arb fuel✝
      end,
      instance : Plausible.ArbitraryFueled✝ (@Value✝) :=
        ⟨arbitraryValue✝⟩]

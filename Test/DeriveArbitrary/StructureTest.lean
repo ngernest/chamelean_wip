@@ -45,8 +45,8 @@ set_option trace.plausible.deriving.arbitrary true in
 trace: [plausible.deriving.arbitrary] ⏎
     [mutual
        def arbitraryFoo✝ : Nat → Plausible.Gen (@Foo✝) :=
-         let rec aux_arb (fuel : Nat) : Plausible.Gen (@Foo✝) :=
-           match fuel with
+         let rec aux_arb (fuel✝ : Nat) : Plausible.Gen (@Foo✝) :=
+           match fuel✝ with
            | Nat.zero =>
              Plausible.Gen.oneOfWithDefault
                (do
@@ -59,7 +59,7 @@ trace: [plausible.deriving.arbitrary] ⏎
                    let a✝¹ ← Plausible.Arbitrary.arbitrary
                    let a✝² ← Plausible.Arbitrary.arbitrary
                    return Foo.mk a✝ a✝¹ a✝²)]
-           | fuel' + 1 =>
+           | fuel'✝ + 1 =>
              Plausible.Gen.frequency
                (do
                  let a✝ ← Plausible.Arbitrary.arbitrary
@@ -73,7 +73,7 @@ trace: [plausible.deriving.arbitrary] ⏎
                      let a✝² ← Plausible.Arbitrary.arbitrary
                      return Foo.mk a✝ a✝¹ a✝²)),
                  ]
-         fun fuel => aux_arb fuel
+         fun fuel✝ => aux_arb fuel✝
      end,
      instance : Plausible.ArbitraryFueled✝ (@Foo✝) :=
        ⟨arbitraryFoo✝⟩]

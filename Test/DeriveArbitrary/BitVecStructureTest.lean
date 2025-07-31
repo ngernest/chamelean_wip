@@ -18,8 +18,8 @@ set_option trace.plausible.deriving.arbitrary true in
 trace: [plausible.deriving.arbitrary] ⏎
     [mutual
        def arbitraryDummyInductive✝ : Nat → Plausible.Gen (@DummyInductive✝) :=
-         let rec aux_arb (fuel : Nat) : Plausible.Gen (@DummyInductive✝) :=
-           match fuel with
+         let rec aux_arb (fuel✝ : Nat) : Plausible.Gen (@DummyInductive✝) :=
+           match fuel✝ with
            | Nat.zero =>
              Plausible.Gen.oneOfWithDefault
                (do
@@ -32,7 +32,7 @@ trace: [plausible.deriving.arbitrary] ⏎
                    let a✝¹ ← Plausible.Arbitrary.arbitrary
                    let a✝² ← Plausible.Arbitrary.arbitrary
                    return DummyInductive.FromBitVec a✝ a✝¹ a✝²)]
-           | fuel' + 1 =>
+           | fuel'✝ + 1 =>
              Plausible.Gen.frequency
                (do
                  let a✝ ← Plausible.Arbitrary.arbitrary
@@ -46,7 +46,7 @@ trace: [plausible.deriving.arbitrary] ⏎
                      let a✝² ← Plausible.Arbitrary.arbitrary
                      return DummyInductive.FromBitVec a✝ a✝¹ a✝²)),
                  ]
-         fun fuel => aux_arb fuel
+         fun fuel✝ => aux_arb fuel✝
      end,
      instance : Plausible.ArbitraryFueled✝ (@DummyInductive✝) :=
        ⟨arbitraryDummyInductive✝⟩]
