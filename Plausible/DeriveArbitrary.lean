@@ -157,8 +157,16 @@ def mkBody (header : Header) (inductiveVal : InductiveVal) (generatorType : TSyn
   let freshFuel' := mkIdent $ localCtx.getUnusedName `fuel'
   let auxArb := mkIdent `aux_arb
 
-  let mut nonRecursiveGenerators := #[]
-  let mut recursiveGenerators := #[]
+  -- Maintain two arrays which will be populated with pairs
+  -- where the first component is a sub-generator (non-recursive / recursive)
+  -- and the 2nd component is the generator's associated weight
+  let mut weightedNonRecursiveGenerators := #[]
+  let mut weightedRecursiveGenerators := #[]
+
+  -- We also need to keep track of non-recursive generators without their weights,
+  -- since some of Plausible's `Gen` combinators operate on generator functions
+  let mut nonRecursiveGeneratorsNoWeights := #[]
+
   for ctorName in inductiveVal.ctors do
     let ctorIdent := mkIdent ctorName
 
@@ -178,10 +186,12 @@ def mkBody (header : Header) (inductiveVal : InductiveVal) (generatorType : TSyn
     let ctorArgIdentsTypes := Array.zip ctorArgIdents ctorArgTypes
 
     if ctorArgNamesTypes.isEmpty then
-      -- Constructor is nullary, we can just use an generator of the form `pure ...`
-      -- (for clarity, this generator is parenthesized in the code produced)
+      -- Constructor is nullary, we can just use an generator of the form `pure ...` with weight 1,
+      -- following the QuickChick convention.
+      -- (For clarity, this generator is parenthesized in the code produced.)
       let pureGen ← `(($(Lean.mkIdent `pure) $ctorIdent))
-      nonRecursiveGenerators := nonRecursiveGenerators.push pureGen
+      weightedNonRecursiveGenerators := weightedNonRecursiveGenerators.push (← `((1, $pureGen)))
+      nonRecursiveGeneratorsNoWeights := nonRecursiveGeneratorsNoWeights.push pureGen
     else
       -- Add all the constructor's argument names + types to the local context,
       -- then produce the body of the sub-generator (& a flag indicating if the constructor is recursive)
@@ -216,32 +226,23 @@ def mkBody (header : Header) (inductiveVal : InductiveVal) (generatorType : TSyn
           pure (generatorBody, ctorIsRecursive))
 
       if !ctorIsRecursive then
-        nonRecursiveGenerators := nonRecursiveGenerators.push generatorBody
+        -- Non-recursive generators have weight 1, following the QuickChick convention
+        weightedNonRecursiveGenerators := weightedNonRecursiveGenerators.push (← `((1, $generatorBody)))
+        nonRecursiveGeneratorsNoWeights := nonRecursiveGeneratorsNoWeights.push generatorBody
       else
-        recursiveGenerators := recursiveGenerators.push generatorBody
+        -- Recursive generaotrs have an associated weight of `fuel' + 1`, following the QuickChick convention
+        weightedRecursiveGenerators := weightedRecursiveGenerators.push (← ``(($freshFuel' + 1, $generatorBody)))
 
-  -- Use the first non-recursive generator as the default generator
+  -- Use the first non-recursive generator (without its weight) as the default generator
   -- If the target type has no non-recursive constructors, we emit an error message
   -- saying that we cannot derive a generator for that type
-  let defaultGenerator ← Option.getDM (nonRecursiveGenerators[0]?)
+  let defaultGenerator ← Option.getDM (nonRecursiveGeneratorsNoWeights[0]?)
     (throwError m!"derive Arbitrary failed, {targetTypeName} has no non-recursive constructors")
-
-  -- Turn each generator into a thunked function and associate each generator with its weight
-  -- (1 for non-recursive generators, `fuel' + 1` for recursive generators)
-  let mut weightedNonRecursiveGenerators := #[]
-  for generator in nonRecursiveGenerators do
-    let weightedGen ← `((1, $generator))
-    weightedNonRecursiveGenerators := weightedNonRecursiveGenerators.push weightedGen
-
-  let mut weightedRecursiveGenerators := #[]
-  for recursiveGen in recursiveGenerators do
-    let thunkedWeightedGen ← ``(($freshFuel' + 1, $recursiveGen))
-    weightedRecursiveGenerators := weightedRecursiveGenerators.push thunkedWeightedGen
 
   -- Create the cases for the pattern-match on the fuel argument
   -- If `fuel = 0`, pick one of the thunked non-recursive generators
   let mut caseExprs := #[]
-  let zeroCase ← `(Term.matchAltExpr| | $(mkIdent ``Nat.zero) => $(mkIdent ``Gen.oneOfWithDefault) $defaultGenerator [$nonRecursiveGenerators,*])
+  let zeroCase ← `(Term.matchAltExpr| | $(mkIdent ``Nat.zero) => $(mkIdent ``Gen.oneOfWithDefault) $defaultGenerator [$nonRecursiveGeneratorsNoWeights,*])
   caseExprs := caseExprs.push zeroCase
 
   -- If `fuel = fuel' + 1`, pick a generator (it can be non-recursive or recursive)
