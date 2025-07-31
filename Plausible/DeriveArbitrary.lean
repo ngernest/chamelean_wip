@@ -183,14 +183,14 @@ def mkBody (header : Header) (inductiveVal : InductiveVal) (generatorType : TSyn
       let pureGen ← `($(Lean.mkIdent `pure) $ctorIdent)
       nonRecursiveGenerators := nonRecursiveGenerators.push pureGen
     else
+      -- Flag to indicate whether the constructor is recursive (initialized to `false`)
+      let mut ctorIsRecursive := false
+
       -- Add all the constructor's argument names + types to the local context,
       -- then produce the body of the sub-generator
-      let (generatorBody, ctorIsRecursive) ←
+      let generatorBody ←
         withLocalDeclsDND ctorArgNamesTypes (fun _ => do
           let mut doElems := #[]
-
-          -- Determine whether the constructor has any recursive arguments
-          let ctorIsRecursive ← isConstructorRecursive targetTypeName ctorName
 
           -- Examine each argument to see which of them require recursive calls to the generator
           for (freshIdent, argType) in ctorArgIdentsTypes do
@@ -209,9 +209,11 @@ def mkBody (header : Header) (inductiveVal : InductiveVal) (generatorType : TSyn
           let pureExpr ← `(doElem| return $ctorIdent $ctorArgIdents*)
           doElems := doElems.push pureExpr
 
-          -- Put the body of the generator together
-          let generatorBody ← `(do $[$doElems:doElem]*)
-          pure (generatorBody, ctorIsRecursive))
+          -- Put the body of the generator together in a `do`-block
+          `(do $[$doElems:doElem]*))
+
+      -- Determine whether the constructor has any recursive arguments
+      ctorIsRecursive := (← isConstructorRecursive targetTypeName ctorName)
 
       if !ctorIsRecursive then
         nonRecursiveGenerators := nonRecursiveGenerators.push generatorBody
