@@ -260,7 +260,7 @@ def mkBody (header : Header) (inductiveVal : InductiveVal) (generatorType : TSyn
 
   -- Create function argument for the generator fuel
   let fuelParam ← `(Term.letIdBinder| ($freshFuel : $(mkIdent `Nat)))
-  let matchExpr ← mkMatchExpr freshFuel caseExprs
+  let matchExpr ← `(match $freshFuel:ident with $caseExprs:matchAlt*)
 
   -- Create an instance of the `ArbitraryFueled` typeclass
   `(let rec $auxArb:ident $fuelParam : $generatorType :=
