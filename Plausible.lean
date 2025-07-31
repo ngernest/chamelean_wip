@@ -12,4 +12,3 @@ import Plausible.Attr
 import Plausible.Tactic
 import Plausible.Arbitrary
 import Plausible.DeriveArbitrary
-import Plausible.Utils

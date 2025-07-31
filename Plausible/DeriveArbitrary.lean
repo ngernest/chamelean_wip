@@ -8,7 +8,6 @@ import Lean.Elab.Deriving.Basic
 import Lean.Elab.Deriving.Util
 
 import Plausible.Arbitrary
-import Plausible.Utils
 
 open Lean Elab Meta Parser Term
 open Elab.Deriving
@@ -183,14 +182,14 @@ def mkBody (header : Header) (inductiveVal : InductiveVal) (generatorType : TSyn
       let pureGen ← `($(Lean.mkIdent `pure) $ctorIdent)
       nonRecursiveGenerators := nonRecursiveGenerators.push pureGen
     else
-      -- Flag to indicate whether the constructor is recursive (initialized to `false`)
-      let mut ctorIsRecursive := false
-
       -- Add all the constructor's argument names + types to the local context,
-      -- then produce the body of the sub-generator
-      let generatorBody ←
+      -- then produce the body of the sub-generator (& a flag indicating if the constructor is recursive)
+      let (generatorBody, ctorIsRecursive) ←
         withLocalDeclsDND ctorArgNamesTypes (fun _ => do
           let mut doElems := #[]
+
+          -- Flag to indicate whether the constructor is recursive (initialized to `false`)
+          let mut ctorIsRecursive := false
 
           -- Examine each argument to see which of them require recursive calls to the generator
           for (freshIdent, argType) in ctorArgIdentsTypes do
@@ -199,6 +198,8 @@ def mkBody (header : Header) (inductiveVal : InductiveVal) (generatorType : TSyn
             -- otherwise generate a value using `arbitrary`
             let bindExpr ←
               if argType.getAppFn.constName == targetTypeName then
+                -- We've detected that the constructor has a recursive argument, so we update the flag
+                ctorIsRecursive := true
                 `(doElem| let $freshIdent ← $(mkIdent `aux_arb):term $(freshFuel'):term)
               else
                 `(doElem| let $freshIdent ← $(mkIdent ``Arbitrary.arbitrary):term)
@@ -210,10 +211,8 @@ def mkBody (header : Header) (inductiveVal : InductiveVal) (generatorType : TSyn
           doElems := doElems.push pureExpr
 
           -- Put the body of the generator together in a `do`-block
-          `(do $[$doElems:doElem]*))
-
-      -- Determine whether the constructor has any recursive arguments
-      ctorIsRecursive := (← isConstructorRecursive targetTypeName ctorName)
+          let generatorBody ← `(do $[$doElems:doElem]*)
+          pure (generatorBody, ctorIsRecursive))
 
       if !ctorIsRecursive then
         nonRecursiveGenerators := nonRecursiveGenerators.push generatorBody
