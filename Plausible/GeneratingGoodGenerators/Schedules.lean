@@ -92,6 +92,36 @@ inductive Density
   | Total
   deriving Repr, BEq
 
+/-- The sort of monad we are compiling to, i.e. one of the following:
+    - An unconstrained / constrained generator (`Gen` / `OptionT Gen`)
+    - An unconstrained / constrained enumerator (`Enumerator` / `OptionT Enumerator`)
+    - A Checker (`Option Bool` monad) -/
+inductive MonadSort
+  | Gen
+  | OptionTGen
+  | Enumerator
+  | OptionTEnumerator
+  | Checker
+  deriving Repr
+
+/-- An intermediate representation of monadic expressions, used in generators/enumerators/checkers
+    - Schedules are compiled to `MExp`s, which are then compiled to Lean code -/
+inductive MExp
+  /-- `MRet e` represents `return e` in some monad -/
+  | MRet (e : MExp)
+
+  /-- `MBind monadSort m1 vars m2` represents `m1 >>= fun vars => m2` in a particular monad,
+       as determined by `monadSort` -/
+  | MBind (monadSort : MonadSort) (m1 : MExp) (vars : List Unknown) (m2 : MExp)
+
+  /-- N-ary function application -/
+  | MApp (f : MExp) (args : List MExp)
+
+  /-- Some constant name -/
+  | MConst (name : Name)
+
+  deriving Repr
+
 
 
 ----------------------------------------------
