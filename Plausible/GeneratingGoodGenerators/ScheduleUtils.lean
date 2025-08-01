@@ -277,9 +277,16 @@ partial def dfs (boundVars : List Name) (remainingVars : List Name) (checkedHypo
 
     return constrainedProdPaths ++ unconstrainedProdPaths
 
-/-- Computes all possible schedules -/
+/-- Computes all possible schedules (each represented as a `List ScheduleStep`).
+    Arguments:
+    - `vars`: list of variables and their type
+    - `hypotheses`: List of hypotheses about the variables in `vars`
+    - `deriveSort` determines whether we're deriving a checker/enumerator/generator
+    - `recCall`: a pair contianing the name of the inductive relation and a list of indices for output arguments
+      + `recCall` represents what a recursive call to the function being derived looks like
+    - `fixedVars`: A list of fixed variables (i.e. inputs to the inductive relation) -/
 def possibleSchedules (vars : List (Name × Expr)) (hypotheses : List HypothesisExpr) (deriveSort : DeriveSort)
-  (recCall : Name × List Nat) (fixed : List Name) : MetaM (List (List ScheduleStep)) := do
+  (recCall : Name × List Nat) (fixedVars : List Name) : MetaM (List (List ScheduleStep)) := do
 
   let sortedHypotheses := mkSortedHypothesesVariablesMap hypotheses
 
@@ -288,14 +295,14 @@ def possibleSchedules (vars : List (Name × Expr)) (hypotheses : List Hypothesis
     | .Checker | .Enumerator => ProducerSort.Enumerator
     | .Generator | .Theorem => ProducerSort.Generator
 
-  let scheduleEnv := ⟨ vars, sortedHypotheses, deriveSort, prodSort, recCall, fixed ⟩
+  let scheduleEnv := ⟨ vars, sortedHypotheses, deriveSort, prodSort, recCall, fixedVars ⟩
 
-  let remainingVars := List.filter (. ∉ fixed) (Prod.fst <$> vars)
+  let remainingVars := List.filter (. ∉ fixedVars) (Prod.fst <$> vars)
 
-  let (newCheckedIdxs, newCheckedHyps) ← List.unzip <$> ReaderT.run (collectCheckSteps fixed []) scheduleEnv
+  let (newCheckedIdxs, newCheckedHyps) ← List.unzip <$> ReaderT.run (collectCheckSteps fixedVars []) scheduleEnv
   let firstChecks := List.reverse $ (ScheduleStep.Check . true) <$> newCheckedHyps
 
-  let schedules ← ReaderT.run (dfs fixed remainingVars newCheckedIdxs firstChecks) scheduleEnv
+  let schedules ← ReaderT.run (dfs fixedVars remainingVars newCheckedIdxs firstChecks) scheduleEnv
 
   let normalizedSchedules := List.eraseDups (normalizeSchedule <$> schedules)
 
