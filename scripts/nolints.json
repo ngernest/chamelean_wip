@@ -17,6 +17,7 @@
   ["docBlame", "Plausible.PrintableProp.printProp"],
   ["docBlame", "Plausible.NamedBinder"],
   ["docBlame", "Plausible.Testable.runProp"],
+  ["docBlame", "Plausible.«command#test_»"],
   ["unusedArguments", "Plausible.RandT.up"],
   ["unusedArguments", "Plausible.RandT.down"],
   ["unusedArguments", "Plausible.NamedBinder"],
