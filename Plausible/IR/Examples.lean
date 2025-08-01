@@ -21,7 +21,7 @@ inductive balanced : Nat → Tree → Prop where
 
 /-- `bst lo hi t` describes whether a tree `t` is a BST that contains values strictly within `lo` and `hi` -/
 inductive bst : Nat → Nat → Tree → Prop where
-| BstLeaf: bst lo hi .Leaf
+-- | BstLeaf: ∀ lo hi, bst lo hi .Leaf
 | BstNode: ∀ lo hi x l r,
   lo < x →
   x < hi →
@@ -46,25 +46,61 @@ inductive term where
 
 /-- `lookup Γ n τ` checks whether the `n`th element of the context `Γ` has type `τ` -/
 inductive lookup : List type -> Nat -> type -> Prop where
-  | LookupNow   : forall τ Γ, lookup (τ :: Γ) 0 τ
-  | LookupLater : forall τ τ' n Γ,
-      lookup Γ n τ -> lookup (τ' :: Γ) (.succ n) τ
+  | Now : forall τ Γ, lookup (τ :: Γ) .zero τ
+  -- | Later : forall τ τ' n Γ,
+  --     lookup Γ n τ -> lookup (τ' :: Γ) (.succ n) τ
 
 /-- `typing Γ e τ` is the typing judgement `Γ ⊢ e : τ` -/
 inductive typing: List type → term → type → Prop where
--- | TConst : ∀ n,
+-- | TConst : ∀ Γ n,
 --     typing Γ (.Const n) .Nat
--- | TAdd: ∀ e1 e2,
+-- | TAdd: ∀ Γ e1 e2,
 --     typing Γ e1 .Nat →
 --     typing Γ e2 .Nat →
 --     typing Γ (.Add e1 e2) .Nat
--- | TAbs: ∀ e τ1 τ2,
+-- | TAbs: ∀ Γ e τ1 τ2,
 --     typing (τ1::Γ) e τ2 →
 --     typing Γ (.Abs τ1 e) (.Fun τ1 τ2)
--- | TVar: ∀ x τ,
+-- | TVar: ∀ Γ x τ,
 --     lookup Γ x τ →
 --     typing Γ (.Var x) τ
-| TApp: ∀ e1 e2 τ1 τ2,
+| TApp: ∀ Γ e1 e2 τ1 τ2,
     typing Γ e2 τ1 →
     typing Γ e1 (.Fun τ1 τ2) →
-    typing Γ (.App (.Abs .Nat e1) e2) τ2
+    typing Γ (.App e1 e2) τ2
+-- | Bogus : ∀ Γ e τ1 τ2,
+--     typing Γ (.Abs τ1 e) (.Fun τ1 τ2)
+
+/-- Variant of the `Var` typing rule in which `τ` appears non-linearly -/
+inductive typingAlt : List type → term → type → Prop where
+  | VarNonlinear : ∀ Γ τ, typingAlt (τ :: Γ) (.Var Nat.zero) τ
+
+/-- Non-empty trees (trees that are not just leaves) -/
+inductive nonempty : Tree → Prop where
+  | NonEmpty : forall x l r, nonempty (.Node x l r)
+
+/-- Complete trees (aka perfect trees) are binary trees whose leaves are all at the same depth -/
+inductive complete : Nat → Tree → Prop where
+  | CompleteLeaf : complete 0 .Leaf
+  | CompleteNode : forall n x l r,
+    complete n l ->
+    complete n r ->
+    complete (.succ n) (.Node x l r)
+
+/-- Example with non-linear patterns, taken from Generating Good Generators -/
+inductive goodTree : Nat → Nat → Tree → Prop where
+  | GoodLeaf : forall n, goodTree n n .Leaf
+
+/-- An inductive relation for left-leaning trees where all right children have to be leaves -/
+inductive LeftLeaning : Tree → Prop where
+  | LeftSubTreeOnly : ∀ x l,
+    LeftLeaning .Leaf →
+    LeftLeaning (.Node x l .Leaf)
+
+/- Determines whether a list is sorted
+    (example taken from Computing Correctly, section 6.3) -/
+-- inductive Sorted : List Nat → Prop where
+--   | SortedCons : ∀ x y l,
+--     x <= y →
+--     Sorted (List.cons y l) →
+--     Sorted (List.cons x (List.cons y l))

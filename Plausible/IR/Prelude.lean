@@ -77,16 +77,17 @@ def option_to_MetaM (o: Option α) (errmsg: String := "Option is none"): MetaM �
   | some v => return v
   | _ => throwError errmsg
 
-/-- Takes a type expression `tyexpr` representing an arrow type, and returns an array of type-expressions
+/-- Takes a type expression `tyExpr` representing an arrow type, and returns an array of type-expressions
     where each element is a component of the arrow type.
     For example, `getComponentsOfArrowType (A -> B -> C)` produces `#[A, B, C]`. -/
-partial def getComponentsOfArrowType (tyexpr : Expr) : MetaM (Array Expr) := do
+partial def getComponentsOfArrowType (tyExpr : Expr) : MetaM (Array Expr) := do
   let rec helper (e : Expr) (acc : Array Expr) : MetaM (Array Expr) := do
     match e with
-    | Expr.forallE _ domain body _ =>
-      helper (body.instantiate1 (mkFVar ⟨`x⟩)) (acc.push domain)
+    | Expr.forallE name domain body _ =>
+      withLocalDeclD name domain fun fvar => do
+        helper (body.instantiate1 fvar) (acc.push domain)
     | e => return acc.push e
-  helper tyexpr #[]
+  helper tyExpr #[]
 
 def typeArrayToString (types : Array Expr) : MetaM String := do
   let typeStrs ← types.mapM (fun t => do pure s!"{← Meta.ppExpr t}")
@@ -165,9 +166,9 @@ def getFVarTypeInContext (fvarId : FVarId) (lctx : LocalContext) : MetaM Expr :=
     - The 2nd component is the body of the forall-expression
     - The 3rd component is an array containing each subterm of the arrow type -/
 def decomposeType (e : Expr) : MetaM (Array (Name × Expr) × Expr × Array Expr) := do
-  let (binder, exp) := extractForAllBinders e
-  let tyexp ← getComponentsOfArrowType exp
-  return (binder, exp, tyexp)
+  let (binder, tyExpr) := extractForAllBinders e
+  let arrowTypeComponents ← getComponentsOfArrowType tyExpr
+  return (binder, tyExpr, arrowTypeComponents)
 
 
 /-- Decomposes a universally-quantified type expression whose body is an arrow type
@@ -456,8 +457,8 @@ def convertIdentsToFVarExprs (terms : Array (TSyntax `term)) : Array Expr :=
 /-- Converts an array of syntactic terms to an array of strings -/
 def convertIdentsToStrings (terms : Array (TSyntax `term)) : Array String :=
   Array.map (fun term =>
-      match term with
-      | `($id:ident) => id.getId.toString
-      | _ => toString term) terms
+    match term with
+    | `($id:ident) => id.getId.toString
+    | _ => toString term) terms
 
 end Plausible.IR

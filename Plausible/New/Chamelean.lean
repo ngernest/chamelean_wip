@@ -5,7 +5,6 @@ import Plausible.New.DeriveConstrainedProducers
 import Plausible.New.Tests
 import Plausible.New.OptionTGen
 import Plausible.New.Idents
-import Plausible.New.Schedules
 import Plausible.New.TSyntaxCombinators
 import Plausible.New.DecOpt
 import Plausible.New.GeneratorCombinators
@@ -29,3 +28,6 @@ import Plausible.New.Debug
 import Plausible.GeneratingGoodGenerators.UnificationMonad
 import Plausible.GeneratingGoodGenerators.ModeAnalysis
 import Plausible.GeneratingGoodGenerators.DeriveSubGenerator
+import Plausible.GeneratingGoodGenerators.GGGTests
+import Plausible.GeneratingGoodGenerators.Schedules
+import Plausible.GeneratingGoodGenerators.ScheduleUtils
