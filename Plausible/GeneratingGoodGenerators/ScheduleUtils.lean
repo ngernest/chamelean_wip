@@ -58,8 +58,8 @@ def isRecCall (binding : List Name) (hyp : HypothesisExpr) (recCall : Name × Li
     else if List.any vars (. ∈ binding) then do
       let v := List.find? (· ∈ binding) vars
       logWarning m!"error: {v} ∈ {binding} = binding"
-      logWarning m!"Arguments to hypothesis {hyp} contain both fixed and yet-to-be-bound variables (not allowed)"
-      pure none
+      throwError m!"Arguments to hypothesis {hyp} contain both fixed and yet-to-be-bound variables (not allowed)"
+      -- pure none
     else pure none) args
   let (inductiveName, outputIdxes) := recCall
   return (ctorName == inductiveName && List.mergeSort outputIdxes == List.mergeSort outputPos)
@@ -134,23 +134,33 @@ def collectCheckSteps (boundVars : List Name) (checkedHypotheses : List Nat) : S
     whereas `τ2` is an input to the generator (since it appears in the conclusion of `TApp`).
     Since `τ1, τ2` both appear under the same `.Fun` constructor,
     `outputInputNotUnderSameConstructor (.Fun τ1 τ2) [τ2]` returns `false`.  -/
-def outputInputNotUnderSameConstructor (hyp : HypothesisExpr) (outputVars : List Name) : Bool :=
+def outputInputNotUnderSameConstructor (hyp : HypothesisExpr) (outputVars : List Name) : ScheduleM Bool := do
+  logWarning m!"Inside outputInputNotUnderSameConstructor"
+  logWarning m!"hyp = {hyp}, outputVars = {outputVars}"
   let (_, args) := hyp
-  not $ List.any args (fun arg =>
+  let result ← not <$> args.anyM (fun arg => do
     let vars := variablesInConstructorExpr arg
-    List.any vars (. ∈ outputVars) && List.any vars (. ∉ outputVars))
+    logWarning m!"vars = {vars}"
+    return List.any vars (. ∈ outputVars) && List.any vars (. ∉ outputVars))
+  logWarning m!"result = {result}"
+  return result
 
 /-- Determines whether the variables in `outputVars` are constrained by a function application in the hypothesis `hyp`.
     This function is necessary since we can't output something and then assert that it equals the output of a (non-constructor) function
     (since we don't have access to the function). -/
-partial def outputsNotConstrainedByFunctionApplication (hyp : HypothesisExpr) (outputVars : List Name) : Bool :=
+partial def outputsNotConstrainedByFunctionApplication (hyp : HypothesisExpr) (outputVars : List Name) : ScheduleM Bool :=
   let (_, args) := hyp
-  not $ List.any args (fun arg => aux false arg)
+  not <$> args.anyM (fun arg => check false arg)
     where
-      aux (b : Bool) (arg : ConstructorExpr) :=
+      check (b : Bool) (arg : ConstructorExpr) : ScheduleM Bool :=
         match arg with
-        | .Unknown u => u ∈ outputVars
-        | .Ctor _ args => List.any args (aux b)
+        | .Unknown u => return (b && u ∈ outputVars)
+        | .Ctor ctorName args => do
+          let env ← getEnv
+          if env.isConstructor ctorName || (← isInductive ctorName) then
+            args.anyM (check b)
+          else
+            args.anyM (check true)
 
 
 /-- If we have a hypothesis that we're generating an argument for,
@@ -222,8 +232,12 @@ def normalizeSchedule (steps : List ScheduleStep) : List ScheduleStep :=
     (Note that the default implementation of `guard` returns `failure`,
     but for our implementation, we prefer to have it return the empty list,
     following the behavior of Haskell's `Control.Monad.guard`) -/
-def guardList [Monad m] (b : Bool) : m (List Unit) :=
-  if b then return [.unit] else return []
+def guardList (b : Bool) : ScheduleM Unit :=
+  if b then
+    return ()
+  else do
+    logWarning m!"guardList failed"
+    failure
 
 /-- Depth-first enumeration of all possible schedules -/
 partial def dfs (boundVars : List Name) (remainingVars : List Name) (checkedHypotheses : List Nat) (scheduleSoFar : List ScheduleStep) : ScheduleM (List (List ScheduleStep)) := do
@@ -260,50 +274,56 @@ partial def dfs (boundVars : List Name) (remainingVars : List Name) (checkedHypo
     logWarning m!"handling constrainedProdPaths with remainingHypotheses = {remainingHypotheses}"
 
     let constrainedProdPaths ← remainingHypotheses.flatMapM (fun (i, hyp, hypVars) => do
-      let _ ← guardList (i ∉ checkedHypotheses)
+      if (i ∈ checkedHypotheses) then
+        pure []
+      else
+        let remainingVarsSet := NameSet.ofList remainingVars
+        let hypVarsSet := NameSet.ofList hypVars
+        let outputSet := remainingVarsSet ∩ hypVarsSet
+        let remainingVars' := (remainingVarsSet \ outputSet).toList
+        let outputVars := outputSet.toList
 
-      let remainingVarsSet := NameSet.ofList remainingVars
-      let hypVarsSet := NameSet.ofList hypVars
-      let outputSet := remainingVarsSet ∩ hypVarsSet
-      let remainingVars' := (remainingVarsSet \ outputSet).toList
-      let outputVars := outputSet.toList
+        logWarning m!"hyp = {hyp}, outputVars = {outputVars}"
 
-      logWarning m!"hyp = {hyp}, outputVars = {outputVars}"
-
-      let _ ← guardList (!outputVars.isEmpty)
-
-      let _ ← guardList (outputInputNotUnderSameConstructor hyp outputVars)
-
-      let _ ← guardList (outputsNotConstrainedByFunctionApplication hyp outputVars)
-
-      let (newMatches, hyp', newOutputs) ← handleConstrainedOutputs hyp outputVars
-      let typedOutputs ← newOutputs.mapM
-        (fun v => do
-          let tyExpr ← Option.getDM (List.lookup v env.vars)
-            (throwError m!"key {v} missing from association list {env.vars}")
-          let constructorExpr ← exprToConstructorExpr tyExpr
-          pure (v, constructorExpr))
-      let (_, hypArgs) := hyp'
-
-      logWarning m!"about to call isRecCall with outputVars = {outputVars}, hyp = {hyp}"
-      let constrainingRelation ←
-        if (← isRecCall outputVars hyp env.recCall) then
-          let inputArgs := filterWithIndex (fun i _ => i ∉ (Prod.snd env.recCall)) hypArgs
-          pure (Source.Rec `rec inputArgs)
+        if outputVars.isEmpty then
+          pure []
+        else if (← not <$> outputInputNotUnderSameConstructor hyp outputVars) then
+          logWarning m!"failed outputsInputsUnderSameConstructor guard with outputVars = {outputVars}, hyp = {hyp}"
+          pure []
+        else if (← not <$> outputsNotConstrainedByFunctionApplication hyp outputVars) then
+          logWarning m!"failed outputsConstrainedByFunctionApplication guard with outputVars = {outputVars}, hyp = {hyp}"
+          pure []
         else
-          pure (Source.NonRec hyp')
-      let constrainedProdStep := ScheduleStep.SuchThat typedOutputs constrainingRelation env.prodSort
+          let (newMatches, hyp', newOutputs) ← handleConstrainedOutputs hyp outputVars
+          let typedOutputs ← newOutputs.mapM
+            (fun v => do
+              let tyExpr ← Option.getDM (List.lookup v env.vars)
+                (throwError m!"key {v} missing from association list {env.vars}")
+              let constructorExpr ← exprToConstructorExpr tyExpr
+              pure (v, constructorExpr))
+          let (_, hypArgs) := hyp'
 
-      logWarning m!"created constrainedProdStep = {repr constrainedProdStep}"
-      logWarning m!"remainingVars' = {remainingVars'}"
+          logWarning m!"about to call isRecCall with outputVars = {outputVars}, hyp = {hyp}"
+          let constrainingRelation ←
+            if (← isRecCall outputVars hyp env.recCall) then
+              let inputArgs := filterWithIndex (fun i _ => i ∉ (Prod.snd env.recCall)) hypArgs
+              pure (Source.Rec `rec inputArgs)
+            else
+              pure (Source.NonRec hyp')
+          let constrainedProdStep := ScheduleStep.SuchThat typedOutputs constrainingRelation env.prodSort
 
-      let (newCheckedIdxs, newCheckedHyps) ← List.unzip <$> collectCheckSteps (outputVars ++ boundVars) (i::checkedHypotheses)
-      -- TODO: handle negated propositions in `ScheduleStep.Check`
-      let checks := List.reverse $ (ScheduleStep.Check . true) <$> newCheckedHyps
+          logWarning m!"created constrainedProdStep = {repr constrainedProdStep}"
+          logWarning m!"remainingVars' = {remainingVars'}"
 
-      dfs (outputVars ++ boundVars) remainingVars'
-        (i :: newCheckedIdxs ++ checkedHypotheses)
-        (checks ++ newMatches ++ constrainedProdStep :: scheduleSoFar))
+          let (newCheckedIdxs, newCheckedHyps) ← List.unzip <$> collectCheckSteps (outputVars ++ boundVars) (i::checkedHypotheses)
+          -- TODO: handle negated propositions in `ScheduleStep.Check`
+          let checks := List.reverse $ (ScheduleStep.Check . true) <$> newCheckedHyps
+
+          dfs (outputVars ++ boundVars) remainingVars'
+            (i :: newCheckedIdxs ++ checkedHypotheses)
+            (checks ++ newMatches ++ constrainedProdStep :: scheduleSoFar))
+
+    logWarning m!"constrainedProdPaths = {repr constrainedProdPaths}"
 
     return constrainedProdPaths ++ unconstrainedProdPaths
 

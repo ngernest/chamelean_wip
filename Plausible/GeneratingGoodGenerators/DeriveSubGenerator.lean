@@ -161,7 +161,12 @@ def convertPatternToTerm (pattern : Pattern) : MetaM (TSyntax `term) :=
 
 mutual
 
-  /-- Produces the code for a pattern match on an unknown -/
+  /-- Produces the code for a pattern match on an unknown
+     TODO: split this into 2 steps
+     1. Compile a `ScheduleStep` to an `MExp`
+     2. Compile the `MExp` to a Lean term
+
+   -/
   partial def emitPatterns (patterns : List (Unknown × Pattern)) (equalities : List (Unknown × Unknown)) (constraints : UnknownMap) : UnifyM (TSyntax `term) :=
     match patterns with
     | [] => emitEqualities equalities constraints
@@ -208,7 +213,16 @@ mutual
       logWarning m!"entered Ctor case of allUnknownsHaveUndefRanges with {ctorExpr}"
       List.allM allUnknownsHaveUndefRanges args
 
-  /-- Produces the code for the body of a sub-generator which processes a list of `hypotheses` under a particular set of `constraints` -/
+  /-- Produces the code for the body of a sub-generator which processes a list of `hypotheses` under a particular set of `constraints`
+
+    - Note: `emitHypotheses` combines the checker/producer `ScheduleStep`s into one function
+    - One option if we want to keep `emitHypotheses` is compile `ScheduleStep`s to `HypothesisExpr`s,
+      i.e. `Name × List ConstructorExpr`
+      +
+    - However, it might be cleaner if we rip out all the emit functions, and go directly
+      from `ScheduleStep`s to `MExp`s, then from `MExp` to Lean code
+
+  -/
   partial def emitHypotheses (hypotheses : List (Name × List ConstructorExpr)) (constraints : UnknownMap) : UnifyM (TSyntax `term) := do
     match hypotheses with
     | [] => finalAssembly
@@ -266,7 +280,10 @@ mutual
   /-- Assembles the body of the generator (this function is called when all hypotheses have been processed by `emitHypotheses`)
 
       (Note that this function doesn't take in an explicit `constraints` argument (unlike the pseudocode in the paper),
-      since we fetch the `constraints` map via a `get` call in the State monad) -/
+      since we fetch the `constraints` map via a `get` call in the State monad)
+
+      - This corresponds to `finally` in QuickChick code
+      -/
   partial def finalAssembly : UnifyM (TSyntax `term) := do
     -- Find all unknowns whose ranges are `Undef`
     let undefUnknowns ← UnifyM.withUnknowns (fun allUnknowns => UnifyM.findUnknownsWithUndefRanges allUnknowns.toList)
@@ -294,7 +311,13 @@ mutual
 
   /-- Produces a let-bind expression which generates an `unknown` subject to a `hypothesis`
       in the body of the sub-generator
-      (this is the final call to a generator when processing one particular hypothesis of a constructor) -/
+      (this is the final call to a generator when processing one particular hypothesis of a constructor)
+
+      - Note: This handles any producer step in a schedule
+      - Segev says "I would hesitate to use the same GGG algorithm as written" since
+        it goes directly to Lean code, instead use `ScheduleStep`s, compile those to `MExp`, then
+        compile those to `TSyntax`
+  -/
   partial def emitFinalCall (unknown : Unknown) (hypothesis : Name × List ConstructorExpr): UnifyM (TSyntax `doElem) := do
     let unifyState ← get
     let outputName := unifyState.outputName

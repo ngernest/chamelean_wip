@@ -105,7 +105,18 @@ inductive MonadSort
   deriving Repr
 
 /-- An intermediate representation of monadic expressions, used in generators/enumerators/checkers
-    - Schedules are compiled to `MExp`s, which are then compiled to Lean code -/
+    - Schedules are compiled to `MExp`s, which are then compiled to Lean code
+
+    - Note: `MExp`s make it easy to optimize generator code down the line
+      (e.g. combine pattern-matches when we have disjoint patterns)
+    - Going directly from schedules to Lean code (a wrapper on top of `TSyntax`) might be fine?
+      + The wrapper should expose `bind, return, backtrack` and pattern-matches
+    - The cool thing about `MExp` is that we can interpret it differently
+      based on the `MonadSort`
+
+    - TODO: we may want `MHole`, `MFail`, `MOutOfFuel`
+    - the other constructors in the Rocq [mexp]
+-/
 inductive MExp
   /-- `MRet e` represents `return e` in some monad -/
   | MRet (e : MExp)
