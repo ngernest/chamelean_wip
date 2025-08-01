@@ -77,7 +77,7 @@ deriving instance Arbitrary for RegExp
 Test that we can use the derived generator to find counterexamples.
 
 We construct a faulty property, which (erroneously) states that
-all regular expressinos never accept any string. (Example taken from
+all regular expressions never accept any string. (Example taken from
 UPenn CIS 5520 https://www.seas.upenn.edu/~cis5520/current/hw/hw04/RegExp.html)
 
 ```lean
