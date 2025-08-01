@@ -120,6 +120,16 @@ inductive MExp
   /-- Some constant name -/
   | MConst (name : Name)
 
+  /-- `MMatch scrutinee [(p1, e1), …, (pn, en)]` represents
+       ```lean
+       match scrutinee with
+       | p1 => e1
+       ...
+       | pn => en
+       ```
+  -/
+  | MMatch (scrutinee : MExp) (cases : List (Pattern × MExp))
+
   deriving Repr
 
 
