@@ -20,8 +20,6 @@ deriving instance Repr, BEq for Unknown
 instance : Ord Unknown where
   compare u1 u2 := compare u1.toString u2.toString
 
-
-
 /-- *Ranges* represent sets of potential values that a variable can take on during generation -/
 inductive Range
   /-- Undefined value, parameterized by a type `ty` (represented as a Lean `Expr`)
@@ -403,6 +401,33 @@ namespace UnifyM
     | .Ctor c args =>
       let unknowns ← List.flatMapM collectUnknownsInConstructorExpr args
       return c :: unknowns
+
+  mutual
+    /-- Evaluates a `Range`, returning a `ConstructorExpr`. Note that if the
+        `Range` is `Fixed` or `Undef`, we return `none` (via `failure`). -/
+    partial def evaluateRange (r : Range) : UnifyM ConstructorExpr :=
+      match r with
+      | .Ctor c args => do
+        let args' ← args.mapM evaluateRange
+        return (ConstructorExpr.Ctor c args')
+      | .Unknown u => evaluateUnknown u
+      | .Fixed | .Undef _ => failure
+
+    /-- Evaluates an `Unknown` based on the bindings in the `UnknownMap`,
+        returning a `ConstructorExpr`.
+
+        Precondition: there must not be any cycles of `Unknown`s in the `UnknownMap`. -/
+    partial def evaluateUnknown (v : Unknown) : UnifyM ConstructorExpr :=
+      withConstraints $ fun k => do
+        let r ← findCorrespondingRange k v
+        match r with
+        | .Undef _ | .Fixed => return ConstructorExpr.Unknown v
+        | .Unknown u =>
+          (evaluateUnknown u) <|> (return ConstructorExpr.Unknown v)
+        | .Ctor c args => do
+          let args' ← args.mapM evaluateRange
+          return (ConstructorExpr.Ctor c args')
+  end
 
 
 
