@@ -39,7 +39,7 @@ inductive DeriveSort
 /-- The type of schedule we wish to derive -/
 inductive ScheduleSort
   /-- tuple of produced outputs from conclusion of constructor -/
-  | ProducerSchedule (isConstrained : Bool) (producerSort : ProducerSort) (conclusion : Name × List ConstructorExpr)
+  | ProducerSchedule (producerSort : ProducerSort) (conclusion : Name × List ConstructorExpr)
 
   /-- checkers need not bother with conclusion of constructor,
       only hypotheses need be checked and conclusion of constructor follows-/
@@ -130,8 +130,9 @@ def exprToHypothesisExpr (e : Expr) : MetaM (Option HypothesisExpr) := do
   let (ctorName, args) := e.getAppFnArgs
 
   let env ← getEnv
-  -- Only proceed if `ctorName` is actually a constructor
-  if env.isConstructor ctorName then
+
+  -- Only proceed if `ctorName` refers to a constructor or the name of an `inductive`
+  if env.isConstructor ctorName || (← isInductive ctorName) then
     let constructorArgs ← args.mapM exprToConstructorExpr
     return some (ctorName, constructorArgs.toList)
   else
