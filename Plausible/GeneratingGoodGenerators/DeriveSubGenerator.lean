@@ -371,7 +371,7 @@ def convertRangeToCtorAppForm (r : Range) : UnifyM (Name × List ConstructorExpr
     is used to determine whether producers should return their results wrapped in an `Option` or not.
 
     - Note: callers should supply `none` as the `ctorNameOpt` argument if `deriveSort := .Theorem` -/
-def getScheduleSort (conclusion : HypothesisExpr) (outputVars : List Unknown) (ctorNameOpt : Option Name) (deriveSort : DeriveSort) (returnOption : Bool) : UnifyM ScheduleSort :=
+def getScheduleSort (conclusion : HypothesisExpr) (outputVars : List Unknown) (ctorNameOpt : Option Name) (deriveSort : DeriveSort) : UnifyM ScheduleSort :=
   match deriveSort with
   | .Checker => return .CheckerSchedule
   | .Theorem => return (.TheoremSchedule conclusion (typeClassUsed := true))
@@ -383,7 +383,7 @@ def getScheduleSort (conclusion : HypothesisExpr) (outputVars : List Unknown) (c
     let conclusion ← do
       let ctorName ← Option.getDM ctorNameOpt (throwError "No constructor name given for Non-theorem schedule")
       pure (ctorName, outputValues)
-    return .ProducerSchedule returnOption producerSort conclusion
+    return .ProducerSchedule producerSort conclusion
 
 
 /-- Function that handles the bulk of the generator derivation algorithm for a single constructor:
@@ -473,7 +473,15 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
     for ((_u1, r1), (_u2, r2)) in conclusionArgsAndRanges.zip unknownArgsAndRanges do
       unify r1 r2
 
-    -- TODO: Call `possibleSchedules` here to get a naive schedule
+    -- Convert the conclusion from an `Expr` to a `HypothesisExpr`
+    let conclusionExpr ← Option.getDM (← exprToHypothesisExpr conclusion)
+      (throwError m!"Unable to convert {conclusion} to a HypothesisExpr")
+
+    -- Determine the appropriate `ScheduleSort` (right now we only produce `ScheduleSort`s for `Generator`s)
+    let _scheduleSort ← getScheduleSort conclusionExpr
+      (outputVars := [outputName]) (some ctorName) (deriveSort := .Generator)
+
+    -- TODO: Then call `possibleSchedules` here to get a naive schedule
     -- Then use the updated unification result to replace all variables in `possibleSchedules`
 
     -- Update the list of hypotheses with the result of unification
