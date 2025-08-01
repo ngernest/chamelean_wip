@@ -44,14 +44,21 @@ def variablesInConstructorExpr (ctorExpr : ConstructorExpr) : List Name :=
     this function checks whether the generator we're using is recursive.
 
     For example, if we're trying to produce a call to the generator [(e, tau) <- typing gamma _ _], then
-    we would have `binding = [e,tau]`, `hyp = typing gamma e tau`. -/
+    we would have `binding = [e,tau]` and `hyp = typing gamma e tau`. -/
 def isRecCall (binding : List Name) (hyp : HypothesisExpr) (recCall : Name × List Nat) : MetaM Bool := do
+  logWarning m!"inside isRecCall, binding = {binding}, hyp = {hyp}, recCall = {recCall}"
   let (ctorName, args) := hyp
-  let outputPos ← filterMapMWithIndex (fun i arg =>
+  logWarning m!"args = {args}"
+  let outputPos ← filterMapMWithIndex (fun i arg => do
     let vars := variablesInConstructorExpr arg
+    logWarning m!"arg = {arg}, vars = {vars}"
     if vars.isEmpty then pure none
-    else if List.all vars (. ∈ binding) then pure (some i)
-    else if List.any vars (. ∈ binding) then throwError m!"Arguments to hypothesis {hyp} contain both fixed and yet-to-be-bound variables (not allowed)"
+    else if List.all vars (. ∈ binding) then
+      pure (some i)
+    else if List.any vars (. ∈ binding) then do
+      let v := List.find? (· ∈ binding) vars
+      logWarning m!"error: {v} ∈ {binding} = binding"
+      throwError m!"Arguments to hypothesis {hyp} contain both fixed and yet-to-be-bound variables (not allowed)"
     else pure none) args
   let (inductiveName, outputIdxes) := recCall
   return (ctorName == inductiveName && List.mergeSort outputIdxes == List.mergeSort outputPos)
@@ -66,7 +73,8 @@ def mkSortedHypothesesVariablesMap (hypotheses : List HypothesisExpr) : List (Hy
 
 /-- Environment for the `ScheduleM` reader monad -/
 structure ScheduleEnv where
-  /-- List of variables and their types -/
+  /-- List of variables which are universally-quantified in the constructor's type,
+      along with the types of these variables -/
   vars : List (Name × Expr)
 
   /-- Hypotheses about the variables in `vars` -/
@@ -130,8 +138,6 @@ def outputInputNotUnderSameConstructor (hyp : HypothesisExpr) (outputVars : List
   not $ List.any args (fun arg =>
     let vars := variablesInConstructorExpr arg
     List.any vars (. ∈ outputVars) && List.any vars (. ∉ outputVars))
-
--- #eval outputInputNotUnderSameConstructor (`typing, [.Unknown `Γ, .Unknown `e1, .Ctor `Fun [.Unknown `τ1, .Unknown `τ2]]) [`τ2]
 
 /-- Determines whether the variables in `outputVars` are constrained by a function application in the hypothesis `hyp`.
     This function is necessary since we can't output something and then assert that it equals the output of a (non-constructor) function
@@ -211,6 +217,10 @@ def normalizeSchedule (steps : List ScheduleStep) : List ScheduleStep :=
       -- Comparison function on blocks of `ScheduleSteps`
       compareBlocks b1 b2 := Ordering.isLE $ Ord.compare b1 b2
 
+
+def guardList (b : Bool) : ScheduleM (List Unit) :=
+  if b then return [.unit] else return []
+
 /-- Depth-first enumeration of all possible schedules -/
 partial def dfs (boundVars : List Name) (remainingVars : List Name) (checkedHypotheses : List Nat) (scheduleSoFar : List ScheduleStep) : ScheduleM (List (List ScheduleStep)) :=
   match remainingVars with
@@ -241,16 +251,19 @@ partial def dfs (boundVars : List Name) (remainingVars : List Name) (checkedHypo
     let remainingHypotheses := filterMapWithIndex (fun i hyp => if i ∈ checkedHypotheses then none else some (i, hyp)) env.sortedHypotheses
 
     let constrainedProdPaths ← remainingHypotheses.flatMapM (fun (i, hyp, hypVars) => do
-      guard (i ∉ checkedHypotheses)
+      let _ ← guardList (i ∉ checkedHypotheses)
+
       let remainingVarsSet := NameSet.ofList remainingVars
       let hypVarsSet := NameSet.ofList hypVars
       let outputSet := remainingVarsSet ∩ hypVarsSet
       let remainingVars' := (remainingVarsSet \ outputSet).toList
       let outputVars := outputSet.toList
 
-      guard !outputVars.isEmpty
-      guard (outputInputNotUnderSameConstructor hyp outputVars)
-      guard (outputsNotConstrainedByFunctionApplication hyp outputVars)
+      let _ ← guardList (!outputVars.isEmpty)
+
+      let _ ← guardList (outputInputNotUnderSameConstructor hyp outputVars)
+
+      let _ ← guardList (outputsNotConstrainedByFunctionApplication hyp outputVars)
 
       let (newMatches, hyp', newOutputs) ← handleConstraintedOutputs hyp outputVars
       let typedOutputs ← newOutputs.mapM
@@ -267,6 +280,9 @@ partial def dfs (boundVars : List Name) (remainingVars : List Name) (checkedHypo
         else
           pure (Source.NonRec hyp')
       let constrainedProdStep := ScheduleStep.SuchThat typedOutputs constrainingRelation env.prodSort
+
+      logWarning m!"created constrainedProdStep = {repr constrainedProdStep}"
+
       let (newCheckedIdxs, newCheckedHyps) ← List.unzip <$> collectCheckSteps (outputVars ++ boundVars) (i::checkedHypotheses)
       -- TODO: handle negated propositions in `ScheduleStep.Check`
       let checks := List.reverse $ (ScheduleStep.Check . true) <$> newCheckedHyps
@@ -275,11 +291,15 @@ partial def dfs (boundVars : List Name) (remainingVars : List Name) (checkedHypo
         (i :: newCheckedIdxs ++ checkedHypotheses)
         (checks ++ newMatches ++ constrainedProdStep :: scheduleSoFar))
 
+    logWarning m!"constrainedProdPaths = {repr constrainedProdPaths}"
+
     return constrainedProdPaths ++ unconstrainedProdPaths
 
-/-- Computes all possible schedules (each represented as a `List ScheduleStep`).
+/-- Computes all possible schedules for a constructor
+    (each candidate schedule is represented as a `List ScheduleStep`).
+
     Arguments:
-    - `vars`: list of variables and their type
+    - `vars`: list of universally-quantified variables and their types
     - `hypotheses`: List of hypotheses about the variables in `vars`
     - `deriveSort` determines whether we're deriving a checker/enumerator/generator
     - `recCall`: a pair contianing the name of the inductive relation and a list of indices for output arguments
@@ -287,6 +307,7 @@ partial def dfs (boundVars : List Name) (remainingVars : List Name) (checkedHypo
     - `fixedVars`: A list of fixed variables (i.e. inputs to the inductive relation) -/
 def possibleSchedules (vars : List (Name × Expr)) (hypotheses : List HypothesisExpr) (deriveSort : DeriveSort)
   (recCall : Name × List Nat) (fixedVars : List Name) : MetaM (List (List ScheduleStep)) := do
+  logWarning "inside possibleSchedules"
 
   let sortedHypotheses := mkSortedHypothesesVariablesMap hypotheses
 

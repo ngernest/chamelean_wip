@@ -159,3 +159,7 @@ def replicateM [Monad m] (n : Nat) (action : m α) : m (List α) :=
     (akin to Haskell's `sequence`) -/
 def List.sequence (xs : List (Option α)) : Option (List α) :=
   List.traverse id xs
+
+
+def listGuard (b : Bool) : List Unit :=
+  if b then [.unit] else []

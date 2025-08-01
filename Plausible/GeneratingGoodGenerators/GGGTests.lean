@@ -72,7 +72,7 @@ inductive NonLeafBST : Nat → Nat → Tree → Prop where
   NonLeafBST x hi r →
   NonLeafBST lo hi (.Node x l r)
 
-/--
+/-
 info: Derived generator:
 ```
 do
@@ -87,5 +87,5 @@ do
     | _ => OptionT.fail
 ```
 -/
-#guard_msgs(info, drop warning) in
-#derive_subgenerator (fun (tree : Tree) => NonLeafBST in1 in2 tree)
+-- #guard_msgs(info, drop warning) in
+-- #derive_subgenerator (fun (tree : Tree) => NonLeafBST in1 in2 tree)

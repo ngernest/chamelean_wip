@@ -376,6 +376,7 @@ def getScheduleSort (conclusion : HypothesisExpr) (outputVars : List Unknown) (c
   | .Checker => return .CheckerSchedule
   | .Theorem => return (.TheoremSchedule conclusion (typeClassUsed := true))
   | ds@(_) => do
+    logWarning "inside getScheduleSort"
     let outputValues ← outputVars.mapM UnifyM.evaluateUnknown
     let producerSort :=
       if let .Enumerator := ds then ProducerSort.Enumerator
@@ -418,7 +419,7 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
     let forAllVars := forAllVarsAndHypsWithTypes.filterMap (fun (nameOpt, ty) =>
       match nameOpt with
       | some name => (name, ty)
-      | none => none)
+      | none => none) |>.toList
 
     -- Extract hypotheses (which correspond to pairs in `forAllVarsAndHypsWithTypes` where the first component is `none`)
     let hypotheses := forAllVarsAndHypsWithTypes.filterMap (fun (nameOpt, tyExpr) =>
@@ -427,39 +428,32 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
       | some _ => none)
     let localCtx ← getLCtx
 
-    -- Stores the representation of hypotheses in *constructor application* form
+    -- Stores the representation of hypotheses as a `HypothesisExpr`
     -- (constructor name applied to some list of arguments, which are themselves `ConstructorExpr`s)
-    let mut hypsInCtorAppForm := #[]
+    let mut hypothesisExprs := #[]
 
-    -- `hypCtorAndRanges` stores the type constructor in each hypothesis as well as the ranges corresponding to
-    -- the arguments in each hypothesis
-    let mut hypCtorAndRanges := #[]
-
-    for hypExpr in hypotheses do
-      let hypTerm ← delabExprInLocalContext localCtx hypExpr
+    for hyp in hypotheses do
+      let hypTerm ← delabExprInLocalContext localCtx hyp
       -- Convert the `TSyntax` representation of the hypothesis to a `Range`
       -- If that fails, convert the `Expr` representation of the hypothesis to a `Range`
       -- (the latter is needed to handle hypotheses which use infix operators)
       let hypRange ←
         try convertHypothesisTermToRange hypTerm
-        catch _ => convertExprToRangeInCurrentContext hypExpr
+        catch _ => convertExprToRangeInCurrentContext hyp
       logWarning m!"hypothesis {hypTerm} has range {hypRange}"
 
-      -- Convert each hypothesis' range to a constructor application
+      -- Convert each hypothesis' range to a `HypothesisExpr`, which is just a constructor application
       -- (constructor name applied to some list of arguments, which are themselves `ConstructorExpr`s)
-      let hypInCtorAppForm@(hypCtor, _) ← convertRangeToCtorAppForm hypRange
-      hypsInCtorAppForm := hypsInCtorAppForm.push hypInCtorAppForm
-
-      hypCtorAndRanges := hypCtorAndRanges.push (hypCtor, hypRange)
+      hypothesisExprs := hypothesisExprs.push (← convertRangeToCtorAppForm hypRange)
 
     -- Creates the initial `UnifyState` needed for the unification algorithm
-    let initialUnifyState := mkInitialUnifyState inputNames outputName outputType forAllVars.toList hypsInCtorAppForm.toList
+    let initialUnifyState := mkInitialUnifyState inputNames outputName outputType forAllVars hypothesisExprs.toList
 
     -- Extend the current state with the contents of `initialUnifyState`
     UnifyM.extendState initialUnifyState
 
-    let state ← get
-    logWarning m!"after extending with initialUnifyState = {state}"
+    -- let state ← get
+    -- logWarning m!"after extending with initialUnifyState = {state}"
 
     -- Get the ranges corresponding to each of the unknowns
     let unknownRanges ← unknowns.mapM processCorrespondingRange
@@ -478,11 +472,35 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
       (throwError m!"Unable to convert {conclusion} to a HypothesisExpr")
 
     -- Determine the appropriate `ScheduleSort` (right now we only produce `ScheduleSort`s for `Generator`s)
-    let _scheduleSort ← getScheduleSort conclusionExpr
+    logWarning m!"Computing schedule stuff now..."
+    let scheduleSort ← getScheduleSort conclusionExpr
       (outputVars := [outputName]) (some ctorName) (deriveSort := .Generator)
 
-    -- TODO: Then call `possibleSchedules` here to get a naive schedule
+    -- Check which universally-quantified variables have a `Fixed` range,
+    -- so that we can supply them to `possibleSchedules` as the `fixedVars` arg
+    let fixedVars ← forAllVars.filterMapM (fun (v, _) => do
+      if (← UnifyM.isUnknownFixed v) then
+        return some v
+      else
+        return none)
+
+    logWarning m!"fixedVars = {fixedVars}"
+
+    let outputIdx := unknowns.idxOf outputName
+
+    -- Call `possibleSchedules` here to get a naive schedule
     -- Then use the updated unification result to replace all variables in `possibleSchedules`
+    let possibleSchedules ← possibleSchedules
+      (vars := forAllVars)
+      (hypotheses := hypothesisExprs.toList)
+      (deriveSort := .Generator)
+      (recCall := (`aux_arb, [outputIdx]))
+      fixedVars
+
+    let naiveSchedule ← Option.getDM (possibleSchedules.head?) (throwError m!"Unable to compute any possible schedules")
+
+    logWarning m!"naiveSchedule = {repr naiveSchedule}"
+    logWarning m!"scheduleSort = {repr scheduleSort}"
 
     -- Update the list of hypotheses with the result of unification
     -- (i.e. constructor arguments in hypotheses are updated with the canonical
@@ -490,7 +508,7 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
     UnifyM.updateHypothesesWithUnificationResult
 
     let finalState ← get
-    logWarning m!"finalState after updating hypotheses = {finalState}"
+    -- logWarning m!"finalState after updating hypotheses = {finalState}"
 
     -- TODO: Instead of returning `TSyntax term`, prepend patterns & equality checks to
     -- the list of `scheduleSteps` returned by `possibleSchedules` (modified by the unifier's results)
@@ -571,7 +589,7 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
 -- TODO: figure out how to assemble the entire generator function with all constructors
 
 -- #derive_subgenerator (fun (tree : Tree) => bst in1 in2 tree)
--- #derive_subgenerator (fun (e : term) => typing G e t)
+#derive_subgenerator (fun (e : term) => typing G e t)
 
 -- #derive_subgenerator (fun (tree : Tree) => LeftLeaning tree)
 

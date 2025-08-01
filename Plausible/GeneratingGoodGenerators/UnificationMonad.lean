@@ -351,7 +351,7 @@ namespace UnifyM
       updating `Unknown`s in `hypotheses` that appear in constructor argument positions
       with their canonical representations (as determined by `findCanonicalUnknown`) -/
   def updateHypothesesWithUnificationResult : UnifyM Unit := do
-    logWarning m!"inside updateHypothesesWithUnificationResult"
+    -- logWarning m!"inside updateHypothesesWithUnificationResult"
     let state ← get
     let k := state.constraints
     let hypotheses := state.hypotheses
@@ -365,7 +365,7 @@ namespace UnifyM
 
       newHypotheses := newHypotheses.push (ctorName, newArgs.toList)
 
-    logWarning m!"hypotheses after unification = {newHypotheses}"
+    -- logWarning m!"hypotheses after unification = {newHypotheses}"
 
     modify $ fun s => { s with hypotheses := newHypotheses.toList }
 
@@ -395,7 +395,6 @@ namespace UnifyM
 
   /-- Accumulates all the `Unknown`s in a `ConstructorExpr` -/
   partial def collectUnknownsInConstructorExpr (ctorExpr : ConstructorExpr) : UnifyM (List Unknown) := do
-    logWarning m!"collectUnknownsInConstructorExpr {ctorExpr}"
     match ctorExpr with
     | .Unknown u => return [u]
     | .Ctor c args =>
@@ -405,21 +404,23 @@ namespace UnifyM
   mutual
     /-- Evaluates a `Range`, returning a `ConstructorExpr`. Note that if the
         `Range` is `Fixed` or `Undef`, we return `none` (via `failure`). -/
-    partial def evaluateRange (r : Range) : UnifyM ConstructorExpr :=
+    partial def evaluateRange (r : Range) : UnifyM ConstructorExpr := do
       match r with
       | .Ctor c args => do
-        let args' ← args.mapM evaluateRange
+        let args' ← List.mapM evaluateRange args
         return (ConstructorExpr.Ctor c args')
       | .Unknown u => evaluateUnknown u
-      | .Fixed | .Undef _ => failure
+      | .Fixed | .Undef _ =>
+        throwError m!"unable to evaluate range {r}"
 
     /-- Evaluates an `Unknown` based on the bindings in the `UnknownMap`,
         returning a `ConstructorExpr`.
 
         Precondition: there must not be any cycles of `Unknown`s in the `UnknownMap`. -/
-    partial def evaluateUnknown (v : Unknown) : UnifyM ConstructorExpr :=
+    partial def evaluateUnknown (v : Unknown) : UnifyM ConstructorExpr := do
       withConstraints $ fun k => do
         let r ← findCorrespondingRange k v
+        logWarning m!"UnknownMap: {v} ↦ {r}"
         match r with
         | .Undef _ | .Fixed => return ConstructorExpr.Unknown v
         | .Unknown u =>
@@ -429,8 +430,24 @@ namespace UnifyM
           return (ConstructorExpr.Ctor c args')
   end
 
+  /-- Determines whether a `Range` is `Fixed`. If the `Range` is in the form `Unknown u`,
+      we check if the range corresponding to `u` in the `UnknownMap` is `Fixed`
+      (this handles chains of `Unknowns` in the `UnknownMap`)  -/
+  partial def isRangeFixed (r : Range) : UnifyM Bool :=
+    match r with
+    | .Fixed => return true
+    | .Undef _ => return false
+    | .Unknown u => do
+      withConstraints $ fun k => do
+        match k[u]? with
+        | none => return false
+        | some r' => isRangeFixed r'
+    | .Ctor _ args => List.allM isRangeFixed args
 
-
+  /-- Determines if an `Unknown` has a `Fixed` `Range` in the `UnknownMap`
+      (this handles chains of `Unknowns` in the `UnknownMap`) -/
+  def isUnknownFixed (u : Unknown) : UnifyM Bool :=
+    isRangeFixed (.Unknown u)
 
 end UnifyM
 
