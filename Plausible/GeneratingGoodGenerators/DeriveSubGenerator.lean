@@ -366,12 +366,24 @@ def convertRangeToCtorAppForm (r : Range) : UnifyM (Name × List ConstructorExpr
     return (c, args)
   | _ => throwError m!"Unable to convert {r} to a constructor expression"
 
--- TODO: finish implementing this
-def getScheduleSort (conclusion : HypothesisExpr) (outputVars : List Unknown) (deriveSort : DeriveSort) (returnOption : Bool) : UnifyM ScheduleSort :=
+/-- Given a `conclusion` to a constructor, a list of `outputVars` and a `deriveSort`,
+    figures out the appropriate `ScheduleSort`. The `returnOption` boolean argument
+    is used to determine whether producers should return their results wrapped in an `Option` or not.
+
+    - Note: callers should supply `none` as the `ctorNameOpt` argument if `deriveSort := .Theorem` -/
+def getScheduleSort (conclusion : HypothesisExpr) (outputVars : List Unknown) (ctorNameOpt : Option Name) (deriveSort : DeriveSort) (returnOption : Bool) : UnifyM ScheduleSort :=
   match deriveSort with
   | .Checker => return .CheckerSchedule
   | .Theorem => return (.TheoremSchedule conclusion (typeClassUsed := true))
-  | _ => sorry
+  | ds@(_) => do
+    let outputValues ← outputVars.mapM UnifyM.evaluateUnknown
+    let producerSort :=
+      if let .Enumerator := ds then ProducerSort.Enumerator
+      else ProducerSort.Generator
+    let conclusion ← do
+      let ctorName ← Option.getDM ctorNameOpt (throwError "No constructor name given for Non-theorem schedule")
+      pure (ctorName, outputValues)
+    return .ProducerSchedule returnOption producerSort conclusion
 
 
 /-- Function that handles the bulk of the generator derivation algorithm for a single constructor:

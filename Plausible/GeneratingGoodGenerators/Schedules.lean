@@ -39,7 +39,7 @@ inductive DeriveSort
 /-- The type of schedule we wish to derive -/
 inductive ScheduleSort
   /-- tuple of produced outputs from conclusion of constructor -/
-  | ProducerSchedule (isConstrained : Bool) (producerSort : ProducerSort) (conclusion : Name × ConstructorExpr)
+  | ProducerSchedule (isConstrained : Bool) (producerSort : ProducerSort) (conclusion : Name × List ConstructorExpr)
 
   /-- checkers need not bother with conclusion of constructor,
       only hypotheses need be checked and conclusion of constructor follows-/
