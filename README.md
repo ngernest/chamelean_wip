@@ -52,11 +52,12 @@ instance : SampleableExt MyType :=
 For more documentation refer to the module docs.
 
 **Deriving Instance for `Arbitrary`** (for algebraic data types)              
-Users can write `deriving Arbitrary` and/or `deriving Enum` after an inductive type definition, i.e.
+Users can write `deriving Arbitrary` after an inductive type definition, i.e.
 ```lean 
 inductive Foo where
   ...
   deriving Arbitrary
 ```
 
-Alternatively, users can also write `deriving instance Arbitrary for T1, ..., Tn` or `deriving instance Enum for T1, ...` as a top-level command to derive `Arbitrary` / `Enum` instances for types `T1, ..., Tn` simultaneously.
+Alternatively, users can also write `deriving instance Arbitrary for T1, ..., Tn` or `deriving instance Enum for T1, ...` as a top-level command to derive `Arbitrary` instances for types `T1, ..., Tn` simultaneously.
+
