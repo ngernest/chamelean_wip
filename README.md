@@ -59,5 +59,5 @@ inductive Foo where
   deriving Arbitrary
 ```
 
-Alternatively, users can also write `deriving instance Arbitrary for T1, ..., Tn` or `deriving instance Enum for T1, ...` as a top-level command to derive `Arbitrary` instances for types `T1, ..., Tn` simultaneously.
+Alternatively, users can also write `deriving instance Arbitrary for T1, ..., Tn` as a top-level command to derive `Arbitrary` instances for types `T1, ..., Tn` simultaneously.
 
