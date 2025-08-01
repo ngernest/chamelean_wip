@@ -2,6 +2,7 @@ import Lean.Expr
 import Lean.LocalContext
 
 import Plausible.GeneratingGoodGenerators.UnificationMonad
+import Plausible.GeneratingGoodGenerators.Schedules
 import Plausible.GeneratingGoodGenerators.ScheduleUtils
 import Plausible.New.DeriveConstrainedProducers
 import Plausible.New.SubGenerators
@@ -450,9 +451,6 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
     -- Extend the current state with the contents of `initialUnifyState`
     UnifyM.extendState initialUnifyState
 
-    -- let state ← get
-    -- logWarning m!"after extending with initialUnifyState = {state}"
-
     -- Get the ranges corresponding to each of the unknowns
     let unknownRanges ← unknowns.mapM processCorrespondingRange
     let unknownArgsAndRanges := unknowns.zip unknownRanges
@@ -486,8 +484,7 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
 
     let outputIdx := unknowns.idxOf outputName
 
-    -- Call `possibleSchedules` here to get a naive schedule
-    -- Then use the updated unification result to replace all variables in `possibleSchedules`
+    -- Compute all possible generator schedules for this constructor
     let possibleSchedules ← possibleSchedules
       (vars := forAllVars)
       (hypotheses := hypothesisExprs.toList)
@@ -495,10 +492,15 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
       (recCall := (`aux_arb, [outputIdx]))
       fixedVars
 
+    -- A naive schedule is the first schedule contained in `possibleSchedules`
     let naiveSchedule ← Option.getDM (possibleSchedules.head?) (throwError m!"Unable to compute any possible schedules")
 
-    logWarning m!"naiveSchedule = {repr naiveSchedule}"
+    -- Update the naive schedule with the result of unification
+    let updatedNaiveSchedule ← updateScheduleSteps naiveSchedule
+
+    logWarning m!"updatedNaiveSchedule = {repr updatedNaiveSchedule}"
     logWarning m!"scheduleSort = {repr scheduleSort}"
+
 
     -- Update the list of hypotheses with the result of unification
     -- (i.e. constructor arguments in hypotheses are updated with the canonical

@@ -4,6 +4,7 @@ import Lean.Expr
 import Lean.Exception
 import Plausible.New.Idents
 
+
 open Lean Idents
 
 
@@ -322,8 +323,8 @@ namespace UnifyM
       - If `u ↦ Unknown u'` in `k`, then we recursively look up the canonical rerpesentation of `u'` by traversing
         the unification graph formed by the `constraints` map in `UnifyState`
       - If `u ↦ r` (where `r` is any `Range` that is not some `Unknown`), then `u` is its own canonical representation
-
-      This function is used to handle cases in `constraints` where an unknown maps to another unknown.  -/
+      - This function is used to handle cases in `constraints` where an unknown maps to another unknown.
+      - Note: this function corresponds to `correct_var` in the QuickChick code.  -/
   partial def findCanonicalUnknown (k : UnknownMap) (u : Unknown) : UnifyM Unknown := do
     let r ← findCorrespondingRange k u
     match r with
@@ -333,7 +334,8 @@ namespace UnifyM
   /-- `updateConstructorArg k ctorArg` uses the `UnknownMap` `k` to rewrite any unknowns that appear in the
       `ConstructorExpr` `ctorArg`, substituting each `Unknown` with its canonical representation
       (determined by calling `findCanonicalUnknown`)
-      - See `updateHypothesesWithUnificationResult` for an example of how this function is used -/
+      - See `updateHypothesesWithUnificationResult` for an example of how this function is used.
+      - Note: this function corresponds to `correct_rocq_constr` in the QuickChick code. -/
   partial def updateConstructorArg (k : UnknownMap) (ctorArg : ConstructorExpr) : UnifyM ConstructorExpr := do
     logWarning m!"updating ctorArg {ctorArg}"
     match ctorArg with
@@ -347,7 +349,14 @@ namespace UnifyM
       let updatedArgs ← args.mapM (updateConstructorArg k)
       return (.Ctor ctorName updatedArgs)
 
-  /-- Updates the list of `hypotheses` in `UnifyState` with the result of unification,
+  partial def updatePattern (k : UnknownMap) (p : Pattern) : UnifyM Pattern := do
+    match p with
+    | .UnknownPattern u => return .UnknownPattern (← findCanonicalUnknown k u)
+    | .CtorPattern c args => do
+      let updatedArgs ← args.mapM (updatePattern k)
+      return .CtorPattern c updatedArgs
+
+    /-- Updates the list of `hypotheses` in `UnifyState` with the result of unification,
       updating `Unknown`s in `hypotheses` that appear in constructor argument positions
       with their canonical representations (as determined by `findCanonicalUnknown`) -/
   def updateHypothesesWithUnificationResult : UnifyM Unit := do
@@ -448,6 +457,8 @@ namespace UnifyM
       (this handles chains of `Unknowns` in the `UnknownMap`) -/
   def isUnknownFixed (u : Unknown) : UnifyM Bool :=
     isRangeFixed (.Unknown u)
+
+
 
 end UnifyM
 
