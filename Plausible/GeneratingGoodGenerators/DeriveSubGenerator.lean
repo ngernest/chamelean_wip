@@ -501,12 +501,6 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
     logWarning m!"updatedNaiveSchedule = {repr updatedNaiveSchedule}"
     logWarning m!"scheduleSort = {repr scheduleSort}"
 
-
-    -- Update the list of hypotheses with the result of unification
-    -- (i.e. constructor arguments in hypotheses are updated with the canonical
-    -- representation of each argument as determined by the unification algorithm)
-    UnifyM.updateHypothesesWithUnificationResult
-
     let finalState ← get
     -- logWarning m!"finalState after updating hypotheses = {finalState}"
 

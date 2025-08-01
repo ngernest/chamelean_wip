@@ -218,8 +218,11 @@ def normalizeSchedule (steps : List ScheduleStep) : List ScheduleStep :=
       -- Comparison function on blocks of `ScheduleSteps`
       compareBlocks b1 b2 := Ordering.isLE $ Ord.compare b1 b2
 
-
-def guardList (b : Bool) : ScheduleM (List Unit) :=
+/-- Same as `Control.Basic.guard`, but specialized to the list monad
+    (Note that the default implementation of `guard` returns `failure`,
+    but for our implementation, we prefer to have it return the empty list,
+    following the behavior of Haskell's `Control.Monad.guard`) -/
+def guardList [Monad m] (b : Bool) : m (List Unit) :=
   if b then return [.unit] else return []
 
 /-- Depth-first enumeration of all possible schedules -/
