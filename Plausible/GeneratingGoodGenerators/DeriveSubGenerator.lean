@@ -113,7 +113,6 @@ def processCorrespondingRange (u : Unknown) : UnifyM Range :=
 /-- Converts an `Expr` to a `Range`, using the ambient `LocalContext` to find the user-facing names
     corresponding to `FVarId`s -/
 partial def convertExprToRangeInCurrentContext (e : Expr) : UnifyM Range := do
-  logWarning m!"converting expr {e} to Range"
   match (← convertToCtorExpr e) with
   | some (f, args) => do
     let argRanges ← args.toList.mapM convertExprToRangeInCurrentContext
@@ -135,7 +134,6 @@ partial def convertExprToRangeInCurrentContext (e : Expr) : UnifyM Range := do
 
 /-- Converts a hypothesis (reprented as a `TSyntax term`) to a `Range` -/
 partial def convertHypothesisTermToRange (term : TSyntax `term) : UnifyM Range := do
-  logWarning m!"converting term {term} to Range"
   match term with
   | `($ctor:ident $args:term*) => do
     let argRanges ← Array.toList <$> args.mapM convertHypothesisTermToRange

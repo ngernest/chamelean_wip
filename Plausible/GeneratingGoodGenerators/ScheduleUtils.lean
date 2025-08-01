@@ -48,7 +48,7 @@ def variablesInConstructorExpr (ctorExpr : ConstructorExpr) : List Name :=
 def isRecCall (binding : List Name) (hyp : HypothesisExpr) (recCall : Name × List Nat) : MetaM Bool := do
   logWarning m!"inside isRecCall, binding = {binding}, hyp = {hyp}, recCall = {recCall}"
   let (ctorName, args) := hyp
-  logWarning m!"args = {args}"
+  logWarning m!"hyp args = {args}"
   let outputPos ← filterMapMWithIndex (fun i arg => do
     let vars := variablesInConstructorExpr arg
     logWarning m!"arg = {arg}, vars = {vars}"
@@ -58,7 +58,8 @@ def isRecCall (binding : List Name) (hyp : HypothesisExpr) (recCall : Name × Li
     else if List.any vars (. ∈ binding) then do
       let v := List.find? (· ∈ binding) vars
       logWarning m!"error: {v} ∈ {binding} = binding"
-      throwError m!"Arguments to hypothesis {hyp} contain both fixed and yet-to-be-bound variables (not allowed)"
+      logWarning m!"Arguments to hypothesis {hyp} contain both fixed and yet-to-be-bound variables (not allowed)"
+      pure none
     else pure none) args
   let (inductiveName, outputIdxes) := recCall
   return (ctorName == inductiveName && List.mergeSort outputIdxes == List.mergeSort outputPos)
@@ -171,7 +172,7 @@ partial def outputsNotConstrainedByFunctionApplication (hyp : HypothesisExpr) (o
        (since TT can handle multiple outputs, each of which may need to be constrained by a pattern)
      - the updated thing we're generating for (e.g. `typing G e v_t1t2` in the example above), ie the RHS of the let-bind
      - the updated output list (e.g. `v_t1t2` in the example above), ie the LHS of the let-bind -/
-def handleConstraintedOutputs (hyp : HypothesisExpr) (outputVars : List Name) : MetaM (List ScheduleStep × HypothesisExpr × List Name) := do
+def handleConstrainedOutputs (hyp : HypothesisExpr) (outputVars : List Name) : MetaM (List ScheduleStep × HypothesisExpr × List Name) := do
   let (ctorName, ctorArgs) := hyp
 
   let (patternMatches, args', newOutputs) ← splitThreeLists <$> ctorArgs.mapM (fun arg =>
@@ -222,10 +223,13 @@ def guardList (b : Bool) : ScheduleM (List Unit) :=
   if b then return [.unit] else return []
 
 /-- Depth-first enumeration of all possible schedules -/
-partial def dfs (boundVars : List Name) (remainingVars : List Name) (checkedHypotheses : List Nat) (scheduleSoFar : List ScheduleStep) : ScheduleM (List (List ScheduleStep)) :=
+partial def dfs (boundVars : List Name) (remainingVars : List Name) (checkedHypotheses : List Nat) (scheduleSoFar : List ScheduleStep) : ScheduleM (List (List ScheduleStep)) := do
   match remainingVars with
-  | [] => return [List.reverse scheduleSoFar]
+  | [] =>
+    logWarning m!"no more vars remaining, returning scheduleSoFar"
+    return [List.reverse scheduleSoFar]
   | _ => do
+    logWarning m!"dfs called with boundVars = {boundVars}, remainingVars = {remainingVars}"
     let env ← read
     let unconstrainedProdPaths ←
       flatMapMWithContext remainingVars (fun v remainingVars' => do
@@ -250,6 +254,8 @@ partial def dfs (boundVars : List Name) (remainingVars : List Name) (checkedHypo
 
     let remainingHypotheses := filterMapWithIndex (fun i hyp => if i ∈ checkedHypotheses then none else some (i, hyp)) env.sortedHypotheses
 
+    logWarning m!"handling constrainedProdPaths with remainingHypotheses = {remainingHypotheses}"
+
     let constrainedProdPaths ← remainingHypotheses.flatMapM (fun (i, hyp, hypVars) => do
       let _ ← guardList (i ∉ checkedHypotheses)
 
@@ -259,13 +265,15 @@ partial def dfs (boundVars : List Name) (remainingVars : List Name) (checkedHypo
       let remainingVars' := (remainingVarsSet \ outputSet).toList
       let outputVars := outputSet.toList
 
+      logWarning m!"hyp = {hyp}, outputVars = {outputVars}"
+
       let _ ← guardList (!outputVars.isEmpty)
 
       let _ ← guardList (outputInputNotUnderSameConstructor hyp outputVars)
 
       let _ ← guardList (outputsNotConstrainedByFunctionApplication hyp outputVars)
 
-      let (newMatches, hyp', newOutputs) ← handleConstraintedOutputs hyp outputVars
+      let (newMatches, hyp', newOutputs) ← handleConstrainedOutputs hyp outputVars
       let typedOutputs ← newOutputs.mapM
         (fun v => do
           let tyExpr ← Option.getDM (List.lookup v env.vars)
@@ -273,6 +281,8 @@ partial def dfs (boundVars : List Name) (remainingVars : List Name) (checkedHypo
           let constructorExpr ← exprToConstructorExpr tyExpr
           pure (v, constructorExpr))
       let (_, hypArgs) := hyp'
+
+      logWarning m!"about to call isRecCall with outputVars = {outputVars}, hyp = {hyp}"
       let constrainingRelation ←
         if (← isRecCall outputVars hyp env.recCall) then
           let inputArgs := filterWithIndex (fun i _ => i ∉ (Prod.snd env.recCall)) hypArgs
@@ -282,6 +292,7 @@ partial def dfs (boundVars : List Name) (remainingVars : List Name) (checkedHypo
       let constrainedProdStep := ScheduleStep.SuchThat typedOutputs constrainingRelation env.prodSort
 
       logWarning m!"created constrainedProdStep = {repr constrainedProdStep}"
+      logWarning m!"remainingVars' = {remainingVars'}"
 
       let (newCheckedIdxs, newCheckedHyps) ← List.unzip <$> collectCheckSteps (outputVars ++ boundVars) (i::checkedHypotheses)
       -- TODO: handle negated propositions in `ScheduleStep.Check`
@@ -290,8 +301,6 @@ partial def dfs (boundVars : List Name) (remainingVars : List Name) (checkedHypo
       dfs (outputVars ++ boundVars) remainingVars'
         (i :: newCheckedIdxs ++ checkedHypotheses)
         (checks ++ newMatches ++ constrainedProdStep :: scheduleSoFar))
-
-    logWarning m!"constrainedProdPaths = {repr constrainedProdPaths}"
 
     return constrainedProdPaths ++ unconstrainedProdPaths
 
