@@ -606,7 +606,7 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
 -- TODO: figure out how to assemble the entire generator function with all constructors
 
 -- #derive_subgenerator (fun (tree : Tree) => bst in1 in2 tree)
-#derive_subgenerator (fun (e : term) => typing G e t)
+-- #derive_subgenerator (fun (e : term) => typing G e t)
 
 -- #derive_subgenerator (fun (tree : Tree) => LeftLeaning tree)
 

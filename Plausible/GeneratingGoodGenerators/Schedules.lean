@@ -1,5 +1,6 @@
-import Lean
 import Plausible.GeneratingGoodGenerators.UnificationMonad
+import Plausible.New.Arbitrary
+import Plausible.New.Enumerators
 
 open Lean
 
@@ -91,63 +92,6 @@ inductive Density
   /-- Unconstrained generation, i.e. calls to `arbitrary` -/
   | Total
   deriving Repr, BEq
-
-/-- The sort of monad we are compiling to, i.e. one of the following:
-    - An unconstrained / constrained generator (`Gen` / `OptionT Gen`)
-    - An unconstrained / constrained enumerator (`Enumerator` / `OptionT Enumerator`)
-    - A Checker (`Option Bool` monad) -/
-inductive MonadSort
-  | Gen
-  | OptionTGen
-  | Enumerator
-  | OptionTEnumerator
-  | Checker
-  deriving Repr
-
-/-- An intermediate representation of monadic expressions, used in generators/enumerators/checkers
-    - Schedules are compiled to `MExp`s, which are then compiled to Lean code
-
-    - Note: `MExp`s make it easy to optimize generator code down the line
-      (e.g. combine pattern-matches when we have disjoint patterns)
-    - Going directly from schedules to Lean code (a wrapper on top of `TSyntax`) might be fine?
-      + The wrapper should expose `bind, return, backtrack` and pattern-matches
-    - The cool thing about `MExp` is that we can interpret it differently
-      based on the `MonadSort`
-
-    - TODO: we may want `MHole`, `MFail`, `MOutOfFuel`
-    - the other constructors in the Rocq [mexp]
--/
-inductive MExp
-  /-- `MRet e` represents `return e` in some monad -/
-  | MRet (e : MExp)
-
-  /-- `MBind monadSort m1 vars m2` represents `m1 >>= fun vars => m2` in a particular monad,
-       as determined by `monadSort` -/
-  | MBind (monadSort : MonadSort) (m1 : MExp) (vars : List Unknown) (m2 : MExp)
-
-  /-- N-ary function application -/
-  | MApp (f : MExp) (args : List MExp)
-
-  /-- Some constant name -/
-  | MConst (name : Name)
-
-  /-- `MMatch scrutinee [(p1, e1), …, (pn, en)]` represents
-       ```lean
-       match scrutinee with
-       | p1 => e1
-       ...
-       | pn => en
-       ```
-  -/
-  | MMatch (scrutinee : MExp) (cases : List (Pattern × MExp))
-
-  deriving Repr
-
-
-
-----------------------------------------------
--- Conversion from `Expr` to `HypothesisExpr`
-----------------------------------------------
 
 
 /-- Convert an `Expr` to a `ConstructorExpr` -/
