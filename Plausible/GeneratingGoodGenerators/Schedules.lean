@@ -1,6 +1,4 @@
 import Plausible.GeneratingGoodGenerators.UnificationMonad
-import Plausible.New.Arbitrary
-import Plausible.New.Enumerators
 
 open Lean
 

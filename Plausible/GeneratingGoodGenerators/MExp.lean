@@ -1,3 +1,6 @@
+import Plausible.New.Arbitrary
+import Plausible.New.ArbitrarySizedSuchThat
+import Plausible.New.Enumerators
 import Plausible.GeneratingGoodGenerators.Schedules
 open Lean
 
@@ -57,15 +60,28 @@ inductive MExp : Type where
   /-- Refers to a variable identifier -/
   | MId (name : Name)
 
+  /-- A function abstraction, where `args` is a list of function arguments
+      (with optional type annotations for each arg), and `body`
+      is an `MExp` representing the function body -/
+  | MFun (args : List (Pattern × Option MExp)) (body : MExp)
+
   deriving Repr, Inhabited
 
 
-/-- Converts a `ProducerSort` to a `MonadSort` -/
+/-- Converts a `ProducerSort` to a `MonadSort`
+    representing an unconstrained producer (i.e. `Gen` or `Enumerator`) -/
 def prodSortToMonadSort (prodSort : ProducerSort) : MonadSort :=
   match prodSort with
   | .Enumerator => MonadSort.Enumerator
   | .Generator => MonadSort.Gen
 
+/-- Converts a `ProducerSort` to a `MonadSort`
+    representing a *constrained* producer
+    (i.e. `OptionT Gen` or `OptionT Enumerator`) -/
+def prodSortToOptionTMonadSort (prodSort : ProducerSort) : MonadSort :=
+  match prodSort with
+  | .Enumerator => MonadSort.OptionTEnumerator
+  | .Generator => MonadSort.OptionTGen
 
 /-- `MExp` representation of an unconstrained producer,
     parameterized by a `producerSort` -/
@@ -73,6 +89,45 @@ def unconstrainedProducer (prodSort : ProducerSort) : MExp :=
   match prodSort with
   | .Enumerator => .MConst ``Enum.enum
   | .Generator => .MConst ``Arbitrary.arbitrary
+
+/-- `MExp` representation of `EnumSizedSuchThat.enumSizedST`,
+    where `prop` is the `Prop` constraining the value being enumerated -/
+def enumSizedST (prop : MExp) : MExp :=
+  .MApp (.MConst ``EnumSizedSuchThat.enumSizedST) [prop]
+
+/-- `MExp` representation of `ArbitrarySizedSuchThat.arbitrarySizedST`,
+    where `prop` is the `Prop` constraining the value being generated -/
+def arbitrarySizedST (prop : MExp) : MExp :=
+  .MApp (.MConst ``ArbitrarySizedSuchThat.arbitrarySizedST) [prop]
+
+/-- Converts a `List α` to a "tuple", where the function `pair`
+    is used to create tuples. The `default` element is used when
+    the input list `l` is empty, although for most use-cases,
+    this function will be called with non-empty lists `l`, so `default`
+    will be `none`. -/
+def tupleOfList [Inhabited α] (pair : α → α → α) (l : List α) (default : Option α) : α :=
+  match l with
+  | [] => default.get!
+  | [x] => x
+  | x :: xs => List.foldl pair x xs
+
+/-- Converts a list of `Pattern`s to a one single `Pattern` expressed
+    as a tuple -/
+def patternTupleOfList (xs : List Pattern) : Pattern :=
+  tupleOfList (fun x y => Pattern.CtorPattern ``Prod.mk [x, y]) xs none
+
+/-- `MExp` representation of a constrained producer,
+    parameterized by a `producerSort`, a list of variable names `vars`,
+    and a `Prop` (`prop`) constraining the values being produced
+
+    - Note: this function corresponds to `such_that_producer`
+      in the QuickChick code -/
+def constrainedProducer (prodSort : ProducerSort) (vars : List Name) (prop : MExp) : MExp :=
+  let argsTuple := patternTupleOfList (Pattern.UnknownPattern <$> vars)
+  let producerWithArgs := MExp.MFun [(argsTuple, none)] prop
+  match prodSort with
+  | .Enumerator => enumSizedST producerWithArgs
+  | .Generator => arbitrarySizedST producerWithArgs
 
 /-- Converts a `ConstructorExpr` to an `MExp` -/
 partial def constructorExprToMExp (expr : ConstructorExpr) : MExp :=
@@ -92,6 +147,8 @@ def recCall (f : Name) (args : List ConstructorExpr) : MExp :=
 /-- Compiles a `ScheduleStep` to an `MExp`
     - Note that we represent `MExp`s as a function `MExp → MExp`,
       akin to difference lists in Haskell
+    - The function parameter `k` represents the remainder of the `mexp`
+      (the rest of the monadic `do`-block)
 -/
 def scheduleStepToMexp (step : ScheduleStep) (mfuel : MExp) (defFuel : MExp) : MExp → MExp :=
   fun k =>
@@ -99,7 +156,17 @@ def scheduleStepToMexp (step : ScheduleStep) (mfuel : MExp) (defFuel : MExp) : M
     | .Unconstrained v src prodSort =>
       let producer :=
         match src with
-        | .NonRec ty => unconstrainedProducer prodSort
-        | .Rec f args => recCall f args
+        | Source.NonRec ty => unconstrainedProducer prodSort
+        | Source.Rec f args => recCall f args
       .MBind (prodSortToMonadSort prodSort) producer [v] k
+    | .SuchThat varsTys prod ps =>
+      let producer :=
+        match prod with
+        | Source.NonRec ty => sorry
+          -- TODO: figure out what to do with `ty`
+          -- constrainedProducer ps (Prod.fst <$> varsTys)
+        | Source.Rec f args => recCall f args
+      let vars := Prod.fst <$> varsTys
+      .MBind (prodSortToOptionTMonadSort ps) producer vars k
+      -- .MBind
     | _ => sorry
