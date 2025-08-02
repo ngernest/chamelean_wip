@@ -1,4 +1,3 @@
-import Lean
 import Plausible.GeneratingGoodGenerators.UnificationMonad
 
 open Lean
@@ -91,12 +90,6 @@ inductive Density
   /-- Unconstrained generation, i.e. calls to `arbitrary` -/
   | Total
   deriving Repr, BEq
-
-
-
-----------------------------------------------
--- Conversion from `Expr` to `HypothesisExpr`
-----------------------------------------------
 
 
 /-- Convert an `Expr` to a `ConstructorExpr` -/
