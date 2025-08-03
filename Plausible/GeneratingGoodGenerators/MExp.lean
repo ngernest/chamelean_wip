@@ -143,6 +143,10 @@ def recCall (f : Name) (args : List ConstructorExpr) : MExp :=
   .MApp (.MId f) $
     [.MId `initSize, .MId `size'] ++ (constructorExprToMExp <$> args)
 
+/-- Converts a `HypothesisExpr` to an `MExp` -/
+def hypothesisExprToMExp (hypExpr : HypothesisExpr) : MExp :=
+  let (ctorName, ctorArgs) := hypExpr
+  .MCtr ctorName (constructorExprToMExp <$> ctorArgs)
 
 /-- Compiles a `ScheduleStep` to an `MExp`
     - Note that we represent `MExp`s as a function `MExp → MExp`,
@@ -162,11 +166,9 @@ def scheduleStepToMexp (step : ScheduleStep) (mfuel : MExp) (defFuel : MExp) : M
     | .SuchThat varsTys prod ps =>
       let producer :=
         match prod with
-        | Source.NonRec ty => sorry
-          -- TODO: figure out what to do with `ty`
-          -- constrainedProducer ps (Prod.fst <$> varsTys)
+        | Source.NonRec hypExpr =>
+          constrainedProducer ps (Prod.fst <$> varsTys) (hypothesisExprToMExp hypExpr)
         | Source.Rec f args => recCall f args
       let vars := Prod.fst <$> varsTys
       .MBind (prodSortToOptionTMonadSort ps) producer vars k
-      -- .MBind
     | _ => sorry
