@@ -69,6 +69,9 @@ inductive MExp : Type where
   /-- Signifies failure (corresponds to the term `OptionT.fail`) -/
   | MFail
 
+  /-- Signifies running out of fuel -/
+  | MOutOfFuel
+
   deriving Repr, Inhabited
 
 
@@ -103,6 +106,11 @@ def enumSizedST (prop : MExp) : MExp :=
     where `prop` is the `Prop` constraining the value being generated -/
 def arbitrarySizedST (prop : MExp) : MExp :=
   .MApp (.MConst ``ArbitrarySizedSuchThat.arbitrarySizedST) [prop]
+
+/-- `mSome x` is an `MExp` representing `Option.some x` -/
+def mSome (x : MExp) : MExp :=
+  .MApp (.MConst ``Option.some) [x]
+
 
 /-- Converts a `List α` to a "tuple", where the function `pair`
     is used to create tuples. The `default` element is used when
@@ -162,6 +170,23 @@ def hypothesisExprToMExp (hypExpr : HypothesisExpr) : MExp :=
 def wildCardPattern : Pattern :=
   .UnknownPattern Name.anonymous
 
+/-- `MExp` representing a pattern-match on a `scrutinee` of type `Option Bool`.
+     Specifically, `matchOptionBool scrutinee trueBranch falseBranch` represents
+     ```lean
+     match scrutinee with
+     | some true => $trueBranch
+     | some false => $falseBranch
+     | none => $MExp.MOutOfFuel
+     ```
+-/
+def matchOptionBool (scrutinee : MExp) (trueBranch : MExp) (falseBranch : MExp) : MExp :=
+  .MMatch scrutinee
+    [
+      (.CtorPattern ``some [.UnknownPattern ``true], trueBranch),
+      (.CtorPattern ``some [.UnknownPattern ``false], falseBranch),
+      (.UnknownPattern ``none, .MOutOfFuel)
+    ]
+
 /-- Compiles a `ScheduleStep` to an `MExp`
     - Note that we represent `MExp`s as a function `MExp → MExp`,
       akin to difference lists in Haskell
@@ -174,7 +199,7 @@ def scheduleStepToMexp (step : ScheduleStep) (mfuel : MExp) (defFuel : MExp) : M
     | .Unconstrained v src prodSort =>
       let producer :=
         match src with
-        | Source.NonRec ty => unconstrainedProducer prodSort
+        | Source.NonRec _ => unconstrainedProducer prodSort
         | Source.Rec f args => recCall f args
       .MBind (prodSortToMonadSort prodSort) producer [v] k
     | .SuchThat varsTys prod ps =>
@@ -195,3 +220,33 @@ def scheduleStepToMexp (step : ScheduleStep) (mfuel : MExp) (defFuel : MExp) : M
       .MBind MonadSort.Checker checker [] k
     | .Match scrutinee pattern =>
       .MMatch (.MId scrutinee) [(pattern, k), (wildCardPattern, .MFail)]
+
+/-- Converts a `Schedule` (a list of `ScheduleStep`s along with a `ScheduleSort`,
+    which acts as the conclusion of the schedule) to an `MExp`.
+    - `mfuel` and `defFuel` are auxiliary `MExp`s representing the fuel
+      for the function we are deriving (these correspond to `size` and `initSize`
+      in the QuickChick code for the derived functions) -/
+def scheduleToMExp (schedule : Schedule) (mfuel : MExp) (defFuel : MExp) : MExp :=
+  let (scheduleSteps, scheduleSort) := schedule
+  -- Determine the *epilogue* of the schedule (i.e. what happens after we
+  -- have finished executing all the `scheduleStep`s)
+  let epilogue :=
+    match scheduleSort with
+    | .ProducerSchedule _ conclusionOutputs =>
+      MExp.MRet (hypothesisExprToMExp conclusionOutputs)
+    | .CheckerSchedule => mSome (.MConst ``true)
+    | .TheoremSchedule conclusion typeClassUsed =>
+      -- Create a pattern-match on the result of hte checker
+      -- on the conclusion, returning `some true` or `some false` accordingly
+      let conclusionMExp := hypothesisExprToMExp conclusion
+      let scrutinee :=
+        if typeClassUsed then decOptChecker conclusionMExp mfuel
+        else conclusionMExp
+      matchOptionBool scrutinee
+        (mSome (.MConst ``true))
+        (mSome (.MConst ``false))
+  -- Fold over the `scheduleSteps` and convert each of them to a functional `MExp`
+  -- Note that the fold composes the `MExp`, and we use `foldr` since
+  -- we want the `epilogue` to be the base-case of the fold
+  List.foldr (fun step acc => scheduleStepToMexp step mfuel defFuel acc)
+    epilogue scheduleSteps
