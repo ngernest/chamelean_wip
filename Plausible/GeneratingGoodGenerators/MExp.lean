@@ -264,8 +264,13 @@ def scheduleToMExp (schedule : Schedule) (mfuel : MExp) (defFuel : MExp) : MExp 
     epilogue scheduleSteps
 
 /-- Compiles a `MExp` to a Lean `doElem`, according to the `DeriveSort` provided -/
-def mexpToTSyntax (mexp : MExp) (deriveSort : DeriveSort) : MetaM (TSyntax `term) :=
+partial def mexpToTSyntax (mexp : MExp) (deriveSort : DeriveSort) : MetaM (TSyntax `term) :=
   match mexp with
+  | .MId v => `($(mkIdent v))
+  | .MApp func args => do
+    let f ← mexpToTSyntax func deriveSort
+    let compiledArgs ← args.toArray.mapM (fun e => mexpToTSyntax e deriveSort)
+    `($f $compiledArgs*)
   | .MRet e => do
     let e' ← mexpToTSyntax e deriveSort
     `(return $e')
