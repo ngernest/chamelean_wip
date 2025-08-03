@@ -267,7 +267,7 @@ def scheduleToMExp (schedule : Schedule) (mfuel : MExp) (defFuel : MExp) : MExp 
 /-- Compiles a `MExp` to a Lean `doElem`, according to the `DeriveSort` provided -/
 partial def mexpToTSyntax (mexp : MExp) (deriveSort : DeriveSort) : MetaM (TSyntax `term) :=
   match mexp with
-  | .MId v => `($(mkIdent v))
+  | .MId v | .MConst v => `($(mkIdent v))
   | .MApp func args => do
     let f ← mexpToTSyntax func deriveSort
     let compiledArgs ← args.toArray.mapM (fun e => mexpToTSyntax e deriveSort)
@@ -321,3 +321,4 @@ partial def mexpToTSyntax (mexp : MExp) (deriveSort : DeriveSort) : MetaM (TSynt
       `($enumeratingOptFn $m1:term $k1:term $initSizeIdent)
     | .Theorem, _ => throwError "Theorem DeriveSort not implemented yet"
     | _, _ => throwError m!"Invalid monadic bind for deriveSort {repr deriveSort}"
+  | .MMatch _ _ => sorry -- TODO: handle MMAtch case
