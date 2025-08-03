@@ -2,8 +2,12 @@ import Plausible.New.Arbitrary
 import Plausible.New.ArbitrarySizedSuchThat
 import Plausible.New.Enumerators
 import Plausible.New.DecOpt
+import Plausible.New.TSyntaxCombinators
 import Plausible.GeneratingGoodGenerators.Schedules
-open Lean
+import Plausible.New.Idents
+
+open Idents
+open Lean Parser
 
 /-- The sort of monad we are compiling to, i.e. one of the following:
     - An unconstrained / constrained generator (`Gen` / `OptionT Gen`)
@@ -128,6 +132,14 @@ def tupleOfList [Inhabited α] (pair : α → α → α) (l : List α) (default 
 def patternTupleOfList (xs : List Pattern) : Pattern :=
   tupleOfList (fun x y => Pattern.CtorPattern ``Prod.mk [x, y]) xs none
 
+/-- Compiles a `Pattern` to a `TSyntax term` -/
+partial def compilePattern (p : Pattern) : MetaM (TSyntax `term) :=
+  match p with
+  | .UnknownPattern u => `($(mkIdent u):ident)
+  | .CtorPattern ctorName args => do
+    let compiledArgs ← args.toArray.mapM compilePattern
+    `($(mkIdent ctorName):ident $compiledArgs*)
+
 /-- `MExp` representation of a constrained producer,
     parameterized by a `producerSort`, a list of variable names `vars`,
     and a `Prop` (`prop`) constraining the values being produced
@@ -250,3 +262,39 @@ def scheduleToMExp (schedule : Schedule) (mfuel : MExp) (defFuel : MExp) : MExp 
   -- we want the `epilogue` to be the base-case of the fold
   List.foldr (fun step acc => scheduleStepToMexp step mfuel defFuel acc)
     epilogue scheduleSteps
+
+/-- Compiles a `MExp` to a Lean `doElem`, according to the `DeriveSort` provided -/
+def mexpToTSyntax (mexp : MExp) (deriveSort : DeriveSort) : MetaM (TSyntax `term) :=
+  match mexp with
+  | .MRet e => do
+    let e' ← mexpToTSyntax e deriveSort
+    `(return $e')
+  | .MBind monadSort m vars k => do
+    -- Compile the monadic expression `m` and the continuation `k` to `TSyntax term`s
+    let m1 ← mexpToTSyntax m deriveSort
+    let k1 ← mexpToTSyntax k deriveSort
+    -- If there are multiple variables that are bound to the result
+    -- of the monadic expression `m`, convert them to a tuple
+    let args := patternTupleOfList (.UnknownPattern <$> vars)
+    let compiledArgs ← compilePattern args
+    match deriveSort, monadSort with
+    | .Generator, .Gen
+    | .Generator, .OptionTGen
+    | .Enumerator, .Enumerator
+    | .Enumerator, .OptionTEnumerator =>
+      `(do let $compiledArgs:term ← $m1:term ; $k1:term)
+    | .Generator, .Checker
+    | .Enumerator, .Checker => do
+      let trueCase ← `(Term.matchAltExpr| | $(mkIdent `some) $(mkIdent `true) => $k1)
+      let wildCardCase ← `(Term.matchAltExpr| | _ => $failFn)
+      let cases := #[trueCase, wildCardCase]
+      `(match $m1:term with $cases:matchAlt*)
+    | .Checker, .Checker =>
+      `($andOptListFn [$m1:term, $k1:term])
+    | .Checker, .Enumerator =>
+      `($enumeratingFn $m1:term $k1:term $initSizeIdent)
+    | .Checker, .OptionTEnumerator =>
+      `($enumeratingOptFn $m1:term $k1:term $initSizeIdent)
+    | .Theorem, _ => throwError "Theorem DeriveSort not implemented yet"
+    | _, _ => throwError m!"Invalid monadic bind for deriveSort {repr deriveSort}"
+  | _ => sorry
