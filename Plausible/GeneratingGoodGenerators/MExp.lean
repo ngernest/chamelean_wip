@@ -1,6 +1,7 @@
 import Plausible.New.Arbitrary
 import Plausible.New.ArbitrarySizedSuchThat
 import Plausible.New.Enumerators
+import Plausible.New.DecOpt
 import Plausible.GeneratingGoodGenerators.Schedules
 open Lean
 
@@ -64,6 +65,9 @@ inductive MExp : Type where
       (with optional type annotations for each arg), and `body`
       is an `MExp` representing the function body -/
   | MFun (args : List (Pattern × Option MExp)) (body : MExp)
+
+  /-- Signifies failure (corresponds to the term `OptionT.fail`) -/
+  | MFail
 
   deriving Repr, Inhabited
 
@@ -129,6 +133,12 @@ def constrainedProducer (prodSort : ProducerSort) (vars : List Name) (prop : MEx
   | .Enumerator => enumSizedST producerWithArgs
   | .Generator => arbitrarySizedST producerWithArgs
 
+/-- `MExp` representation of a `DecOpt` instance (a checker).
+    Specifically, `decOptChecker prop fuel` represents the term
+    `DecOpt.decOpt $prop $fuel`. -/
+def decOptChecker (prop : MExp) (fuel : MExp) : MExp :=
+  .MApp (.MConst ``DecOpt.decOpt) [prop, fuel]
+
 /-- Converts a `ConstructorExpr` to an `MExp` -/
 partial def constructorExprToMExp (expr : ConstructorExpr) : MExp :=
   match expr with
@@ -147,6 +157,10 @@ def recCall (f : Name) (args : List ConstructorExpr) : MExp :=
 def hypothesisExprToMExp (hypExpr : HypothesisExpr) : MExp :=
   let (ctorName, ctorArgs) := hypExpr
   .MCtr ctorName (constructorExprToMExp <$> ctorArgs)
+
+/-- `Pattern` that represents a wildcard (i.e. `_` on the LHS of a pattern-match) -/
+def wildCardPattern : Pattern :=
+  .UnknownPattern Name.anonymous
 
 /-- Compiles a `ScheduleStep` to an `MExp`
     - Note that we represent `MExp`s as a function `MExp → MExp`,
@@ -171,4 +185,13 @@ def scheduleStepToMexp (step : ScheduleStep) (mfuel : MExp) (defFuel : MExp) : M
         | Source.Rec f args => recCall f args
       let vars := Prod.fst <$> varsTys
       .MBind (prodSortToOptionTMonadSort ps) producer vars k
-    | _ => sorry
+    | .Check src _ =>
+      let checker :=
+        match src with
+        | Source.NonRec hypExpr =>
+          decOptChecker (hypothesisExprToMExp hypExpr) mfuel
+        | Source.Rec f args => recCall f args
+      -- TODO: handle checking hypotheses w/ negative polarity (currently not handled)
+      .MBind MonadSort.Checker checker [] k
+    | .Match scrutinee pattern =>
+      .MMatch (.MId scrutinee) [(pattern, k), (wildCardPattern, .MFail)]
