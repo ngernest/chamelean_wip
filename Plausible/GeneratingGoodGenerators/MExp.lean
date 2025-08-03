@@ -271,6 +271,13 @@ partial def mexpToTSyntax (mexp : MExp) (deriveSort : DeriveSort) : MetaM (TSynt
     let f ← mexpToTSyntax func deriveSort
     let compiledArgs ← args.toArray.mapM (fun e => mexpToTSyntax e deriveSort)
     `($f $compiledArgs*)
+  | .MFail | .MOutOfFuel =>
+    -- Note: right now we compile `MFail` and `MOutOfFuel` to the same Lean terms
+    -- for simplicity, but in the future we may want to distinguish them
+    match deriveSort with
+    | .Generator | .Enumerator => `($failFn)
+    | .Checker => `($(mkIdent `some) $(mkIdent `false))
+    | .Theorem => throwError "compiling MExps for Theorem DeriveSorts not implemented"
   | .MRet e => do
     let e' ← mexpToTSyntax e deriveSort
     `(return $e')
@@ -302,4 +309,3 @@ partial def mexpToTSyntax (mexp : MExp) (deriveSort : DeriveSort) : MetaM (TSynt
       `($enumeratingOptFn $m1:term $k1:term $initSizeIdent)
     | .Theorem, _ => throwError "Theorem DeriveSort not implemented yet"
     | _, _ => throwError m!"Invalid monadic bind for deriveSort {repr deriveSort}"
-  | _ => sorry
