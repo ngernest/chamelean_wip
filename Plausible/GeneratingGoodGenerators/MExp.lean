@@ -65,10 +65,9 @@ inductive MExp : Type where
   /-- Refers to a variable identifier -/
   | MId (name : Name)
 
-  /-- A function abstraction, where `args` is a list of function arguments
-      (with optional type annotations for each arg), and `body`
-      is an `MExp` representing the function body -/
-  | MFun (args : List (Pattern × Option MExp)) (body : MExp)
+  /-- A function abstraction, where `args` is a list of variable names,
+      and `body` is an `MExp` representing the function body -/
+  | MFun (args : List Name) (body : MExp)
 
   /-- Signifies failure (corresponds to the term `OptionT.fail`) -/
   | MFail
@@ -147,11 +146,13 @@ partial def compilePattern (p : Pattern) : MetaM (TSyntax `term) :=
     - Note: this function corresponds to `such_that_producer`
       in the QuickChick code -/
 def constrainedProducer (prodSort : ProducerSort) (vars : List Name) (prop : MExp) : MExp :=
-  let argsTuple := patternTupleOfList (Pattern.UnknownPattern <$> vars)
-  let producerWithArgs := MExp.MFun [(argsTuple, none)] prop
-  match prodSort with
-  | .Enumerator => enumSizedST producerWithArgs
-  | .Generator => arbitrarySizedST producerWithArgs
+  if vars.isEmpty then
+    panic! "Received empty list of variables for constrainedProducer"
+  else
+    let producerWithArgs := MExp.MFun vars prop
+    match prodSort with
+    | .Enumerator => enumSizedST producerWithArgs
+    | .Generator => arbitrarySizedST producerWithArgs
 
 /-- `MExp` representation of a `DecOpt` instance (a checker).
     Specifically, `decOptChecker prop fuel` represents the term
@@ -271,6 +272,17 @@ partial def mexpToTSyntax (mexp : MExp) (deriveSort : DeriveSort) : MetaM (TSynt
     let f ← mexpToTSyntax func deriveSort
     let compiledArgs ← args.toArray.mapM (fun e => mexpToTSyntax e deriveSort)
     `($f $compiledArgs*)
+  | .MCtr ctorName args => do
+    let compiledArgs ← args.toArray.mapM (fun e => mexpToTSyntax e deriveSort)
+    `($(mkIdent ctorName) $compiledArgs*)
+  | .MFun vars body => do
+    let compiledBody ← mexpToTSyntax body deriveSort
+    match vars with
+    | [] => throwError "empty list of function arguments supplied to MFun"
+    | [x] => `(fun $(mkIdent x) => $compiledBody)
+    | _ =>
+      -- TODO: figure out how to tuple when we have multiple arguments
+      `(fun $(mkIdent <$> vars.toArray):ident* => $compiledBody)
   | .MFail | .MOutOfFuel =>
     -- Note: right now we compile `MFail` and `MOutOfFuel` to the same Lean terms
     -- for simplicity, but in the future we may want to distinguish them
