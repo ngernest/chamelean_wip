@@ -530,6 +530,8 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
     -- convert them to the appropriate `ScheduleStep`s, and prepends them to the `naiveSchedule`
     let fullSchedule := addConclusionPatternsAndEqualitiesToSchedule finalState.patterns finalState.equalities (updatedNaiveSchedule, scheduleSort)
 
+    -- logWarning m!"fullSchedule = {repr fullSchedule}"
+
     -- Compile the schedule to an `MExp`, then compile the `MExp` to a Lean term containing the generator
     let mexpOfSchedule := scheduleToMExp fullSchedule (.MId `size) (.MId `size)
 

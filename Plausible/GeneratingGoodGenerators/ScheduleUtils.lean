@@ -47,7 +47,9 @@ def variablesInConstructorExpr (ctorExpr : ConstructorExpr) : List Name :=
     we would have `binding = [e,tau]` and `hyp = typing gamma e tau`. -/
 def isRecCall (binding : List Name) (hyp : HypothesisExpr) (recCall : Name × List Nat) : MetaM Bool := do
   let (ctorName, args) := hyp
-  let outputPos ← filterMapMWithIndex (fun i arg => do
+  -- An output position is a position where all vars contained are unbound
+  -- if they are unbound, we include them in the list of output indices (`outputPositions`)
+  let outputPositions ← filterMapMWithIndex (fun i arg => do
     let vars := variablesInConstructorExpr arg
     if vars.isEmpty then pure none
     else if List.all vars (. ∈ binding) then
@@ -58,7 +60,9 @@ def isRecCall (binding : List Name) (hyp : HypothesisExpr) (recCall : Name × Li
       throwError m!"Arguments to hypothesis {hyp} contain both fixed and yet-to-be-bound variables (not allowed)"
     else pure none) args
   let (inductiveName, outputIdxes) := recCall
-  return (ctorName == inductiveName && List.mergeSort outputIdxes == List.mergeSort outputPos)
+  -- logWarning m!"isRecCall: binding = {binding}, hyp = {hyp}"
+  -- logWarning m!"isRecCall: outputIdxes = {List.mergeSort outputIdxes}, outputPositions = {List.mergeSort outputPositions}"
+  return (ctorName == inductiveName && List.mergeSort outputIdxes == List.mergeSort outputPositions)
 
 /-- Given a list of `hypotheses`, creates an association list mapping each hypothesis to a list of variable names.
     This list is then sorted in ascending order based on the length of the variable name list.
