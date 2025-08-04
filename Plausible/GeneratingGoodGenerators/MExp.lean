@@ -181,7 +181,7 @@ def hypothesisExprToMExp (hypExpr : HypothesisExpr) : MExp :=
 
 /-- `Pattern` that represents a wildcard (i.e. `_` on the LHS of a pattern-match) -/
 def wildCardPattern : Pattern :=
-  .UnknownPattern Name.anonymous
+  .UnknownPattern `_
 
 /-- `MExp` representing a pattern-match on a `scrutinee` of type `Option Bool`.
      Specifically, `matchOptionBool scrutinee trueBranch falseBranch` represents

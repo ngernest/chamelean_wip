@@ -341,7 +341,6 @@ namespace UnifyM
     | .Unknown arg =>
       let canonicalUnknown ← findCanonicalUnknown k arg
       if arg != canonicalUnknown then
-        logWarning m!"updateConstructorArg: arg {arg} != canonicalUnknown {canonicalUnknown}, switching to {canonicalUnknown}"
         return (.Unknown canonicalUnknown)
       else
         return (.Unknown arg)
