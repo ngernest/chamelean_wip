@@ -508,7 +508,7 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
       (vars := forAllVars)
       (hypotheses := hypothesisExprs.toList)
       (deriveSort := .Generator)
-      (recCall := (`aux_arb, [outputIdx]))
+      (recCall := (`typing, [outputIdx]))
       fixedVars
 
     -- A *naive* schedule is the first schedule contained in `possibleSchedules`

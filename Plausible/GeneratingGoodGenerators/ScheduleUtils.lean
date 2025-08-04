@@ -58,6 +58,7 @@ def isRecCall (binding : List Name) (hyp : HypothesisExpr) (recCall : Name × Li
       throwError m!"Arguments to hypothesis {hyp} contain both fixed and yet-to-be-bound variables (not allowed)"
     else pure none) args
   let (inductiveName, outputIdxes) := recCall
+  logWarning m!"isRecCall: ctorName = {ctorName}, inductiveName = {inductiveName}"
   return (ctorName == inductiveName && List.mergeSort outputIdxes == List.mergeSort outputPos)
 
 /-- Given a list of `hypotheses`, creates an association list mapping each hypothesis to a list of variable names.
@@ -236,7 +237,7 @@ partial def dfs (boundVars : List Name) (remainingVars : List Name) (checkedHypo
         let (ctorName, ctorArgs) := ty.getAppFnArgs
         let src ←
           if ctorName == Prod.fst env.recCall
-            then Source.Rec `rec <$> ctorArgs.toList.mapM (fun foo => exprToConstructorExpr foo)
+            then Source.Rec `aux_arb <$> ctorArgs.toList.mapM (fun foo => exprToConstructorExpr foo)
           else
             let hypothesisExpr ← exprToHypothesisExpr ty
             match hypothesisExpr with
@@ -278,7 +279,7 @@ partial def dfs (boundVars : List Name) (remainingVars : List Name) (checkedHypo
           let constrainingRelation ←
             if (← isRecCall outputVars hyp env.recCall) then
               let inputArgs := filterWithIndex (fun i _ => i ∉ (Prod.snd env.recCall)) hypArgs
-              pure (Source.Rec `rec inputArgs)
+              pure (Source.Rec `aux_arb inputArgs)
             else
               pure (Source.NonRec hyp')
           let constrainedProdStep := ScheduleStep.SuchThat typedOutputs constrainingRelation env.prodSort
