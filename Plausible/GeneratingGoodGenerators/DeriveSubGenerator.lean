@@ -399,7 +399,6 @@ def getScheduleSort (conclusion : HypothesisExpr) (outputVars : List Unknown) (c
   | .Checker => return .CheckerSchedule
   | .Theorem => return (.TheoremSchedule conclusion (typeClassUsed := true))
   | ds@(_) => do
-    logWarning "inside getScheduleSort"
     let outputValues ← outputVars.mapM UnifyM.evaluateUnknown
     let producerSort :=
       if let .Enumerator := ds then ProducerSort.Enumerator
@@ -463,7 +462,6 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
       let hypRange ←
         try convertHypothesisTermToRange hypTerm
         catch _ => convertExprToRangeInCurrentContext hyp
-      logWarning m!"hypothesis {hypTerm} has range {hypRange}"
 
       -- Convert each hypothesis' range to a `HypothesisExpr`, which is just a constructor application
       -- (constructor name applied to some list of arguments, which are themselves `ConstructorExpr`s)
@@ -492,7 +490,6 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
       (throwError m!"Unable to convert {conclusion} to a HypothesisExpr")
 
     -- Determine the appropriate `ScheduleSort` (right now we only produce `ScheduleSort`s for `Generator`s)
-    logWarning m!"Computing schedule stuff now..."
     let scheduleSort ← getScheduleSort conclusionExpr
       (outputVars := [outputName]) (some ctorName) (deriveSort := .Generator)
 
@@ -503,8 +500,6 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
         return some v
       else
         return none)
-
-    logWarning m!"fixedVars = {fixedVars}"
 
     let outputIdx := unknowns.idxOf outputName
 

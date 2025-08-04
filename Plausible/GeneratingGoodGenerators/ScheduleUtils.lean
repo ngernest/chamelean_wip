@@ -46,20 +46,16 @@ def variablesInConstructorExpr (ctorExpr : ConstructorExpr) : List Name :=
     For example, if we're trying to produce a call to the generator [(e, tau) <- typing gamma _ _], then
     we would have `binding = [e,tau]` and `hyp = typing gamma e tau`. -/
 def isRecCall (binding : List Name) (hyp : HypothesisExpr) (recCall : Name × List Nat) : MetaM Bool := do
-  logWarning m!"inside isRecCall, binding = {binding}, hyp = {hyp}, recCall = {recCall}"
   let (ctorName, args) := hyp
-  logWarning m!"hyp args = {args}"
   let outputPos ← filterMapMWithIndex (fun i arg => do
     let vars := variablesInConstructorExpr arg
-    logWarning m!"arg = {arg}, vars = {vars}"
     if vars.isEmpty then pure none
     else if List.all vars (. ∈ binding) then
       pure (some i)
     else if List.any vars (. ∈ binding) then do
       let v := List.find? (· ∈ binding) vars
-      logWarning m!"error: {v} ∈ {binding} = binding"
+      logError m!"error: {v} ∈ {binding} = binding"
       throwError m!"Arguments to hypothesis {hyp} contain both fixed and yet-to-be-bound variables (not allowed)"
-      -- pure none
     else pure none) args
   let (inductiveName, outputIdxes) := recCall
   return (ctorName == inductiveName && List.mergeSort outputIdxes == List.mergeSort outputPos)
@@ -135,14 +131,10 @@ def collectCheckSteps (boundVars : List Name) (checkedHypotheses : List Nat) : S
     Since `τ1, τ2` both appear under the same `.Fun` constructor,
     `outputInputNotUnderSameConstructor (.Fun τ1 τ2) [τ2]` returns `false`.  -/
 def outputInputNotUnderSameConstructor (hyp : HypothesisExpr) (outputVars : List Name) : ScheduleM Bool := do
-  logWarning m!"Inside outputInputNotUnderSameConstructor"
-  logWarning m!"hyp = {hyp}, outputVars = {outputVars}"
   let (_, args) := hyp
   let result ← not <$> args.anyM (fun arg => do
     let vars := variablesInConstructorExpr arg
-    logWarning m!"vars = {vars}"
     return List.any vars (. ∈ outputVars) && List.any vars (. ∉ outputVars))
-  logWarning m!"result = {result}"
   return result
 
 /-- Determines whether the variables in `outputVars` are constrained by a function application in the hypothesis `hyp`.
@@ -233,10 +225,8 @@ def normalizeSchedule (steps : List ScheduleStep) : List ScheduleStep :=
 partial def dfs (boundVars : List Name) (remainingVars : List Name) (checkedHypotheses : List Nat) (scheduleSoFar : List ScheduleStep) : ScheduleM (List (List ScheduleStep)) := do
   match remainingVars with
   | [] =>
-    logWarning m!"no more vars remaining, returning scheduleSoFar"
     return [List.reverse scheduleSoFar]
   | _ => do
-    logWarning m!"dfs called with boundVars = {boundVars}, remainingVars = {remainingVars}"
     let env ← read
     let unconstrainedProdPaths ←
       flatMapMWithContext remainingVars (fun v remainingVars' => do
@@ -261,8 +251,6 @@ partial def dfs (boundVars : List Name) (remainingVars : List Name) (checkedHypo
 
     let remainingHypotheses := filterMapWithIndex (fun i hyp => if i ∈ checkedHypotheses then none else some (i, hyp)) env.sortedHypotheses
 
-    logWarning m!"handling constrainedProdPaths with remainingHypotheses = {remainingHypotheses}"
-
     let constrainedProdPaths ← remainingHypotheses.flatMapM (fun (i, hyp, hypVars) => do
       if (i ∈ checkedHypotheses) then
         pure []
@@ -273,15 +261,11 @@ partial def dfs (boundVars : List Name) (remainingVars : List Name) (checkedHypo
         let remainingVars' := (remainingVarsSet \ outputSet).toList
         let outputVars := outputSet.toList
 
-        logWarning m!"hyp = {hyp}, outputVars = {outputVars}"
-
         if outputVars.isEmpty then
           pure []
         else if (← not <$> outputInputNotUnderSameConstructor hyp outputVars) then
-          logWarning m!"failed outputsInputsUnderSameConstructor guard with outputVars = {outputVars}, hyp = {hyp}"
           pure []
         else if (← not <$> outputsNotConstrainedByFunctionApplication hyp outputVars) then
-          logWarning m!"failed outputsConstrainedByFunctionApplication guard with outputVars = {outputVars}, hyp = {hyp}"
           pure []
         else
           let (newMatches, hyp', newOutputs) ← handleConstrainedOutputs hyp outputVars
@@ -325,7 +309,6 @@ partial def dfs (boundVars : List Name) (remainingVars : List Name) (checkedHypo
     - `fixedVars`: A list of fixed variables (i.e. inputs to the inductive relation) -/
 def possibleSchedules (vars : List (Name × Expr)) (hypotheses : List HypothesisExpr) (deriveSort : DeriveSort)
   (recCall : Name × List Nat) (fixedVars : List Name) : MetaM (List (List ScheduleStep)) := do
-  logWarning "inside possibleSchedules"
 
   let sortedHypotheses := mkSortedHypothesesVariablesMap hypotheses
 

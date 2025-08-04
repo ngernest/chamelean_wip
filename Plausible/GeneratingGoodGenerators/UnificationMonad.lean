@@ -433,7 +433,6 @@ namespace UnifyM
     partial def evaluateUnknown (v : Unknown) : UnifyM ConstructorExpr := do
       withConstraints $ fun k => do
         let r ← findCorrespondingRange k v
-        logWarning m!"UnknownMap: {v} ↦ {r}"
         match r with
         | .Undef _ | .Fixed => return ConstructorExpr.Unknown v
         | .Unknown u =>
