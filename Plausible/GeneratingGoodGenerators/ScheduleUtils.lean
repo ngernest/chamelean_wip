@@ -204,7 +204,8 @@ def handleConstrainedOutputs (hyp : HypothesisExpr) (outputVars : List Name) : M
 
   return (patternMatches.filterMap id, (ctorName, args'), newOutputs.filterMap id)
 
-/-- Converts a list of `ScheduleStep`s to normal form -/
+/-- Converts a list of `ScheduleStep`s to *normal form* (i.e. all unconstrained generation
+    occurs before constrained generation) -/
 def normalizeSchedule (steps : List ScheduleStep) : List ScheduleStep :=
   -- `unconstrainedBlock` is a list of `ScheduleStep`s consisting only of unconstrianed generation
   -- (i.e. calls to `arbitrary`)
@@ -227,17 +228,6 @@ def normalizeSchedule (steps : List ScheduleStep) : List ScheduleStep :=
     where
       -- Comparison function on blocks of `ScheduleSteps`
       compareBlocks b1 b2 := Ordering.isLE $ Ord.compare b1 b2
-
-/-- Same as `Control.Basic.guard`, but specialized to the list monad
-    (Note that the default implementation of `guard` returns `failure`,
-    but for our implementation, we prefer to have it return the empty list,
-    following the behavior of Haskell's `Control.Monad.guard`) -/
-def guardList (b : Bool) : ScheduleM Unit :=
-  if b then
-    return ()
-  else do
-    logWarning m!"guardList failed"
-    failure
 
 /-- Depth-first enumeration of all possible schedules -/
 partial def dfs (boundVars : List Name) (remainingVars : List Name) (checkedHypotheses : List Nat) (scheduleSoFar : List ScheduleStep) : ScheduleM (List (List ScheduleStep)) := do
@@ -327,6 +317,8 @@ partial def dfs (boundVars : List Name) (remainingVars : List Name) (checkedHypo
 
     return constrainedProdPaths ++ unconstrainedProdPaths
 
+
+
 /-- Computes all possible schedules for a constructor
     (each candidate schedule is represented as a `List ScheduleStep`).
 
@@ -359,4 +351,15 @@ def possibleSchedules (vars : List (Name × Expr)) (hypotheses : List Hypothesis
 
   let normalizedSchedules := List.eraseDups (normalizeSchedule <$> schedules)
 
-  return (List.mergeSort normalizedSchedules (le := fun s1 s2 => s1.length <= s2.length))
+  -- Keep only schedules where `SuchThat` steps only bind 1 output to the
+  -- result of a call to a constrained generator
+  -- (this is a simplification we make for now so we don't have to handle tupling multiple inputs to constrained generators)
+  let finalSchedules := normalizedSchedules.filter
+    (fun scheduleSteps =>
+      scheduleSteps.all
+        (fun step =>
+          match step with
+          | ScheduleStep.SuchThat inputs _ _ => inputs.length <= 1
+          | _ => true))
+
+  return (List.mergeSort finalSchedules (le := fun s1 s2 => s1.length <= s2.length))

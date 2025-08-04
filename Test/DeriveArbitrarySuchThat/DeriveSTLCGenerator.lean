@@ -45,3 +45,5 @@ info: Try this generator: instance : ArbitrarySizedSuchThat Nat (fun x => lookup
 -/
 #guard_msgs(info, drop warning) in
 #derive_generator (fun (x : Nat) => lookup Γ x τ)
+
+-- #synth ArbitrarySizedSuchThat (Nat × type) (fun (x, τ) => lookup Γ x τ)
