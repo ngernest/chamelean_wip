@@ -293,7 +293,6 @@ partial def dfs (boundVars : List Name) (remainingVars : List Name) (checkedHypo
               pure (v, constructorExpr))
           let (_, hypArgs) := hyp'
 
-          logWarning m!"about to call isRecCall with outputVars = {outputVars}, hyp = {hyp}"
           let constrainingRelation ←
             if (← isRecCall outputVars hyp env.recCall) then
               let inputArgs := filterWithIndex (fun i _ => i ∉ (Prod.snd env.recCall)) hypArgs
@@ -302,9 +301,6 @@ partial def dfs (boundVars : List Name) (remainingVars : List Name) (checkedHypo
               pure (Source.NonRec hyp')
           let constrainedProdStep := ScheduleStep.SuchThat typedOutputs constrainingRelation env.prodSort
 
-          logWarning m!"created constrainedProdStep = {repr constrainedProdStep}"
-          logWarning m!"remainingVars' = {remainingVars'}"
-
           let (newCheckedIdxs, newCheckedHyps) ← List.unzip <$> collectCheckSteps (outputVars ++ boundVars) (i::checkedHypotheses)
           -- TODO: handle negated propositions in `ScheduleStep.Check`
           let checks := List.reverse $ (ScheduleStep.Check . true) <$> newCheckedHyps
@@ -312,8 +308,6 @@ partial def dfs (boundVars : List Name) (remainingVars : List Name) (checkedHypo
           dfs (outputVars ++ boundVars) remainingVars'
             (i :: newCheckedIdxs ++ checkedHypotheses)
             (checks ++ newMatches ++ constrainedProdStep :: scheduleSoFar))
-
-    logWarning m!"constrainedProdPaths = {repr constrainedProdPaths}"
 
     return constrainedProdPaths ++ unconstrainedProdPaths
 

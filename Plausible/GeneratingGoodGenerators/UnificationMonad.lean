@@ -337,11 +337,11 @@ namespace UnifyM
       - See `updateHypothesesWithUnificationResult` for an example of how this function is used.
       - Note: this function corresponds to `correct_rocq_constr` in the QuickChick code. -/
   partial def updateConstructorArg (k : UnknownMap) (ctorArg : ConstructorExpr) : UnifyM ConstructorExpr := do
-    logWarning m!"updating ctorArg {ctorArg}"
     match ctorArg with
     | .Unknown arg =>
       let canonicalUnknown ← findCanonicalUnknown k arg
       if arg != canonicalUnknown then
+        logWarning m!"updateConstructorArg: arg {arg} != canonicalUnknown {canonicalUnknown}, switching to {canonicalUnknown}"
         return (.Unknown canonicalUnknown)
       else
         return (.Unknown arg)

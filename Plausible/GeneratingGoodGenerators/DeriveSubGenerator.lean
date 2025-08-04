@@ -516,28 +516,25 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
       (recCall := (`aux_arb, [outputIdx]))
       fixedVars
 
-    -- A naive schedule is the first schedule contained in `possibleSchedules`
-    let naiveSchedule ← Option.getDM (possibleSchedules.head?) (throwError m!"Unable to compute any possible schedules")
+    -- A *naive* schedule is the first schedule contained in `possibleSchedules`
+    let originalNaiveSchedule ← Option.getDM (possibleSchedules.head?) (throwError m!"Unable to compute any possible schedules")
 
     -- Update the naive schedule with the result of unification
-    let updatedNaiveSchedule ← updateScheduleSteps naiveSchedule
-
-    logWarning m!"updatedNaiveSchedule = {repr updatedNaiveSchedule}"
-    logWarning m!"scheduleSort = {repr scheduleSort}"
+    let updatedNaiveSchedule ← updateScheduleSteps originalNaiveSchedule
 
     let finalState ← get
 
     -- Takes the `patterns` and `equalities` fields from `UnifyState` (created after
     -- the conclusion of a constructor has been unified with the top-level arguments to the inductive relation),
     -- convert them to the appropriate `ScheduleStep`s, and prepends them to the `naiveSchedule`
-    let fullSchedule := addConclusionPatternsAndEqualitiesToSchedule finalState.patterns finalState.equalities (naiveSchedule, scheduleSort)
+    let fullSchedule := addConclusionPatternsAndEqualitiesToSchedule finalState.patterns finalState.equalities (updatedNaiveSchedule, scheduleSort)
 
+    logWarning m!"fullSchedule = {repr fullSchedule}"
+
+    -- Compile the schedule to an `MExp`, then compile the `MExp` to a Lean term containing the generator
     let mexpOfSchedule := scheduleToMExp fullSchedule (.MId `size) (.MId `size)
-    let compiledSubGenerator ← mexpToTSyntax mexpOfSchedule .Generator
 
-    logWarning m!"compiled sub-generator: {compiledSubGenerator}"
-
-    return compiledSubGenerator)
+    mexpToTSyntax mexpOfSchedule .Generator)
 
 
 /-- Command for deriving a sub-generator for one construtctor of an inductive relation (per figure 4 of GGG) -/
