@@ -58,7 +58,6 @@ def isRecCall (binding : List Name) (hyp : HypothesisExpr) (recCall : Name × Li
       throwError m!"Arguments to hypothesis {hyp} contain both fixed and yet-to-be-bound variables (not allowed)"
     else pure none) args
   let (inductiveName, outputIdxes) := recCall
-  logWarning m!"isRecCall: ctorName = {ctorName}, inductiveName = {inductiveName}"
   return (ctorName == inductiveName && List.mergeSort outputIdxes == List.mergeSort outputPos)
 
 /-- Given a list of `hypotheses`, creates an association list mapping each hypothesis to a list of variable names.

@@ -246,7 +246,14 @@ def scheduleToMExp (schedule : Schedule) (mfuel : MExp) (defFuel : MExp) : MExp 
   let epilogue :=
     match scheduleSort with
     | .ProducerSchedule _ conclusionOutputs =>
-      MExp.MRet (hypothesisExprToMExp conclusionOutputs)
+      -- Convert all the outputs in the conclusion to `mexp`s
+      let conclusionMExps := constructorExprToMExp <$> conclusionOutputs
+      -- If there are multiple outputs, wrap them in a tuple
+      match conclusionMExps with
+      | [] => panic! "No outputs being returned in producer schedule"
+      | [output] => MExp.MRet output
+      | outputs => tupleOfList (fun e1 e2 => .MApp (.MConst ``Prod.mk) [e1, e2]) outputs outputs[0]?
+      -- MExp.MRet (.MApp (.MConst ``Prod.mk) outputs)
     | .CheckerSchedule => mSome (.MConst ``true)
     | .TheoremSchedule conclusion typeClassUsed =>
       -- Create a pattern-match on the result of hte checker

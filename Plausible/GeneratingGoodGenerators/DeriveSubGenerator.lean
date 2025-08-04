@@ -394,18 +394,23 @@ def convertRangeToCtorAppForm (r : Range) : UnifyM (Name × List ConstructorExpr
     is used to determine whether producers should return their results wrapped in an `Option` or not.
 
     - Note: callers should supply `none` as the `ctorNameOpt` argument if `deriveSort := .Theorem` -/
-def getScheduleSort (conclusion : HypothesisExpr) (outputVars : List Unknown) (ctorNameOpt : Option Name) (deriveSort : DeriveSort) : UnifyM ScheduleSort :=
+def getScheduleSort (conclusion : HypothesisExpr) (outputVars : List Unknown) (ctorNameOpt : Option Name) (deriveSort : DeriveSort) (returnOption : Bool) : UnifyM ScheduleSort :=
   match deriveSort with
   | .Checker => return .CheckerSchedule
   | .Theorem => return (.TheoremSchedule conclusion (typeClassUsed := true))
-  | ds@(_) => do
+  | _ => do
     let outputValues ← outputVars.mapM UnifyM.evaluateUnknown
     let producerSort :=
-      if let .Enumerator := ds then ProducerSort.Enumerator
+      if let .Enumerator := deriveSort then ProducerSort.Enumerator
       else ProducerSort.Generator
     let conclusion ← do
-      let ctorName ← Option.getDM ctorNameOpt (throwError "No constructor name given for Non-theorem schedule")
-      pure (ctorName, outputValues)
+      if returnOption then
+        pure outputValues
+      else
+        let ctorName ← Option.getDM ctorNameOpt
+          (throwError "No constructor name given for Non-theorem schedule")
+        pure [ConstructorExpr.Ctor ctorName outputValues]
+    -- TODO: fix this (we shouldn't return the conclusion as is)
     return .ProducerSchedule producerSort conclusion
 
 
@@ -492,6 +497,7 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
     -- Determine the appropriate `ScheduleSort` (right now we only produce `ScheduleSort`s for `Generator`s)
     let scheduleSort ← getScheduleSort conclusionExpr
       (outputVars := [outputName]) (some ctorName) (deriveSort := .Generator)
+      (returnOption := true)
 
     -- Check which universally-quantified variables have a `Fixed` range,
     -- so that we can supply them to `possibleSchedules` as the `fixedVars` arg
