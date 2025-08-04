@@ -227,6 +227,7 @@
   ["docBlame", "normalizeSchedule.normalize"],
   ["docBlame", "normalizeSchedule.compareBlocks"],
   ["docBlame", "modeAnalyze.followUnknownChain"],
+  ["docBlame", "outputsNotConstrainedByFunctionApplication.check"],
   ["unusedArguments", "runSizedEnum"],
   ["unusedArguments", "analyzePartiallyDefined"],
   ["unusedArguments", "gen_typing.aux_arb"],
@@ -236,5 +237,6 @@
   ["unusedArguments", "Plausible.RandT.up"],
   ["unusedArguments", "Plausible.RandT.down"],
   ["unusedArguments", "Plausible.NamedBinder"],
-  ["unusedArguments", "Plausible.Decorations.DecorationsOf"]
+  ["unusedArguments", "Plausible.Decorations.DecorationsOf"],
+  ["unusedArguments", "scheduleStepToMexp"]
 ]

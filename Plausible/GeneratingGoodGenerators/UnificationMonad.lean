@@ -349,6 +349,10 @@ namespace UnifyM
       let updatedArgs ← args.mapM (updateConstructorArg k)
       return (.Ctor ctorName updatedArgs)
 
+  /-- `updatePattern k p` uses the `UnknownMap` `k` to rewrite any unknowns that appear in the
+      `Pattern` `p`, substituting each `Unknown` with its canonical representation
+      (determined by calling `findCanonicalUnknown`)
+    - Note: this function corresponds to `correct_pat` in the QuickChick code -/
   partial def updatePattern (k : UnknownMap) (p : Pattern) : UnifyM Pattern := do
     match p with
     | .UnknownPattern u => return .UnknownPattern (← findCanonicalUnknown k u)
