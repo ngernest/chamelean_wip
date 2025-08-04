@@ -279,13 +279,12 @@ partial def mexpToTSyntax (mexp : MExp) (deriveSort : DeriveSort) : MetaM (TSynt
     let compiledBody ← mexpToTSyntax body deriveSort
     match vars with
     | [] => throwError "empty list of function arguments supplied to MFun"
-    | [x] => `(fun $(mkIdent x) => $compiledBody)
+    | [x] => `((fun $(mkIdent x) => $compiledBody))
     | _ =>
       -- When we have multiple args, create a tuple containing all of them
       -- in the argument of the lambda
-      let args := Lean.mkIdent <$> vars.toArray
-      let argsTuple := Syntax.mkCApp ``Prod.mk args
-      `(fun $argsTuple:term => $compiledBody)
+      let args ← mkTuple vars
+      `((fun $args:term => $compiledBody))
   | .MFail | .MOutOfFuel =>
     -- Note: right now we compile `MFail` and `MOutOfFuel` to the same Lean terms
     -- for simplicity, but in the future we may want to distinguish them
@@ -302,8 +301,12 @@ partial def mexpToTSyntax (mexp : MExp) (deriveSort : DeriveSort) : MetaM (TSynt
     let k1 ← mexpToTSyntax k deriveSort
     -- If there are multiple variables that are bound to the result
     -- of the monadic expression `m`, convert them to a tuple
-    let args := patternTupleOfList (.UnknownPattern <$> vars)
-    let compiledArgs ← compilePattern args
+    let compiledArgs ←
+      if vars.isEmpty then
+        throwError m!"empty list of vars supplied to MBind"
+      else
+        mkTuple vars
+
     match deriveSort, monadSort with
     | .Generator, .Gen
     | .Generator, .OptionTGen
