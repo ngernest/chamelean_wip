@@ -26,7 +26,7 @@ info: Try this generator: instance : ArbitrarySizedSuchThat Nat (fun x => lookup
                   match Γ_1 with
                   | τ_1 :: Γ =>
                     match DecOpt.decOpt (τ_1 = τ_1_0) initSize with
-                    | Option.some Bool.true => pure 0
+                    | Option.some Bool.true => pure Nat.zero
                     | _ => OptionT.fail
                   | _ => OptionT.fail)),
             (1, OptionTGen.thunkGen (fun _ => OptionT.fail))]
@@ -38,16 +38,8 @@ info: Try this generator: instance : ArbitrarySizedSuchThat Nat (fun x => lookup
                   match Γ_1 with
                   | τ_1 :: Γ =>
                     match DecOpt.decOpt (τ_1 = τ_1_0) initSize with
-                    | Option.some Bool.true => pure 0
+                    | Option.some Bool.true => pure Nat.zero
                     | _ => OptionT.fail
-                  | _ => OptionT.fail)),
-            (Nat.succ size',
-              OptionTGen.thunkGen
-                (fun _ =>
-                  match Γ_1 with
-                  | τ' :: Γ => do
-                    let n ← aux_arb initSize size' Γ τ_1
-                    return Nat.succ n
                   | _ => OptionT.fail))]
     fun size => aux_arb size size Γ τ
 -/
