@@ -7,7 +7,7 @@ import Plausible.GeneratingGoodGenerators.Schedules
 import Plausible.New.Idents
 
 open Idents
-open Lean Parser
+open Lean Parser Elab
 
 /-- The sort of monad we are compiling to, i.e. one of the following:
     - An unconstrained / constrained generator (`Gen` / `OptionT Gen`)
@@ -206,7 +206,7 @@ def matchOptionBool (scrutinee : MExp) (trueBranch : MExp) (falseBranch : MExp) 
     - The function parameter `k` represents the remainder of the `mexp`
       (the rest of the monadic `do`-block)
 -/
-def scheduleStepToMexp (step : ScheduleStep) (mfuel : MExp) (defFuel : MExp) : MExp → MExp :=
+def scheduleStepToMexp (step : ScheduleStep) (mfuel : MExp) (_defFuel : MExp) : MExp → MExp :=
   fun k =>
     match step with
     | .Unconstrained v src prodSort =>
@@ -281,8 +281,11 @@ partial def mexpToTSyntax (mexp : MExp) (deriveSort : DeriveSort) : MetaM (TSynt
     | [] => throwError "empty list of function arguments supplied to MFun"
     | [x] => `(fun $(mkIdent x) => $compiledBody)
     | _ =>
-      -- TODO: figure out how to tuple when we have multiple arguments
-      `(fun $(mkIdent <$> vars.toArray):ident* => $compiledBody)
+      -- When we have multiple args, create a tuple containing all of them
+      -- in the argument of the lambda
+      let args := Lean.mkIdent <$> vars.toArray
+      let argsTuple := Syntax.mkCApp ``Prod.mk args
+      `(fun $argsTuple:term => $compiledBody)
   | .MFail | .MOutOfFuel =>
     -- Note: right now we compile `MFail` and `MOutOfFuel` to the same Lean terms
     -- for simplicity, but in the future we may want to distinguish them
@@ -306,19 +309,35 @@ partial def mexpToTSyntax (mexp : MExp) (deriveSort : DeriveSort) : MetaM (TSynt
     | .Generator, .OptionTGen
     | .Enumerator, .Enumerator
     | .Enumerator, .OptionTEnumerator =>
+      -- If we have a producer, we can just produce a monadic bind
       `(do let $compiledArgs:term ← $m1:term ; $k1:term)
     | .Generator, .Checker
     | .Enumerator, .Checker => do
+      -- If a producer invokes a checker, we have to invoke the checker
+      -- provided by the `DecOpt` instance for the proposition, then pattern
+      -- match on its result
       let trueCase ← `(Term.matchAltExpr| | $(mkIdent `some) $(mkIdent `true) => $k1)
       let wildCardCase ← `(Term.matchAltExpr| | _ => $failFn)
       let cases := #[trueCase, wildCardCase]
       `(match $m1:term with $cases:matchAlt*)
     | .Checker, .Checker =>
+      -- For checkers, we can just invoke `DecOpt.andOptList`
       `($andOptListFn [$m1:term, $k1:term])
     | .Checker, .Enumerator =>
+      -- If a checker invokes an unconstrained enumerator,
+      -- we call `EnumeratorCombinators.enumerating`
       `($enumeratingFn $m1:term $k1:term $initSizeIdent)
     | .Checker, .OptionTEnumerator =>
+      -- If a checker invokes a contrained enumerator,
+      -- we call `EnumeratorCombinators.enumeratingOpt`
       `($enumeratingOptFn $m1:term $k1:term $initSizeIdent)
     | .Theorem, _ => throwError "Theorem DeriveSort not implemented yet"
     | _, _ => throwError m!"Invalid monadic bind for deriveSort {repr deriveSort}"
-  | .MMatch _ _ => sorry -- TODO: handle MMAtch case
+  | .MMatch scrutinee cases => do
+    -- Compile the scrutinee, the LHS & RHS of each case separately
+    let compiledScrutinee ← mexpToTSyntax scrutinee deriveSort
+    let compiledCases ← cases.toArray.mapM (fun (pattern, rhs) => do
+      let lhs ← compilePattern pattern
+      let compiledRHS ← mexpToTSyntax rhs deriveSort
+      `(Term.matchAltExpr| | $lhs:term => $compiledRHS))
+    `(match $compiledScrutinee:term with $compiledCases:matchAlt*)
