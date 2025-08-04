@@ -4,6 +4,7 @@ import Lean.LocalContext
 import Plausible.GeneratingGoodGenerators.UnificationMonad
 import Plausible.GeneratingGoodGenerators.Schedules
 import Plausible.GeneratingGoodGenerators.ScheduleUtils
+import Plausible.GeneratingGoodGenerators.MExp
 import Plausible.New.DeriveConstrainedProducers
 import Plausible.New.SubGenerators
 import Plausible.New.DeriveArbitrary
@@ -525,12 +526,18 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
     logWarning m!"scheduleSort = {repr scheduleSort}"
 
     let finalState ← get
-    -- logWarning m!"finalState after updating hypotheses = {finalState}"
 
-    -- TODO: Instead of returning `TSyntax term`, prepend patterns & equality checks to
-    -- the list of `scheduleSteps` returned by `possibleSchedules` (modified by the unifier's results)
+    -- Takes the `patterns` and `equalities` fields from `UnifyState` (created after
+    -- the conclusion of a constructor has been unified with the top-level arguments to the inductive relation),
+    -- convert them to the appropriate `ScheduleStep`s, and prepends them to the `naiveSchedule`
+    let fullSchedule := addConclusionPatternsAndEqualitiesToSchedule finalState.patterns finalState.equalities (naiveSchedule, scheduleSort)
 
-    emitPatterns finalState.patterns finalState.equalities.toList finalState.constraints)
+    let mexpOfSchedule := scheduleToMExp fullSchedule (.MId `size) (.MId `size)
+    let compiledSubGenerator ← mexpToTSyntax mexpOfSchedule .Generator
+
+    logWarning m!"compiled sub-generator: {compiledSubGenerator}"
+
+    return compiledSubGenerator)
 
 
 /-- Command for deriving a sub-generator for one construtctor of an inductive relation (per figure 4 of GGG) -/

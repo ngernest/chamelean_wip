@@ -162,3 +162,16 @@ def updateScheduleSteps (scheduleSteps : List ScheduleStep) : UnifyM (List Sched
     | .Check src polarity => do
       let updatedSrc ← updateSource k src
       return .Check updatedSrc polarity)
+
+/-- Takes the `patterns` and `equalities` fields from `UnifyState` (which are created after
+    the conclusion of a constructor has been unified with the top-level arguments to the inductive relation),
+    converts them to the appropriate `ScheduleStep`s, and prepends them to the `currentSchedule`.
+
+    - The intuition for prepending these newly-created steps to the existing schedule is that we want to
+      make sure all the equalities & pattern-matches needed for the conclusion hold before
+      processing the rest of the schedule. -/
+def addConclusionPatternsAndEqualitiesToSchedule (patterns : List (Unknown × Pattern)) (equalities : Std.HashSet (Unknown × Unknown)) (currentSchedule : Schedule) : Schedule :=
+  let (existingScheduleSteps, scheduleSort) := currentSchedule
+  let matchSteps := (Function.uncurry ScheduleStep.Match) <$> patterns
+  let equalityCheckSteps := (fun (u1, u2) => ScheduleStep.Check (Source.NonRec (`BEq.beq, [.Unknown u1, .Unknown u2])) true) <$> equalities.toList
+  (matchSteps ++ equalityCheckSteps ++ existingScheduleSteps, scheduleSort)
