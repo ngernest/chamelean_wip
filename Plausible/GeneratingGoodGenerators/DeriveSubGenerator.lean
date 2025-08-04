@@ -590,9 +590,10 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
       let freshenedInputNamesExcludingOutput := (Array.eraseIdx! freshUnknowns outputIdx).toList
 
       for ctorName in inductiveVal.ctors do
-        let derivationResult ← UnifyM.runInMetaM
+        -- TODO: figure out how to combine all the sub-generators across all constructors
+        let subGenerator ← UnifyM.runInMetaM
           (processCtorInContext ctorName freshenedOutputName outputType freshenedInputNamesExcludingOutput freshUnknowns) emptyUnifyState
-        match derivationResult with
+        match subGenerator with
         | some (generator, _) => logInfo m!"Derived generator:\n```\n{generator}\n```"
         | none => logInfo m!"Derived generator:\n```\nreturn none\n```"
 

@@ -261,11 +261,9 @@ partial def dfs (boundVars : List Name) (remainingVars : List Name) (checkedHypo
         let remainingVars' := (remainingVarsSet \ outputSet).toList
         let outputVars := outputSet.toList
 
-        if outputVars.isEmpty then
-          pure []
-        else if (← not <$> outputInputNotUnderSameConstructor hyp outputVars) then
-          pure []
-        else if (← not <$> outputsNotConstrainedByFunctionApplication hyp outputVars) then
+        if outputVars.isEmpty
+          || (← not <$> outputInputNotUnderSameConstructor hyp outputVars)
+          || (← not <$> outputsNotConstrainedByFunctionApplication hyp outputVars) then
           pure []
         else
           let (newMatches, hyp', newOutputs) ← handleConstrainedOutputs hyp outputVars
