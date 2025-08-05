@@ -4,7 +4,7 @@ import Plausible.New.OptionTGen
 import Plausible.New.DecOpt
 import Plausible.New.ArbitrarySizedSuchThat
 import Plausible.GeneratingGoodGenerators.DeriveSubGenerator
-import Test.DeriveArbitrarySuchThat.BinaryTree
+import Test.CommonDefinitions.BinaryTree
 
 
 open ArbitrarySizedSuchThat OptionTGen
@@ -15,9 +15,6 @@ set_option guard_msgs.diff true
 inductive GoodTree : Nat → Nat → BinaryTree → Prop where
   | GoodLeaf : ∀ n, GoodTree n n .Leaf
 
--- TODO: (fix this)
--- we want to invoke `in2_1 = in1_1` in the checker, not `in1_1 = in1_1_0`!
-
 /--
 info: Try this generator: instance : ArbitrarySizedSuchThat BinaryTree (fun t_1 => GoodTree in1_1 in2_1 t_1) where
   arbitrarySizedST :=
@@ -26,13 +23,13 @@ info: Try this generator: instance : ArbitrarySizedSuchThat BinaryTree (fun t_1 
       | Nat.zero =>
         OptionTGen.backtrack
           [(1,
-              match DecOpt.decOpt (BEq.beq in1_1 in2_1) size with
+              match DecOpt.decOpt (BEq.beq in1_1 in2_1) initSize with
               | Option.some Bool.true => return BinaryTree.Leaf
               | _ => OptionT.fail)]
       | Nat.succ size' =>
         OptionTGen.backtrack
           [(1,
-              match DecOpt.decOpt (BEq.beq in1_1 in2_1) size with
+              match DecOpt.decOpt (BEq.beq in1_1 in2_1) initSize with
               | Option.some Bool.true => return BinaryTree.Leaf
               | _ => OptionT.fail),
             ]

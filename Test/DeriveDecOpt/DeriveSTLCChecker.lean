@@ -2,6 +2,7 @@ import Plausible.New.DecOpt
 import Plausible.New.DeriveChecker
 import Plausible.New.EnumeratorCombinators
 import Test.DeriveDecOpt.DeriveBSTChecker
+import Test.DeriveEnumSuchThat.DeriveSTLCEnumerator
 
 open DecOpt
 
@@ -28,11 +29,6 @@ info: Try this checker: instance : DecOpt (lookup Γ x τ) where
 -/
 #guard_msgs(info, drop warning) in
 #derive_checker (lookup Γ x τ)
-
--- Dummy `EnumSizedSuchThat` instance
--- TODO: implement metaprogramming infrastructure for deriving `EnumSizedSuchThat` instances
-instance : EnumSizedSuchThat type (fun τ => typing Γ e τ) where
-  enumSizedST := fun _ => OptionT.fail
 
 /--
 info: Try this checker: instance : DecOpt (typing Γ e τ) where

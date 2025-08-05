@@ -20,6 +20,8 @@ import Test.DeriveArbitrary.DeriveNKIBinopGenerator
 import Test.DeriveArbitrary.DeriveRegExpGenerator
 import Test.DeriveArbitrary.StructureTest
 import Test.DeriveArbitrary.BitVecStructureTest
+import Test.DeriveArbitrarySuchThat.DeriveSTLCGenerator
+import Test.DeriveArbitrarySuchThat.NonLinearPatternsTest
 
 -- Tests for instances of `Enum` for simple types
 import Test.Enum.EnumInstancesTest
@@ -49,9 +51,7 @@ import Test.DeriveEnumSuchThat.DeriveRegExpMatchEnumerator
 import Test.DeriveEnumSuchThat.SimultaneousMatchingTests
 
 
--- TODO: re-enable these failing tests after unification algorithm from Generating Good Generators has been merged
--- import Test.DeriveArbitrarySuchThat.DeriveSTLCGenerator
+-- TODO: re-enable these failing tests after checker/enumerator deriver has been updated to use schedules
 -- import Test.DeriveEnumSuchThat.DeriveSTLCEnumerator
--- import Test.DeriveArbitrarySuchThat.NonLinearPatternsTest
 -- import Test.DeriveEnumSuchThat.NonLinearPatternsTest
 -- import Test.DeriveDecOpt.NonLinearPatternsTest

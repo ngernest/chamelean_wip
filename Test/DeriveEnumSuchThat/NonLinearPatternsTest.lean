@@ -9,23 +9,20 @@ import Test.DeriveArbitrarySuchThat.NonLinearPatternsTest
 
 set_option guard_msgs.diff true
 
--- TODO: (fix this)
--- we want to invoke `in2_0 = in1_0` in the enumerator, not `in1 = in1_0`!
-
 /--
-info: Try this generator: instance : EnumSizedSuchThat BinaryTree (fun t => GoodTree in1 in2 t) where
+info: Try this enumerator: instance : EnumSizedSuchThat BinaryTree (fun t => GoodTree in1 in2 t) where
   enumSizedST :=
-    let rec aux_enum (initSize : Nat) (size : Nat) (in1_0 : Nat) (in2_0 : Nat) : OptionT Enumerator BinaryTree :=
+    let rec aux_enum (initSize : Nat) (size : Nat) (in1_1 : Nat) (in2_1 : Nat) : OptionT Enumerator BinaryTree :=
       match size with
       | Nat.zero =>
         EnumeratorCombinators.enumerate
-          [match DecOpt.decOpt (in1 = in1_0) initSize with
+          [match DecOpt.decOpt (in1_1 = in1_1_0) initSize with
             | Option.some Bool.true => pure BinaryTree.Leaf
             | _ => OptionT.fail,
             OptionT.fail]
       | Nat.succ size' =>
         EnumeratorCombinators.enumerate
-          [match DecOpt.decOpt (in1 = in1_0) initSize with
+          [match DecOpt.decOpt (in1_1 = in1_1_0) initSize with
             | Option.some Bool.true => pure BinaryTree.Leaf
             | _ => OptionT.fail]
     fun size => aux_enum size size in1 in2
