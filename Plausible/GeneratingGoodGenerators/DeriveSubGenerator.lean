@@ -414,10 +414,11 @@ def getScheduleSort (conclusion : HypothesisExpr) (outputVars : List Unknown) (c
     return .ProducerSchedule producerSort conclusion
 
 
-/-- Function that handles the bulk of the generator derivation algorithm for a single constructor:
-    processes the entire type of the constructor within the same `LocalContext` (the one produced by `forallTelescopeReducing`)
+/-- Computes a *naive* generator schedule for a sub-generator corresponding to a constructor of an inductive relation.
+    Note: this function processes the entire type of the constructor within the same `LocalContext`
+    (the one produced by `forallTelescopeReducing`).
 
-    Takes as argument:
+    This function takes the following as arguments:
     - The constructor name `ctorName`
     - The name (`outputName`) and type (`outputType`) of the output (value to be generated)
     - The names of inputs `inputNames` (arguments to the generator)
@@ -425,7 +426,7 @@ def getScheduleSort (conclusion : HypothesisExpr) (outputVars : List Unknown) (c
       + Note: `unknowns == inputNames ∪ { outputName }`, i.e. `unknowns` contains all args to the inductive relation
         listed in order, which coincides with `inputNames ∪ { outputName }`
     - The name of the inductive relation we are targeting (`inductiveName`) -/
-def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Expr) (inputNames : List Name)
+def getScheduleForConstructor (ctorName : Name) (outputName : Name) (outputType : Expr) (inputNames : List Name)
   (unknowns : Array Unknown) : UnifyM Schedule := do
   let ctorInfo ← getConstInfoCtor ctorName
   let ctorType := ctorInfo.type
@@ -591,11 +592,15 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
       let freshenedInputNamesExcludingOutput := (Array.eraseIdx! freshUnknowns outputIdx).toList
 
       for ctorName in inductiveVal.ctors do
+       -- Determine whether the constructor is recursive
+       -- (i.e. if the constructor has a hypothesis that refers to the inductive relation we are targeting)
+        let isRecursive ← isConstructorRecursive inductiveName ctorName
+
         -- TODO: figure out how to combine all the sub-generators across all constructors
-        let scheduleAndUnifyState ← UnifyM.runInMetaM
-          (processCtorInContext ctorName freshenedOutputName outputType freshenedInputNamesExcludingOutput freshUnknowns) emptyUnifyState
-        match scheduleAndUnifyState with
-        | some (schedule, _) =>
+        let scheduleOption ← UnifyM.runInMetaM
+          (getScheduleForConstructor ctorName freshenedOutputName outputType freshenedInputNamesExcludingOutput freshUnknowns) emptyUnifyState
+        match scheduleOption with
+        | some schedule =>
           -- Compile the schedule to an `MExp`, then compile the `MExp` to a Lean term containing the code for the sub-generator
           let mexp ← scheduleToMExp schedule (.MId `size) (.MId `size)
           let subGenerator ← mexpToTSyntax mexp .Generator

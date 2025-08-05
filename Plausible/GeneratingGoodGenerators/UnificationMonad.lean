@@ -275,9 +275,10 @@ namespace UnifyM
   def insertUnknown (u : Unknown) : UnifyM Unit := do
     modify $ fun s => { s with unknowns := s.unknowns.insert u}
 
-  /-- Runs a `UnifyM` computation, returning the result in the `MetaM` monad -/
-  def runInMetaM (action : UnifyM α) (st : UnifyState) : MetaM (Option (α × UnifyState)) := do
-    OptionT.run (StateT.run action st)
+  /-- Runs a `UnifyM` computation and discards the resulting state,
+      with the result returned in the `MetaM` monad as an `Option` -/
+  def runInMetaM (action : UnifyM α) (st : UnifyState) : MetaM (Option α) := do
+    OptionT.run (StateT.run' action st)
 
   /-- Finds the `Range` corresponding to an `Unknown` `u` in the
       `UnknownMap` `k`, returning an informative error message if `u ∉ k.keys` -/
