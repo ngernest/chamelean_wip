@@ -11,6 +11,14 @@ open Lean
     applied to some list of arguments, each of which are `ConstructorExpr`s -/
 abbrev HypothesisExpr := Name × List ConstructorExpr
 
+/-- `ToExpr` instance for `HypothesisExpr`
+    (for converting `HypothesisExpr`s to Lean `Expr`s) -/
+instance : ToExpr HypothesisExpr where
+  toExpr (hypExpr : HypothesisExpr) : Expr :=
+    let (ctorName, ctorArgs) := hypExpr
+    mkAppN (mkConst ctorName) (toExpr <$> ctorArgs.toArray)
+  toTypeExpr := mkConst ``Expr
+
 /-- A source is the thing we wish to check/generate/enumerate -/
 inductive Source
   | NonRec : HypothesisExpr → Source

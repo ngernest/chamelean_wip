@@ -94,11 +94,22 @@ def prodSortToOptionTMonadSort (prodSort : ProducerSort) : MonadSort :=
   | .Generator => MonadSort.OptionTGen
 
 /-- `MExp` representation of an unconstrained producer,
-    parameterized by a `producerSort` -/
-def unconstrainedProducer (prodSort : ProducerSort) : MExp :=
+    parameterized by a `producerSort` and the type `ty` (represented as an `Expr`)
+    of the value being generated -/
+def unconstrainedProducer (prodSort : ProducerSort) (ty : Expr) : MetaM MExp := do
+  let typeClassName :=
+    match prodSort with
+    | .Enumerator => ``Enum
+    | .Generator => ``Arbitrary
+  let typeClassInstance := mkApp (mkConst typeClassName) ty
+  let typeClassExists ← Option.isSome <$> Meta.synthInstance? typeClassInstance
+
+  if (not typeClassExists) then
+    logWarning m!"Please first derive the typeclass instance ({typeClassInstance})"
+
   match prodSort with
-  | .Enumerator => .MConst ``Enum.enum
-  | .Generator => .MConst ``Arbitrary.arbitrary
+  | .Enumerator => pure $ .MConst ``Enum.enum
+  | .Generator => pure $ .MConst ``Arbitrary.arbitrary
 
 /-- `MExp` representation of `EnumSizedSuchThat.enumSizedST`,
     where `prop` is the `Prop` constraining the value being enumerated -/
@@ -198,11 +209,13 @@ mutual
   partial def scheduleStepToMexp (step : ScheduleStep) (mfuel : MExp) (_defFuel : MExp) : MExp → TermElabM MExp :=
     fun k =>
       match step with
-      | .Unconstrained v src prodSort =>
-        let producer :=
+      | .Unconstrained v src prodSort => do
+        let producer ←
           match src with
-          | Source.NonRec _ => unconstrainedProducer prodSort
-          | Source.Rec f args => recCall f args
+          | Source.NonRec hyp =>
+            let tyExpr := toExpr hyp
+            unconstrainedProducer prodSort tyExpr
+          | Source.Rec f args => pure $ recCall f args
         pure $ .MBind (prodSortToMonadSort prodSort) producer [v] k
       | .SuchThat varsTys prod ps => do
         let producer ←
