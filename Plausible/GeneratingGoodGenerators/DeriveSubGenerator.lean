@@ -9,10 +9,12 @@ import Plausible.New.DeriveConstrainedProducers
 import Plausible.New.SubGenerators
 import Plausible.New.DeriveArbitrary
 import Plausible.New.TSyntaxCombinators
-import Plausible.New.Debug
 import Plausible.New.Utils
 import Plausible.IR.Prelude
 import Plausible.IR.Examples
+
+import Plausible.New.Arbitrary
+import Plausible.New.STLC
 
 import Lean.Elab.Command
 import Lean.Meta.Basic
@@ -573,7 +575,7 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
 
     -- Add the name & type of each argument to the inductive relation to the ambient `LocalContext`
     -- (as a local declaration)
-    let (baseGenerators, inductiveGenerators, localCtx) ←
+    let (baseGenerators, inductiveGenerators, freshenedOutputName, freshArgIdents, localCtx) ←
       liftTermElabM $ withLocalDeclsDND argNamesTypes (fun _ => do
         let mut localCtx ← getLCtx
         let mut freshUnknowns := #[]
@@ -607,7 +609,7 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
           match scheduleOption with
           | some schedule =>
             -- Compile the schedule to an `MExp`, then compile the `MExp` to a Lean term containing the code for the sub-generator
-            let mexp ← scheduleToMExp schedule (.MId `size) (.MId `size)
+            let mexp ← scheduleToMExp schedule (.MId `size) (.MId `initSize)
             let subGenerator ← mexpToTSyntax mexp .Generator
             -- logInfo m!"Derived generator:\n```\n{subGenerator}\n```"
 
@@ -625,15 +627,15 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
         let baseGenerators ← `([$weightedNonRecursiveGenerators,*])
         let inductiveGenerators ← `([$weightedNonRecursiveGenerators,*, $weightedRecursiveGenerators,*])
 
-        return (baseGenerators, inductiveGenerators, localCtx))
+        return (baseGenerators, inductiveGenerators, freshenedOutputName, Lean.mkIdent <$> freshUnknowns, localCtx))
 
     -- Create an instance of the `ArbitrarySuchThat` typeclass
     let typeClassInstance ←
-      mkProducerTypeClassInstance
+      mkProducerTypeClassInstance'
         baseGenerators inductiveGenerators
-        inductiveSyntax argIdents
-        outputName outputTypeSyntax
-        .Generator localCtx Std.HashMap.emptyWithCapacity
+        inductiveSyntax freshArgIdents
+        freshenedOutputName outputTypeSyntax
+        .Generator localCtx
 
     -- Pretty-print the derived generator
     let genFormat ← liftCoreM (PrettyPrinter.ppCommand typeClassInstance)
@@ -648,8 +650,13 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
   | _ => throwUnsupportedSyntax
 
 
+-- Extra Arbitrary instances needed in order for STLC example to work
+deriving instance Arbitrary for type, term
 
--- TODO: figure out how to assemble the entire generator function with all constructors
+-- Extra `ArbitrarySizedSuchThat` needed in order for STLC example to work
+instance : ArbitrarySizedSuchThat type (fun t => typing G e t) where
+  arbitrarySizedST := sorry
+
 
 -- #derive_subgenerator (fun (tree : Tree) => bst in1 in2 tree)
 -- #derive_subgenerator (fun (e : term) => typing G e t)

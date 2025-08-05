@@ -113,14 +113,16 @@ def unconstrainedProducer (prodSort : ProducerSort) (ty : Expr) : MetaM MExp := 
   | .Generator => pure $ .MConst ``Arbitrary.arbitrary
 
 /-- `MExp` representation of `EnumSizedSuchThat.enumSizedST`,
-    where `prop` is the `Prop` constraining the value being enumerated -/
-def enumSizedST (prop : MExp) : MExp :=
-  .MApp (.MConst ``EnumSizedSuchThat.enumSizedST) [prop]
+    where `prop` is the `Prop` constraining the value being enumerated
+    and `fuel` is an `MExp` representing the fuel argument to the enumerator -/
+def enumSizedST (prop : MExp) (fuel : MExp) : MExp :=
+  .MApp (.MConst ``EnumSizedSuchThat.enumSizedST) [prop, fuel]
 
 /-- `MExp` representation of `ArbitrarySizedSuchThat.arbitrarySizedST`,
-    where `prop` is the `Prop` constraining the value being generated -/
-def arbitrarySizedST (prop : MExp) : MExp :=
-  .MApp (.MConst ``ArbitrarySizedSuchThat.arbitrarySizedST) [prop]
+    where `prop` is the `Prop` constraining the value being generated
+    and `fuel` is an `MExp` representing the fuel argument to the generator -/
+def arbitrarySizedST (prop : MExp) (fuel : MExp) : MExp :=
+  .MApp (.MConst ``ArbitrarySizedSuchThat.arbitrarySizedST) [prop, fuel]
 
 /-- `mSome x` is an `MExp` representing `Option.some x` -/
 def mSome (x : MExp) : MExp :=
@@ -207,7 +209,7 @@ mutual
       - The function parameter `k` represents the remainder of the `mexp`
         (the rest of the monadic `do`-block)
   -/
-  partial def scheduleStepToMexp (step : ScheduleStep) (mfuel : MExp) (_defFuel : MExp) : MExp → TermElabM MExp :=
+  partial def scheduleStepToMexp (step : ScheduleStep) (mfuel : MExp) (defFuel : MExp) : MExp → TermElabM MExp :=
     fun k =>
       match step with
       | .Unconstrained v src prodSort => do
@@ -222,7 +224,7 @@ mutual
         let producer ←
           match prod with
           | Source.NonRec hypExpr =>
-            constrainedProducer ps varsTys (hypothesisExprToMExp hypExpr)
+            constrainedProducer ps varsTys (hypothesisExprToMExp hypExpr) defFuel
           | Source.Rec f args => pure (recCall f args)
         let vars := Prod.fst <$> varsTys
         pure $ .MBind (prodSortToOptionTMonadSort ps) producer vars k
@@ -362,7 +364,7 @@ mutual
 
       - Note: this function corresponds to `such_that_producer`
         in the QuickChick code -/
-  partial def constrainedProducer (prodSort : ProducerSort) (varsTys : List (Name × ConstructorExpr)) (prop : MExp) : TermElabM MExp :=
+  partial def constrainedProducer (prodSort : ProducerSort) (varsTys : List (Name × ConstructorExpr)) (prop : MExp) (fuel : MExp) : TermElabM MExp :=
     if varsTys.isEmpty then
       panic! "Received empty list of variables for constrainedProducer"
     else do
@@ -383,7 +385,7 @@ mutual
 
       let producerWithArgs := MExp.MFun args prop
       match prodSort with
-      | .Enumerator => return enumSizedST producerWithArgs
-      | .Generator => return arbitrarySizedST producerWithArgs
+      | .Enumerator => return enumSizedST producerWithArgs fuel
+      | .Generator => return arbitrarySizedST producerWithArgs fuel
 
 end
