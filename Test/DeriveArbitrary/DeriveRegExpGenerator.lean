@@ -22,6 +22,20 @@ inductive RegExp : Type where
   | Star : RegExp → RegExp
   deriving Repr, Arbitrary
 
+/-- `NatString` is a type abbreviation for `List Nat` -/
+abbrev NatString := List Nat
+deriving instance BEq for NatString
+
+/-- Converts a `NatString` to a `Nat` -/
+def stringOfNatString (n : NatString) : String :=
+  match n with
+  | [] => ""
+  | x :: xs => toString x ++ stringOfNatString xs
+
+/-- A `Repr` instance for `NatString`, which uses our pretty-printing function above -/
+instance : Repr NatString where
+  reprPrec n _ := stringOfNatString n
+
 -- Test that we can successfully synthesize instances of `Arbitrary` & `ArbitrarySized`
 
 /-- info: instArbitrarySizedRegExp -/

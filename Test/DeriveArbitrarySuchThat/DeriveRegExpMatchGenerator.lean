@@ -53,9 +53,9 @@ def r0 : RegExp :=
 -- Generator for strings that match the regexp `r0`
 
 /--
-info: Try this generator: instance : ArbitrarySizedSuchThat (List Nat) (fun s => ExpMatch s r0) where
+info: Try this generator: instance : ArbitrarySizedSuchThat NatString (fun s => ExpMatch s r0) where
   arbitrarySizedST :=
-    let rec aux_arb (initSize : Nat) (size : Nat) (r0_1 : RegExp) : OptionT Plausible.Gen (List Nat) :=
+    let rec aux_arb (initSize : Nat) (size : Nat) (r0_1 : RegExp) : OptionT Plausible.Gen NatString :=
       match size with
       | Nat.zero =>
         OptionTGen.backtrack
@@ -135,7 +135,8 @@ info: Try this generator: instance : ArbitrarySizedSuchThat (List Nat) (fun s =>
     fun size => aux_arb size size r0
 -/
 #guard_msgs(info, drop warning) in
-#derive_generator (fun (s : List Nat) => ExpMatch s r0)
+#derive_generator (fun (s : NatString) => ExpMatch s r0)
 
--- To sample from this generator, we can run the following:
--- #eval runSizedGen (arbitrarySizedST (fun s => ExpMatch s r0)) 10
+-- To sample from this generator and print out 10 successful examples using the `Repr`
+-- instance for `NatString`, we can run the following:
+#eval runSizedGenPrintOutput (arbitrarySizedST (fun s => ExpMatch s r0)) 10
