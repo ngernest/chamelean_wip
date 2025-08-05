@@ -2,7 +2,7 @@ import Plausible.Gen
 import Plausible.New.OptionTGen
 import Plausible.New.DecOpt
 import Plausible.New.ArbitrarySizedSuchThat
-import Plausible.New.DeriveArbitrarySuchThat
+import Plausible.GeneratingGoodGenerators.DeriveSubGenerator
 import Test.DeriveArbitrary.DeriveRegExpGenerator
 
 open ArbitrarySizedSuchThat OptionTGen
@@ -53,89 +53,70 @@ def r0 : RegExp :=
 -- Generator for strings that match the regexp `r0`
 
 /--
-info: Try this generator: instance : ArbitrarySizedSuchThat (List Nat) (fun s => ExpMatch s r0) where
+info: Try this generator: instance : ArbitrarySizedSuchThat (List Nat) (fun s_1 => ExpMatch s_1 r0_1) where
   arbitrarySizedST :=
     let rec aux_arb (initSize : Nat) (size : Nat) (r0_1 : RegExp) : OptionT Plausible.Gen (List Nat) :=
       match size with
       | Nat.zero =>
         OptionTGen.backtrack
           [(1,
-              OptionTGen.thunkGen
-                (fun _ =>
-                  match r0_1 with
-                  | RegExp.EmptyStr => pure []
-                  | _ => OptionT.fail)),
+              match r0_1 with
+              | RegExp.EmptyStr => return List.nil
+              | _ => OptionT.fail),
             (1,
-              OptionTGen.thunkGen
-                (fun _ =>
-                  match r0_1 with
-                  | RegExp.Char x => pure [x]
-                  | _ => OptionT.fail)),
+              match r0_1 with
+              | RegExp.Char x => return List.cons x (List.nil)
+              | _ => OptionT.fail),
             (1,
-              OptionTGen.thunkGen
-                (fun _ =>
-                  match r0_1 with
-                  | RegExp.Star re => pure []
-                  | _ => OptionT.fail)),
-            (1, OptionTGen.thunkGen (fun _ => OptionT.fail))]
+              match r0_1 with
+              | RegExp.Star re => return List.nil
+              | _ => OptionT.fail)]
       | Nat.succ size' =>
         OptionTGen.backtrack
           [(1,
-              OptionTGen.thunkGen
-                (fun _ =>
-                  match r0_1 with
-                  | RegExp.EmptyStr => pure []
-                  | _ => OptionT.fail)),
+              match r0_1 with
+              | RegExp.EmptyStr => return List.nil
+              | _ => OptionT.fail),
             (1,
-              OptionTGen.thunkGen
-                (fun _ =>
-                  match r0_1 with
-                  | RegExp.Char x => pure [x]
-                  | _ => OptionT.fail)),
-            (Nat.succ size',
-              OptionTGen.thunkGen
-                (fun _ =>
-                  match r0_1 with
-                  | RegExp.App re1 re2 => do
-                    let s1 ← aux_arb initSize size' re1
-                    let s2 ← aux_arb initSize size' re2
-                    return s1 ++ s2
-                  | _ => OptionT.fail)),
-            (Nat.succ size',
-              OptionTGen.thunkGen
-                (fun _ =>
-                  match r0_1 with
-                  | RegExp.Union re1 re2 => do
-                    let s_1 ← aux_arb initSize size' re1
-                    return s_1
-                  | _ => OptionT.fail)),
-            (Nat.succ size',
-              OptionTGen.thunkGen
-                (fun _ =>
-                  match r0_1 with
-                  | RegExp.Union re1 re2 => do
-                    let s_1 ← aux_arb initSize size' re2
-                    return s_1
-                  | _ => OptionT.fail)),
+              match r0_1 with
+              | RegExp.Char x => return List.cons x (List.nil)
+              | _ => OptionT.fail),
             (1,
-              OptionTGen.thunkGen
-                (fun _ =>
-                  match r0_1 with
-                  | RegExp.Star re => pure []
-                  | _ => OptionT.fail)),
+              match r0_1 with
+              | RegExp.Star re => return List.nil
+              | _ => OptionT.fail),
             (Nat.succ size',
-              OptionTGen.thunkGen
-                (fun _ =>
-                  match r0_1 with
-                  | RegExp.Star re => do
-                    let s1 ← aux_arb initSize size' re
-                    let s2 ← aux_arb initSize size' (RegExp.Star re)
-                    return s1 ++ s2
-                  | _ => OptionT.fail))]
-    fun size => aux_arb size size r0
+              match r0_1 with
+              | RegExp.App re1 re2 => do
+                let s1 ← aux_arb initSize size' re1;
+                do
+                  let s2 ← aux_arb initSize size' re2;
+                  return HAppend.hAppend s1 s2
+              | _ => OptionT.fail),
+            (Nat.succ size',
+              match r0_1 with
+              | RegExp.Union re1 re2 => do
+                let s_1 ← aux_arb initSize size' re1;
+                return s_1
+              | _ => OptionT.fail),
+            (Nat.succ size',
+              match r0_1 with
+              | RegExp.Union re1 re2 => do
+                let s_1 ← aux_arb initSize size' re2;
+                return s_1
+              | _ => OptionT.fail),
+            (Nat.succ size',
+              match r0_1 with
+              | RegExp.Star re => do
+                let s1 ← aux_arb initSize size' re;
+                do
+                  let s2 ← aux_arb initSize size' (RegExp.Star re);
+                  return HAppend.hAppend s1 s2
+              | _ => OptionT.fail)]
+    fun size => aux_arb size size r0_1
 -/
 #guard_msgs(info, drop warning) in
-#derive_generator (fun (s : List Nat) => ExpMatch s r0)
+#derive_scheduled_generator (fun (s : List Nat) => ExpMatch s r0)
 
 -- To sample from this generator, we can run the following:
 -- #eval runSizedGen (arbitrarySizedST (fun s => ExpMatch s r0)) 10

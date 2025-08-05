@@ -11,6 +11,7 @@ import Test.DeriveArbitrarySuchThat.DeriveBSTGenerator
 import Test.DeriveArbitrarySuchThat.DeriveBalancedTreeGenerator
 import Test.DeriveArbitrarySuchThat.DeriveRegExpMatchGenerator
 import Test.DeriveArbitrarySuchThat.SimultaneousMatchingTests
+import Test.DeriveArbitrarySuchThat.BinaryTree
 
 -- Tests for `deriving Arbitrary`
 import Test.DeriveArbitrary.DeriveTreeGenerator

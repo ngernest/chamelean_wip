@@ -3,7 +3,7 @@ import Plausible.Gen
 import Plausible.New.OptionTGen
 import Plausible.New.DecOpt
 import Plausible.New.ArbitrarySizedSuchThat
-import Plausible.New.DeriveArbitrarySuchThat
+import Plausible.GeneratingGoodGenerators.DeriveSubGenerator
 
 open ArbitrarySizedSuchThat OptionTGen
 
@@ -20,88 +20,81 @@ inductive MinOk : List Nat → List Nat → Prop where
     MinOk l (x::l')
 
 /--
-info: Try this generator: instance : ArbitrarySizedSuchThat (List Nat) (fun l => MinOk l a) where
+info: Try this generator: instance : ArbitrarySizedSuchThat (List Nat) (fun l_1 => MinOk l_1 a_1) where
   arbitrarySizedST :=
     let rec aux_arb (initSize : Nat) (size : Nat) (a_1 : List Nat) : OptionT Plausible.Gen (List Nat) :=
       match size with
       | Nat.zero =>
         OptionTGen.backtrack
           [(1,
-              OptionTGen.thunkGen
-                (fun _ =>
-                  match a_1 with
-                  | [] => pure []
-                  | _ => OptionT.fail)),
-            (1, OptionTGen.thunkGen (fun _ => OptionT.fail))]
+              match a_1 with
+              | List.nil => return List.nil
+              | _ => OptionT.fail)]
       | Nat.succ size' =>
         OptionTGen.backtrack
           [(1,
-              OptionTGen.thunkGen
-                (fun _ =>
-                  match a_1 with
-                  | [] => pure []
-                  | _ => OptionT.fail)),
+              match a_1 with
+              | List.nil => return List.nil
+              | _ => OptionT.fail),
             (Nat.succ size',
-              OptionTGen.thunkGen
-                (fun _ =>
-                  match a_1 with
-                  | x :: l' => do
-                    let l_1 ← aux_arb initSize size' l'
-                    if x ∈ l_1 then ⏎
-                      return l_1
-                    else
-                      OptionT.fail
-                  | _ => OptionT.fail))]
-    fun size => aux_arb size size a
+              match a_1 with
+              | List.cons x l' => do
+                let l_1 ← aux_arb initSize size' l';
+                match DecOpt.decOpt (Membership.mem l_1 x) initSize with
+                  | Option.some Bool.true => return l_1
+                  | _ => OptionT.fail
+              | _ => OptionT.fail)]
+    fun size => aux_arb size size a_1
 -/
 #guard_msgs(info, drop warning) in
-#derive_generator (fun (l: List Nat) => MinOk l a)
+#derive_scheduled_generator (fun (l: List Nat) => MinOk l a)
 
 /-- Example inductive relation involving simultaneous pattern-matching on multiple inputs -/
 inductive MinEx : Nat → List Nat → List Nat → Prop where
-| ME_empty : MinEx 0 [] []
+| ME_empty : MinEx .zero [] []
 | ME_present : ∀ x l n l',
     MinEx n l l' →
     x ∈ l →
     MinEx (Nat.succ n) l (x::l')
 
 /--
-info: Try this generator: instance : ArbitrarySizedSuchThat (List Nat) (fun l => MinEx n l a) where
+info: Try this generator: instance : ArbitrarySizedSuchThat (List Nat) (fun l_1 => MinEx n_1 l_1 l'_1) where
   arbitrarySizedST :=
-    let rec aux_arb (initSize : Nat) (size : Nat) (n_1 : Nat) (a_1 : List Nat) : OptionT Plausible.Gen (List Nat) :=
+    let rec aux_arb (initSize : Nat) (size : Nat) (n_1 : Nat) (l'_1 : List Nat) : OptionT Plausible.Gen (List Nat) :=
       match size with
       | Nat.zero =>
         OptionTGen.backtrack
           [(1,
-              OptionTGen.thunkGen
-                (fun _ =>
-                  match n_1, a_1 with
-                  | 0, [] => pure []
-                  | _, _ => OptionT.fail)),
-            (1, OptionTGen.thunkGen (fun _ => OptionT.fail))]
+              match l'_1 with
+              | List.nil =>
+                match n_1 with
+                | Nat.zero => return List.nil
+                | _ => OptionT.fail
+              | _ => OptionT.fail)]
       | Nat.succ size' =>
         OptionTGen.backtrack
           [(1,
-              OptionTGen.thunkGen
-                (fun _ =>
-                  match n_1, a_1 with
-                  | 0, [] => pure []
-                  | _, _ => OptionT.fail)),
+              match l'_1 with
+              | List.nil =>
+                match n_1 with
+                | Nat.zero => return List.nil
+                | _ => OptionT.fail
+              | _ => OptionT.fail),
             (Nat.succ size',
-              OptionTGen.thunkGen
-                (fun _ =>
-                  match n_1, a_1 with
-                  | Nat.succ n, x :: l' => do
-                    let l_1 ← aux_arb initSize size' n l'
-                    if x ∈ l_1 then ⏎
-                      return l_1
-                    else
-                      OptionT.fail
-                  | _, _ => OptionT.fail))]
-    fun size => aux_arb size size n a
+              match l'_1 with
+              | List.cons x l' =>
+                match n_1 with
+                | Nat.succ n => do
+                  let l_1 ← ArbitrarySizedSuchThat.arbitrarySizedST (fun l_1 => Membership.mem l_1 x) initSize;
+                  match DecOpt.decOpt (MinEx n l_1 l') initSize with
+                    | Option.some Bool.true => return l_1
+                    | _ => OptionT.fail
+                | _ => OptionT.fail
+              | _ => OptionT.fail)]
+    fun size => aux_arb size size n_1 l'_1
 -/
 #guard_msgs(info, drop warning) in
-#derive_generator (fun (l: List Nat) => MinEx n l a)
+#derive_scheduled_generator (fun (l : List Nat) => MinEx n l l')
 
 -- TODO: test derived generator on this example
 -- (need to introduce a fresh variable and an equality constraint between it & the function call
