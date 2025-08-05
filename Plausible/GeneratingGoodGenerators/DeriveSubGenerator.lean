@@ -24,9 +24,9 @@ open Lean Elab Command Meta Term Parser
 open Idents
 open Plausible.IR
 
----------------------------------------------------------------------------------------------
--- Implements figure 4 from "Generating Good Generators for Inductive Relations" (GGG), POPL '18
---------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------------------------------------
+-- Adapted from "Generating Good Generators for Inductive Relations" (POPL '18) & "Testing Theorems, Fully Automatically" (2025)
+----------------------------------------------------------------------------------------------------------------------------------
 
 /-- Creates the initial constraint map κ where all inputs are `Fixed`, the output & all universally-quantified variables is `Undef`
     - `forAllVariables` is a list of (variable name, variable type) pairs -/
@@ -172,213 +172,6 @@ def convertPatternToTerm (pattern : Pattern) : MetaM (TSyntax `term) :=
     let argSyntaxes ← args.mapM convertPatternToTerm
     argSyntaxes.foldlM (fun acc arg => `($acc $arg)) ctorIdent
 
-mutual
-
-  /-- Produces the code for a pattern match on an unknown
-     TODO: split this into 2 steps
-     1. Compile a `ScheduleStep` to an `MExp`
-     2. Compile the `MExp` to a Lean term
-
-   -/
-  partial def emitPatterns (patterns : List (Unknown × Pattern)) (equalities : List (Unknown × Unknown)) (constraints : UnknownMap) : UnifyM (TSyntax `term) :=
-    match patterns with
-    | [] => emitEqualities equalities constraints
-    | (u, p) :: ps => do
-      let caseRHS ← emitPatterns ps equalities constraints
-      let caseLHS ← convertPatternToTerm p
-
-      -- If the pattern-match succeeds, use the RHS computed in `caseRHS`
-      let nonTrivialCase ← `(Term.matchAltExpr| | $caseLHS => $caseRHS)
-
-      -- Otherwise, just return `None` (by doing `OptionT.fail`)
-      let trivialCase ← `(Term.matchAltExpr| | _ => $failFn)
-
-      -- Create the actual pattern-match
-      let cases := #[nonTrivialCase, trivialCase]
-      mkMatchExpr (mkIdent u) cases
-
-  /-- Produces the code for an equality check according to a list of `equalities` and a particular set of `constraints` -/
-  partial def emitEqualities (equalities : List (Unknown × Unknown)) (constraints : UnknownMap) : UnifyM (TSyntax `term) :=
-    match equalities with
-    | [] => UnifyM.withHypotheses (fun hyps => emitHypotheses hyps constraints)
-    | (u1, u2) :: eqs => do
-      /- We produce the expression
-        ```lean
-        match DecOpt.decOpt ($u1 = $u2) $initSize with
-        | some true => $trueCaseRHS
-        | _ => OptionT.fail
-        ```
-        where we invoke the checker provided by the `DecOpt` typeclass to determine whether `u1 = u2` -/
-
-      let scrutinee ← `($decOptFn ($(mkIdent u1) == $(mkIdent u2)) $initSizeIdent)
-      let trueCaseRHS ← emitEqualities eqs constraints
-      let trueCase ← `(Term.matchAltExpr | | $(mkIdent ``some) $(mkIdent ``true) => $trueCaseRHS)
-      let catchAllCase ← `(Term.matchAltExpr | | _ => $failFn)
-      let cases := #[trueCase, catchAllCase]
-      mkMatchExprWithScrutineeTerm scrutinee cases
-
-  /-- Determines if all unknowns in a `ConstructorExpr` have `Range`s of the form `Undef τ` for some type `τ` -/
-  partial def allUnknownsHaveUndefRanges (ctorExpr : ConstructorExpr) : UnifyM Bool := do
-    logWarning m!"Checking if unknowns in {ctorExpr} have Undef Ranges"
-    match ctorExpr with
-    | .Unknown u => not <$> UnifyM.hasUndefRange u
-    | .Ctor _ args =>
-      logWarning m!"entered Ctor case of allUnknownsHaveUndefRanges with {ctorExpr}"
-      List.allM allUnknownsHaveUndefRanges args
-
-  /-- Produces the code for the body of a sub-generator which processes a list of `hypotheses` under a particular set of `constraints`
-
-    - Note: `emitHypotheses` combines the checker/producer `ScheduleStep`s into one function
-    - One option if we want to keep `emitHypotheses` is compile `ScheduleStep`s to `HypothesisExpr`s,
-      i.e. `Name × List ConstructorExpr`
-      +
-    - However, it might be cleaner if we rip out all the emit functions, and go directly
-      from `ScheduleStep`s to `MExp`s, then from `MExp` to Lean code
-
-  -/
-  partial def emitHypotheses (hypotheses : List (Name × List ConstructorExpr)) (constraints : UnknownMap) : UnifyM (TSyntax `term) := do
-    match hypotheses with
-    | [] => finalAssembly
-    | hypothesis@(ctorName, ctorArgs) :: remainingHyps => do
-      logWarning m!"inEmitHypotheses, head of list is ({ctorName} {ctorArgs})"
-      /- If all of the constructor's args don't have a `Range` of the form `Undef τ`,
-        we can simply produce the expression
-        ```lean
-        match DecOpt.decOpt ($ctorName $ctorArgs*) with
-        | some true => $(emitHypotheses hyps constrains)
-        | _ => OptionT.fail
-        ```
-        where we invoke the checker for the hypothesis and pattern-match based on its result -/
-      if (← List.allM allUnknownsHaveUndefRanges ctorArgs) then
-        logWarning m!"emitHypotheses ({ctorName} {ctorArgs}), all unknowns don't have Undef range"
-        let ctorArgsArr ← UnifyM.convertConstructorExprsToTSyntaxTerms ctorArgs.toArray
-        let hypothesisCheck ← `($decOptFn ($(mkIdent ctorName) $ctorArgsArr*) $initSizeIdent)
-        let trueCaseRHS ← emitHypotheses remainingHyps constraints
-        let trueCase ← `(Term.matchAltExpr| | $(mkIdent ``some) $(mkIdent ``true) => $trueCaseRHS)
-        let catchAllCase ← `(Term.matchAltExpr| | _ => $failFn)
-        let cases := #[trueCase, catchAllCase]
-        mkMatchExprWithScrutineeTerm hypothesisCheck cases
-      else
-        let mut doElems := #[]
-
-        -- Accumulate all unknowns contained in `ctorArgs`
-        let unknownsInCtorArgs ← List.flatMapM UnifyM.collectUnknownsInConstructorExpr ctorArgs
-        -- `undefUnknowns` is a list of all `Unknown`s in `ctorArgs` that have a `Range` of the form `Undef τ`, with length `n`
-        let undefUnknowns ← UnifyM.findUnknownsWithUndefRanges unknownsInCtorArgs
-
-        logWarning m!"emitHypotheses ({ctorName} {ctorArgs}), unknowns {undefUnknowns} have Undef range"
-
-        match unsnoc undefUnknowns with
-        | none => throwError "Unreachable case: by construction, there must exist at least one unknown with an `Undef` Range"
-        | some (undefUnknownsPrefix, finalUnknown) =>
-          -- For each `u ∈ undefUnknowns[0..=n-2]`, we generate `u` freely by producing the expr `let u ← arbitrary`
-          for u in undefUnknownsPrefix do
-            let letBindExpr ← mkLetBind (mkIdent u) #[arbitraryFn]
-            doElems := doElems.push letBindExpr
-
-          logWarning m!"finalUnknown = {finalUnknown}"
-
-          -- To generate the `finalUnknown`, we pass the `finalUnknown` and the current `hypothesis` to `emitFinalCall`
-          doElems := doElems.push (← emitFinalCall finalUnknown hypothesis)
-
-          -- We then update all `u ∈ undefUnknowns` to have a fixed range in `constraints`,
-          -- and handle the remaining hypotheses via a recursive call to `emitHypotheses` with the updated `constraints`
-          UnifyM.fixRanges undefUnknowns
-          let recursiveCallResult ← UnifyM.withConstraints (fun k => emitHypotheses remainingHyps k)
-          doElems := doElems.push (← `(doElem| $recursiveCallResult:term))
-
-          -- We then put everything together in one big monadic do-block
-          mkDoBlock doElems
-
-  /-- Assembles the body of the generator (this function is called when all hypotheses have been processed by `emitHypotheses`)
-
-      (Note that this function doesn't take in an explicit `constraints` argument (unlike the pseudocode in the paper),
-      since we fetch the `constraints` map via a `get` call in the State monad)
-
-      - This corresponds to `finally` in QuickChick code
-      -/
-  partial def finalAssembly : UnifyM (TSyntax `term) := do
-    -- Find all unknowns whose ranges are `Undef`
-    let undefUnknowns ← UnifyM.withUnknowns (fun allUnknowns => UnifyM.findUnknownsWithUndefRanges allUnknowns.toList)
-
-    -- Update the constraint map so that all unknowns in `undefKnowns` now have a `Fixed` `Range`
-    UnifyM.fixRanges undefUnknowns
-
-    -- Construct the final expression that will be produced by the generator
-    let unifyState ← get
-    let outputName := unifyState.outputName
-    let updatedConstraints := unifyState.constraints
-    let rangeForOutput ← UnifyM.findCorrespondingRange updatedConstraints outputName
-
-    let result ← emitResult updatedConstraints outputName rangeForOutput
-
-    -- Bind each unknown in `undefUnknowns` to the result of an arbitrary call,
-    -- then return the value computed in `result`
-    let mut doElems := #[]
-    for u in undefUnknowns do
-      doElems := doElems.push (← mkLetBind (mkIdent u) #[arbitraryFn])
-    doElems := doElems.push (← `(doElem| return $result))
-
-    -- Put everything together in one monadic do-block
-    mkDoBlock doElems
-
-  /-- Produces a let-bind expression which generates an `unknown` subject to a `hypothesis`
-      in the body of the sub-generator
-      (this is the final call to a generator when processing one particular hypothesis of a constructor)
-
-      - Note: This handles any producer step in a schedule
-      - Segev says "I would hesitate to use the same GGG algorithm as written" since
-        it goes directly to Lean code, instead use `ScheduleStep`s, compile those to `MExp`, then
-        compile those to `TSyntax`
-  -/
-  partial def emitFinalCall (unknown : Unknown) (hypothesis : Name × List ConstructorExpr): UnifyM (TSyntax `doElem) := do
-    let unifyState ← get
-    let outputName := unifyState.outputName
-    let lhs := mkIdent unknown
-    logWarning m!"inside emitFinalCall, unknown = {unknown}, outputName = {outputName}"
-
-    -- Determine if a recursive call to `auxArb` is needed, i.e. if the `range` corresponding to `unknown`
-    -- is `.Undef ty`, where `ty` is the same type as the `outputType` (with type equality determined by `Meta.isDefEq`)
-    let range ← UnifyM.findCorrespondingRange unifyState.constraints unknown
-    let recursiveCallNeeded ←
-      (match range with
-      | .Undef ty =>
-        Meta.isDefEq ty unifyState.outputType
-      | _ => pure false)
-
-    logWarning m!"recursiveCallNeeded = {recursiveCallNeeded}"
-
-    if unknown == outputName || recursiveCallNeeded then
-      logWarning m!"entered true branch of emitFinalCall"
-
-      -- Produce a recursive call to `auxArb` (recursively generate a value for the unknown)
-      -- Each `input` in `inputNames` is an argument for `auxArb`
-      let argsForRecursiveCall := Lean.mkIdent <$> unifyState.inputNames.toArray
-
-      -- Produce a monadic let-bind expression of the form `let $lhs ← auxArb initSize size' $argsForRecursiveCall`
-      mkLetBind lhs (#[auxArbFn, initSizeIdent, mkIdent `size'] ++ argsForRecursiveCall)
-    else do
-      -- Generate a value for the unknown via a call to `arbitraryST`, passing in the final hypothesis
-      -- as an argument to `arbitraryST`
-      let unknownIdent := mkIdent unknown
-      let (ctorName, ctorArgs) := hypothesis
-      let ctorArgsArr ← UnifyM.convertConstructorExprsToTSyntaxTerms ctorArgs.toArray
-      let constraint ← `((fun $unknownIdent => $(mkIdent ctorName) $ctorArgsArr*))
-      let rhsTerms := #[(arbitrarySTFn : TSyntax `term), constraint]
-      mkLetBind lhs rhsTerms
-
-  /-- Produces a term corresponding to the value being generated -/
-  partial def emitResult (k : UnknownMap) (u : Unknown) (range : Range) : UnifyM (TSyntax `term) := do
-    match range with
-    | .Unknown u' => emitResult k u' (← UnifyM.findCorrespondingRange k u')
-    | .Fixed => `($(mkIdent u))
-    | .Ctor c rs => do
-      let ctorIdent := mkIdent c
-      let ctorArgs ← Array.mapM (fun r => emitResult k u r) rs.toArray
-      `($ctorIdent $ctorArgs*)
-    | .Undef ty => throwError m!"Error: unknown {u} has a range of (Undef {ty}) in {k.toList}"
-
-end
 
 /-- Converts a `Range` to a `ConstructorExpr`
     (helper function used by `convertRangeToCtorAppForm`) -/
@@ -547,7 +340,7 @@ def getScheduleForConstructor (inductiveName : Name) (ctorName : Name) (outputNa
     return fullSchedule)
 
 
-/-- Command for deriving a sub-generator for one construtctor of an inductive relation (per figure 4 of GGG) -/
+/-- Command for deriving a constrained generator for an inductive relation that uses generator schedules -/
 syntax (name := derive_scheduled_generator) "#derive_scheduled_generator" "(" "fun" "(" ident ":" term ")" "=>" term ")" : command
 
 @[command_elab derive_scheduled_generator]
@@ -667,12 +460,11 @@ instance : ArbitrarySizedSuchThat type (fun t => typing G e t) where
   arbitrarySizedST := sorry
 
 
+-- TODO: debug BST tree case
 -- #derive_scheduled_generator (fun (tree : Tree) => bst in1 in2 tree)
+
 -- #derive_scheduled_generator (fun (e : term) => typing G e t)
 
 -- #derive_scheduled_generator (fun (tree : Tree) => LeftLeaning tree)
 
 -- #derive_scheduled_generator (fun (xs : List Nat) => Sorted xs)
-
--- TODO: debug balanced tree case
--- #derive_scheduled_generator (fun (tree : Tree) => balanced n tree)
