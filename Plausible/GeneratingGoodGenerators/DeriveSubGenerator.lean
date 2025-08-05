@@ -426,7 +426,7 @@ def getScheduleSort (conclusion : HypothesisExpr) (outputVars : List Unknown) (c
         listed in order, which coincides with `inputNames ∪ { outputName }`
     - The name of the inductive relation we are targeting (`inductiveName`) -/
 def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Expr) (inputNames : List Name)
-  (unknowns : Array Unknown) : UnifyM (TSyntax `term) := do
+  (unknowns : Array Unknown) : UnifyM Schedule := do
   let ctorInfo ← getConstInfoCtor ctorName
   let ctorType := ctorInfo.type
 
@@ -530,12 +530,7 @@ def processCtorInContext (ctorName : Name) (outputName : Name) (outputType : Exp
     -- convert them to the appropriate `ScheduleStep`s, and prepends them to the `naiveSchedule`
     let fullSchedule := addConclusionPatternsAndEqualitiesToSchedule finalState.patterns finalState.equalities (updatedNaiveSchedule, scheduleSort)
 
-    -- logWarning m!"fullSchedule = {repr fullSchedule}"
-
-    -- Compile the schedule to an `MExp`, then compile the `MExp` to a Lean term containing the generator
-    let mexpOfSchedule := scheduleToMExp fullSchedule (.MId `size) (.MId `size)
-
-    mexpToTSyntax mexpOfSchedule .Generator)
+    return fullSchedule)
 
 
 /-- Command for deriving a sub-generator for one construtctor of an inductive relation (per figure 4 of GGG) -/
@@ -597,10 +592,14 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
 
       for ctorName in inductiveVal.ctors do
         -- TODO: figure out how to combine all the sub-generators across all constructors
-        let subGenerator ← UnifyM.runInMetaM
+        let scheduleAndUnifyState ← UnifyM.runInMetaM
           (processCtorInContext ctorName freshenedOutputName outputType freshenedInputNamesExcludingOutput freshUnknowns) emptyUnifyState
-        match subGenerator with
-        | some (generator, _) => logInfo m!"Derived generator:\n```\n{generator}\n```"
+        match scheduleAndUnifyState with
+        | some (schedule, _) =>
+          -- Compile the schedule to an `MExp`, then compile the `MExp` to a Lean term containing the code for the sub-generator
+          let mexp ← scheduleToMExp schedule (.MId `size) (.MId `size)
+          let subGenerator ← mexpToTSyntax mexp .Generator
+          logInfo m!"Derived generator:\n```\n{subGenerator}\n```"
         | none => logInfo m!"Derived generator:\n```\nreturn none\n```"
 
 

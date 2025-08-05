@@ -56,6 +56,18 @@ inductive ConstructorExpr
   | Ctor : Name -> List ConstructorExpr -> ConstructorExpr
   deriving Repr, BEq, Inhabited, Ord
 
+/-- Converts a `ConstructorExpr` to a Lean `Expr` -/
+partial def constructorExprToExpr (ctorExpr : ConstructorExpr) : Expr :=
+  match ctorExpr with
+  | .Unknown name => mkConst name
+  | .Ctor ctorName ctorArgs =>
+    mkAppN (mkConst ctorName) (constructorExprToExpr <$> ctorArgs.toArray)
+
+/-- `ToExpr` instance for `ConstructorExpr` -/
+instance : ToExpr ConstructorExpr where
+  toExpr := constructorExprToExpr
+  toTypeExpr := mkConst ``Expr
+
 /-- Converts a `Pattern` to an equivalent `ConstructorExpr` -/
 partial def constructorExprOfPattern (pattern : Pattern) : ConstructorExpr :=
   match pattern with
