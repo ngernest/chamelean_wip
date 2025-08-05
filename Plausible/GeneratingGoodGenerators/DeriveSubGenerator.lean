@@ -343,6 +343,7 @@ def getScheduleForConstructor (inductiveName : Name) (ctorName : Name) (outputNa
 /-- Command for deriving a constrained generator for an inductive relation that uses generator schedules -/
 syntax (name := derive_scheduled_generator) "#derive_scheduled_generator" "(" "fun" "(" ident ":" term ")" "=>" term ")" : command
 
+/-- Elaborator for the `#derive_scheduled_generator` command which derives constrained generator using generator schedules -/
 @[command_elab derive_scheduled_generator]
 def elabDeriveScheduledGenerator : CommandElab := fun stx => do
   match stx with

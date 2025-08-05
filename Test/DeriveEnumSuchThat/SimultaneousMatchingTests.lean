@@ -3,8 +3,8 @@ import Plausible.New.Enumerators
 import Plausible.New.DeriveEnumSuchThat
 import Plausible.New.EnumeratorCombinators
 
--- See `Test/DeriveArbitrarySuchThat/SimultaneousMatchingTests.lean` for the definition of the inductive relations
-import Test.DeriveArbitrarySuchThat.SimultaneousMatchingTests
+-- See `Test/CommonDefinitions/ListRelations.lean` for the definition of the inductive relations
+import Test.CommonDefinitions.ListRelations
 
 set_option guard_msgs.diff true
 
@@ -27,10 +27,7 @@ info: Try this enumerator: instance : EnumSizedSuchThat (List Nat) (fun l => Min
             match a_1 with
             | x :: l' => do
               let l_1 ← aux_enum initSize size' l'
-              if x ∈ l_1 then ⏎
-                return l_1
-              else
-                OptionT.fail
+              return l_1
             | _ => OptionT.fail]
     fun size => aux_enum size size a
 -/
@@ -45,21 +42,18 @@ info: Try this enumerator: instance : EnumSizedSuchThat (List Nat) (fun l => Min
       | Nat.zero =>
         EnumeratorCombinators.enumerate
           [match n_1, a_1 with
-            | 0, [] => pure []
+            | Nat.zero, [] => pure []
             | _, _ => OptionT.fail,
             OptionT.fail]
       | Nat.succ size' =>
         EnumeratorCombinators.enumerate
           [match n_1, a_1 with
-            | 0, [] => pure []
+            | Nat.zero, [] => pure []
             | _, _ => OptionT.fail,
             match n_1, a_1 with
             | Nat.succ n, x :: l' => do
               let l_1 ← aux_enum initSize size' n l'
-              if x ∈ l_1 then ⏎
-                return l_1
-              else
-                OptionT.fail
+              return l_1
             | _, _ => OptionT.fail]
     fun size => aux_enum size size n a
 -/

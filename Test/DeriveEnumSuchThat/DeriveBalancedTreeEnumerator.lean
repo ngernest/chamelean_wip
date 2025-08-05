@@ -16,19 +16,19 @@ info: Try this enumerator: instance : EnumSizedSuchThat BinaryTree (fun t => bal
       | Nat.zero =>
         EnumeratorCombinators.enumerate
           [match n_1 with
-            | 0 => pure BinaryTree.Leaf
+            | Nat.zero => pure BinaryTree.Leaf
             | _ => OptionT.fail,
             match n_1 with
-            | 1 => pure BinaryTree.Leaf
+            | Nat.succ Nat.zero => pure BinaryTree.Leaf
             | _ => OptionT.fail,
             OptionT.fail]
       | Nat.succ size' =>
         EnumeratorCombinators.enumerate
           [match n_1 with
-            | 0 => pure BinaryTree.Leaf
+            | Nat.zero => pure BinaryTree.Leaf
             | _ => OptionT.fail,
             match n_1 with
-            | 1 => pure BinaryTree.Leaf
+            | Nat.succ Nat.zero => pure BinaryTree.Leaf
             | _ => OptionT.fail,
             match n_1 with
             | Nat.succ n => do

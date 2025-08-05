@@ -4,7 +4,7 @@ import Plausible.New.OptionTGen
 import Plausible.New.DecOpt
 import Plausible.New.ArbitrarySizedSuchThat
 import Plausible.GeneratingGoodGenerators.DeriveSubGenerator
-import Test.DeriveArbitrarySuchThat.BinaryTree
+import Test.CommonDefinitions.BinaryTree
 
 open ArbitrarySizedSuchThat OptionTGen
 

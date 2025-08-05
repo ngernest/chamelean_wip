@@ -228,6 +228,8 @@
   ["docBlame", "normalizeSchedule.compareBlocks"],
   ["docBlame", "modeAnalyze.followUnknownChain"],
   ["docBlame", "outputsNotConstrainedByFunctionApplication.check"],
+  ["docBlame", "instArbitrarySizedTerm.aux_arb"],
+  ["docBlame", "instArbitrarySizedType.aux_arb"],
   ["unusedArguments", "runSizedEnum"],
   ["unusedArguments", "analyzePartiallyDefined"],
   ["unusedArguments", "gen_typing.aux_arb"],
