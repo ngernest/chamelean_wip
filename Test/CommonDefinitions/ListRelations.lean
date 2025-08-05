@@ -27,7 +27,7 @@ inductive MinEx : Nat → List Nat → List Nat → Prop where
 -- (need to introduce a fresh variable and an equality constraint between it & the function call
 -- (Computing Correctly, section 3.1), i.e. introduce a constraint `l'' = [x] + l'`
 inductive MinEx2 : Nat → List Nat → List Nat → Prop where
-| ME_empty : MinEx2 0 [] []
+| ME_empty : MinEx2 .zero [] []
 | ME_present : ∀ x l l',
     MinEx2 x l l' →
     MinEx2 (Nat.succ x) l ([x] ++ l')
@@ -36,6 +36,6 @@ inductive MinEx2 : Nat → List Nat → List Nat → Prop where
 -- TODO: test derived generator on this example
 -- (need to support function calls (Computing Correctly section 3.1))
 inductive MinEx3 : Nat → List Nat → List Nat → Prop where
-| ME_empty : MinEx3 0 [] []
+| ME_empty : MinEx3 .zero [] []
 | ME_present : ∀ x l,
     MinEx3 x l ([x] ++ l)
