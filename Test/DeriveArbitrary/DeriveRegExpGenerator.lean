@@ -26,7 +26,7 @@ inductive RegExp : Type where
 abbrev NatString := List Nat
 deriving instance BEq for NatString
 
-/-- Converts a `NatString` to a `Nat` -/
+/-- Converts a `NatString` to a `String` for pretty-printing -/
 def stringOfNatString (n : NatString) : String :=
   match n with
   | [] => ""
