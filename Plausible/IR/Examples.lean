@@ -19,12 +19,17 @@ inductive balanced : Nat → Tree → Prop where
   balanced n l → balanced n r →
   balanced (.succ n) (.Node x l r)
 
+/-- `between lo x hi` means `lo < x < hi` -/
+inductive between : Nat -> Nat -> Nat -> Prop where
+| BetweenN : ∀ n m, n <= m -> between n (.succ n) (.succ (.succ m))
+| BetweenS : ∀ n m o,
+  between n m o -> between n (.succ m) (.succ o)
+
 /-- `bst lo hi t` describes whether a tree `t` is a BST that contains values strictly within `lo` and `hi` -/
 inductive bst : Nat → Nat → Tree → Prop where
--- | BstLeaf: ∀ lo hi, bst lo hi .Leaf
+| BstLeaf: ∀ lo hi, bst lo hi .Leaf
 | BstNode: ∀ lo hi x l r,
-  lo < x →
-  x < hi →
+  between lo x hi →
   bst lo x l →
   bst x hi r →
   bst lo hi (.Node x l r)

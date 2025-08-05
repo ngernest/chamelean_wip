@@ -61,10 +61,10 @@ def isRecCall (binding : List Name) (hyp : HypothesisExpr) (recCall : Name × Li
     else pure none) args
   let (inductiveName, outputIdxes) := recCall
   let result := (ctorName == inductiveName && List.mergeSort outputIdxes == List.mergeSort outputPositions)
-  if not result then
-    logWarning m!"isRecCall result = {result}"
-    logWarning m!"isRecCall: ctorName = {ctorName}, inductiveName = {inductiveName}"
-    logWarning m!"isRecCall: outputIdxes = {List.mergeSort outputIdxes}, outputPositions = {List.mergeSort outputPositions}"
+  -- if not result then
+  --   logWarning m!"isRecCall result = {result}"
+  --   logWarning m!"isRecCall: ctorName = {ctorName}, inductiveName = {inductiveName}"
+  --   logWarning m!"isRecCall: outputIdxes = {List.mergeSort outputIdxes}, outputPositions = {List.mergeSort outputPositions}"
   return result
 
 /-- Given a list of `hypotheses`, creates an association list mapping each hypothesis to a list of variable names.

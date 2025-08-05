@@ -413,7 +413,8 @@ def elabDeriveScheduledGenerator : CommandElab := fun stx => do
             -- Compile the schedule to an `MExp`, then compile the `MExp` to a Lean term containing the code for the sub-generator
             let mexp ← scheduleToMExp schedule (.MId `size) (.MId `initSize)
             let subGenerator ← mexpToTSyntax mexp .Generator
-            -- logInfo m!"Derived generator:\n```\n{subGenerator}\n```"
+
+            logWarning m!"subGenerator = {subGenerator}"
 
             -- Determine whether the constructor is recursive
             -- (i.e. if the constructor has a hypothesis that refers to the inductive relation we are targeting)
