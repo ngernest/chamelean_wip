@@ -60,9 +60,12 @@ def isRecCall (binding : List Name) (hyp : HypothesisExpr) (recCall : Name × Li
       throwError m!"Arguments to hypothesis {hyp} contain both fixed and yet-to-be-bound variables (not allowed)"
     else pure none) args
   let (inductiveName, outputIdxes) := recCall
-  -- logWarning m!"isRecCall: binding = {binding}, hyp = {hyp}"
-  -- logWarning m!"isRecCall: outputIdxes = {List.mergeSort outputIdxes}, outputPositions = {List.mergeSort outputPositions}"
-  return (ctorName == inductiveName && List.mergeSort outputIdxes == List.mergeSort outputPositions)
+  let result := (ctorName == inductiveName && List.mergeSort outputIdxes == List.mergeSort outputPositions)
+  if not result then
+    logWarning m!"isRecCall result = {result}"
+    logWarning m!"isRecCall: ctorName = {ctorName}, inductiveName = {inductiveName}"
+    logWarning m!"isRecCall: outputIdxes = {List.mergeSort outputIdxes}, outputPositions = {List.mergeSort outputPositions}"
+  return result
 
 /-- Given a list of `hypotheses`, creates an association list mapping each hypothesis to a list of variable names.
     This list is then sorted in ascending order based on the length of the variable name list.

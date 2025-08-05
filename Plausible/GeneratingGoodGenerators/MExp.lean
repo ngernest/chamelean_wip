@@ -224,6 +224,8 @@ mutual
         let producer ←
           match prod with
           | Source.NonRec hypExpr =>
+            logWarning m!"Encountered scheduleStep of .SuchThat {varsTys} {repr prod} {repr ps}"
+            logWarning m!"prod is hypExpr = {hypExpr}"
             constrainedProducer ps varsTys (hypothesisExprToMExp hypExpr) defFuel
           | Source.Rec f args => pure (recCall f args)
         let vars := Prod.fst <$> varsTys

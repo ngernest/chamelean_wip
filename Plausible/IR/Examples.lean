@@ -13,8 +13,8 @@ deriving Repr
 /-- `balanced n t` describes whether the tree `t` of height `n` is *balanced*, i.e.
     every path through the tree has length either `n` or `n-1`. -/
 inductive balanced : Nat → Tree → Prop where
-| B0 : balanced 0 .Leaf
-| B1 : balanced 1 .Leaf
+| B0 : balanced .zero .Leaf
+| B1 : balanced (.succ .zero) .Leaf
 | BS : ∀ n x l r,
   balanced n l → balanced n r →
   balanced (.succ n) (.Node x l r)

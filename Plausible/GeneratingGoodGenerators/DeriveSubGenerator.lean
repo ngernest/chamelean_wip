@@ -117,7 +117,7 @@ def processCorrespondingRange (u : Unknown) : UnifyM Range :=
       return .Unknown u'
     | some r => return r
 
-/-- Converts an `Expr` to a `Range`, using the ambient `LocalContext` to find the user-facing names
+/-- Converts an `Expr` to a `Range`, using the `LocalContext` to find the user-facing names
     corresponding to `FVarId`s -/
 partial def convertExprToRangeInCurrentContext (e : Expr) : UnifyM Range := do
   match (← convertToCtorExpr e) with
@@ -137,6 +137,13 @@ partial def convertExprToRangeInCurrentContext (e : Expr) : UnifyM Range := do
     else
       match e with
       | .const u _ => return (.Unknown u)
+      | .lit literal =>
+        -- Nat / String literals correspond to a `Range` that is a nullary constructor
+        let name :=
+          match literal with
+          | .natVal n => Name.mkStr1 (toString n)
+          | .strVal s => Name.mkStr1 s
+        return .Ctor name []
       | _ => throwError m!"Cannot convert expression {e} to Range"
 
 /-- Converts a hypothesis (reprented as a `TSyntax term`) to a `Range` -/
@@ -424,6 +431,7 @@ def getScheduleSort (conclusion : HypothesisExpr) (outputVars : List Unknown) (c
     (the one produced by `forallTelescopeReducing`).
 
     This function takes the following as arguments:
+    - The name of the inductive relation `inductiveName`
     - The constructor name `ctorName`
     - The name (`outputName`) and type (`outputType`) of the output (value to be generated)
     - The names of inputs `inputNames` (arguments to the generator)
@@ -431,7 +439,7 @@ def getScheduleSort (conclusion : HypothesisExpr) (outputVars : List Unknown) (c
       + Note: `unknowns == inputNames ∪ { outputName }`, i.e. `unknowns` contains all args to the inductive relation
         listed in order, which coincides with `inputNames ∪ { outputName }`
     - The name of the inductive relation we are targeting (`inductiveName`) -/
-def getScheduleForConstructor (ctorName : Name) (outputName : Name) (outputType : Expr) (inputNames : List Name)
+def getScheduleForConstructor (inductiveName : Name) (ctorName : Name) (outputName : Name) (outputType : Expr) (inputNames : List Name)
   (unknowns : Array Unknown) : UnifyM Schedule := do
   let ctorInfo ← getConstInfoCtor ctorName
   let ctorType := ctorInfo.type
@@ -520,7 +528,7 @@ def getScheduleForConstructor (ctorName : Name) (outputName : Name) (outputType 
       (vars := forAllVars)
       (hypotheses := hypothesisExprs.toList)
       (deriveSort := .Generator)
-      (recCall := (`typing, [outputIdx]))
+      (recCall := (inductiveName, [outputIdx]))
       fixedVars
 
     -- A *naive* schedule is the first schedule contained in `possibleSchedules`
@@ -604,7 +612,7 @@ def elabDeriveScheduledGenerator : CommandElab := fun stx => do
 
         for ctorName in inductiveVal.ctors do
           let scheduleOption ← (UnifyM.runInMetaM
-            (getScheduleForConstructor ctorName freshenedOutputName
+            (getScheduleForConstructor inductiveName ctorName freshenedOutputName
               outputType freshenedInputNamesExcludingOutput freshUnknowns)
               emptyUnifyState)
           match scheduleOption with
@@ -665,3 +673,6 @@ instance : ArbitrarySizedSuchThat type (fun t => typing G e t) where
 -- #derive_scheduled_generator (fun (tree : Tree) => LeftLeaning tree)
 
 -- #derive_scheduled_generator (fun (xs : List Nat) => Sorted xs)
+
+-- TODO: debug balanced tree case
+-- #derive_scheduled_generator (fun (tree : Tree) => balanced n tree)
