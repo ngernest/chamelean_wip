@@ -285,7 +285,7 @@ namespace UnifyM
   def findCorrespondingRange (k : UnknownMap) (u : Unknown) : UnifyM Range :=
     match k[u]? with
     | some r => return r
-    | none => throwError m!"unable to find {u} in UnknownMap {k.toList}"
+    | none => throwError m!"unable to find unknown {u} in UnknownMap {k.toList}"
 
   /-- Determines if an unknown `u` has a `Range` of `Undef τ` for some type `τ`
       in the constraints map -/
@@ -298,7 +298,7 @@ namespace UnifyM
       | _ => return false)
 
   /-- Determines whether a `Range` is fixed with respect to the constraint map `k` -/
-  partial def hasFixedRange (k : UnknownMap) (r : Range) : UnifyM Bool :=
+  partial def hasFixedRange (k : UnknownMap) (r : Range) : UnifyM Bool := do
     match r with
     | .Undef _ => return false
     | .Fixed => return true
@@ -393,28 +393,6 @@ namespace UnifyM
     | .CtorPattern c args => do
       let updatedArgs ← args.mapM (updatePattern k)
       return .CtorPattern c updatedArgs
-
-    /-- Updates the list of `hypotheses` in `UnifyState` with the result of unification,
-      updating `Unknown`s in `hypotheses` that appear in constructor argument positions
-      with their canonical representations (as determined by `findCanonicalUnknown`) -/
-  def updateHypothesesWithUnificationResult : UnifyM Unit := do
-    -- logWarning m!"inside updateHypothesesWithUnificationResult"
-    let state ← get
-    let k := state.constraints
-    let hypotheses := state.hypotheses
-
-    let mut newHypotheses := #[]
-    for (ctorName, ctorArgs) in hypotheses do
-      let mut newArgs := #[]
-      for arg in ctorArgs do
-        let updatedArg ← updateConstructorArg k arg
-        newArgs := newArgs.push updatedArg
-
-      newHypotheses := newHypotheses.push (ctorName, newArgs.toList)
-
-    -- logWarning m!"hypotheses after unification = {newHypotheses}"
-
-    modify $ fun s => { s with hypotheses := newHypotheses.toList }
 
   /-- Extends the current state with the contents of the fields in `newState`
       (Note that the `outputName` and `outputType` of `newStates` are used) -/

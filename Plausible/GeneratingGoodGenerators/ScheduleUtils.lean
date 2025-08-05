@@ -268,6 +268,8 @@ partial def dfs (boundVars : List Name) (remainingVars : List Name) (checkedHypo
         let remainingVars' := (remainingVarsSet \ outputSet).toList
         let outputVars := outputSet.toList
 
+        -- If any of these 3 conditions are true, there are no possible constrained producer `ScheduleStep`s,
+        -- so just return the empty list
         if outputVars.isEmpty
           || (← not <$> outputInputNotUnderSameConstructor hyp outputVars)
           || (← not <$> outputsNotConstrainedByFunctionApplication hyp outputVars) then
@@ -276,10 +278,12 @@ partial def dfs (boundVars : List Name) (remainingVars : List Name) (checkedHypo
           let (newMatches, hyp', newOutputs) ← handleConstrainedOutputs hyp outputVars
           let typedOutputs ← newOutputs.mapM
             (fun v => do
-              let tyExpr ← Option.getDM (List.lookup v env.vars)
-                (throwError m!"key {v} missing from association list {env.vars}")
-              let constructorExpr ← exprToConstructorExpr tyExpr
-              pure (v, constructorExpr))
+              match List.lookup v env.vars with
+              | some tyExpr =>
+                let constructorExpr ← exprToConstructorExpr tyExpr
+                pure (v, constructorExpr)
+              | none =>
+                pure (v, .Unknown `_))
           let (_, hypArgs) := hyp'
 
           let constrainingRelation ←

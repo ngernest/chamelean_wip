@@ -1,7 +1,9 @@
 import Plausible.Gen
 import Plausible.New.OptionTGen
 import Plausible.New.DecOpt
+import Plausible.New.Arbitrary
 import Plausible.New.ArbitrarySizedSuchThat
+import Test.DeriveArbitrary.DeriveSTLCTermTypeGenerators
 import Plausible.GeneratingGoodGenerators.DeriveSubGenerator
 
 open ArbitrarySizedSuchThat OptionTGen
@@ -36,6 +38,95 @@ info: Try this generator: instance : ArbitrarySizedSuchThat Nat (fun x_1 => look
 -/
 #guard_msgs(info, drop warning) in
 #derive_scheduled_generator (fun (x : Nat) => lookup Γ x τ)
+
+/--
+info: Try this generator: instance : ArbitrarySizedSuchThat type (fun τ_1 => lookup Γ_1 x_1 τ_1) where
+  arbitrarySizedST :=
+    let rec aux_arb (initSize : Nat) (size : Nat) (Γ_1 : List type) (x_1 : Nat) : OptionT Plausible.Gen type :=
+      match size with
+      | Nat.zero =>
+        OptionTGen.backtrack
+          [(1,
+              match x_1 with
+              | Nat.zero =>
+                match Γ_1 with
+                | List.cons τ Γ => return τ
+                | _ => OptionT.fail
+              | _ => OptionT.fail)]
+      | Nat.succ size' =>
+        OptionTGen.backtrack
+          [(1,
+              match x_1 with
+              | Nat.zero =>
+                match Γ_1 with
+                | List.cons τ Γ => return τ
+                | _ => OptionT.fail
+              | _ => OptionT.fail),
+            ]
+    fun size => aux_arb size size Γ_1 x_1
+-/
+#guard_msgs(info, drop warning) in
+#derive_scheduled_generator (fun (τ : type) => lookup Γ x τ)
+
+/--
+info: Try this generator: instance : ArbitrarySizedSuchThat type (fun t_1 => typing G_1 e_1 t_1) where
+  arbitrarySizedST :=
+    let rec aux_arb (initSize : Nat) (size : Nat) (G_1 : List type) (e_1 : term) : OptionT Plausible.Gen type :=
+      match size with
+      | Nat.zero =>
+        OptionTGen.backtrack
+          [(1,
+              match e_1 with
+              | term.Const n => return type.Nat
+              | _ => OptionT.fail),
+            (1,
+              match e_1 with
+              | term.Var x => do
+                let t_1 ← ArbitrarySizedSuchThat.arbitrarySizedST (fun t_1 => lookup G_1 x t_1) initSize;
+                return t_1
+              | _ => OptionT.fail)]
+      | Nat.succ size' =>
+        OptionTGen.backtrack
+          [(1,
+              match e_1 with
+              | term.Const n => return type.Nat
+              | _ => OptionT.fail),
+            (1,
+              match e_1 with
+              | term.Var x => do
+                let t_1 ← ArbitrarySizedSuchThat.arbitrarySizedST (fun t_1 => lookup G_1 x t_1) initSize;
+                return t_1
+              | _ => OptionT.fail),
+            (Nat.succ size',
+              match e_1 with
+              | term.Add e1 e2 =>
+                match DecOpt.decOpt (typing G_1 e1 (type.Nat)) initSize with
+                | Option.some Bool.true =>
+                  match DecOpt.decOpt (typing G_1 e2 (type.Nat)) initSize with
+                  | Option.some Bool.true => return type.Nat
+                  | _ => OptionT.fail
+                | _ => OptionT.fail
+              | _ => OptionT.fail),
+            (Nat.succ size',
+              match e_1 with
+              | term.Abs τ1 e => do
+                let τ2 ← aux_arb initSize size' (List.cons τ1 G_1) e;
+                return type.Fun τ1 τ2
+              | _ => OptionT.fail),
+            (Nat.succ size',
+              match e_1 with
+              | term.App e1 e2 => do
+                let τ1 ← aux_arb initSize size' G_1 e2;
+                do
+                  let t_1 ← Arbitrary.arbitrary;
+                  match DecOpt.decOpt (typing G_1 e1 (type.Fun τ1 t_1)) initSize with
+                    | Option.some Bool.true => return t_1
+                    | _ => OptionT.fail
+              | _ => OptionT.fail)]
+    fun size => aux_arb size size G_1 e_1
+-/
+#guard_msgs(info, drop warning) in
+#derive_scheduled_generator (fun (t : type) => typing G e t)
 
 /--
 info: Try this generator: instance : ArbitrarySizedSuchThat term (fun e_1 => typing G_1 e_1 t_1) where

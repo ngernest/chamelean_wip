@@ -404,6 +404,8 @@ def elabDeriveScheduledGenerator : CommandElab := fun stx => do
 
         let freshSize' := mkIdent $ localCtx.getUnusedName `size'
 
+        let mut requiredInstances := #[]
+
         for ctorName in inductiveVal.ctors do
           let scheduleOption ← (UnifyM.runInMetaM
             (getScheduleForConstructor inductiveName ctorName freshenedOutputName
@@ -411,9 +413,14 @@ def elabDeriveScheduledGenerator : CommandElab := fun stx => do
               emptyUnifyState)
           match scheduleOption with
           | some schedule =>
-            -- Compile the schedule to an `MExp`, then compile the `MExp` to a Lean term containing the code for the sub-generator
-            let mexp ← scheduleToMExp schedule (.MId `size) (.MId `initSize)
-            let subGenerator ← mexpToTSyntax mexp .Generator
+            -- Obtain a sub-generator for this constructor, along with an array of all typeclass instances that need to be defined beforehand
+            -- (Under the hood, we compile the schedule to an `MExp`, then compile the `MExp` to a Lean term containing the code for the sub-generator.
+            -- This is all done in a state monad, where we keep appending to an array of typeclass instance names when we detect that a new instance is required)
+            let (subGenerator, instances) ← StateT.run (s := #[]) (do
+              let mexp ← scheduleToMExp schedule (.MId `size) (.MId `initSize)
+              mexpToTSyntax mexp .Generator)
+
+            requiredInstances := requiredInstances ++ instances
 
             -- Determine whether the constructor is recursive
             -- (i.e. if the constructor has a hypothesis that refers to the inductive relation we are targeting)
@@ -425,6 +432,10 @@ def elabDeriveScheduledGenerator : CommandElab := fun stx => do
               weightedNonRecursiveGenerators := weightedNonRecursiveGenerators.push (← `( (1, $subGenerator) ))
 
           | none => throwError m!"Unable to derive generator schedule for constructor {ctorName}"
+
+        if (not requiredInstances.isEmpty) then
+          let deduplicatedInstances := List.eraseDups requiredInstances.toList
+          logWarning m!"Required typeclass instances (please derive these first if they aren't already defined):\n{deduplicatedInstances}"
 
         let baseGenerators ← `([$weightedNonRecursiveGenerators,*])
         let inductiveGenerators ← `([$weightedNonRecursiveGenerators,*, $weightedRecursiveGenerators,*])
@@ -454,20 +465,5 @@ def elabDeriveScheduledGenerator : CommandElab := fun stx => do
 
   | _ => throwUnsupportedSyntax
 
-
--- Extra Arbitrary instances needed in order for STLC example to work
-deriving instance Arbitrary for type, term
-
--- Extra `ArbitrarySizedSuchThat` needed in order for STLC example to work
-instance : ArbitrarySizedSuchThat type (fun t => typing G e t) where
-  arbitrarySizedST := sorry
-
-
--- TODO: debug BST tree case
--- #derive_scheduled_generator (fun (tree : Tree) => bst in1 in2 tree)
-
--- #derive_scheduled_generator (fun (e : term) => typing G e t)
-
--- #derive_scheduled_generator (fun (tree : Tree) => LeftLeaning tree)
-
--- #derive_scheduled_generator (fun (xs : List Nat) => Sorted xs)
+-- TODO: debug these cases
+-- #derive_scheduled_generator (fun (l : List Nat) => inList x l)

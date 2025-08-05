@@ -240,5 +240,5 @@
   ["unusedArguments", "Plausible.RandT.down"],
   ["unusedArguments", "Plausible.NamedBinder"],
   ["unusedArguments", "Plausible.Decorations.DecorationsOf"],
-  ["unusedArguments", "scheduleStepToMexp"]
+  ["unusedArguments", "scheduleStepToMExp"]
 ]

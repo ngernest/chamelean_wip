@@ -99,8 +99,13 @@ inductive Density
   | Total
   deriving Repr, BEq
 
+/-- Converts a `HypothesisExpr` to a `TSyntax term` -/
+def hypothesisExprToTSyntaxTerm (hypExpr : HypothesisExpr) : MetaM (TSyntax `term) := do
+  let (ctorName, ctorArgs) := hypExpr
+  let ctorArgTerms ← ctorArgs.toArray.mapM constructorExprToTSyntaxTerm
+  `($(mkIdent ctorName) $ctorArgTerms:term*)
 
-/-- Convert an `Expr` to a `ConstructorExpr` -/
+/-- Converts an `Expr` to a `ConstructorExpr` -/
 partial def exprToConstructorExpr (e : Expr) : MetaM ConstructorExpr := do
   match e with
   | .fvar id =>

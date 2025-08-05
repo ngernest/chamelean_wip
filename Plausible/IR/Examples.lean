@@ -4,6 +4,12 @@ open Plausible
 
 set_option linter.missingDocs false
 
+/-- List membership expressed as an inductive relation:
+   `inList x l` means `x ∈ l`. -/
+inductive inList : Nat → List Nat → Prop where
+| Here : ∀ x l, inList x (x::l)
+| There : ∀ x y l, inList x l → inList x (y::l)
+
 /-- A datatype for binary trees -/
 inductive Tree where
 | Leaf : Tree

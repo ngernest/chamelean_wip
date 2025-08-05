@@ -38,7 +38,8 @@ info: Try this checker: instance : DecOpt (InList x l) where
 #guard_msgs(info, drop warning) in
 #derive_checker (InList x l)
 
--- TODO: replace this with the call `#derive_scheduled_generator (fun (l : List Nat) => InList x l)`
+
+-- TODO: replace this dummy instance with the call `#derive_scheduled_generator (fun (l : List Nat) => InList x l)`
 -- after the deriver has been updated to support types which involve type constructor applications (e.g. `List Nat`)
 instance : ArbitrarySizedSuchThat (List Nat) (fun l => InList x l) where
   arbitrarySizedST := sorry
