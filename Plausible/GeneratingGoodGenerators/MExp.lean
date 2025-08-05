@@ -235,7 +235,7 @@ mutual
             decOptChecker (hypothesisExprToMExp hypExpr) mfuel
           | Source.Rec f args => recCall f args
         -- TODO: handle checking hypotheses w/ negative polarity (currently not handled)
-        pure $ .MBind MonadSort.Checker checker [] k
+        pure $ .MMatch checker [(.CtorPattern ``some [.UnknownPattern ``true], k), (wildCardPattern, .MFail)]
       | .Match scrutinee pattern =>
         pure $ .MMatch (.MId scrutinee) [(pattern, k), (wildCardPattern, .MFail)]
 
@@ -315,7 +315,7 @@ mutual
       -- of the monadic expression `m`, convert them to a tuple
       let compiledArgs ←
         if vars.isEmpty then
-          throwError m!"empty list of vars supplied to MBind"
+          throwError m!"empty list of vars supplied to MBind, m1 = {m1}, k1 = {k1}"
         else
           mkTuple vars
 

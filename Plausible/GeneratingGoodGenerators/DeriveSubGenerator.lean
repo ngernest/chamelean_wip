@@ -10,6 +10,7 @@ import Plausible.New.SubGenerators
 import Plausible.New.DeriveArbitrary
 import Plausible.New.TSyntaxCombinators
 import Plausible.New.Utils
+import Plausible.New.Debug
 import Plausible.IR.Prelude
 import Plausible.IR.Examples
 
@@ -465,7 +466,7 @@ def getScheduleForConstructor (ctorName : Name) (outputName : Name) (outputType 
     let mut hypothesisExprs := #[]
 
     for hyp in hypotheses do
-      let hypTerm ← delabExprInLocalContext localCtx hyp
+      let hypTerm ← withOptions setDelaboratorOptions (delabExprInLocalContext localCtx hyp)
       -- Convert the `TSyntax` representation of the hypothesis to a `Range`
       -- If that fails, convert the `Expr` representation of the hypothesis to a `Range`
       -- (the latter is needed to handle hypotheses which use infix operators)
@@ -539,12 +540,12 @@ def getScheduleForConstructor (ctorName : Name) (outputName : Name) (outputType 
 
 
 /-- Command for deriving a sub-generator for one construtctor of an inductive relation (per figure 4 of GGG) -/
-syntax (name := derive_subgenerator) "#derive_subgenerator" "(" "fun" "(" ident ":" term ")" "=>" term ")" : command
+syntax (name := derive_scheduled_generator) "#derive_scheduled_generator" "(" "fun" "(" ident ":" term ")" "=>" term ")" : command
 
-@[command_elab derive_subgenerator]
-def elabDeriveSubGenerator : CommandElab := fun stx => do
+@[command_elab derive_scheduled_generator]
+def elabDeriveScheduledGenerator : CommandElab := fun stx => do
   match stx with
-  | `(#derive_subgenerator ( fun ( $var:ident : $outputTypeSyntax:term ) => $body:term )) => do
+  | `(#derive_scheduled_generator ( fun ( $var:ident : $outputTypeSyntax:term ) => $body:term )) => do
 
     -- Parse the body of the lambda for an application of the inductive relation
     let (inductiveSyntax, argIdents) ← parseInductiveApp body
@@ -658,9 +659,9 @@ instance : ArbitrarySizedSuchThat type (fun t => typing G e t) where
   arbitrarySizedST := sorry
 
 
--- #derive_subgenerator (fun (tree : Tree) => bst in1 in2 tree)
--- #derive_subgenerator (fun (e : term) => typing G e t)
+-- #derive_scheduled_generator (fun (tree : Tree) => bst in1 in2 tree)
+-- #derive_scheduled_generator (fun (e : term) => typing G e t)
 
--- #derive_subgenerator (fun (tree : Tree) => LeftLeaning tree)
+-- #derive_scheduled_generator (fun (tree : Tree) => LeftLeaning tree)
 
--- #derive_subgenerator (fun (xs : List Nat) => Sorted xs)
+-- #derive_scheduled_generator (fun (xs : List Nat) => Sorted xs)

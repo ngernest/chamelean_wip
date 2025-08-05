@@ -202,7 +202,9 @@ def mkProducerTypeClassInstance (baseGenerators : TSyntax `term) (inductiveGener
             $matchExpr
           fun $freshSizeIdent => $innerFunctionIdent $freshSizeIdent $freshSizeIdent $outerParams*)
 
-/-- Like `mkProducerTypeClassInstance`, but without the `nameMap` -/
+/-- Like `mkProducerTypeClassInstance`, but without the `nameMap`
+    - TODO: clean-up this function!
+ -/
 def mkProducerTypeClassInstance' (baseGenerators : TSyntax `term) (inductiveGenerators : TSyntax `term) (inductiveStx : TSyntax `term)
   (args : TSyntaxArray `term) (targetVar : Name)
   (targetTypeSyntax : TSyntax `term) (producerType : ProducerType)
