@@ -44,37 +44,48 @@ def reCls (l : List Nat) (ign : RegExp) : RegExp :=
   | [x] => RegExp.Char x
   | x :: xs => RegExp.Union (RegExp.Char x) (reCls xs ign)
 
+/-- reg_exp is `[123]*` -/
+def r : RegExp :=
+  RegExp.Star
+    (RegExp.Union
+        (RegExp.Char 1)
+        (RegExp.Union (RegExp.Char 2) (RegExp.Char 3)))
+
+example: ExpMatch [] r := by apply ExpMatch.MStar0
+example: ExpMatch (3::1::[]) r := sorry
+example: ExpMatch (1::2::2::[]) r := sorry
+
 /-- reg_exp is `1230*[456]*` -/
 def r0 : RegExp :=
   RegExp.App
     (RegExp.App (reStr [1, 2, 3] (RegExp.Char 0)) (RegExp.Star (RegExp.Char 0)))
     (RegExp.Star (reCls [4, 5, 6] (RegExp.Char 0)))
 
--- Generator for strings that match the regexp `r0`
+-- Generator for strings that match the regexp `re`
 
 /--
-info: Try this generator: instance : ArbitrarySizedSuchThat NatString (fun s => ExpMatch s r0) where
+info: Try this generator: instance : ArbitrarySizedSuchThat NatString (fun s => ExpMatch s re) where
   arbitrarySizedST :=
-    let rec aux_arb (initSize : Nat) (size : Nat) (r0_1 : RegExp) : OptionT Plausible.Gen NatString :=
+    let rec aux_arb (initSize : Nat) (size : Nat) (re_1 : RegExp) : OptionT Plausible.Gen NatString :=
       match size with
       | Nat.zero =>
         OptionTGen.backtrack
           [(1,
               OptionTGen.thunkGen
                 (fun _ =>
-                  match r0_1 with
+                  match re_1 with
                   | RegExp.EmptyStr => pure []
                   | _ => OptionT.fail)),
             (1,
               OptionTGen.thunkGen
                 (fun _ =>
-                  match r0_1 with
+                  match re_1 with
                   | RegExp.Char x => pure [x]
                   | _ => OptionT.fail)),
             (1,
               OptionTGen.thunkGen
                 (fun _ =>
-                  match r0_1 with
+                  match re_1 with
                   | RegExp.Star re => pure []
                   | _ => OptionT.fail)),
             (1, OptionTGen.thunkGen (fun _ => OptionT.fail))]
@@ -83,19 +94,19 @@ info: Try this generator: instance : ArbitrarySizedSuchThat NatString (fun s => 
           [(1,
               OptionTGen.thunkGen
                 (fun _ =>
-                  match r0_1 with
+                  match re_1 with
                   | RegExp.EmptyStr => pure []
                   | _ => OptionT.fail)),
             (1,
               OptionTGen.thunkGen
                 (fun _ =>
-                  match r0_1 with
+                  match re_1 with
                   | RegExp.Char x => pure [x]
                   | _ => OptionT.fail)),
             (Nat.succ size',
               OptionTGen.thunkGen
                 (fun _ =>
-                  match r0_1 with
+                  match re_1 with
                   | RegExp.App re1 re2 => do
                     let s1 ← aux_arb initSize size' re1
                     let s2 ← aux_arb initSize size' re2
@@ -104,7 +115,7 @@ info: Try this generator: instance : ArbitrarySizedSuchThat NatString (fun s => 
             (Nat.succ size',
               OptionTGen.thunkGen
                 (fun _ =>
-                  match r0_1 with
+                  match re_1 with
                   | RegExp.Union re1 re2 => do
                     let s_1 ← aux_arb initSize size' re1
                     return s_1
@@ -112,7 +123,7 @@ info: Try this generator: instance : ArbitrarySizedSuchThat NatString (fun s => 
             (Nat.succ size',
               OptionTGen.thunkGen
                 (fun _ =>
-                  match r0_1 with
+                  match re_1 with
                   | RegExp.Union re1 re2 => do
                     let s_1 ← aux_arb initSize size' re2
                     return s_1
@@ -120,23 +131,23 @@ info: Try this generator: instance : ArbitrarySizedSuchThat NatString (fun s => 
             (1,
               OptionTGen.thunkGen
                 (fun _ =>
-                  match r0_1 with
+                  match re_1 with
                   | RegExp.Star re => pure []
                   | _ => OptionT.fail)),
             (Nat.succ size',
               OptionTGen.thunkGen
                 (fun _ =>
-                  match r0_1 with
+                  match re_1 with
                   | RegExp.Star re => do
                     let s1 ← aux_arb initSize size' re
                     let s2 ← aux_arb initSize size' (RegExp.Star re)
                     return s1 ++ s2
                   | _ => OptionT.fail))]
-    fun size => aux_arb size size r0
+    fun size => aux_arb size size re
 -/
 #guard_msgs(info, drop warning) in
-#derive_generator (fun (s : NatString) => ExpMatch s r0)
+#derive_generator (fun (s : NatString) => ExpMatch s re)
 
 -- To sample from this generator and print out 10 successful examples using the `Repr`
 -- instance for `NatString`, we can run the following:
-#eval runSizedGenPrintOutput (arbitrarySizedST (fun s => ExpMatch s r0)) 10
+#eval runSizedGenPrintOutput (arbitrarySizedST (fun s => ExpMatch s r)) 10
