@@ -14,6 +14,8 @@ import Plausible.New.Utils
 import Plausible.IR.Prelude
 import Plausible.IR.Examples
 
+import Lean.Elab.Command
+import Lean.Meta.Basic
 
 open Lean Elab Command Meta Term Parser
 open Idents
@@ -571,53 +573,77 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
 
     -- Add the name & type of each argument to the inductive relation to the ambient `LocalContext`
     -- (as a local declaration)
-    liftTermElabM $ withLocalDeclsDND argNamesTypes (fun _ => do
-      let mut localCtx ← getLCtx
-      let mut freshUnknowns := #[]
+    let (baseGenerators, inductiveGenerators, localCtx) ←
+      liftTermElabM $ withLocalDeclsDND argNamesTypes (fun _ => do
+        let mut localCtx ← getLCtx
+        let mut freshUnknowns := #[]
 
-      -- For each arg to the inductive relation (as specified to the user),
-      -- create a fresh name (to avoid clashing with names that may appear in constructors
-      -- of the inductive relation). Note that this requires updating the `LocalContext`
-      for argName in argNames do
-        let freshArgName := localCtx.getUnusedName argName
-        localCtx := localCtx.renameUserName argName freshArgName
-        freshUnknowns := freshUnknowns.push freshArgName
+        -- For each arg to the inductive relation (as specified to the user),
+        -- create a fresh name (to avoid clashing with names that may appear in constructors
+        -- of the inductive relation). Note that this requires updating the `LocalContext`
+        for argName in argNames do
+          let freshArgName := localCtx.getUnusedName argName
+          localCtx := localCtx.renameUserName argName freshArgName
+          freshUnknowns := freshUnknowns.push freshArgName
 
-      -- Since the `output` also appears as an argument to the inductive relation,
-      -- we also need to freshen its name
-      let freshenedOutputName := freshUnknowns[outputIdx]!
+        -- Since the `output` also appears as an argument to the inductive relation,
+        -- we also need to freshen its name
+        let freshenedOutputName := freshUnknowns[outputIdx]!
 
-      -- Each argument to the inductive relation (except the one at `outputIdx`)
-      -- is treated as an input
-      let freshenedInputNamesExcludingOutput := (Array.eraseIdx! freshUnknowns outputIdx).toList
+        -- Each argument to the inductive relation (except the one at `outputIdx`)
+        -- is treated as an input
+        let freshenedInputNamesExcludingOutput := (Array.eraseIdx! freshUnknowns outputIdx).toList
 
-      let mut nonRecursiveGenerators := #[]
-      let mut recursiveGenerators := #[]
+        let mut weightedNonRecursiveGenerators := #[]
+        let mut weightedRecursiveGenerators := #[]
 
-      for ctorName in inductiveVal.ctors do
-        let scheduleOption ← UnifyM.runInMetaM
-          (getScheduleForConstructor ctorName freshenedOutputName
-            outputType freshenedInputNamesExcludingOutput freshUnknowns)
-            emptyUnifyState
-        match scheduleOption with
-        | some schedule =>
-          -- Compile the schedule to an `MExp`, then compile the `MExp` to a Lean term containing the code for the sub-generator
-          let mexp ← scheduleToMExp schedule (.MId `size) (.MId `size)
-          let subGenerator ← mexpToTSyntax mexp .Generator
-          logInfo m!"Derived generator:\n```\n{subGenerator}\n```"
+        let freshSize' := mkIdent $ localCtx.getUnusedName `size'
 
-          -- Determine whether the constructor is recursive
-          -- (i.e. if the constructor has a hypothesis that refers to the inductive relation we are targeting)
-          let isRecursive ← isConstructorRecursive inductiveName ctorName
+        for ctorName in inductiveVal.ctors do
+          let scheduleOption ← (UnifyM.runInMetaM
+            (getScheduleForConstructor ctorName freshenedOutputName
+              outputType freshenedInputNamesExcludingOutput freshUnknowns)
+              emptyUnifyState)
+          match scheduleOption with
+          | some schedule =>
+            -- Compile the schedule to an `MExp`, then compile the `MExp` to a Lean term containing the code for the sub-generator
+            let mexp ← scheduleToMExp schedule (.MId `size) (.MId `size)
+            let subGenerator ← mexpToTSyntax mexp .Generator
+            -- logInfo m!"Derived generator:\n```\n{subGenerator}\n```"
 
-          if isRecursive then
-            recursiveGenerators := recursiveGenerators.push subGenerator
-          else
-            nonRecursiveGenerators := nonRecursiveGenerators.push subGenerator
+            -- Determine whether the constructor is recursive
+            -- (i.e. if the constructor has a hypothesis that refers to the inductive relation we are targeting)
+            let isRecursive ← isConstructorRecursive inductiveName ctorName
 
-          -- TODO: figure out how to combine all the sub-generators across all constructors
+            if isRecursive then
+              weightedRecursiveGenerators := weightedRecursiveGenerators.push (← `( ($(mkIdent ``Nat.succ) $freshSize', $subGenerator) ))
+            else
+              weightedNonRecursiveGenerators := weightedNonRecursiveGenerators.push (← `( (1, $subGenerator) ))
 
-        | none => throwError m!"Unable to derive generator schedule for constructor {ctorName}")
+          | none => throwError m!"Unable to derive generator schedule for constructor {ctorName}"
+
+        let baseGenerators ← `([$weightedNonRecursiveGenerators,*])
+        let inductiveGenerators ← `([$weightedNonRecursiveGenerators,*, $weightedRecursiveGenerators,*])
+
+        return (baseGenerators, inductiveGenerators, localCtx))
+
+    -- Create an instance of the `ArbitrarySuchThat` typeclass
+    let typeClassInstance ←
+      mkProducerTypeClassInstance
+        baseGenerators inductiveGenerators
+        inductiveSyntax argIdents
+        outputName outputTypeSyntax
+        .Generator localCtx Std.HashMap.emptyWithCapacity
+
+    -- Pretty-print the derived generator
+    let genFormat ← liftCoreM (PrettyPrinter.ppCommand typeClassInstance)
+
+    -- Display the code for the derived generator to the user
+    -- & prompt the user to accept it in the VS Code side panel
+    liftTermElabM $ Tactic.TryThis.addSuggestion stx
+      (Format.pretty genFormat) (header := "Try this generator: ")
+
+    elabCommand typeClassInstance
 
   | _ => throwUnsupportedSyntax
 
@@ -626,7 +652,7 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
 -- TODO: figure out how to assemble the entire generator function with all constructors
 
 -- #derive_subgenerator (fun (tree : Tree) => bst in1 in2 tree)
-#derive_subgenerator (fun (e : term) => typing G e t)
+-- #derive_subgenerator (fun (e : term) => typing G e t)
 
 -- #derive_subgenerator (fun (tree : Tree) => LeftLeaning tree)
 
