@@ -208,8 +208,10 @@ mutual
         akin to difference lists in Haskell
       - The function parameter `k` represents the remainder of the `mexp`
         (the rest of the monadic `do`-block)
+      - `mfuel` and `defFuel` are `MExp`s representing the current size and the initial size
+        supplied to the generator/enumerator/checker we're deriving
   -/
-  partial def scheduleStepToMexp (step : ScheduleStep) (mfuel : MExp) (defFuel : MExp) : MExp → TermElabM MExp :=
+  partial def scheduleStepToMexp (step : ScheduleStep) (_mfuel : MExp) (defFuel : MExp) : MExp → TermElabM MExp :=
     fun k =>
       match step with
       | .Unconstrained v src prodSort => do
@@ -234,7 +236,7 @@ mutual
         let checker :=
           match src with
           | Source.NonRec hypExpr =>
-            decOptChecker (hypothesisExprToMExp hypExpr) mfuel
+            decOptChecker (hypothesisExprToMExp hypExpr) defFuel
           | Source.Rec f args => recCall f args
         -- TODO: handle checking hypotheses w/ negative polarity (currently not handled)
         pure $ .MMatch checker [(.CtorPattern ``some [.UnknownPattern ``true], k), (wildCardPattern, .MFail)]
