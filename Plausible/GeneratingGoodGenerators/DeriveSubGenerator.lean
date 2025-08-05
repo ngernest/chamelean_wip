@@ -571,13 +571,13 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
 
     -- Add the name & type of each argument to the inductive relation to the ambient `LocalContext`
     -- (as a local declaration)
-    liftTermElabM $ withLocalDeclsDND argNamesTypes $ fun _ => do
+    liftTermElabM $ withLocalDeclsDND argNamesTypes (fun _ => do
       let mut localCtx ← getLCtx
       let mut freshUnknowns := #[]
 
       -- For each arg to the inductive relation (as specified to the user),
       -- create a fresh name (to avoid clashing with names that may appear in constructors
-      -- of the inductive relation). Note that this requires updating the ambient `LocalContext`
+      -- of the inductive relation). Note that this requires updating the `LocalContext`
       for argName in argNames do
         let freshArgName := localCtx.getUnusedName argName
         localCtx := localCtx.renameUserName argName freshArgName
@@ -591,23 +591,33 @@ def elabDeriveSubGenerator : CommandElab := fun stx => do
       -- is treated as an input
       let freshenedInputNamesExcludingOutput := (Array.eraseIdx! freshUnknowns outputIdx).toList
 
-      for ctorName in inductiveVal.ctors do
-       -- Determine whether the constructor is recursive
-       -- (i.e. if the constructor has a hypothesis that refers to the inductive relation we are targeting)
-        let isRecursive ← isConstructorRecursive inductiveName ctorName
+      let mut nonRecursiveGenerators := #[]
+      let mut recursiveGenerators := #[]
 
-        -- TODO: figure out how to combine all the sub-generators across all constructors
+      for ctorName in inductiveVal.ctors do
         let scheduleOption ← UnifyM.runInMetaM
-          (getScheduleForConstructor ctorName freshenedOutputName outputType freshenedInputNamesExcludingOutput freshUnknowns) emptyUnifyState
+          (getScheduleForConstructor ctorName freshenedOutputName
+            outputType freshenedInputNamesExcludingOutput freshUnknowns)
+            emptyUnifyState
         match scheduleOption with
         | some schedule =>
           -- Compile the schedule to an `MExp`, then compile the `MExp` to a Lean term containing the code for the sub-generator
           let mexp ← scheduleToMExp schedule (.MId `size) (.MId `size)
           let subGenerator ← mexpToTSyntax mexp .Generator
           logInfo m!"Derived generator:\n```\n{subGenerator}\n```"
-        | none => logInfo m!"Derived generator:\n```\nreturn none\n```"
 
+          -- Determine whether the constructor is recursive
+          -- (i.e. if the constructor has a hypothesis that refers to the inductive relation we are targeting)
+          let isRecursive ← isConstructorRecursive inductiveName ctorName
 
+          if isRecursive then
+            recursiveGenerators := recursiveGenerators.push subGenerator
+          else
+            nonRecursiveGenerators := nonRecursiveGenerators.push subGenerator
+
+          -- TODO: figure out how to combine all the sub-generators across all constructors
+
+        | none => throwError m!"Unable to derive generator schedule for constructor {ctorName}")
 
   | _ => throwUnsupportedSyntax
 
