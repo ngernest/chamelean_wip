@@ -414,8 +414,6 @@ def elabDeriveScheduledGenerator : CommandElab := fun stx => do
             let mexp ← scheduleToMExp schedule (.MId `size) (.MId `initSize)
             let subGenerator ← mexpToTSyntax mexp .Generator
 
-            logWarning m!"subGenerator = {subGenerator}"
-
             -- Determine whether the constructor is recursive
             -- (i.e. if the constructor has a hypothesis that refers to the inductive relation we are targeting)
             let isRecursive ← isConstructorRecursive inductiveName ctorName
@@ -444,9 +442,12 @@ def elabDeriveScheduledGenerator : CommandElab := fun stx => do
     let genFormat ← liftCoreM (PrettyPrinter.ppCommand typeClassInstance)
 
     -- Display the code for the derived generator to the user
+    logInfo m!"Try this generator: {Format.pretty genFormat}"
+
+    -- Display the code for the derived generator to the user
     -- & prompt the user to accept it in the VS Code side panel
-    liftTermElabM $ Tactic.TryThis.addSuggestion stx
-      (Format.pretty genFormat) (header := "Try this generator: ")
+    -- liftTermElabM $ Tactic.TryThis.addSuggestion stx
+    --   (Format.pretty genFormat) (header := "Try this generator: ")
 
     elabCommand typeClassInstance
 
