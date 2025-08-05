@@ -145,17 +145,36 @@ def exprToHypothesisExpr (e : Expr) : MetaM (Option HypothesisExpr) := do
     return none
 
 /-- Updates a `Source` with the result of unification as contained in the `UnknownMap` -/
-def updateSource (k : UnknownMap) (src : Source) : UnifyM Source :=
+def updateSource (k : UnknownMap) (src : Source) : UnifyM Source := do
+  logWarning m!"updating source {repr src}"
   match src with
-  | .NonRec (ctorName, args) => do
-    let updatedArgs ← List.mapM (UnifyM.updateConstructorArg k) args
-    return .NonRec (ctorName, updatedArgs)
+  | .NonRec hyp => do
+    let hypExpr := toExpr hyp
+    logWarning m!"hypExpr is {hypExpr}"
+
+    -- To do so, we first extract the constructor in the hypothesis
+    -- and see if it corresponds to a type constructor for a parameterized type `inductive` type (e.g. `List`)
+    -- If yes, we can just return the source as is, since the source is just the name of a type
+    let (typeConstructor, _) := hypExpr.getAppFnArgs
+
+    try (do
+      -- TODO: figure out why this causes tests to fail!
+      let inductiveVal ← getConstInfoInduct typeConstructor
+      logWarning m!"inductiveVal.all = {inductiveVal.all}"
+      logWarning m!"inductiveVal.ctors = {inductiveVal.ctors}"
+      logWarning m!"inductiveVal.numParams = {inductiveVal.numParams}"
+      pure src)
+    catch _ =>
+      let (ctorName, args) := hyp
+      let updatedArgs ← List.mapM (UnifyM.updateConstructorArg k) args
+      return .NonRec (ctorName, updatedArgs)
   | .Rec r tys => do
     let updatedTys ← List.mapM (UnifyM.updateConstructorArg k) tys
     return .Rec r updatedTys
 
 /-- Updates a list of `ScheduleSteps` with the result of unification -/
-def updateScheduleSteps (scheduleSteps : List ScheduleStep) : UnifyM (List ScheduleStep) :=
+def updateScheduleSteps (scheduleSteps : List ScheduleStep) : UnifyM (List ScheduleStep) := do
+  logWarning "updating scheduleSteps..."
   UnifyM.withConstraints $ fun k => scheduleSteps.mapM (fun step =>
     match step with
     | .Match u p => do
@@ -163,7 +182,9 @@ def updateScheduleSteps (scheduleSteps : List ScheduleStep) : UnifyM (List Sched
       let updatedPattern ← UnifyM.updatePattern k p
       return .Match updatedScrutinee updatedPattern
     | .Unconstrained u src producerSort => do
+      logWarning m!"in unconstrained case, finding canonical unknown for unknown {u}"
       let updatedUnknown ← UnifyM.findCanonicalUnknown k u
+      logWarning m!"updatedUnknown = {updatedUnknown}"
       let updatedSrc ← updateSource k src
       return .Unconstrained updatedUnknown updatedSrc producerSort
     | .SuchThat unknownsAndTypes src dst => do

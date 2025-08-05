@@ -362,6 +362,7 @@ namespace UnifyM
       - Note: this function corresponds to `correct_var` in the QuickChick code.  -/
   partial def findCanonicalUnknown (k : UnknownMap) (u : Unknown) : UnifyM Unknown := do
     let r ← findCorrespondingRange k u
+    logWarning m!"findCanonicalUnknown: unknown {u} ↦ range {r}"
     match r with
     | .Unknown u' => findCanonicalUnknown k u'
     | _ => return u
@@ -372,6 +373,7 @@ namespace UnifyM
       - See `updateHypothesesWithUnificationResult` for an example of how this function is used.
       - Note: this function corresponds to `correct_rocq_constr` in the QuickChick code. -/
   partial def updateConstructorArg (k : UnknownMap) (ctorArg : ConstructorExpr) : UnifyM ConstructorExpr := do
+    logWarning m!"updating constructorArg {ctorArg}"
     match ctorArg with
     | .Unknown arg =>
       let canonicalUnknown ← findCanonicalUnknown k arg

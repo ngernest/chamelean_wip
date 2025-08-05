@@ -466,4 +466,4 @@ def elabDeriveScheduledGenerator : CommandElab := fun stx => do
   | _ => throwUnsupportedSyntax
 
 -- TODO: debug these cases
--- #derive_scheduled_generator (fun (l : List Nat) => inList x l)
+#derive_scheduled_generator (fun (l : List Nat) => inList x l)
