@@ -4,10 +4,11 @@ import Plausible.New.Enumerators
 import Plausible.New.DecOpt
 import Plausible.New.TSyntaxCombinators
 import Plausible.GeneratingGoodGenerators.Schedules
+import Plausible.GeneratingGoodGenerators.UnificationMonad
 import Plausible.New.Idents
 
 open Idents
-open Lean Parser Elab Term
+open Lean Parser Elab Term Command
 
 /-- The sort of monad we are compiling to, i.e. one of the following:
     - An unconstrained / constrained generator (`Gen` / `OptionT Gen`)
@@ -365,31 +366,20 @@ mutual
     if varsTys.isEmpty then
       panic! "Received empty list of variables for constrainedProducer"
     else do
-      let (args, _argTys) := List.unzip varsTys
-
       -- Determine whether the typeclass instance for the constrained generator already exists
-      -- i.e. check if an instance for `ArbitrarySizedSuchThat` / `EnumSizedSuchThat` with the specified `prop` already exists
-      -- To do so, we need to elaborate the `MExp`s to `Expr`s and use Lean's in-built functions
-      -- for synthesizing typeclass instances
+      -- i.e. check if an instance for `ArbitrarySizedSuchThat` / `EnumSizedSuchThat` with the
+      -- specified `argTys` and `prop` already exists
+      let (args, argTys) := List.unzip varsTys
+      let argsTuple ← mkTuple args
+      let argTyTerms ← monadLift $ argTys.toArray.mapM constructorExprToTSyntaxTerm
+      let propBody ← mexpToTSyntax prop .Generator
+      let typeClassName :=
+        match prodSort with
+        | .Enumerator => ``EnumSizedSuchThat
+        | .Generator => ``ArbitrarySizedSuchThat
+      let typeClassInstance ← `($(mkIdent typeClassName) $argTyTerms* (fun $argsTuple:term => $propBody))
 
-      -- Note: the following code is commented out because we need to assemble the whole generator before we can
-      -- even attempt to synthesize typeclass instances (otherwise elaborating to `Expr` doesn't work due to identifier issues)
-
-      -- let argTyExprs := toExpr <$> argTys.toArray
-      -- let propTerm ← mexpToTSyntax prop .Generator
-      -- let propExpr ← elabTerm propTerm none
-
-      -- let typeClassName :=
-      --   match prodSort with
-      --   | .Enumerator => ``EnumSizedSuchThat
-      --   | .Generator => ``ArbitrarySizedSuchThat
-
-      -- let typeClassInstance ← Meta.mkAppM typeClassName (argTyExprs.push propExpr)
-      -- let typeClassExists ← Option.isSome <$> Meta.synthInstance? typeClassInstance
-
-      -- -- If no such typeclass exists, emit a warning
-      -- if (not typeClassExists) then
-      --   logWarning m!"Please first derive the typeclass instance {typeClassInstance}"
+      logWarning m!"Check that the typeclass instance ({typeClassInstance}) already exists -- if not, please derive it first!"
 
       let producerWithArgs := MExp.MFun args prop
       match prodSort with

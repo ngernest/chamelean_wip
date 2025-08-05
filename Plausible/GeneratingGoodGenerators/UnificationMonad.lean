@@ -68,6 +68,15 @@ instance : ToExpr ConstructorExpr where
   toExpr := constructorExprToExpr
   toTypeExpr := mkConst ``Expr
 
+/-- Converts a `ConstructorExpr` to a Lean `TSyntax term` -/
+partial def constructorExprToTSyntaxTerm (ctorExpr : ConstructorExpr) : MetaM (TSyntax `term) :=
+  match ctorExpr with
+  | .Unknown name => `($(mkIdent name))
+  | .Ctor ctorName ctorArgs => do
+    let argTerms ← ctorArgs.toArray.mapM constructorExprToTSyntaxTerm
+    `($(mkIdent ctorName) $argTerms:term*)
+
+
 /-- Converts a `Pattern` to an equivalent `ConstructorExpr` -/
 partial def constructorExprOfPattern (pattern : Pattern) : ConstructorExpr :=
   match pattern with
@@ -115,6 +124,19 @@ structure UnifyState where
   hypotheses : List (Name × List ConstructorExpr)
 
   deriving Repr
+
+/-- Initial (empty) unification state
+    - Note that the dummy `outputName` and `outputType` are never used
+      (it will be updated when callers invoke the unification algorithm through this monad) -/
+def emptyUnifyState : UnifyState :=
+  { constraints := ∅,
+    equalities := ∅,
+    patterns := [],
+    unknowns := ∅,
+    outputName := `dummyOutput,
+    outputType := mkConst `dummyOutputType
+    inputNames := []
+    hypotheses := [] }
 
 ---------------------------------------------------------------
 -- `ToMessageData` instances for pretty-printing
