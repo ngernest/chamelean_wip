@@ -220,55 +220,78 @@ def getScheduleSort (conclusion : HypothesisExpr) (outputVars : List Unknown) (c
     return .ProducerSchedule producerSort conclusion
 
 
-/-- `rewriteFunctionCallsInConclusionNEW hypotheses conclusion inductiveRelationName` does the following:
+
+/-- `rewriteFunctionCallsInConclusionUnifyM hypotheses conclusion inductiveRelationName` does the following:
     1. Checks if the `conclusion` contains a function call where the function is *not* the same as the `inductiveRelationName`.
        (If no, we just return the pair `(hypotheses, conclusion)` as is.)
     2. If yes, we create a fresh variable & add an extra hypothesis where the fresh var is bound to the result of the function call.
-    3. We then rewrite the conclusion, replacing occurrences of the function call with the fresh variable.
-    The updated hypotheses, conclusion, the name & type of the fresh variable produced, and new `LocalContext` are subsequently returned.
+    3. We add the fresh variable to the `unknowns` set and the `constraints` map in `UnifyState`, where it maps to an `Undef` range
+       (see comments in the body of this function for more details).
+    4. We then rewrite the conclusion, replacing occurrences of the function call with the fresh variable.
+    The updated hypotheses, conclusion, a list of the names & types of the fresh variables produced, and new `LocalContext` are subsequently returned.
     - Note: it is the caller's responsibility to check that `conclusion` does indeed contain
       a non-trivial function application (e.g. by using `containsNonTrivialFuncApp`) -/
-def rewriteFunctionCallsInConclusionNEW (hypotheses : Array Expr) (conclusion : Expr) (inductiveRelationName : Name) (localCtx : LocalContext) : UnifyM (Array Expr × Expr × Option (Name × Expr) × LocalContext) := do
+def rewriteFunctionCallsUnifyM (hypotheses : Array Expr) (conclusion : Expr) (inductiveRelationName : Name) (localCtx : LocalContext) : UnifyM (Array Expr × Expr × List (Name × Expr) × LocalContext) := do
 
   -- Filter out cases where the function being called is the same as the inductive relation's name
   -- Note: this analysis is more simplistic compared to the one performed by `containsNonTrivialFuncApp`,
   -- which is why callers should have called `containsNonTrivialFuncApp` beforehand
-  let possibleFuncApp := Expr.find? (fun subExpr =>
-    subExpr.isApp && subExpr.getAppFn.constName.getRoot != inductiveRelationName) conclusion
+  -- let possibleFuncApp := Expr.find? (fun subExpr =>
+  --   subExpr.isApp && subExpr.getAppFn.constName.getRoot != inductiveRelationName) conclusion
 
-  match possibleFuncApp with
-  | none => pure (hypotheses, conclusion, none, ← getLCtx)
-  | some funcAppExpr => withLCtx' localCtx do
-    let funcAppType ← inferType funcAppExpr
+  let funcAppExprs ← conclusion.foldlM (init := []) (fun acc subExpr => do
+    if (← containsNonTrivialFuncApp subExpr inductiveRelationName)
+      then pure (subExpr :: acc)
+    else
+      pure acc)
 
-    -- Create a fresh name (an `Unknown`), insert it into the set of unknowns in `UnifyState`
-    -- Thie fresh unknown has the same type as the result of the function application (`funcAppType`),
-    -- so we give it a `Range` of `Undef funcAppType`
-    let freshUnknown := (localCtx.getUnusedName `unk)
-    UnifyM.insertUnknown freshUnknown
-    UnifyM.update freshUnknown (.Undef funcAppType)
+  match funcAppExprs with
+  | [] => pure (hypotheses, conclusion, [], ← getLCtx)
+  | _ => withLCtx' localCtx do
 
-    -- We use `withLocalDecl` to add the fresh variable to the local context
-    withLocalDeclD freshUnknown funcAppType (fun newVarExpr => do
-      logWarning m!"newVarExpr = {newVarExpr}"
+    let mut freshUnknownsAndTypes := #[]
+    for funcAppExpr in funcAppExprs do
+      let funcAppType ← inferType funcAppExpr
 
-      -- Create a new hypothesis stating that `newVarExpr = funcAppExpr`, then
-      -- add it to the array of `hypotheses`
-      let newHyp ← mkEq newVarExpr funcAppExpr
+      -- Create a fresh name (an `Unknown`), insert it into the set of unknowns in `UnifyState`
+      -- Thie fresh unknown has the same type as the result of the function application (`funcAppType`),
+      -- so we give it a `Range` of `Undef funcAppType`
+      let freshUnknown := (localCtx.getUnusedName `unk)
+      UnifyM.insertUnknown freshUnknown
+      UnifyM.update freshUnknown (.Undef funcAppType)
+      freshUnknownsAndTypes := freshUnknownsAndTypes.push (freshUnknown, funcAppType)
 
-      logWarning m!"newHyp: {newHyp}"
+    -- We use `withLocalDecl` to add all the fresh variables produced to the local context
+    withLocalDeclsDND freshUnknownsAndTypes (fun freshVarExprs => do
+      logWarning m!"newVarExpr = {freshVarExprs}"
 
-      let updatedHypotheses := Array.push hypotheses newHyp
+      -- Association list mapping each function call to the corresponding fresh variable
+      let newEqualities := List.zip funcAppExprs freshVarExprs.toList
+
+      let mut additionalHyps := #[]
+      for (newVarExpr, funcAppExpr) in Array.zip freshVarExprs funcAppExprs.toArray do
+        -- Create a new hypothesis stating that `newVarExpr = funcAppExpr`, then
+        -- add it to the array of `hypotheses`
+        let newHyp ← mkEq newVarExpr funcAppExpr
+        logWarning m!"newHyp: {newHyp}"
+        additionalHyps := additionalHyps.push newHyp
+
+      let updatedHypotheses := hypotheses ++ additionalHyps
 
       -- Note: since we're doing a purely syntactic rewriting operation here,
       -- it suffices to use `==` to compare `subExpr` with `funcAppExpr` instead of using `MetaM.isDefEq`
-      let rewrittenConclusion := Expr.replace
-        (fun subExpr => if subExpr == funcAppExpr then some newVarExpr else none) conclusion
+      -- let rewrittenConclusion := Expr.replace
+      --   (fun subExpr => if subExpr == funcAppExpr then some newVarExprs else none) conclusion
+
+      let rewrittenConclusion ← conclusion.traverseChildren (fun subExpr =>
+        match List.lookup subExpr newEqualities with
+        | some freshVar => pure freshVar
+        | none => pure subExpr)
 
       logWarning m!"rewrittenConclusion: {rewrittenConclusion}"
 
       -- Insert the fresh variable into the bound-variable context
-      return (updatedHypotheses, rewrittenConclusion, some (freshUnknown, funcAppType), ← getLCtx))
+      return (updatedHypotheses, rewrittenConclusion, freshUnknownsAndTypes.toList, ← getLCtx))
 
 /-- Unifies each argument in the conclusion of an inductive relation with the top-level arguments to the relation
     (using the unification algorithm from Generating Good Generations),
@@ -322,15 +345,15 @@ def getScheduleForConstructor (inductiveName : Name) (ctorName : Name) (outputNa
     -- (i.e. one where the function is not a constructor of an inductive type)
     let conclusionNeedsRewriting ← containsNonTrivialFuncApp conclusion inductiveName
 
-    -- If the conclusion contains a function call, rewrite the conclusion by introducing a fresh variable
+    -- For each function call in the cocnlusion, rewrite it by introducing a fresh variable
     -- equal to the result of the function call, and adding an extra hypothesis asserting equality
     -- between the function call and the variable.
-    -- `freshNameTypeOption` is the name & type of the fresh variable produced
-    let (updatedHypotheses, updatedConclusion, freshNameTypeOption, updatedLocalCtx) ←
+    -- `freshNamesAndTypes` is a list containing the names & types of the fresh variables produced during this procedure.
+    let (updatedHypotheses, updatedConclusion, freshNamesAndTypes, updatedLocalCtx) ←
       if conclusionNeedsRewriting then
-        rewriteFunctionCallsInConclusionNEW hypotheses conclusion inductiveName (← getLCtx)
+        rewriteFunctionCallsUnifyM hypotheses conclusion inductiveName (← getLCtx)
       else
-        pure (hypotheses, conclusion, none, ← getLCtx)
+        pure (hypotheses, conclusion, [], ← getLCtx)
 
     -- Enter the updated `LocalContext` containing the fresh variable that was created when rewriting the conclusion
     withLCtx' updatedLocalCtx (do
@@ -395,7 +418,7 @@ def getScheduleForConstructor (inductiveName : Name) (ctorName : Name) (outputNa
 
       -- Include any fresh variables produced (when rewriting function calls in conclusions)
       -- in the list of universally-quantified variables
-      let updatedForAllVars := forAllVars ++ Option.getD (List.singleton <$> freshNameTypeOption) []
+      let updatedForAllVars := forAllVars ++ freshNamesAndTypes
 
       let outputIdx := unknowns.idxOf outputName
 
@@ -559,7 +582,7 @@ instance : ArbitrarySizedSuchThat Nat (fun m => m = n * n) where
 inductive square : Nat → Nat → Prop where
   | sq : forall n, square n (n * n)
 
-#derive_scheduled_generator (fun (n : Nat) => square n m)
+-- #derive_scheduled_generator (fun (n : Nat) => square n m)
 
 
 inductive MinEx2' : Nat → List Nat → List Nat → Prop where
@@ -569,14 +592,15 @@ inductive MinEx2' : Nat → List Nat → List Nat → Prop where
     MinEx2' (Nat.succ x) l ([x] ++ l')
 
 
--- #derive_scheduled_generator (fun (l : List Nat) => MinEx2' x l l')
-
-
 instance : ArbitrarySizedSuchThat (List Nat) (fun l'_1 => l'_1 = [x_1] ++ l_1) where
   arbitrarySizedST := sorry
+
+-- TODO: figure out the issue with `MinEx2'`
+-- #derive_scheduled_generator (fun (l : List Nat) => MinEx2' x l l')
+
 
 inductive MinEx3' : Nat → List Nat → List Nat → Prop where
 | ME_empty : MinEx3' .zero [] []
 | ME_present : ∀ x l,
     MinEx3' x l ([x] ++ l)
-#derive_scheduled_generator (fun (l : List Nat) => MinEx3' x l l')
+-- #derive_scheduled_generator (fun (l : List Nat) => MinEx3' x l l')
