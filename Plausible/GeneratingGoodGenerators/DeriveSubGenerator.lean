@@ -225,10 +225,10 @@ def getScheduleSort (conclusion : HypothesisExpr) (outputVars : List Unknown) (c
        (If no, we just return the pair `(hypotheses, conclusion)` as is.)
     2. If yes, we create a fresh variable & add an extra hypothesis where the fresh var is bound to the result of the function call.
     3. We then rewrite the conclusion, replacing occurrences of the function call with the fresh variable.
-    The updated hypotheses, conclusion and new `LocalContext` are subsequently returned.
+    The updated hypotheses, conclusion, the name & type of the fresh variable produced, and new `LocalContext` are subsequently returned.
     - Note: it is the caller's responsibility to check that `conclusion` does indeed contain
       a non-trivial function application (e.g. by using `containsNonTrivialFuncApp`) -/
-def rewriteFunctionCallsInConclusionNEW (hypotheses : Array Expr) (conclusion : Expr) (inductiveRelationName : Name) (localCtx : LocalContext) : UnifyM (Array Expr × Expr × LocalContext) :=
+def rewriteFunctionCallsInConclusionNEW (hypotheses : Array Expr) (conclusion : Expr) (inductiveRelationName : Name) (localCtx : LocalContext) : UnifyM (Array Expr × Expr × Option (Name × Expr) × LocalContext) := do
 
   -- Filter out cases where the function being called is the same as the inductive relation's name
   -- Note: this analysis is more simplistic compared to the one performed by `containsNonTrivialFuncApp`,
@@ -237,17 +237,19 @@ def rewriteFunctionCallsInConclusionNEW (hypotheses : Array Expr) (conclusion : 
     subExpr.isApp && subExpr.getAppFn.constName.getRoot != inductiveRelationName) conclusion
 
   match possibleFuncApp with
-  | none => return (hypotheses, conclusion, ← getLCtx)
+  | none => pure (hypotheses, conclusion, none, ← getLCtx)
   | some funcAppExpr => withLCtx' localCtx do
     let funcAppType ← inferType funcAppExpr
 
-    -- Create a fresh name, insert it into the set of unknowns in `UnifyState` and give it a `Fixed` range
-    let freshName := (localCtx.getUnusedName `u)
-    UnifyM.insertUnknown freshName
-    UnifyM.update freshName .Fixed
+    -- Create a fresh name (an `Unknown`), insert it into the set of unknowns in `UnifyState`
+    -- Thie fresh unknown has the same type as the result of the function application (`funcAppType`),
+    -- so we give it a `Range` of `Undef funcAppType`
+    let freshUnknown := (localCtx.getUnusedName `unk)
+    UnifyM.insertUnknown freshUnknown
+    UnifyM.update freshUnknown (.Undef funcAppType)
 
     -- We use `withLocalDecl` to add the fresh variable to the local context
-    withLocalDeclD freshName funcAppType (fun newVarExpr => do
+    withLocalDeclD freshUnknown funcAppType (fun newVarExpr => do
       logWarning m!"newVarExpr = {newVarExpr}"
 
       -- Create a new hypothesis stating that `newVarExpr = funcAppExpr`, then
@@ -256,7 +258,6 @@ def rewriteFunctionCallsInConclusionNEW (hypotheses : Array Expr) (conclusion : 
 
       logWarning m!"newHyp: {newHyp}"
 
-      -- let newVarFVarId := newVarExpr.fvarId!
       let updatedHypotheses := Array.push hypotheses newHyp
 
       -- Note: since we're doing a purely syntactic rewriting operation here,
@@ -267,7 +268,7 @@ def rewriteFunctionCallsInConclusionNEW (hypotheses : Array Expr) (conclusion : 
       logWarning m!"rewrittenConclusion: {rewrittenConclusion}"
 
       -- Insert the fresh variable into the bound-variable context
-      return (updatedHypotheses, rewrittenConclusion, ← getLCtx))
+      return (updatedHypotheses, rewrittenConclusion, some (freshUnknown, funcAppType), ← getLCtx))
 
 /-- Unifies each argument in the conclusion of an inductive relation with the top-level arguments to the relation
     (using the unification algorithm from Generating Good Generations),
@@ -323,12 +324,13 @@ def getScheduleForConstructor (inductiveName : Name) (ctorName : Name) (outputNa
 
     -- If the conclusion contains a function call, rewrite the conclusion by introducing a fresh variable
     -- equal to the result of the function call, and adding an extra hypothesis asserting equality
-    -- between the function call and the variable
-    let (updatedHypotheses, updatedConclusion, updatedLocalCtx) ←
+    -- between the function call and the variable.
+    -- `freshNameTypeOption` is the name & type of the fresh variable produced
+    let (updatedHypotheses, updatedConclusion, freshNameTypeOption, updatedLocalCtx) ←
       if conclusionNeedsRewriting then
         rewriteFunctionCallsInConclusionNEW hypotheses conclusion inductiveName (← getLCtx)
       else
-        pure (hypotheses, conclusion, ← getLCtx)
+        pure (hypotheses, conclusion, none, ← getLCtx)
 
     -- Enter the updated `LocalContext` containing the fresh variable that was created when rewriting the conclusion
     withLCtx' updatedLocalCtx (do
@@ -391,15 +393,19 @@ def getScheduleForConstructor (inductiveName : Name) (ctorName : Name) (outputNa
         else
           return none)
 
+      -- Include any fresh variables produced (when rewriting function calls in conclusions)
+      -- in the list of universally-quantified variables
+      let updatedForAllVars := forAllVars ++ Option.getD (List.singleton <$> freshNameTypeOption) []
+
       let outputIdx := unknowns.idxOf outputName
 
       -- Compute all possible generator schedules for this constructor
       let possibleSchedules ← possibleSchedules
-        (vars := forAllVars)
+        (vars := updatedForAllVars)
         (hypotheses := hypothesisExprs.toList)
         (deriveSort := .Generator)
         (recCall := (inductiveName, [outputIdx]))
-        fixedVars
+        (fixedVars := fixedVars)
 
       -- A *naive* schedule is the first schedule contained in `possibleSchedules`
       let originalNaiveSchedule ← Option.getDM (possibleSchedules.head?) (throwError m!"Unable to compute any possible schedules")
@@ -413,6 +419,8 @@ def getScheduleForConstructor (inductiveName : Name) (ctorName : Name) (outputNa
       -- the conclusion of a constructor has been unified with the top-level arguments to the inductive relation),
       -- convert them to the appropriate `ScheduleStep`s, and prepends them to the `naiveSchedule`
       let fullSchedule := addConclusionPatternsAndEqualitiesToSchedule finalState.patterns finalState.equalities (updatedNaiveSchedule, scheduleSort)
+
+      logWarning m!"fullSchedule = {repr fullSchedule}"
 
       return fullSchedule))
 
@@ -541,13 +549,17 @@ def elabDeriveScheduledGenerator : CommandElab := fun stx => do
 
 -- TODO: debug these cases
 
+
+instance : ArbitrarySizedSuchThat Nat (fun m => m = n * n) where
+  arbitrarySizedST := sorry
+
 -- Example taken from section 3.1 of "Computing Correctly with Inductive Relations"
 -- Note how `n * n` is a function call that appears in the conclusion of a constructor
 -- for an inductive relation
 inductive square : Nat → Nat → Prop where
   | sq : forall n, square n (n * n)
 
--- #derive_scheduled_generator (fun (n : Nat) => square n m)
+#derive_scheduled_generator (fun (n : Nat) => square n m)
 
 
 inductive MinEx2' : Nat → List Nat → List Nat → Prop where
@@ -558,3 +570,13 @@ inductive MinEx2' : Nat → List Nat → List Nat → Prop where
 
 
 -- #derive_scheduled_generator (fun (l : List Nat) => MinEx2' x l l')
+
+
+instance : ArbitrarySizedSuchThat (List Nat) (fun l'_1 => l'_1 = [x_1] ++ l_1) where
+  arbitrarySizedST := sorry
+
+inductive MinEx3' : Nat → List Nat → List Nat → Prop where
+| ME_empty : MinEx3' .zero [] []
+| ME_present : ∀ x l,
+    MinEx3' x l ([x] ++ l)
+#derive_scheduled_generator (fun (l : List Nat) => MinEx3' x l l')
