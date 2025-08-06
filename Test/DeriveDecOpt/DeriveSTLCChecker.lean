@@ -24,6 +24,10 @@ info: Try this checker: instance : DecOpt (lookup Γ x τ) where
           [fun _ =>
             match Γ_1, x_1 with
             | τ_1 :: Γ, Nat.zero => Option.some Bool.true
+            | _, _ => Option.some Bool.false,
+            fun _ =>
+            match Γ_1, x_1 with
+            | τ' :: Γ, Nat.succ n => aux_dec initSize size' Γ n τ_1
             | _, _ => Option.some Bool.false]
     fun size => aux_dec size size Γ x τ
 -/

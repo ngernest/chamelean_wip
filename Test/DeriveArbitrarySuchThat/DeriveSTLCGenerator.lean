@@ -33,7 +33,12 @@ info: Try this generator: instance : ArbitrarySizedSuchThat Nat (fun x_1 => look
                 | Option.some Bool.true => return Nat.zero
                 | _ => OptionT.fail
               | _ => OptionT.fail),
-            ]
+            (Nat.succ size',
+              match Γ_1 with
+              | List.cons τ' Γ => do
+                let n ← aux_arb initSize size' Γ τ_1;
+                return Nat.succ n
+              | _ => OptionT.fail)]
     fun size => aux_arb size size Γ_1 τ_1
 -/
 #guard_msgs(info, drop warning) in
@@ -62,7 +67,15 @@ info: Try this generator: instance : ArbitrarySizedSuchThat type (fun τ_1 => lo
                 | List.cons τ Γ => return τ
                 | _ => OptionT.fail
               | _ => OptionT.fail),
-            ]
+            (Nat.succ size',
+              match x_1 with
+              | Nat.succ n =>
+                match Γ_1 with
+                | List.cons τ' Γ => do
+                  let τ_1 ← aux_arb initSize size' Γ n;
+                  return τ_1
+                | _ => OptionT.fail
+              | _ => OptionT.fail)]
     fun size => aux_arb size size Γ_1 x_1
 -/
 #guard_msgs(info, drop warning) in
@@ -181,4 +194,4 @@ info: Try this generator: instance : ArbitrarySizedSuchThat term (fun e_1 => typ
 #guard_msgs(info, drop warning) in
 #derive_scheduled_generator (fun (e : term) => typing G e t)
 
--- #eval runSizedGen (ArbitrarySizedSuchThat.arbitrarySizedST (fun e => typing [] e .Nat)) 10
+-- #eval runSizedGen (ArbitrarySizedSuchThat.arbitrarySizedST (fun e => typing [] e $ .Fun .Nat .Nat)) 3
