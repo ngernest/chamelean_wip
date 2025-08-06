@@ -1,5 +1,7 @@
 import Plausible.GeneratingGoodGenerators.UnificationMonad
+import Plausible.IR.Prelude
 
+open Plausible.IR
 open Lean
 
 ----------------------------------------------
@@ -144,6 +146,13 @@ def exprToHypothesisExpr (e : Expr) : MetaM (Option HypothesisExpr) := do
   else
     return none
 
+/-- Helper function called by `updateSource`, which updates variables in a hypothesis `hyp`
+    with the result of unification (provided via the `UnifyM` monad) -/
+def updateNonRecSource (k : UnknownMap) (hyp : HypothesisExpr) : UnifyM Source := do
+  let (ctorName, args) := hyp
+  let updatedArgs ← List.mapM (UnifyM.updateConstructorArg k) args
+  return .NonRec (ctorName, updatedArgs)
+
 /-- Updates a `Source` with the result of unification as contained in the `UnknownMap` -/
 def updateSource (k : UnknownMap) (src : Source) : UnifyM Source := do
   logWarning m!"updating source {repr src}"
@@ -155,19 +164,26 @@ def updateSource (k : UnknownMap) (src : Source) : UnifyM Source := do
     -- To do so, we first extract the constructor in the hypothesis
     -- and see if it corresponds to a type constructor for a parameterized type `inductive` type (e.g. `List`)
     -- If yes, we can just return the source as is, since the source is just the name of a type
-    let (typeConstructor, _) := hypExpr.getAppFnArgs
+    let (ctor, _) := hypExpr.getAppFnArgs
 
     try (do
-      -- TODO: figure out why this causes tests to fail!
-      let inductiveVal ← getConstInfoInduct typeConstructor
-      logWarning m!"inductiveVal.all = {inductiveVal.all}"
-      logWarning m!"inductiveVal.ctors = {inductiveVal.ctors}"
-      logWarning m!"inductiveVal.numParams = {inductiveVal.numParams}"
-      pure src)
+      -- Determine the return type of the constructor in the hypothesis
+      let inductiveVal ← getConstInfoInduct ctor
+      let ctorTy := inductiveVal.type
+      let returnType ← Array.back! <$> getComponentsOfArrowType ctorTy
+      -- If the return type is *not* `Prop`, then the `Source` is
+      -- a generator for some inductive type (as opposed to an inductive `Prop`),
+      -- so we don't need to update the source
+      if (not returnType.isProp) then
+        pure src
+      else
+        updateNonRecSource k hyp)
     catch _ =>
-      let (ctorName, args) := hyp
-      let updatedArgs ← List.mapM (UnifyM.updateConstructorArg k) args
-      return .NonRec (ctorName, updatedArgs)
+      -- `ctor` is not an inductive type (calling Lean's `getConstInfoInduct` function raised an exception)
+      -- This means we have a hypothesis which is *not* an application of some inductive type/proposition,
+      -- i.e. we can just update the variables in the `hyp` w/ the result of unification
+      updateNonRecSource k hyp
+
   | .Rec r tys => do
     let updatedTys ← List.mapM (UnifyM.updateConstructorArg k) tys
     return .Rec r updatedTys
