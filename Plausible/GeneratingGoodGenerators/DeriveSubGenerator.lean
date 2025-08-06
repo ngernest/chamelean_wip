@@ -219,7 +219,11 @@ def getScheduleSort (conclusion : HypothesisExpr) (outputVars : List Unknown) (c
     return .ProducerSchedule producerSort conclusion
 
 
-/-- Computes a *naive* generator schedule for a sub-generator corresponding to a constructor of an inductive relation.
+/-- Unifies each argument in the conclusion of an inductive relation with the top-level arguments to the relation
+    (using the unification algorithm from Generating Good Generations),
+    and subsequently computes a *naive* generator schedule for a sub-generator corresponding to the constructor
+    (using the schedules discussed in Testing Theorems).
+
     Note: this function processes the entire type of the constructor within the same `LocalContext`
     (the one produced by `forallTelescopeReducing`).
 
@@ -260,6 +264,8 @@ def getScheduleForConstructor (inductiveName : Name) (ctorName : Name) (outputNa
       match nameOpt with
       | none => tyExpr
       | some _ => none)
+
+    -- Obtain the `LocalContext` (needed for delaborating `Expr`s)
     let localCtx ← getLCtx
 
     -- Stores the representation of hypotheses as a `HypothesisExpr`
@@ -376,8 +382,10 @@ def elabDeriveScheduledGenerator : CommandElab := fun stx => do
     let argNames := (fun ident => ident.getId) <$> argIdents
     let argNamesTypes := argNames.zip argTypes
 
-    -- Add the name & type of each argument to the inductive relation to the ambient `LocalContext`
-    -- (as a local declaration)
+    -- Add the name & type of each argument to the inductive relation to the `LocalContext`
+    -- Then, derive `baseGenerators` & `inductiveGenerators` (the code for the sub-generators
+    -- that are invoked when `size = 0` and `size > 0` respectively),
+    -- and obtain freshened versions of the output variable / arguments (`freshenedOutputName`, `freshArgIdents`)
     let (baseGenerators, inductiveGenerators, freshenedOutputName, freshArgIdents, localCtx) ←
       liftTermElabM $ withLocalDeclsDND argNamesTypes (fun _ => do
         let mut localCtx ← getLCtx
@@ -456,16 +464,18 @@ def elabDeriveScheduledGenerator : CommandElab := fun stx => do
     -- Display the code for the derived generator to the user
     logInfo m!"Try this generator: {Format.pretty genFormat}"
 
-    -- Display the code for the derived generator to the user
-    -- & prompt the user to accept it in the VS Code side panel
-    -- liftTermElabM $ Tactic.TryThis.addSuggestion stx
-    --   (Format.pretty genFormat) (header := "Try this generator: ")
-
     elabCommand typeClassInstance
 
   | _ => throwUnsupportedSyntax
 
 -- TODO: debug these cases
--- #derive_scheduled_generator (fun (l : List Nat) => inList x l)
 
--- #derive_scheduled_generator (fun (tree : Tree) => bst lo hi tree)
+
+inductive MinEx2' : Nat → List Nat → List Nat → Prop where
+| ME_empty : MinEx2' .zero [] []
+| ME_present : ∀ x l l',
+    MinEx2' x l l' →
+    MinEx2' (Nat.succ x) l ([x] ++ l')
+
+
+-- #derive_scheduled_generator (fun (l : List Nat) => MinEx2' x l l')
