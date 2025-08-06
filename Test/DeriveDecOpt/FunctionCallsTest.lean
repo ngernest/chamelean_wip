@@ -1,15 +1,10 @@
 import Plausible.New.DecOpt
 import Plausible.New.DeriveChecker
+import Test.CommonDefinitions.FunctionCallInConclusion
 
 open DecOpt
 
 set_option guard_msgs.diff true
-
--- Example taken from section 3.1 of "Computing Correctly with Inductive Relations"
--- Note how `n * n` is a function call that appears in the conclusion of a constructor
--- for an inductive relation
-inductive square_of : Nat → Nat → Prop where
-  | sq : forall n, square_of n (n * n)
 
 /--
 info: Try this checker: instance : DecOpt (square_of n m) where

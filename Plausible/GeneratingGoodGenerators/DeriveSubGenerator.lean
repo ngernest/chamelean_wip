@@ -401,7 +401,7 @@ def getScheduleForConstructor (inductiveName : Name) (ctorName : Name) (outputNa
 
       -- Convert the conclusion from an `Expr` to a `HypothesisExpr`
       let conclusionExpr ← Option.getDM (← exprToHypothesisExpr conclusion)
-        (throwError m!"Unable to convert {conclusion} to a HypothesisExpr")
+        (throwError m!"Unable to convert conclusion {conclusion} to a HypothesisExpr")
 
       -- Determine the appropriate `ScheduleSort` (right now we only produce `ScheduleSort`s for `Generator`s)
       let scheduleSort ← getScheduleSort conclusionExpr
@@ -461,6 +461,8 @@ def elabDeriveScheduledGenerator : CommandElab := fun stx => do
     let (inductiveSyntax, argIdents) ← parseInductiveApp body
     let inductiveName := inductiveSyntax.getId
 
+    logWarning m!"argIdents = {argIdents}"
+
     -- Figure out the name and type of the value we wish to generate (the "output")
     let outputName := var.getId
     let outputType ← liftTermElabM $ elabTerm outputTypeSyntax none
@@ -477,6 +479,14 @@ def elabDeriveScheduledGenerator : CommandElab := fun stx => do
 
     -- Determine the type for each argument to the inductive
     let (_, _, inductiveTypeComponents) ← liftTermElabM $ decomposeType inductiveVal.type
+
+    -- let afterInstantiatingValueLevelParams ← liftCoreM $ instantiateValueLevelParams constInfo [mkLevelParam ``Nat]
+    -- logWarning m!"afterInstantiatingValueLevelParams = {afterInstantiatingValueLevelParams}"
+
+    -- let inferredImplicitTyExpr := Expr.inferImplicit inductiveVal.type inductiveVal.numParams (considerRange := true)
+    -- logWarning m!"type after inferring implicit = {inferredImplicitTyExpr}"
+
+    logWarning m!"inductiveTypeComponents = {inductiveTypeComponents}"
 
     -- To obtain the type of each arg to the inductive,
     -- we pop the last element (`Prop`) from `inductiveTypeComponents`
@@ -573,34 +583,11 @@ def elabDeriveScheduledGenerator : CommandElab := fun stx => do
 -- TODO: debug these cases
 
 
-instance : ArbitrarySizedSuchThat Nat (fun m => m = n * n) where
-  arbitrarySizedST := sorry
-
--- Example taken from section 3.1 of "Computing Correctly with Inductive Relations"
--- Note how `n * n` is a function call that appears in the conclusion of a constructor
--- for an inductive relation
-inductive square : Nat → Nat → Prop where
-  | sq : forall n, square n (n * n)
-
--- #derive_scheduled_generator (fun (n : Nat) => square n m)
+-- inductive MinEx2' : Nat → List Nat → List Nat → Prop where
+-- | ME_empty : MinEx2' .zero [] []
+-- | ME_present : ∀ x l l',
+--     MinEx2' x l l' →
+--     MinEx2' (Nat.succ x) l ([x] ++ l')
 
 
-inductive MinEx2' : Nat → List Nat → List Nat → Prop where
-| ME_empty : MinEx2' .zero [] []
-| ME_present : ∀ x l l',
-    MinEx2' x l l' →
-    MinEx2' (Nat.succ x) l ([x] ++ l')
-
-
-instance : ArbitrarySizedSuchThat (List Nat) (fun l'_1 => l'_1 = [x_1] ++ l_1) where
-  arbitrarySizedST := sorry
-
--- TODO: figure out the issue with `MinEx2'`
 -- #derive_scheduled_generator (fun (l : List Nat) => MinEx2' x l l')
-
-
-inductive MinEx3' : Nat → List Nat → List Nat → Prop where
-| ME_empty : MinEx3' .zero [] []
-| ME_present : ∀ x l,
-    MinEx3' x l ([x] ++ l)
--- #derive_scheduled_generator (fun (l : List Nat) => MinEx3' x l l')

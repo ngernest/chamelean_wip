@@ -247,7 +247,7 @@ partial def dfs (boundVars : List Name) (remainingVars : List Name) (checkedHypo
           else
             let hypothesisExpr ← exprToHypothesisExpr ty
             match hypothesisExpr with
-            | none => throwError m!"unable to convert Expr {ty} to a HypothesisExpr"
+            | none => throwError m!"DFS: unable to convert Expr {ty} to a HypothesisExpr"
             | some hypExpr => pure (Source.NonRec hypExpr)
         let unconstrainedProdStep := ScheduleStep.Unconstrained v src env.prodSort
         -- TODO: handle negated propositions in `ScheduleStep.Check`
