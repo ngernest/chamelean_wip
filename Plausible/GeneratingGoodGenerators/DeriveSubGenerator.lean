@@ -13,6 +13,7 @@ import Plausible.New.Utils
 import Plausible.New.Debug
 import Plausible.IR.Prelude
 import Plausible.IR.Examples
+import Plausible.IR.Extractor
 
 import Plausible.New.Arbitrary
 import Plausible.New.STLC
@@ -219,6 +220,55 @@ def getScheduleSort (conclusion : HypothesisExpr) (outputVars : List Unknown) (c
     return .ProducerSchedule producerSort conclusion
 
 
+/-- `rewriteFunctionCallsInConclusionNEW hypotheses conclusion inductiveRelationName` does the following:
+    1. Checks if the `conclusion` contains a function call where the function is *not* the same as the `inductiveRelationName`.
+       (If no, we just return the pair `(hypotheses, conclusion)` as is.)
+    2. If yes, we create a fresh variable & add an extra hypothesis where the fresh var is bound to the result of the function call.
+    3. We then rewrite the conclusion, replacing occurrences of the function call with the fresh variable.
+    The updated hypotheses, conclusion and new `LocalContext` are subsequently returned.
+    - Note: it is the caller's responsibility to check that `conclusion` does indeed contain
+      a non-trivial function application (e.g. by using `containsNonTrivialFuncApp`) -/
+def rewriteFunctionCallsInConclusionNEW (hypotheses : Array Expr) (conclusion : Expr) (inductiveRelationName : Name) (localCtx : LocalContext) : UnifyM (Array Expr × Expr × LocalContext) :=
+
+  -- Filter out cases where the function being called is the same as the inductive relation's name
+  -- Note: this analysis is more simplistic compared to the one performed by `containsNonTrivialFuncApp`,
+  -- which is why callers should have called `containsNonTrivialFuncApp` beforehand
+  let possibleFuncApp := Expr.find? (fun subExpr =>
+    subExpr.isApp && subExpr.getAppFn.constName.getRoot != inductiveRelationName) conclusion
+
+  match possibleFuncApp with
+  | none => return (hypotheses, conclusion, ← getLCtx)
+  | some funcAppExpr => withLCtx' localCtx do
+    let funcAppType ← inferType funcAppExpr
+
+    -- Create a fresh name, insert it into the set of unknowns in `UnifyState` and give it a `Fixed` range
+    let freshName := (localCtx.getUnusedName `u)
+    UnifyM.insertUnknown freshName
+    UnifyM.update freshName .Fixed
+
+    -- We use `withLocalDecl` to add the fresh variable to the local context
+    withLocalDeclD freshName funcAppType (fun newVarExpr => do
+      logWarning m!"newVarExpr = {newVarExpr}"
+
+      -- Create a new hypothesis stating that `newVarExpr = funcAppExpr`, then
+      -- add it to the array of `hypotheses`
+      let newHyp ← mkEq newVarExpr funcAppExpr
+
+      logWarning m!"newHyp: {newHyp}"
+
+      -- let newVarFVarId := newVarExpr.fvarId!
+      let updatedHypotheses := Array.push hypotheses newHyp
+
+      -- Note: since we're doing a purely syntactic rewriting operation here,
+      -- it suffices to use `==` to compare `subExpr` with `funcAppExpr` instead of using `MetaM.isDefEq`
+      let rewrittenConclusion := Expr.replace
+        (fun subExpr => if subExpr == funcAppExpr then some newVarExpr else none) conclusion
+
+      logWarning m!"rewrittenConclusion: {rewrittenConclusion}"
+
+      -- Insert the fresh variable into the bound-variable context
+      return (updatedHypotheses, rewrittenConclusion, ← getLCtx))
+
 /-- Unifies each argument in the conclusion of an inductive relation with the top-level arguments to the relation
     (using the unification algorithm from Generating Good Generations),
     and subsequently computes a *naive* generator schedule for a sub-generator corresponding to the constructor
@@ -243,6 +293,7 @@ def getScheduleForConstructor (inductiveName : Name) (ctorName : Name) (outputNa
 
   -- Stay within the forallTelescope scope for all processing
   forallTelescopeReducing ctorType (cleanupAnnotations := true) (fun forAllVarsAndHyps conclusion => do
+    -- Collect all the universally-quantified variables + hypotheses
     -- Universally-quantified variables `x : τ` are represented using `(some x, τ)`
     -- Hypotheses are represented using `(none, hyp)` (first component is `none` since a hypothesis doesn't have a name)
     let forAllVarsAndHypsWithTypes ← forAllVarsAndHyps.mapM (fun fvar => do
@@ -254,98 +305,116 @@ def getScheduleForConstructor (inductiveName : Name) (ctorName : Name) (outputNa
       else
         return (none, localDecl.type))
 
+    -- Extract the universally quantified variables
     let forAllVars := forAllVarsAndHypsWithTypes.filterMap (fun (nameOpt, ty) =>
       match nameOpt with
-      | some name => (name, ty)
+      | some name => some (name, ty)
       | none => none) |>.toList
 
     -- Extract hypotheses (which correspond to pairs in `forAllVarsAndHypsWithTypes` where the first component is `none`)
     let hypotheses := forAllVarsAndHypsWithTypes.filterMap (fun (nameOpt, tyExpr) =>
       match nameOpt with
-      | none => tyExpr
+      | none => some tyExpr
       | some _ => none)
 
-    -- TODO: detect if the conclusion contains a function call, and if so, rewrite it
+    -- Check if the conclusion contains a non-trivial function call
+    -- (i.e. one where the function is not a constructor of an inductive type)
+    let conclusionNeedsRewriting ← containsNonTrivialFuncApp conclusion inductiveName
 
-    -- Obtain the `LocalContext` (needed for delaborating `Expr`s)
-    let localCtx ← getLCtx
-
-    -- Stores the representation of hypotheses as a `HypothesisExpr`
-    -- (constructor name applied to some list of arguments, which are themselves `ConstructorExpr`s)
-    let mut hypothesisExprs := #[]
-
-    for hyp in hypotheses do
-      let hypTerm ← withOptions setDelaboratorOptions (delabExprInLocalContext localCtx hyp)
-      -- Convert the `TSyntax` representation of the hypothesis to a `Range`
-      -- If that fails, convert the `Expr` representation of the hypothesis to a `Range`
-      -- (the latter is needed to handle hypotheses which use infix operators)
-      let hypRange ←
-        try convertHypothesisTermToRange hypTerm
-        catch _ => convertExprToRangeInCurrentContext hyp
-
-      -- Convert each hypothesis' range to a `HypothesisExpr`, which is just a constructor application
-      -- (constructor name applied to some list of arguments, which are themselves `ConstructorExpr`s)
-      hypothesisExprs := hypothesisExprs.push (← convertRangeToCtorAppForm hypRange)
-
-    -- Creates the initial `UnifyState` needed for the unification algorithm
-    let initialUnifyState := mkInitialUnifyState inputNames outputName outputType forAllVars hypothesisExprs.toList
-
-    -- Extend the current state with the contents of `initialUnifyState`
-    UnifyM.extendState initialUnifyState
-
-    -- Get the ranges corresponding to each of the unknowns
-    let unknownRanges ← unknowns.mapM processCorrespondingRange
-    let unknownArgsAndRanges := unknowns.zip unknownRanges
-
-    -- Compute the appropriate `Range` for each argument in the constructor's conclusion
-    let conclusionArgs := conclusion.getAppArgs
-    let conclusionRanges ← conclusionArgs.mapM convertExprToRangeInCurrentContext
-    let conclusionArgsAndRanges := conclusionArgs.zip conclusionRanges
-
-    for ((_u1, r1), (_u2, r2)) in conclusionArgsAndRanges.zip unknownArgsAndRanges do
-      unify r1 r2
-
-    -- Convert the conclusion from an `Expr` to a `HypothesisExpr`
-    let conclusionExpr ← Option.getDM (← exprToHypothesisExpr conclusion)
-      (throwError m!"Unable to convert {conclusion} to a HypothesisExpr")
-
-    -- Determine the appropriate `ScheduleSort` (right now we only produce `ScheduleSort`s for `Generator`s)
-    let scheduleSort ← getScheduleSort conclusionExpr
-      (outputVars := [outputName]) (some ctorName) (deriveSort := .Generator)
-      (returnOption := true)
-
-    -- Check which universally-quantified variables have a `Fixed` range,
-    -- so that we can supply them to `possibleSchedules` as the `fixedVars` arg
-    let fixedVars ← forAllVars.filterMapM (fun (v, _) => do
-      if (← UnifyM.isUnknownFixed v) then
-        return some v
+    -- If the conclusion contains a function call, rewrite the conclusion by introducing a fresh variable
+    -- equal to the result of the function call, and adding an extra hypothesis asserting equality
+    -- between the function call and the variable
+    let (updatedHypotheses, updatedConclusion, updatedLocalCtx) ←
+      if conclusionNeedsRewriting then
+        rewriteFunctionCallsInConclusionNEW hypotheses conclusion inductiveName (← getLCtx)
       else
-        return none)
+        pure (hypotheses, conclusion, ← getLCtx)
 
-    let outputIdx := unknowns.idxOf outputName
+    -- Enter the updated `LocalContext` containing the fresh variable that was created when rewriting the conclusion
+    withLCtx' updatedLocalCtx (do
+      logWarning m!"updatedHypotheses: {updatedHypotheses}"
 
-    -- Compute all possible generator schedules for this constructor
-    let possibleSchedules ← possibleSchedules
-      (vars := forAllVars)
-      (hypotheses := hypothesisExprs.toList)
-      (deriveSort := .Generator)
-      (recCall := (inductiveName, [outputIdx]))
-      fixedVars
+      -- Stores the representation of hypotheses as a `HypothesisExpr`
+      -- (constructor name applied to some list of arguments, which are themselves `ConstructorExpr`s)
+      let mut hypothesisExprs := #[]
 
-    -- A *naive* schedule is the first schedule contained in `possibleSchedules`
-    let originalNaiveSchedule ← Option.getDM (possibleSchedules.head?) (throwError m!"Unable to compute any possible schedules")
+      for hyp in updatedHypotheses do
+        let hypTerm ← withOptions setDelaboratorOptions (delabExprInLocalContext updatedLocalCtx hyp)
+        -- Convert the `TSyntax` representation of the hypothesis to a `Range`
+        -- If that fails, convert the `Expr` representation of the hypothesis to a `Range`
+        -- (the latter is needed to handle hypotheses which use infix operators)
+        let hypRange ←
+          try convertHypothesisTermToRange hypTerm
+          catch _ => convertExprToRangeInCurrentContext hyp
 
-    -- Update the naive schedule with the result of unification
-    let updatedNaiveSchedule ← updateScheduleSteps originalNaiveSchedule
+        -- Convert each hypothesis' range to a `HypothesisExpr`, which is just a constructor application
+        -- (constructor name applied to some list of arguments, which are themselves `ConstructorExpr`s)
+        hypothesisExprs := hypothesisExprs.push (← convertRangeToCtorAppForm hypRange)
 
-    let finalState ← get
+      -- Creates the initial `UnifyState` needed for the unification algorithm
+      let initialUnifyState := mkInitialUnifyState inputNames outputName outputType forAllVars hypothesisExprs.toList
 
-    -- Takes the `patterns` and `equalities` fields from `UnifyState` (created after
-    -- the conclusion of a constructor has been unified with the top-level arguments to the inductive relation),
-    -- convert them to the appropriate `ScheduleStep`s, and prepends them to the `naiveSchedule`
-    let fullSchedule := addConclusionPatternsAndEqualitiesToSchedule finalState.patterns finalState.equalities (updatedNaiveSchedule, scheduleSort)
+      -- Extend the current state with the contents of `initialUnifyState`
+      UnifyM.extendState initialUnifyState
 
-    return fullSchedule)
+      let state ← get
+      logWarning m!"state = {state}"
+
+      -- Get the ranges corresponding to each of the unknowns
+      let unknownRanges ← unknowns.mapM processCorrespondingRange
+      let unknownArgsAndRanges := unknowns.zip unknownRanges
+
+      -- Compute the appropriate `Range` for each argument in the constructor's conclusion
+      let conclusionArgs := updatedConclusion.getAppArgs
+      let conclusionRanges ← conclusionArgs.mapM convertExprToRangeInCurrentContext
+      let conclusionArgsAndRanges := conclusionArgs.zip conclusionRanges
+
+      logWarning m!"conclusionArgsAndRanges = {conclusionArgsAndRanges}"
+
+      for ((_u1, r1), (_u2, r2)) in conclusionArgsAndRanges.zip unknownArgsAndRanges do
+        unify r1 r2
+
+      -- Convert the conclusion from an `Expr` to a `HypothesisExpr`
+      let conclusionExpr ← Option.getDM (← exprToHypothesisExpr conclusion)
+        (throwError m!"Unable to convert {conclusion} to a HypothesisExpr")
+
+      -- Determine the appropriate `ScheduleSort` (right now we only produce `ScheduleSort`s for `Generator`s)
+      let scheduleSort ← getScheduleSort conclusionExpr
+        (outputVars := [outputName]) (some ctorName) (deriveSort := .Generator)
+        (returnOption := true)
+
+      -- Check which universally-quantified variables have a `Fixed` range,
+      -- so that we can supply them to `possibleSchedules` as the `fixedVars` arg
+      let fixedVars ← forAllVars.filterMapM (fun (v, _) => do
+        if (← UnifyM.isUnknownFixed v) then
+          return some v
+        else
+          return none)
+
+      let outputIdx := unknowns.idxOf outputName
+
+      -- Compute all possible generator schedules for this constructor
+      let possibleSchedules ← possibleSchedules
+        (vars := forAllVars)
+        (hypotheses := hypothesisExprs.toList)
+        (deriveSort := .Generator)
+        (recCall := (inductiveName, [outputIdx]))
+        fixedVars
+
+      -- A *naive* schedule is the first schedule contained in `possibleSchedules`
+      let originalNaiveSchedule ← Option.getDM (possibleSchedules.head?) (throwError m!"Unable to compute any possible schedules")
+
+      -- Update the naive schedule with the result of unification
+      let updatedNaiveSchedule ← updateScheduleSteps originalNaiveSchedule
+
+      let finalState ← get
+
+      -- Takes the `patterns` and `equalities` fields from `UnifyState` (created after
+      -- the conclusion of a constructor has been unified with the top-level arguments to the inductive relation),
+      -- convert them to the appropriate `ScheduleStep`s, and prepends them to the `naiveSchedule`
+      let fullSchedule := addConclusionPatternsAndEqualitiesToSchedule finalState.patterns finalState.equalities (updatedNaiveSchedule, scheduleSort)
+
+      return fullSchedule))
 
 
 /-- Command for deriving a constrained generator for an inductive relation that uses generator schedules -/
@@ -471,6 +540,14 @@ def elabDeriveScheduledGenerator : CommandElab := fun stx => do
   | _ => throwUnsupportedSyntax
 
 -- TODO: debug these cases
+
+-- Example taken from section 3.1 of "Computing Correctly with Inductive Relations"
+-- Note how `n * n` is a function call that appears in the conclusion of a constructor
+-- for an inductive relation
+inductive square : Nat → Nat → Prop where
+  | sq : forall n, square n (n * n)
+
+-- #derive_scheduled_generator (fun (n : Nat) => square n m)
 
 
 inductive MinEx2' : Nat → List Nat → List Nat → Prop where

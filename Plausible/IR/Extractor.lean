@@ -71,7 +71,7 @@ def isInductiveRelation (tyexpr : Expr) : MetaM Bool := do
     1. Checks if the `conclusion` contains a function call where the function is *not* the same as the `inductiveRelationName`.
        (If no, we just return the pair `(hypotheses, conclusion)` as is.)
     2. If yes, we create a fresh variable & add an extra hypothesis where the fresh var is bound to the result of the function call.
-    3. We then rewrite the conclusion, replacing occurrences of the function call with the fresh variable,
+    3. We then rewrite the conclusion, replacing occurrences of the function call with the fresh variable.
     The updated hypotheses & conclusion are subsequently returned.
     - Note: it is the caller's responsibility to check that `conclusion` does indeed contain
       a non-trivial function application (e.g. by using `containsNonTrivialFuncApp`) -/
@@ -93,7 +93,6 @@ def rewriteFuncCallsInConclusion (hypotheses : Array Expr) (conclusion : Expr) (
       -- Create a new hypothesis stating that `newVarExpr = funcAppExpr`, then
       -- add it to the array of `hypotheses`
       let newHyp ← mkEq newVarExpr funcAppExpr
-      -- let newVarFVarId := newVarExpr.fvarId!
       let updatedHypotheses := Array.push hypotheses newHyp
 
       -- Note: since we're doing a purely syntactic rewriting operation here,
