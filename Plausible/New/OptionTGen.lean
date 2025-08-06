@@ -1,6 +1,7 @@
 import Plausible.New.GeneratorCombinators
 
 import Plausible.Gen
+import Plausible.Sampleable
 open Plausible
 
 namespace OptionTGen
@@ -73,5 +74,10 @@ def sized (f : Nat → OptionT Gen α) : OptionT Gen α :=
     returning the generated `Option α` in the `IO` monad -/
 def runSizedGen {α} (sizedGen : Nat → OptionT Gen α) (size : Nat) : IO (Option α) :=
   Gen.run (OptionT.run $ sizedGen size) size
+
+/-- Samples from an `OptionT Gen` generator that is parameterized by its `size`,
+    printing out 10 samples using the `Repr` instance for `α` -/
+def runSizedGenPrintOutput [Repr α] (sizedGen : Nat → OptionT Gen α) (size : Nat) :=
+  printSamples (OptionT.run (sizedGen size))
 
 end OptionTGen

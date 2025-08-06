@@ -181,4 +181,4 @@ info: Try this generator: instance : ArbitrarySizedSuchThat term (fun e_1 => typ
 #guard_msgs(info, drop warning) in
 #derive_scheduled_generator (fun (e : term) => typing G e t)
 
-#eval runSizedGen (ArbitrarySizedSuchThat.arbitrarySizedST (fun e => typing [] e .Nat)) 10
+-- #eval runSizedGen (ArbitrarySizedSuchThat.arbitrarySizedST (fun e => typing [] e .Nat)) 10
