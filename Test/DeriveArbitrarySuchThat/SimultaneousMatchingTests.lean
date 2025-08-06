@@ -155,9 +155,45 @@ info: Try this generator: instance : ArbitrarySizedSuchThat (List Nat) (fun l_1 
 #guard_msgs(info, drop warning) in
 #derive_scheduled_generator (fun (l : List Nat) => MinEx3 x l l')
 
+/--
+info: Try this generator: instance : ArbitrarySizedSuchThat (List Nat) (fun l'_1 => MinEx2 x_1 l_1 l'_1) where
+  arbitrarySizedST :=
+    let rec aux_arb (initSize : Nat) (size : Nat) (x_1 : Nat) (l_1 : List Nat) : OptionT Plausible.Gen (List Nat) :=
+      match size with
+      | Nat.zero =>
+        OptionTGen.backtrack
+          [(1,
+              match l_1 with
+              | List.nil =>
+                match x_1 with
+                | Nat.zero => return List.nil
+                | _ => OptionT.fail
+              | _ => OptionT.fail)]
+      | Nat.succ size' =>
+        OptionTGen.backtrack
+          [(1,
+              match l_1 with
+              | List.nil =>
+                match x_1 with
+                | Nat.zero => return List.nil
+                | _ => OptionT.fail
+              | _ => OptionT.fail),
+            (Nat.succ size',
+              match x_1 with
+              | Nat.succ x => do
+                let l' ← aux_arb initSize size' x l_1;
+                do
+                  let l'_1 ←
+                    ArbitrarySizedSuchThat.arbitrarySizedST
+                        (fun l'_1 => Eq l'_1 (HAppend.hAppend (List.cons x (List.nil)) l')) initSize;
+                  return l'_1
+              | _ => OptionT.fail)]
+    fun size => aux_arb size size x_1 l_1
+-/
+#guard_msgs(info, drop warning) in
+#derive_scheduled_generator (fun (l' : List Nat) => MinEx2 x l l')
 
--- TODO: uncomment the following failing test after we support rewriting function calls
-/-
+/--
 info: Try this generator: instance : ArbitrarySizedSuchThat (List Nat) (fun l_1 => MinEx2 x_1 l_1 l'_1) where
   arbitrarySizedST :=
     let rec aux_arb (initSize : Nat) (size : Nat) (x_1 : Nat) (l'_1 : List Nat) : OptionT Plausible.Gen (List Nat) :=
@@ -181,18 +217,18 @@ info: Try this generator: instance : ArbitrarySizedSuchThat (List Nat) (fun l_1 
                 | _ => OptionT.fail
               | _ => OptionT.fail),
             (Nat.succ size',
-              match l'_1 with
-              | HAppend.hAppend (List.cons u_3 (List.nil)) l' =>
-                match x_1 with
-                | Nat.succ x =>
-                  match DecOpt.decOpt (BEq.beq u_3 x) initSize with
-                  | Option.some Bool.true => do
-                    let l_1 ← aux_arb initSize size' x l';
+              match x_1 with
+              | Nat.succ x => do
+                let l_1 ← Arbitrary.arbitrary;
+                do
+                  let l' ← ArbitrarySizedSuchThat.arbitrarySizedST (fun l' => MinEx2 x l_1 l') initSize;
+                  do
+                    let l'_1 ←
+                      ArbitrarySizedSuchThat.arbitrarySizedST
+                          (fun l'_1 => Eq l'_1 (HAppend.hAppend (List.cons x (List.nil)) l')) initSize;
                     return l_1
-                  | _ => OptionT.fail
-                | _ => OptionT.fail
               | _ => OptionT.fail)]
     fun size => aux_arb size size x_1 l'_1
 -/
--- #guard_msgs(info, drop warning) in
--- #derive_scheduled_generator (fun (l : List Nat) => MinEx2 x l l')
+#guard_msgs(info, drop warning) in
+#derive_scheduled_generator (fun (l : List Nat) => MinEx2 x l l')

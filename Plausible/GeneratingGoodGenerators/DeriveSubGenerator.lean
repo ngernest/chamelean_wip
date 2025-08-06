@@ -263,8 +263,6 @@ def rewriteFunctionCallsUnifyM (hypotheses : Array Expr) (conclusion : Expr) (in
 
     -- We use `withLocalDecl` to add all the fresh variables produced to the local context
     withLocalDeclsDND freshUnknownsAndTypes (fun freshVarExprs => do
-      logWarning m!"newVarExpr = {freshVarExprs}"
-
       -- Association list mapping each function call to the corresponding fresh variable
       let newEqualities := List.zip funcAppExprs freshVarExprs.toList
 
@@ -273,7 +271,6 @@ def rewriteFunctionCallsUnifyM (hypotheses : Array Expr) (conclusion : Expr) (in
         -- Create a new hypothesis stating that `newVarExpr = funcAppExpr`, then
         -- add it to the array of `hypotheses`
         let newHyp ← mkEq newVarExpr funcAppExpr
-        logWarning m!"newHyp: {newHyp}"
         additionalHyps := additionalHyps.push newHyp
 
       let updatedHypotheses := hypotheses ++ additionalHyps
@@ -287,8 +284,6 @@ def rewriteFunctionCallsUnifyM (hypotheses : Array Expr) (conclusion : Expr) (in
         match List.lookup subExpr newEqualities with
         | some freshVar => pure freshVar
         | none => pure subExpr)
-
-      logWarning m!"rewrittenConclusion: {rewrittenConclusion}"
 
       -- Insert the fresh variable into the bound-variable context
       return (updatedHypotheses, rewrittenConclusion, freshUnknownsAndTypes.toList, ← getLCtx))
@@ -357,8 +352,6 @@ def getScheduleForConstructor (inductiveName : Name) (ctorName : Name) (outputNa
 
     -- Enter the updated `LocalContext` containing the fresh variable that was created when rewriting the conclusion
     withLCtx' updatedLocalCtx (do
-      logWarning m!"updatedHypotheses: {updatedHypotheses}"
-
       -- Stores the representation of hypotheses as a `HypothesisExpr`
       -- (constructor name applied to some list of arguments, which are themselves `ConstructorExpr`s)
       let mut hypothesisExprs := #[]
@@ -382,9 +375,6 @@ def getScheduleForConstructor (inductiveName : Name) (ctorName : Name) (outputNa
       -- Extend the current state with the contents of `initialUnifyState`
       UnifyM.extendState initialUnifyState
 
-      let state ← get
-      logWarning m!"state = {state}"
-
       -- Get the ranges corresponding to each of the unknowns
       let unknownRanges ← unknowns.mapM processCorrespondingRange
       let unknownArgsAndRanges := unknowns.zip unknownRanges
@@ -393,8 +383,6 @@ def getScheduleForConstructor (inductiveName : Name) (ctorName : Name) (outputNa
       let conclusionArgs := updatedConclusion.getAppArgs
       let conclusionRanges ← conclusionArgs.mapM convertExprToRangeInCurrentContext
       let conclusionArgsAndRanges := conclusionArgs.zip conclusionRanges
-
-      logWarning m!"conclusionArgsAndRanges = {conclusionArgsAndRanges}"
 
       for ((_u1, r1), (_u2, r2)) in conclusionArgsAndRanges.zip unknownArgsAndRanges do
         unify r1 r2
@@ -443,8 +431,6 @@ def getScheduleForConstructor (inductiveName : Name) (ctorName : Name) (outputNa
       -- convert them to the appropriate `ScheduleStep`s, and prepends them to the `naiveSchedule`
       let fullSchedule := addConclusionPatternsAndEqualitiesToSchedule finalState.patterns finalState.equalities (updatedNaiveSchedule, scheduleSort)
 
-      logWarning m!"fullSchedule = {repr fullSchedule}"
-
       return fullSchedule))
 
 
@@ -457,11 +443,10 @@ def elabDeriveScheduledGenerator : CommandElab := fun stx => do
   match stx with
   | `(#derive_scheduled_generator ( fun ( $var:ident : $outputTypeSyntax:term ) => $body:term )) => do
 
+
     -- Parse the body of the lambda for an application of the inductive relation
     let (inductiveSyntax, argIdents) ← parseInductiveApp body
     let inductiveName := inductiveSyntax.getId
-
-    logWarning m!"argIdents = {argIdents}"
 
     -- Figure out the name and type of the value we wish to generate (the "output")
     let outputName := var.getId
@@ -479,14 +464,6 @@ def elabDeriveScheduledGenerator : CommandElab := fun stx => do
 
     -- Determine the type for each argument to the inductive
     let (_, _, inductiveTypeComponents) ← liftTermElabM $ decomposeType inductiveVal.type
-
-    -- let afterInstantiatingValueLevelParams ← liftCoreM $ instantiateValueLevelParams constInfo [mkLevelParam ``Nat]
-    -- logWarning m!"afterInstantiatingValueLevelParams = {afterInstantiatingValueLevelParams}"
-
-    -- let inferredImplicitTyExpr := Expr.inferImplicit inductiveVal.type inductiveVal.numParams (considerRange := true)
-    -- logWarning m!"type after inferring implicit = {inferredImplicitTyExpr}"
-
-    logWarning m!"inductiveTypeComponents = {inductiveTypeComponents}"
 
     -- To obtain the type of each arg to the inductive,
     -- we pop the last element (`Prop`) from `inductiveTypeComponents`
@@ -579,15 +556,3 @@ def elabDeriveScheduledGenerator : CommandElab := fun stx => do
     elabCommand typeClassInstance
 
   | _ => throwUnsupportedSyntax
-
--- TODO: debug these cases
-
-
--- inductive MinEx2' : Nat → List Nat → List Nat → Prop where
--- | ME_empty : MinEx2' .zero [] []
--- | ME_present : ∀ x l l',
---     MinEx2' x l l' →
---     MinEx2' (Nat.succ x) l ([x] ++ l')
-
-
--- #derive_scheduled_generator (fun (l : List Nat) => MinEx2' x l l')

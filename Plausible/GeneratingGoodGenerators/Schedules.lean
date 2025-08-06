@@ -155,11 +155,9 @@ def updateNonRecSource (k : UnknownMap) (hyp : HypothesisExpr) : UnifyM Source :
 
 /-- Updates a `Source` with the result of unification as contained in the `UnknownMap` -/
 def updateSource (k : UnknownMap) (src : Source) : UnifyM Source := do
-  logWarning m!"updating source {repr src}"
   match src with
   | .NonRec hyp => do
     let hypExpr := toExpr hyp
-    logWarning m!"hypExpr is {hypExpr}"
 
     -- To do so, we first extract the constructor in the hypothesis
     -- and see if it corresponds to a type constructor for a parameterized type `inductive` type (e.g. `List`)
@@ -190,7 +188,6 @@ def updateSource (k : UnknownMap) (src : Source) : UnifyM Source := do
 
 /-- Updates a list of `ScheduleSteps` with the result of unification -/
 def updateScheduleSteps (scheduleSteps : List ScheduleStep) : UnifyM (List ScheduleStep) := do
-  logWarning "updating scheduleSteps..."
   UnifyM.withConstraints $ fun k => scheduleSteps.mapM (fun step =>
     match step with
     | .Match u p => do
@@ -198,9 +195,7 @@ def updateScheduleSteps (scheduleSteps : List ScheduleStep) : UnifyM (List Sched
       let updatedPattern ← UnifyM.updatePattern k p
       return .Match updatedScrutinee updatedPattern
     | .Unconstrained u src producerSort => do
-      logWarning m!"in unconstrained case, finding canonical unknown for unknown {u}"
       let updatedUnknown ← UnifyM.findCanonicalUnknown k u
-      logWarning m!"updatedUnknown = {updatedUnknown}"
       let updatedSrc ← updateSource k src
       return .Unconstrained updatedUnknown updatedSrc producerSort
     | .SuchThat unknownsAndTypes src dst => do

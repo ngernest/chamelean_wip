@@ -23,18 +23,16 @@ inductive MinEx : Nat → List Nat → List Nat → Prop where
     InList x l →
     MinEx (Nat.succ n) l (x::l')
 
--- TODO: test derived generator on this example
--- (need to introduce a fresh variable and an equality constraint between it & the function call
--- (Computing Correctly, section 3.1), i.e. introduce a constraint `l'' = [x] + l'`
+/-- Example inductive relation involving a non-trivial function call
+    (`l'' = [x] + l'`)  in the conclusion -/
 inductive MinEx2 : Nat → List Nat → List Nat → Prop where
 | ME_empty : MinEx2 .zero [] []
 | ME_present : ∀ x l l',
     MinEx2 x l l' →
     MinEx2 (Nat.succ x) l ([x] ++ l')
 
-
--- TODO: test derived generator on this example
--- (need to support function calls (Computing Correctly section 3.1))
+/-- Example inductive relation involving a non-trivial function call
+    (e.g. `[x] ++ l`) in the conclusion -/
 inductive MinEx3 : Nat → List Nat → List Nat → Prop where
 | ME_empty : MinEx3 .zero [] []
 | ME_present : ∀ x l,
