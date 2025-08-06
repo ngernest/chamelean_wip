@@ -38,15 +38,30 @@ info: Try this checker: instance : DecOpt (InList x l) where
 #guard_msgs(info, drop warning) in
 #derive_checker (InList x l)
 
-
--- TODO: replace this dummy instance with the call `#derive_scheduled_generator (fun (l : List Nat) => InList x l)`
--- after the deriver has been updated to support types which involve type constructor applications (e.g. `List Nat`)
-instance : ArbitrarySizedSuchThat (List Nat) (fun l => InList x l) where
-  arbitrarySizedST := sorry
-
-
--- #guard_msgs(info, drop warning) in
--- #derive_scheduled_generator (fun (l : List Nat) => InList x l)
+/--
+info: Try this generator: instance : ArbitrarySizedSuchThat (List Nat) (fun l_1 => InList x_1 l_1) where
+  arbitrarySizedST :=
+    let rec aux_arb (initSize : Nat) (size : Nat) (x_1 : Nat) : OptionT Plausible.Gen (List Nat) :=
+      match size with
+      | Nat.zero =>
+        OptionTGen.backtrack
+          [(1, do
+              let l ← Arbitrary.arbitrary;
+              return List.cons x_1 l)]
+      | Nat.succ size' =>
+        OptionTGen.backtrack
+          [(1, do
+              let l ← Arbitrary.arbitrary;
+              return List.cons x_1 l),
+            (Nat.succ size', do
+              let l ← aux_arb initSize size' x_1;
+              do
+                let y ← Arbitrary.arbitrary;
+                return List.cons y l)]
+    fun size => aux_arb size size x_1
+-/
+#guard_msgs(info, drop warning) in
+#derive_scheduled_generator (fun (l : List Nat) => InList x l)
 
 
 /--
