@@ -265,6 +265,8 @@ def getScheduleForConstructor (inductiveName : Name) (ctorName : Name) (outputNa
       | none => tyExpr
       | some _ => none)
 
+    -- TODO: detect if the conclusion contains a function call, and if so, rewrite it
+
     -- Obtain the `LocalContext` (needed for delaborating `Expr`s)
     let localCtx ← getLCtx
 
