@@ -2,7 +2,6 @@ import Plausible.New.DeriveChecker
 import Plausible.New.SubGenerators
 import Plausible.New.SubCheckers
 import Plausible.New.DeriveConstrainedProducers
-import Plausible.New.Tests
 import Plausible.New.OptionTGen
 import Plausible.New.Idents
 import Plausible.New.TSyntaxCombinators
