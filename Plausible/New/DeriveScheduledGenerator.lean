@@ -606,7 +606,7 @@ def elabDeriveScheduledEnumerator : CommandElab := fun stx => do
     let genFormat ← liftCoreM (PrettyPrinter.ppCommand typeClassInstance)
 
     -- Display the code for the derived generator to the user
-    logInfo m!"Try this generator: {Format.pretty genFormat}"
+    logInfo m!"Try this enumerator: {Format.pretty genFormat}"
 
     elabCommand typeClassInstance
 
