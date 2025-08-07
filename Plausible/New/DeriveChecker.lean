@@ -9,6 +9,15 @@ open Lean Std Elab Command Meta Term Parser
 open Idents
 open Plausible.IR
 
+/-- Derives a checker which checks the `inductiveProp` (an inductive relation, represented as a `TSyntax term`)
+    using the unification algorithm from Generating Good Generators and the schedules discuseed in Testing Theorems -/
+def deriveScheduledChecker (inductiveProp : TSyntax `term) : CommandElabM (TSyntax `command) := do
+  -- Parse `inductiveProp` for an application of the inductive relation
+  let (inductiveName, args) ← deconstructInductiveApplication inductiveProp
+
+  -- TODO: fill in the body of this function following the template in `DeriveConstrainedProducer.lean`
+  sorry
+
 /-- Produces an instance of the `DecOpt` typeclass containing the definition for the top-level derived checker.
     The arguments to this function are:
     - a list of `baseCheckers` (each represented as a Lean term), to be invoked when `size == 0`

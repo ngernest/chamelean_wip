@@ -610,5 +610,3 @@ def elabDeriveScheduledEnumerator : CommandElab := fun stx => do
     elabCommand typeClassInstance
 
   | _ => throwUnsupportedSyntax
-
--- #derive_enumerator (fun (t : Tree) => bst lo hi t)
