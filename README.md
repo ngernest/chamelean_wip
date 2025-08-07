@@ -6,8 +6,9 @@ checkers / enumerators / generators for inductive relations.
 to perform this procedure.)
 
 Our design is heavily inspired by [Coq/Rocq's QuickChick](https://github.com/QuickChick/QuickChick) library and the following papers:
-- [Computing Correctly with Inductive Relations (PLDI 2022)](https://lemonidas.github.io/pdf/ComputingCorrectly.pdf)
-- [Generating Good Generators for Inductive Relations (POPL 2018)](https://lemonidas.github.io/pdf/GeneratingGoodGenerators.pdf)
+- [*Computing Correctly with Inductive Relations* (PLDI 2022)](https://lemonidas.github.io/pdf/ComputingCorrectly.pdf)
+- [*Generating Good Generators for Inductive Relations* (POPL 2018)](https://lemonidas.github.io/pdf/GeneratingGoodGenerators.pdf)
+- *Testing Theorems, Fully Automatically* (under submission, 2025)
 
 ## Overview
 Like QuickChick, we provide the following typeclasses:
@@ -119,6 +120,13 @@ We provide a command elaborator which elaborates the `#derive_checker` command:
 - [`OptionTGen.lean`](./Plausible/New/OptionTGen.lean): Generator combinators that work over the `OptionT Gen` monad transformer (representing generators that may fail)
 - [`EnumeratorCombinators.lean`](./Plausible/New/EnumeratorCombinators.lean): Combinators over enumators 
 
+**Generator derivation algorithm** (adapted from the QuickChick papers):
+- [`UnificationMonad.lean`](./Plausible/New/UnificationMonad.lean): The unification monad described in [*Generating Good Generators*](https://lemonidas.github.io/pdf/GeneratingGoodGenerators.pdf)
+- [`Schedules.lean`](./Plausible/New/Schedules.lean): Type definitions for generator schedules, as described in *Testing Theorems*
+- [`DeriveSchedules.lean`](./Plausible/New/DeriveSchedules.lean): Algorithm for deriving generator schedules, as described in *Testing Theorems* 
+- [`DeriveScheduledGenerator.lean`](./Plausible/New/DeriveScheduledGenerator.lean): Algorithm for deriving constrained generators using the aforementioned unification algorithm & generator schedules
+- [`MExp.lean`](./Plausible/New/MExp.lean): An intermediate representation for monadic expressions (`MExp`), used when compiling schedules to Lean code
+
 **Metaprogramming infrastructure**:
 - [`TSyntaxCombinators.lean`](./Plausible/New/TSyntaxCombinators.lean): Combinators over `TSyntax` for creating monadic `do`-blocks & other Lean expressions via metaprogramming
 - [`DeriveArbitrary.lean`](./Plausible/New/DeriveArbitrary.lean): Deriver for unconstrained generators (instances of the `Arbitrary` / `ArbitrarySized` typeclasses)
@@ -141,8 +149,8 @@ We provide a command elaborator which elaborates the `#derive_checker` command:
 
 **Examples**:
 - [`Examples.lean`](./Plausible/IR/Examples.lean): Some example inductive relations (BSTs, balanced trees, STLC)
-- [`STLC.lean`](./Plausible/New/STLC.lean): Example checkers & generators for well-typed STLC terms
-- [`Trees.lean`](./Plausible/New/Trees.lean): Example generators for balanced trees & BSTs
+- [`STLC.lean`](./Plausible/New/Examples/STLC.lean): Example hand-written checkers & generators for well-typed STLC terms
+- [`Trees.lean`](./Plausible/New/Examples/Trees.lean): Example hand-written generators for balanced trees & BSTs
 - [`DeriveRegExpGenerator.lean`](./Test/DeriveArbitrary/DeriveRegExpGenerator.lean): Example generators for regular expressions
 
 **Tests**:      

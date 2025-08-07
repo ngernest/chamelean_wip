@@ -22,6 +22,10 @@ class ArbitrarySized (α : Type) where
 instance [ArbitrarySized α] : Arbitrary α where
   arbitrary := GeneratorCombinators.sized ArbitrarySized.arbitrarySized
 
+/-- Every `Arbitrary α` instance gives rise to an `Arbitrary (Option α)` instance -/
+instance [Arbitrary α] : Arbitrary (Option α) where
+  arbitrary := pure <$> Arbitrary.arbitrary
+
 /-- If we have `Repr`, `ArbitrarySized` & `Shrinkable` instances for a type,
     then that type gets a `SampleableExt` instance
     - Note: Plausible's `SampleableExt` is analogous to QuickChick's `Arbitrary` typeclass

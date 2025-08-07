@@ -6,4 +6,3 @@ import Plausible.IR.Action
 import Plausible.IR.Constructor
 import Plausible.IR.Backtrack
 import Plausible.IR.Generator
-import Plausible.IR.Renaming

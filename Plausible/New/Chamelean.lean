@@ -5,18 +5,16 @@ import Plausible.New.DeriveConstrainedProducers
 import Plausible.New.Tests
 import Plausible.New.OptionTGen
 import Plausible.New.Idents
-import Plausible.New.Schedules
 import Plausible.New.TSyntaxCombinators
 import Plausible.New.DecOpt
 import Plausible.New.GeneratorCombinators
 import Plausible.New.ArbitrarySizedSuchThat
-import Plausible.New.DeriveArbitrarySuchThat
 import Plausible.New.Arbitrary
 import Plausible.New.Enumerators
 import Plausible.New.EnumeratorCombinators
 import Plausible.New.LazyList
-import Plausible.New.STLC
-import Plausible.New.Trees
+import Plausible.New.Examples.STLC
+import Plausible.New.Examples.Trees
 import Plausible.New.NKIExperiments
 import Plausible.New.DeriveArbitrary
 import Plausible.New.DeriveEnum
@@ -24,8 +22,8 @@ import Plausible.New.DeriveEnumSuchThat
 import Plausible.New.SubEnumerators
 import Plausible.New.Utils
 import Plausible.New.Debug
-
--- Experimental code which implements the algorithm from "Generating Good Generators for Inductive Relations"
-import Plausible.GeneratingGoodGenerators.UnificationMonad
-import Plausible.GeneratingGoodGenerators.ModeAnalysis
-import Plausible.GeneratingGoodGenerators.DeriveSubGenerator
+import Plausible.New.UnificationMonad
+import Plausible.New.DeriveScheduledGenerator
+import Plausible.New.Schedules
+import Plausible.New.DeriveSchedules
+import Plausible.New.MExp

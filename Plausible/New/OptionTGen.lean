@@ -71,13 +71,13 @@ def sized (f : Nat → OptionT Gen α) : OptionT Gen α :=
   Gen.getSize >>= f
 
 /-- Samples from an `OptionT Gen` generator that is parameterized by its `size`,
-    returning the generated `Option α` in the `IO` monad -/
-def runSizedGen {α} (sizedGen : Nat → OptionT Gen α) (size : Nat) : IO (Option α) :=
-  Gen.run (OptionT.run $ sizedGen size) size
+    printing out 1 sample using the `Repr` instance for `α` -/
+def runSizedGen {α} [Repr α] (sizedGen : Nat → OptionT Gen α) (size : Nat) : IO PUnit :=
+  printNSamples (OptionT.run (sizedGen size)) 1
 
 /-- Samples from an `OptionT Gen` generator that is parameterized by its `size`,
     printing out 10 samples using the `Repr` instance for `α` -/
-def runSizedGenPrintOutput [Repr α] (sizedGen : Nat → OptionT Gen α) (size : Nat) :=
+def runSizedGenPrintOutput [Repr α] (sizedGen : Nat → OptionT Gen α) (size : Nat) : IO PUnit :=
   printSamples (OptionT.run (sizedGen size))
 
 end OptionTGen

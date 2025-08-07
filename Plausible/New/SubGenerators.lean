@@ -27,7 +27,7 @@ open Idents
 def genInputForInductive (fvar : FVarId) (hyp : Expr) (idx : Nat) (generationStyle : GenerationStyle) (producerType : ProducerType) (localCtx : LocalContext) : MetaM (TSyntax `doElem) := do
   let argExprs := hyp.getAppArgs.eraseIdx! idx
   let argTerms ← Array.mapM (delabExprInLocalContext localCtx) argExprs
-  let lhs := Lean.mkIdent $ getUserNameInContext localCtx fvar
+  let lhs := Lean.mkIdent $ getUserNameInContext! localCtx fvar
 
   let hypTerm ← delabExprInLocalContext localCtx hyp
   let producerConstraint ← `((fun $lhs:ident => $hypTerm))
@@ -153,7 +153,7 @@ def mkLetBindExprsInDoBlock (actions : Array Action) (producerType : ProducerTyp
         match producerType with
         | .Generator => arbitraryFn
         | .Enumerator => enumFn
-      let bindExpr ← mkLetBind (Lean.mkIdent $ getUserNameInContext localCtx fvar) #[producerFn]
+      let bindExpr ← mkLetBind (Lean.mkIdent $ getUserNameInContext! localCtx fvar) #[producerFn]
       doElems := doElems.push bindExpr
     | _ => continue
 

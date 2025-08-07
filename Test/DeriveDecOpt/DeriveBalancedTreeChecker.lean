@@ -16,21 +16,21 @@ info: Try this checker: instance : DecOpt (balancedTree n t) where
         DecOpt.checkerBacktrack
           [fun _ =>
             match n_1, t_1 with
-            | 0, BinaryTree.Leaf => Option.some Bool.true
+            | Nat.zero, BinaryTree.Leaf => Option.some Bool.true
             | _, _ => Option.some Bool.false,
             fun _ =>
             match n_1, t_1 with
-            | 1, BinaryTree.Leaf => Option.some Bool.true
+            | Nat.succ Nat.zero, BinaryTree.Leaf => Option.some Bool.true
             | _, _ => Option.some Bool.false]
       | Nat.succ size' =>
         DecOpt.checkerBacktrack
           [fun _ =>
             match n_1, t_1 with
-            | 0, BinaryTree.Leaf => Option.some Bool.true
+            | Nat.zero, BinaryTree.Leaf => Option.some Bool.true
             | _, _ => Option.some Bool.false,
             fun _ =>
             match n_1, t_1 with
-            | 1, BinaryTree.Leaf => Option.some Bool.true
+            | Nat.succ Nat.zero, BinaryTree.Leaf => Option.some Bool.true
             | _, _ => Option.some Bool.false,
             fun _ =>
             match n_1, t_1 with

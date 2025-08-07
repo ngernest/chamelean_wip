@@ -12,6 +12,17 @@ def mkLetBind (lhs : Ident) (rhsTerms : TSyntaxArray `term) : MetaM (TSyntax `do
     `(doElem| let $lhs:term ← $f:term $argTerms* )
   | [] => throwError "rhsTerms can't be empty"
 
+/-- `mkTuple components` creates an n-ary tuple from the `Name`s in the list `components`
+    - If `components` is Empty, we produce the unit value `()`
+    - If `components` has length 1, we just produce one single `Ident` -/
+def mkTuple (components : List Name) : MetaM (TSyntax `term) :=
+  match components with
+  | [] => `(())
+  | [x] => `($(mkIdent x))
+  | x :: xs => do
+    let tail ← mkTuple xs
+    `( ( $(mkIdent x):term, $tail:term ) )
+
 /-- Constructs a Lean monadic `do` block out of an array of `doSeq`s
     (expressions that appear in the `do` block) -/
 def mkDoBlock (doElems : TSyntaxArray `doElem) : MetaM (TSyntax `term) := do

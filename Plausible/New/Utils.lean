@@ -3,12 +3,98 @@ import Lean
 import Plausible.IR.Prelude
 import Batteries.Data.List.Basic
 
-open Lean Meta
+open Lean Meta LocalContext Std
 open Plausible.IR
 
+/-- `Monad` instance for List.
+    Note that:
+    - The Lean standard library does not have a Monad instance for List (see https://leanprover-community.github.io/archive/stream/270676-lean4/topic/Option.20do.20notation.20regression.3F.html#231433226)
+    - MathLib4 does have a Monad instance for List, but we wish to avoid having Chamelean rely on Mathlib
+    as a dependency, so we reproduce instance here instead. -/
+instance : Monad List where
+  pure x := [x]
+  bind xs f := xs.flatMap f
 
-/-- Looks up the user-facing `Name` corresponding to an `FVarId` in a specific `LocalContext` -/
-def getUserNameInContext (lctx : LocalContext) (fvarId : FVarId) : Name :=
+/-- `Alternative` instance for List.
+     - MathLib4 does have an `Alternative` instance for List, but we wish to avoid having Chamelean rely on Mathlib
+    as a dependency, so we reproduce the instance here instead. -/
+instance : Alternative List where
+  failure := List.nil
+  orElse l l' := List.append l (l' ())
+
+/-- Decomposes an list `xs` into a pair `(xs', x)`
+   where `xs' = xs[0..=n-2]` and `x = xs[n - 1]` (where `n` is the length of `xs`).
+   - If `xs` is empty, this function returns `none`
+   - If `xs = #[x]`, this function returns `some (#[], x)`
+   - Note: this function is the same as `unsnoc` in Haskell's `Data.List` library -/
+def unsnoc (xs : List α) : Option (List α × α) :=
+  match xs.getLast? with
+  | none => none
+  | some x => some (xs.take (xs.length - 1), x)
+
+/-- Variant of `List.flatMap` where the function `f` expects two arguments:
+    the current argument of the list and all *other* elements in the list (in order) excluding the current one.
+    Intuitively, this is a version of `flatMap` where each element is processed
+    by `f` with contextual information from the other elements. -/
+def flatMapWithContext (xs : List α) (f : α → List α → List β) : List β :=
+  aux [] xs
+    where
+      aux (acc : List α) (l : List α) : List β :=
+        match l with
+        | [] => []
+        | hd :: tl => f hd (List.reverse acc ++ tl) ++ aux (hd :: acc) tl
+
+/-- Variant of `flatMapWithContext` where the function `f` is monadic
+    and returns `m (List β)` -/
+def flatMapMWithContext [Monad m] (xs : List α) (f : α → List α → m (List β)) : m (List β) :=
+  aux [] xs
+    where
+      aux (acc : List α) (l : List α) : m (List β) :=
+        match l with
+        | [] => return []
+        | hd :: tl => do
+            let xs ← f hd (List.reverse acc ++ tl)
+            let ys ← aux (hd :: acc) tl
+            return (xs ++ ys)
+
+
+/-- Variant of `List.filterMap` where the function `f` also takes in the index of the
+    current element in the list -/
+def filterMapWithIndex (f : Nat → α → Option β) (xs : List α) : List β :=
+  xs.zipIdx.filterMap (Function.uncurry $ flip f)
+
+/-- Variant of `List.filterMapM` where the function `f` also takes in the index of the
+    current element in the list -/
+def filterMapMWithIndex [Monad m] (f : Nat → α → m (Option β)) (xs : List α) : m (List β) :=
+  xs.zipIdx.filterMapM (Function.uncurry $ flip f)
+
+/-- Variant of `List.filter` where the predicate `p` takes in the index of
+    the element as its first argument -/
+def filterWithIndex (p : Nat → α → Bool) (xs : List α) : List α :=
+  Prod.fst <$> xs.zipIdx.filter (Function.uncurry $ flip p)
+
+/-- `mkInitialContextForInductiveRelation inputTypes inputNames`
+    creates the initial `LocalContext` where each `(x, τ)` in `Array.zip inputTypes inputNames`
+    is given the declaration `x : τ` in the resultant context.
+
+    This function returns a quadruple containing `inputTypes`, `inputNames` represented as an `Array` of `Name`s,
+    the resultant `LocalContext` and a map from original names to freshened names. -/
+def mkInitialContextForInductiveRelation (inputTypes : Array Expr) (inputNames : Array Name) : MetaM (Array Expr × Array Name × LocalContext × HashMap Name Name) := do
+  let localDecls := inputNames.zip inputTypes
+  withLocalDeclsDND localDecls $ fun exprs => do
+    let mut nameMapBindings := #[]
+    let mut localCtx ← getLCtx
+    for currentName in inputNames do
+      let freshName := getUnusedName localCtx currentName
+      localCtx := renameUserName localCtx currentName freshName
+      nameMapBindings := nameMapBindings.push (currentName, freshName)
+    let nameMap := HashMap.ofList (Array.toList nameMapBindings)
+    return (exprs, inputNames, localCtx, nameMap)
+
+
+/-- Looks up the user-facing `Name` corresponding to an `FVarId` in a specific `LocalContext`
+    - Panics if `fvarId` is not in the `LocalContext` -/
+def getUserNameInContext! (lctx : LocalContext) (fvarId : FVarId) : Name :=
   (lctx.get! fvarId).userName
 
 /-- Helper function for setting delaborator options

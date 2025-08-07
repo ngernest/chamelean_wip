@@ -3,6 +3,7 @@ import Std
 import Plausible.IR.Examples
 import Plausible.IR.Prelude
 import Plausible.New.Idents
+import Plausible.New.Utils
 import Plausible.IR.KeyValueStore
 open List Nat Array String
 open Lean Std Elab Command Meta Term LocalContext
@@ -70,7 +71,7 @@ def isInductiveRelation (tyexpr : Expr) : MetaM Bool := do
     1. Checks if the `conclusion` contains a function call where the function is *not* the same as the `inductiveRelationName`.
        (If no, we just return the pair `(hypotheses, conclusion)` as is.)
     2. If yes, we create a fresh variable & add an extra hypothesis where the fresh var is bound to the result of the function call.
-    3. We then rewrite the conclusion, replacing occurrences of the function call with the fresh variable,
+    3. We then rewrite the conclusion, replacing occurrences of the function call with the fresh variable.
     The updated hypotheses & conclusion are subsequently returned.
     - Note: it is the caller's responsibility to check that `conclusion` does indeed contain
       a non-trivial function application (e.g. by using `containsNonTrivialFuncApp`) -/
@@ -92,7 +93,6 @@ def rewriteFuncCallsInConclusion (hypotheses : Array Expr) (conclusion : Expr) (
       -- Create a new hypothesis stating that `newVarExpr = funcAppExpr`, then
       -- add it to the array of `hypotheses`
       let newHyp ← mkEq newVarExpr funcAppExpr
-      -- let newVarFVarId := newVarExpr.fvarId!
       let updatedHypotheses := Array.push hypotheses newHyp
 
       -- Note: since we're doing a purely syntactic rewriting operation here,
@@ -478,25 +478,6 @@ def mkDefaultInputNames (inputExpr : Expr) : MetaM (Array String) := do
     return (← mkDefaultInputNames_aux input_types.size)
   | none => throwError "input expression is not a function application"
 
-/-- `mkInitialContextForInductiveRelation inputTypes inputNames`
-    creates the initial `LocalContext` where each `(x, τ)` in `Array.zip inputTypes inputNames`
-    is given the declaration `x : τ` in the resultant context.
-
-    This function returns a quadruple containing `inputTypes`, `inputNames` represented as an `Array` of `Name`s,
-    the resultant `LocalContext` and a map from original names to freshened names. -/
-def mkInitialContextForInductiveRelation (inputTypes : Array Expr) (inputNameStrings : Array String) : MetaM (Array Expr × Array Name × LocalContext × HashMap Name Name) := do
-  let inputNames := Name.mkStr1 <$> inputNameStrings
-  let localDecls := inputNames.zip inputTypes
-  withLocalDeclsDND localDecls $ fun exprs => do
-    let mut nameMapBindings := #[]
-    let mut localCtx ← getLCtx
-    for currentName in inputNames do
-      let freshName := getUnusedName localCtx currentName
-      localCtx := renameUserName localCtx currentName freshName
-      nameMapBindings := nameMapBindings.push (currentName, freshName)
-    let nameMap := HashMap.ofList (Array.toList nameMapBindings)
-    return (exprs, inputNames, localCtx, nameMap)
-
 
 /-- Takes in an expression of the form `R e1 ... en`, where `R` is an inductive relation
     with arguments specified by `argNames`, and extracts metadata corresponding to the `inductive`,
@@ -510,7 +491,7 @@ def getInductiveInfoWithArgs (inputExpr : Expr) (argNames : Array String) : Meta
     -- `input_types` contains all elements of `tyexprs_in_arrow_type` except the conclusion (which is `Prop`)
     let inputTypes := tyexprs_in_arrow_type.pop
 
-    let (input_vars, input_vars_names, localCtx, nameMap) ← mkInitialContextForInductiveRelation inputTypes argNames
+    let (input_vars, input_vars_names, localCtx, nameMap) ← mkInitialContextForInductiveRelation inputTypes (Name.mkStr1 <$> argNames)
 
     let env ← getEnv
     match env.find? inductive_name with

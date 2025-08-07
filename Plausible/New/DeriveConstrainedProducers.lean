@@ -15,12 +15,12 @@ open Lean Elab Command Meta Term Parser Std
 open Idents
 
 /-- Extracts the name of the induction relation and its arguments -/
-def parseInductiveApp (body : Term) : CommandElabM (Name × TSyntaxArray `ident) := do
+def parseInductiveApp (body : Term) : CommandElabM (TSyntax `ident × TSyntaxArray `ident) := do
   match body with
   | `($indRel:ident $args:ident*) => do
-    return (indRel.getId, args)
+    return (indRel, args)
   | `($indRel:ident) => do
-    return (indRel.getId, #[])
+    return (indRel, #[])
   | _ => throwErrorAt body "Expected inductive type application"
 
 /-- Extracts the name of the induction relation and its arguments
@@ -161,6 +161,101 @@ def mkProducerTypeClassInstance (baseGenerators : TSyntax `term) (inductiveGener
         -- (so that if we pattern match on the parameter, we avoid pattern variables from shadowing it)
         -- We obtain this fresh name by looking up in the `nameMap`
         let innerParamIdent := lookupFreshenedNameInNameMap nameMap (Array.map Prod.fst paramInfo) paramName
+
+        let innerParam ← `(Term.letIdBinder| ($innerParamIdent : $paramType))
+        innerParams := innerParams.push innerParam
+
+    -- Figure out which typeclass should be derived
+    -- (`ArbitrarySizedSuchThat` for generators, `EnumSizedSuchThat` for enumerators)
+    let producerTypeClass :=
+      match producerType with
+      | .Generator => arbitrarySizedSuchThatTypeclass
+      | .Enumerator => enumSizedSuchThatTypeclass
+
+    -- Similarly, figure out the name of the function corresponding to the typeclass above
+    let producerTypeClassFunction :=
+      match producerType with
+      | .Generator => unqualifiedArbitrarySizedSTFn
+      | .Enumerator => unqualifiedEnumSizedSTFn
+
+    -- Generators use `aux_arb` as the inner function, enumerators use `aux_enum`
+    let innerFunctionIdent :=
+      match producerType with
+      | .Generator => mkFreshAccessibleIdent topLevelLocalCtx `aux_arb
+      | .Enumerator => mkFreshAccessibleIdent topLevelLocalCtx `aux_enum
+
+    -- Determine the appropriate type constructor to use as the producer's type
+    -- (either `Gen` or `Enumerator`)
+    let producerTypeConstructor :=
+      match producerType with
+      | .Generator => genTypeConstructor
+      | .Enumerator => enumTypeConstructor
+
+    -- Determine the appropriate type of the final producer
+    -- (either `OptionT Plausible.Gen α` or `OptionT Enum α`)
+    let optionTProducerType ← `($optionTTypeConstructor $producerTypeConstructor $targetTypeSyntax)
+
+    -- Produce an instance of the appropriate typeclass containing the definition for the derived producer
+    `(instance : $producerTypeClass $targetTypeSyntax (fun $(mkIdent targetVar) => $inductiveStx $args*) where
+        $producerTypeClassFunction:ident :=
+          let rec $innerFunctionIdent:ident $innerParams* : $optionTProducerType :=
+            $matchExpr
+          fun $freshSizeIdent => $innerFunctionIdent $freshSizeIdent $freshSizeIdent $outerParams*)
+
+/-- Like `mkProducerTypeClassInstance`, but without the `nameMap`
+    - TODO: clean-up this function!
+ -/
+def mkProducerTypeClassInstance' (baseGenerators : TSyntax `term) (inductiveGenerators : TSyntax `term) (inductiveStx : TSyntax `term)
+  (args : TSyntaxArray `term) (targetVar : Name)
+  (targetTypeSyntax : TSyntax `term) (producerType : ProducerType)
+  (topLevelLocalCtx : LocalContext) : CommandElabM (TSyntax `command) := do
+    -- Produce a fresh name for the `size` argument for the lambda
+    -- at the end of the generator function, as well as the `aux_arb` inner helper function
+    let freshSizeIdent := mkFreshAccessibleIdent topLevelLocalCtx `size
+    let freshSize' := mkFreshAccessibleIdent topLevelLocalCtx `size'
+
+    let inductiveName := inductiveStx.raw.getId
+
+    -- The (backtracking) combinator to be invoked
+    -- (`OptionTGen.backtrack` for generators, `EnumeratorCombinators.enumerate` for enumerators)
+    let combinatorFn :=
+      match producerType with
+      | .Generator => OptionTBacktrackFn
+      | .Enumerator => enumerateFn
+
+    -- Create the cases for the pattern-match on the size argument
+    let mut caseExprs := #[]
+    let zeroCase ← `(Term.matchAltExpr| | $(mkIdent ``Nat.zero) => $combinatorFn $baseGenerators)
+    caseExprs := caseExprs.push zeroCase
+
+    let succCase ← `(Term.matchAltExpr| | $(mkIdent ``Nat.succ) $freshSize' => $combinatorFn $inductiveGenerators)
+    caseExprs := caseExprs.push succCase
+
+    -- Create function arguments for the producer's `size` & `initSize` parameters
+    -- (former is the generator size, latter is the size argument with which to invoke other auxiliary producers/checkers)
+    let initSizeParam ← `(Term.letIdBinder| ($initSizeIdent : $natIdent))
+    let sizeParam ← `(Term.letIdBinder| ($sizeIdent : $natIdent))
+    let matchExpr ← liftTermElabM $ mkMatchExpr sizeIdent caseExprs
+
+    -- Add parameters for each argument to the inductive relation
+    -- (except the target variable, which we'll filter out later)
+    let paramInfo ← analyzeInductiveArgs inductiveName args
+
+    -- Inner params are for the inner `aux_arb` / `aux_enum` function
+    let mut innerParams := #[]
+    innerParams := innerParams.push initSizeParam
+    innerParams := innerParams.push sizeParam
+
+    -- Outer params are for the top-level lambda function which invokes `aux_arb` / `aux_enum`
+    let mut outerParams := #[]
+    for (paramName, paramType) in paramInfo do
+      -- Only add a function parameter is the argument to the inductive relation is not the target variable
+      -- (We skip the target variable since that's the value we wish to generate)
+      if paramName != targetVar then
+        let outerParamIdent := mkIdent paramName
+        outerParams := outerParams.push outerParamIdent
+
+        let innerParamIdent := mkIdent paramName
 
         let innerParam ← `(Term.letIdBinder| ($innerParamIdent : $paramType))
         innerParams := innerParams.push innerParam
