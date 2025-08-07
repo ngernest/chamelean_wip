@@ -1,6 +1,6 @@
 import Plausible.New.Arbitrary
 import Plausible.New.ArbitrarySizedSuchThat
-import Plausible.GeneratingGoodGenerators.DeriveSubGenerator
+import Plausible.GeneratingGoodGenerators.DeriveScheduledGenerator
 import Test.CommonDefinitions.FunctionCallInConclusion
 
 open DecOpt
