@@ -14,7 +14,6 @@ import Plausible.New.EnumeratorCombinators
 import Plausible.New.LazyList
 import Plausible.New.Examples.STLC
 import Plausible.New.Examples.Trees
-import Plausible.New.NKIExperiments
 import Plausible.New.DeriveArbitrary
 import Plausible.New.DeriveEnum
 import Plausible.New.DeriveEnumSuchThat
