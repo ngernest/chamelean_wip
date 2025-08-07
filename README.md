@@ -8,6 +8,7 @@ to perform this procedure.)
 Our design is heavily inspired by [Coq/Rocq's QuickChick](https://github.com/QuickChick/QuickChick) library and the following papers:
 - [Computing Correctly with Inductive Relations (PLDI 2022)](https://lemonidas.github.io/pdf/ComputingCorrectly.pdf)
 - [Generating Good Generators for Inductive Relations (POPL 2018)](https://lemonidas.github.io/pdf/GeneratingGoodGenerators.pdf)
+- Testing Theorems, Fully Automatically (under submission, 2025)
 
 ## Overview
 Like QuickChick, we provide the following typeclasses:
@@ -118,6 +119,9 @@ We provide a command elaborator which elaborates the `#derive_checker` command:
 - [`GeneratorCombinators.lean`](./Plausible/New/GeneratorCombinators.lean): Extra combinators for Plausible generators (e.g. analogs of the `sized` and `frequency` combinators from Haskell QuickCheck)
 - [`OptionTGen.lean`](./Plausible/New/OptionTGen.lean): Generator combinators that work over the `OptionT Gen` monad transformer (representing generators that may fail)
 - [`EnumeratorCombinators.lean`](./Plausible/New/EnumeratorCombinators.lean): Combinators over enumators 
+
+**Generator derivation algorithm from the QuickChick papers**:
+- []
 
 **Metaprogramming infrastructure**:
 - [`TSyntaxCombinators.lean`](./Plausible/New/TSyntaxCombinators.lean): Combinators over `TSyntax` for creating monadic `do`-blocks & other Lean expressions via metaprogramming
