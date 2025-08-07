@@ -5,7 +5,7 @@ import Plausible.New.UnificationMonad
 import Plausible.New.Schedules
 import Plausible.New.DeriveSchedules
 import Plausible.New.MExp
-import Plausible.New.DeriveConstrainedProducers
+import Plausible.New.MakeConstrainedProducerInstance
 import Plausible.New.SubGenerators
 import Plausible.New.DeriveArbitrary
 import Plausible.New.TSyntaxCombinators
