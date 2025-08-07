@@ -545,7 +545,7 @@ def deriveConstrainedProducer (outputVar : Ident) (outputTypeSyntax : TSyntax `t
       return (baseProducers, inductiveProducers, freshenedOutputName, Lean.mkIdent <$> freshUnknowns, localCtx))
 
   -- Create an instance of the appropriate producer typeclass
-  mkProducerTypeClassInstance'
+  mkConstrainedProducerTypeClassInstance
     baseProducers
     inductiveProducers
     inductiveSyntax
