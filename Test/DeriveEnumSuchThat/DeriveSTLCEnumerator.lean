@@ -35,4 +35,4 @@ info: Try this enumerator: instance : EnumSizedSuchThat Nat (fun x_1 => lookup �
     fun size => aux_enum size size Γ_1 τ_1
 -/
 #guard_msgs(info, drop warning) in
-#derive_scheduled_enumerator (fun (x : Nat) => lookup Γ x τ)
+#derive_enumerator (fun (x : Nat) => lookup Γ x τ)

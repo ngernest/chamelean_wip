@@ -35,7 +35,7 @@ info: Try this enumerator: instance : EnumSizedSuchThat Nat (fun x_1 => Between 
     fun size => aux_enum size size lo_1 hi_1
 -/
 #guard_msgs(info, drop warning) in
-#derive_scheduled_enumerator (fun (x : Nat) => Between lo x hi)
+#derive_enumerator (fun (x : Nat) => Between lo x hi)
 
 /--
 info: Try this enumerator: instance : EnumSizedSuchThat BinaryTree (fun t_1 => BST lo_1 hi_1 t_1) where
@@ -55,4 +55,4 @@ info: Try this enumerator: instance : EnumSizedSuchThat BinaryTree (fun t_1 => B
     fun size => aux_enum size size lo_1 hi_1
 -/
 #guard_msgs(info, drop warning) in
-#derive_scheduled_enumerator (fun (t : BinaryTree) => BST lo hi t)
+#derive_enumerator (fun (t : BinaryTree) => BST lo hi t)

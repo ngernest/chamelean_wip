@@ -60,7 +60,7 @@ info: Try this enumerator: instance : EnumSizedSuchThat (List Nat) (fun s_1 => E
     fun size => aux_enum size size r0_1
 -/
 #guard_msgs(info, drop warning) in
-#derive_scheduled_enumerator (fun (s : List Nat) => ExpMatch s r0)
+#derive_enumerator (fun (s : List Nat) => ExpMatch s r0)
 
 -- To sample from this enumerator, we can run the following:
 -- #eval runSizedEnum (EnumSizedSuchThat.enumSizedST (fun s => ExpMatch s r0)) 3

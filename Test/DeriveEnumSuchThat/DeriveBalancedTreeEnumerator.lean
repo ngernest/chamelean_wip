@@ -41,4 +41,4 @@ info: Try this enumerator: instance : EnumSizedSuchThat BinaryTree (fun t_1 => b
     fun size => aux_enum size size n_1
 -/
 #guard_msgs(info, drop warning) in
-#derive_scheduled_enumerator (fun (t : BinaryTree) => balancedTree n t)
+#derive_enumerator (fun (t : BinaryTree) => balancedTree n t)

@@ -31,7 +31,7 @@ info: Try this enumerator: instance : EnumSizedSuchThat (List Nat) (fun l_1 => I
     fun size => aux_enum size size x_1
 -/
 #guard_msgs(info, drop warning) in
-#derive_scheduled_enumerator (fun (l : List Nat) => InList x l)
+#derive_enumerator (fun (l : List Nat) => InList x l)
 
 /--
 info: Try this enumerator: instance : EnumSizedSuchThat (List Nat) (fun l_1 => MinOk l_1 a_1) where
@@ -58,7 +58,7 @@ info: Try this enumerator: instance : EnumSizedSuchThat (List Nat) (fun l_1 => M
     fun size => aux_enum size size a_1
 -/
 #guard_msgs(info, drop warning) in
-#derive_scheduled_enumerator (fun (l: List Nat) => MinOk l a)
+#derive_enumerator (fun (l: List Nat) => MinOk l a)
 
 /--
 info: Try this enumerator: instance : EnumSizedSuchThat (List Nat) (fun l_1 => MinEx n_1 l_1 a_1) where
@@ -94,4 +94,4 @@ info: Try this enumerator: instance : EnumSizedSuchThat (List Nat) (fun l_1 => M
     fun size => aux_enum size size n_1 a_1
 -/
 #guard_msgs(info, drop warning) in
-#derive_scheduled_enumerator (fun (l: List Nat) => MinEx n l a)
+#derive_enumerator (fun (l: List Nat) => MinEx n l a)

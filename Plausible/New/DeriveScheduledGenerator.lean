@@ -591,14 +591,14 @@ def elabDeriveGenerator : CommandElab := fun stx => do
   | _ => throwUnsupportedSyntax
 
 /-- Command for deriving a constrained generator for an inductive relation -/
-syntax (name := derive_scheduled_enumerator) "#derive_scheduled_enumerator" "(" "fun" "(" ident ":" term ")" "=>" term ")" : command
+syntax (name := derive_enumerator) "#derive_enumerator" "(" "fun" "(" ident ":" term ")" "=>" term ")" : command
 
 /-- Elaborator for the `#derive_generator` command which derives a constrained generator
     using generator schedules from Testing Theorems & the unification algorithm from Generating Good Generators -/
-@[command_elab derive_scheduled_enumerator]
+@[command_elab derive_enumerator]
 def elabDeriveScheduledEnumerator : CommandElab := fun stx => do
   match stx with
-  | `(#derive_scheduled_enumerator ( fun ( $var:ident : $outputTypeSyntax:term ) => $body:term )) => do
+  | `(#derive_enumerator ( fun ( $var:ident : $outputTypeSyntax:term ) => $body:term )) => do
     -- Derive an instance of the `ArbitrarySuchThat` typeclass
     let typeClassInstance ← deriveEnumSuchThatInstance var outputTypeSyntax body
 
@@ -612,4 +612,4 @@ def elabDeriveScheduledEnumerator : CommandElab := fun stx => do
 
   | _ => throwUnsupportedSyntax
 
--- #derive_scheduled_enumerator (fun (t : Tree) => bst lo hi t)
+-- #derive_enumerator (fun (t : Tree) => bst lo hi t)
