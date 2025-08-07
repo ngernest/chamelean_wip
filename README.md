@@ -88,7 +88,7 @@ instance of the `ArbitrarySizedSuchThat` / `EnumSizedSuchThat` typeclass (along 
 #eval runSizedEnum (EnumSizedSuchThat.enumSizedST (fun t => balanced 5 t)) 3
 ```
 
-**3. Deriving checkers (partial decision procedures)** (for inductively-defined propositions)
+**3. Deriving checkers (partial decision procedures)** (for inductively-defined propositions)                                 
 A checker for an inductively-defined `Prop` is a `Nat -> Option Bool` function, which 
 takes a `Nat` argument as fuel and returns `none` if it can't decide whether the `Prop` holds (e.g. it runs out of fuel),
 and otherwise returns `some true/some false` depending on whether the `Prop` holds.
