@@ -1,5 +1,5 @@
 import Lean
-import Plausible.GeneratingGoodGenerators.UnificationMonad
+import Plausible.New.UnificationMonad
 import Plausible.New.TSyntaxCombinators
 
 open Lean Meta

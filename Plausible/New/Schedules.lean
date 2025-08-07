@@ -1,4 +1,4 @@
-import Plausible.GeneratingGoodGenerators.UnificationMonad
+import Plausible.New.UnificationMonad
 import Plausible.IR.Prelude
 
 open Plausible.IR

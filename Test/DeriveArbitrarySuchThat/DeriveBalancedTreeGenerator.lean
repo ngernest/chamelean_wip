@@ -3,7 +3,7 @@ import Plausible.Gen
 import Plausible.New.OptionTGen
 import Plausible.New.DecOpt
 import Plausible.New.ArbitrarySizedSuchThat
-import Plausible.GeneratingGoodGenerators.DeriveScheduledGenerator
+import Plausible.New.DeriveScheduledGenerator
 import Test.CommonDefinitions.BinaryTree
 
 open ArbitrarySizedSuchThat OptionTGen

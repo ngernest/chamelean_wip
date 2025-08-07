@@ -24,9 +24,9 @@ import Plausible.New.Utils
 import Plausible.New.Debug
 
 -- Experimental code which implements the algorithm from "Generating Good Generators for Inductive Relations"
-import Plausible.GeneratingGoodGenerators.UnificationMonad
-import Plausible.GeneratingGoodGenerators.ModeAnalysis
-import Plausible.GeneratingGoodGenerators.DeriveScheduledGenerator
-import Plausible.GeneratingGoodGenerators.Schedules
-import Plausible.GeneratingGoodGenerators.DeriveSchedules
-import Plausible.GeneratingGoodGenerators.MExp
+import Plausible.New.UnificationMonad
+import Plausible.New.ModeAnalysis
+import Plausible.New.DeriveScheduledGenerator
+import Plausible.New.Schedules
+import Plausible.New.DeriveSchedules
+import Plausible.New.MExp
