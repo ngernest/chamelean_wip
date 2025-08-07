@@ -1,6 +1,6 @@
 import Plausible.New.DecOpt
 import Plausible.New.Enumerators
-import Plausible.New.DeriveScheduledGenerator
+import Plausible.New.DeriveConstrainedProducer
 import Plausible.New.EnumeratorCombinators
 import Test.DeriveArbitrarySuchThat.DeriveBSTGenerator
 

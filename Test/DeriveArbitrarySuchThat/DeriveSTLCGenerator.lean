@@ -4,7 +4,7 @@ import Plausible.New.DecOpt
 import Plausible.New.Arbitrary
 import Plausible.New.ArbitrarySizedSuchThat
 import Test.DeriveArbitrary.DeriveSTLCTermTypeGenerators
-import Plausible.New.DeriveScheduledGenerator
+import Plausible.New.DeriveConstrainedProducer
 
 open ArbitrarySizedSuchThat OptionTGen
 

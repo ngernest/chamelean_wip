@@ -20,7 +20,7 @@ import Plausible.New.SubEnumerators
 import Plausible.New.Utils
 import Plausible.New.Debug
 import Plausible.New.UnificationMonad
-import Plausible.New.DeriveScheduledGenerator
+import Plausible.New.DeriveConstrainedProducer
 import Plausible.New.Schedules
 import Plausible.New.DeriveSchedules
 import Plausible.New.MExp

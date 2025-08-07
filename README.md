@@ -124,7 +124,7 @@ We provide a command elaborator which elaborates the `#derive_checker` command:
 - [`UnificationMonad.lean`](./Plausible/New/UnificationMonad.lean): The unification monad described in [*Generating Good Generators*](https://lemonidas.github.io/pdf/GeneratingGoodGenerators.pdf)
 - [`Schedules.lean`](./Plausible/New/Schedules.lean): Type definitions for generator schedules, as described in *Testing Theorems*
 - [`DeriveSchedules.lean`](./Plausible/New/DeriveSchedules.lean): Algorithm for deriving generator schedules, as described in *Testing Theorems* 
-- [`DeriveScheduledGenerator.lean`](./Plausible/New/DeriveScheduledGenerator.lean): Algorithm for deriving constrained generators using the aforementioned unification algorithm & generator schedules
+- [`DeriveConstrainedProducer.lean`](./Plausible/New/DeriveConstrainedProducer.lean): Algorithm for deriving constrained generators using the aforementioned unification algorithm & generator schedules
 - [`MExp.lean`](./Plausible/New/MExp.lean): An intermediate representation for monadic expressions (`MExp`), used when compiling schedules to Lean code
 
 **Metaprogramming infrastructure**:
