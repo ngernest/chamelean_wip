@@ -224,13 +224,65 @@ def normalizeSchedule (steps : List ScheduleStep) : List ScheduleStep :=
       -- Comparison function on blocks of `ScheduleSteps`
       compareBlocks b1 b2 := Ordering.isLE $ Ord.compare b1 b2
 
-/-- Depth-first enumeration of all possible schedules -/
+/-- Depth-first enumeration of all possible schedules.
+
+    The list of possible schedules boils down to taking a permutation of list of hypotheses -- what this function
+    does is it comes up with the list of possible permutations of hypotheses.
+
+    For `TyApp` in the STLC example, here are the possible permutations (output is e, the unbound vars are {e1, e2, t1}):
+
+    (a.) `[typing Γ e1 (TFun 𝜏1 𝜏2), typing Γ e2 𝜏1]`
+    (b.) `[typing Γ e2 𝜏1, typing Γ e1 (TFun 𝜏1 𝜏2)]`
+
+    We first discuss permutation (a).
+
+    For permutation (a), `t1` and `e1` are unbound, so we're generate the max no. of variables possible
+      * `e1` is in an outputtable position (since its not under a constructor)
+      * `t1` is *not* in an ouputtable position (since `t1` is under the `TFun` constructor, `type` is an input mode, and `t2` is also an input mode)
+      * This means `t1` has to be generated first arbitrarily
+
+    We have elaborated this step to:
+    ```lean
+      t1 <- type                      -- (this uses the `Arbitrary` instance for [type])
+      e1 <- typing Γ ? (TFun t1 t2)    -- (this desugars to `arbitraryST (fun e1 => typing Γ e1 (TFun t1 t2))` )
+    ```
+
+    Now that we have generated `t1` and `e1`, the next hypothesis is `typing Γ e2 𝜏1`
+    * `e2` is the only variable that's unbound
+    * Thus, our only option is to do:
+    ```lean
+      e2 <- typing Γ ? t1
+    ```
+
+    + For permutation (b), the first thing we do is check what are the unbound (not generated & not fixed by inputs)
+      variables that are constrained by the first hypothesis `typing Γ e2 𝜏1`
+      * `e2` is unbound & can be output (since its in the output mode & not generated yet)
+      * `t1` can also be output since its not been generated yet & not under a constructor
+        * `Γ` is fixed already (bound) b/c its a top-level argument (input) to `aux_arb`
+      * Here we have 3 possible choices:
+        1. Arbitrary [t1], ArbitrarySuchThat [e2]
+        2. Arbitrary [e2], ArbitrarySuchThat [t1]
+        3. ArbitrarySuchThat [e2, t1]
+
+      * For each choice, we can then elaborate the next `ScheduleStep` in our hypothesis permutation (i.e. `typing Γ e1 (TFun 𝜏1 𝜏2)`)
+      + Rest of the logic for dealing with permutation (b) is similar to as the 1st permutation
+-/
 partial def dfs (boundVars : List Name) (remainingVars : List Name) (checkedHypotheses : List Nat) (scheduleSoFar : List ScheduleStep) : ScheduleM (List (List ScheduleStep)) := do
   match remainingVars with
   | [] =>
     return [List.reverse scheduleSoFar]
   | _ => do
+    -- Obtain environment variables via the underlying reader monad's `read` functino
     let env ← read
+
+    -- Determine the right name for the recursive function in the producer
+    let recursiveFunctionName :=
+      match env.prodSort with
+      | .Generator => `aux_arb
+      | .Enumerator => `aux_enum
+
+    -- Enumerate all paths for unconstrained generation / enumeration
+    -- Each unconstrained path is a choice to instantiate one of the unbound variables arbitrarily
     let unconstrainedProdPaths ←
       flatMapMWithContext remainingVars (fun v remainingVars' => do
         let (newCheckedIdxs, newCheckedHyps) ← List.unzip <$> collectCheckSteps (v::boundVars) checkedHypotheses
@@ -239,7 +291,7 @@ partial def dfs (boundVars : List Name) (remainingVars : List Name) (checkedHypo
         let (ctorName, ctorArgs) := ty.getAppFnArgs
         let src ←
           if ctorName == Prod.fst env.recCall
-            then Source.Rec `aux_arb <$> ctorArgs.toList.mapM (fun foo => exprToConstructorExpr foo)
+            then Source.Rec recursiveFunctionName <$> ctorArgs.toList.mapM (fun foo => exprToConstructorExpr foo)
           else
             let hypothesisExpr ← exprToHypothesisExpr ty
             match hypothesisExpr with
@@ -254,6 +306,9 @@ partial def dfs (boundVars : List Name) (remainingVars : List Name) (checkedHypo
 
     let remainingHypotheses := filterMapWithIndex (fun i hyp => if i ∈ checkedHypotheses then none else some (i, hyp)) env.sortedHypotheses
 
+    -- Enumerate all paths for constrained generation / enumeration, based on the remaining hypotheses.
+    -- Each constrained path is a choice to satisfy a hypothesis and generate one or more variables that it constrains with `arbitrarySuchThat` / `enumSuchThat`
+    -- In a constrained path, we always output as many variables as possible.
     let constrainedProdPaths ← remainingHypotheses.flatMapM (fun (i, hyp, hypVars) => do
       if (i ∈ checkedHypotheses) then
         pure []
@@ -285,7 +340,7 @@ partial def dfs (boundVars : List Name) (remainingVars : List Name) (checkedHypo
           let constrainingRelation ←
             if (← isRecCall outputVars hyp env.recCall) then
               let inputArgs := filterWithIndex (fun i _ => i ∉ (Prod.snd env.recCall)) hypArgs
-              pure (Source.Rec `aux_arb inputArgs)
+              pure (Source.Rec recursiveFunctionName inputArgs)
             else
               pure (Source.NonRec hyp')
           let constrainedProdStep := ScheduleStep.SuchThat typedOutputs constrainingRelation env.prodSort
@@ -300,7 +355,15 @@ partial def dfs (boundVars : List Name) (remainingVars : List Name) (checkedHypo
 
     return constrainedProdPaths ++ unconstrainedProdPaths
 
-
+/-- Takes a `deriveSort` and returns the corresponding `ProducerSort`:
+    - If we're deriving a `Checker` or a `Enumerator`, the corresponding `ProducerSort` is an `Enumerator`,
+      since its more efficient to enumerate values when checking
+    - If we're deriving a `Generator` or a function which generates inputs to a `Theorem`,
+      the corresponding `ProducerSort` is a `Generator`, since we want to generate random inputs -/
+def convertDeriveSortToProducerSort (deriveSort : DeriveSort) : ProducerSort :=
+  match deriveSort with
+  | .Checker | .Enumerator => ProducerSort.Enumerator
+  | .Generator | .Theorem => ProducerSort.Generator
 
 /-- Computes all possible schedules for a constructor
     (each candidate schedule is represented as a `List ScheduleStep`).
@@ -317,10 +380,7 @@ def possibleSchedules (vars : List (Name × Expr)) (hypotheses : List Hypothesis
 
   let sortedHypotheses := mkSortedHypothesesVariablesMap hypotheses
 
-  let prodSort :=
-    match deriveSort with
-    | .Checker | .Enumerator => ProducerSort.Enumerator
-    | .Generator | .Theorem => ProducerSort.Generator
+  let prodSort := convertDeriveSortToProducerSort deriveSort
 
   let scheduleEnv := ⟨ vars, sortedHypotheses, deriveSort, prodSort, recCall, fixedVars ⟩
 

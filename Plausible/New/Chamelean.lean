@@ -1,7 +1,7 @@
 import Plausible.New.DeriveChecker
 import Plausible.New.SubGenerators
 import Plausible.New.SubCheckers
-import Plausible.New.DeriveConstrainedProducers
+import Plausible.New.MakeConstrainedProducerInstance
 import Plausible.New.OptionTGen
 import Plausible.New.Idents
 import Plausible.New.TSyntaxCombinators
@@ -16,12 +16,10 @@ import Plausible.New.Examples.STLC
 import Plausible.New.Examples.Trees
 import Plausible.New.DeriveArbitrary
 import Plausible.New.DeriveEnum
-import Plausible.New.DeriveEnumSuchThat
-import Plausible.New.SubEnumerators
 import Plausible.New.Utils
 import Plausible.New.Debug
 import Plausible.New.UnificationMonad
-import Plausible.New.DeriveScheduledGenerator
+import Plausible.New.DeriveConstrainedProducer
 import Plausible.New.Schedules
 import Plausible.New.DeriveSchedules
 import Plausible.New.MExp

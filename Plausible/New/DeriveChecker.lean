@@ -1,6 +1,6 @@
 import Lean
 import Plausible.IR.Prelude
-import Plausible.New.DeriveConstrainedProducers
+import Plausible.New.MakeConstrainedProducerInstance
 import Plausible.New.SubCheckers
 import Plausible.New.Idents
 import Plausible.New.DecOpt

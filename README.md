@@ -124,23 +124,20 @@ We provide a command elaborator which elaborates the `#derive_checker` command:
 - [`UnificationMonad.lean`](./Plausible/New/UnificationMonad.lean): The unification monad described in [*Generating Good Generators*](https://lemonidas.github.io/pdf/GeneratingGoodGenerators.pdf)
 - [`Schedules.lean`](./Plausible/New/Schedules.lean): Type definitions for generator schedules, as described in *Testing Theorems*
 - [`DeriveSchedules.lean`](./Plausible/New/DeriveSchedules.lean): Algorithm for deriving generator schedules, as described in *Testing Theorems* 
-- [`DeriveScheduledGenerator.lean`](./Plausible/New/DeriveScheduledGenerator.lean): Algorithm for deriving constrained generators using the aforementioned unification algorithm & generator schedules
+- [`DeriveConstrainedProducer.lean`](./Plausible/New/DeriveConstrainedProducer.lean): Algorithm for deriving constrained generators using the aforementioned unification algorithm & generator schedules
 - [`MExp.lean`](./Plausible/New/MExp.lean): An intermediate representation for monadic expressions (`MExp`), used when compiling schedules to Lean code
+- [`MakeConstrainedProducerInstance.lean`](./Plausible/New/MakeConstrainedProducerInstance.lean): Auxiliary functions for creating instances of typeclasses for constrained producers (`ArbitrarySuchThat`, `EnumSuchThat`)
 
 **Metaprogramming infrastructure**:
 - [`TSyntaxCombinators.lean`](./Plausible/New/TSyntaxCombinators.lean): Combinators over `TSyntax` for creating monadic `do`-blocks & other Lean expressions via metaprogramming
 - [`DeriveArbitrary.lean`](./Plausible/DeriveArbitrary.lean): Deriver for unconstrained generators (instances of the `Arbitrary` / `ArbitrarySized` typeclasses)
 - [`DeriveEnum.lean`](./Plausible/New/DeriveEnum.lean): Deriver for unconstrainted enumerators 
 (instances of the `Enum` / `EnumSized` typeclasses) 
-- [`DeriveConstrainedProducers.lean`](./Plausible/New/DeriveConstrainedProducers.lean): Contains most of the generalized logic for deriving constrained producers (used for both generators & enumerators)
-- [`DeriveGenerator.lean`](./Plausible/New/DeriveGenerator.lean): Top-level command elaborator for deriving for *constrained* generators (instances of the `ArbitrarySizedSuchThat` typeclass)
-- [`DeriveEnumSuchThat.lean`](./Plausible/New/DeriveEnumSuchThat.lean): Top-level command elaborator for deriving *constrained* enumerators (instances of the `EnumSizedSuchThat` typeclass) 
 - [`DeriveChecker.lean`](./Plausible/New/DeriveChecker.lean): Deriver for automatically deriving checkers (instances of the `DecOpt` typeclass)
 
 **Logic for handling constraints when deriving code**:
 - [`SubGenerators.lean`](./Plausible/New/SubGenerators.lean): Handles constraints when deriving sub-generators (handlers invoked by top-level derived generators)
 - [`SubCheckers.lean`](./Plausible/New/SubCheckers.lean): Handles constraints when deriving sub-checkers (handlers invoked by top-level derived checkers)
-- [`SubEnumerators.lean`](./Plausible/New/SubEnumerators.lean): Handles constraints when deriving sub-enumerators (handlers invoked by top-level derived enumerators)
 
 **Miscellany**:
 - [`LazyList.lean`](./Plausible/New/LazyList.lean): Implementation of lazy lists (used for enumerators)

@@ -50,9 +50,8 @@ import Test.DeriveEnumSuchThat.DeriveBSTEnumerator
 import Test.DeriveEnumSuchThat.DeriveBalancedTreeEnumerator
 import Test.DeriveEnumSuchThat.DeriveRegExpMatchEnumerator
 import Test.DeriveEnumSuchThat.SimultaneousMatchingTests
-
+import Test.DeriveEnumSuchThat.DeriveSTLCEnumerator
+import Test.DeriveEnumSuchThat.NonLinearPatternsTest
 
 -- TODO: re-enable these failing tests after checker/enumerator deriver has been updated to use schedules
--- import Test.DeriveEnumSuchThat.DeriveSTLCEnumerator
--- import Test.DeriveEnumSuchThat.NonLinearPatternsTest
 -- import Test.DeriveDecOpt.NonLinearPatternsTest
