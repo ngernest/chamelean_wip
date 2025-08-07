@@ -142,9 +142,6 @@ def separateFVarsInHypothesis (hypothesis : Expr) (initialFVars : Array FVarId)
   withLCtx' lctx do
     let mut lctx := lctx
     let initializedFVars := Array.intersect (extractFVarIds hypothesis) initialFVars
-
-    -- IO.println s!"initializedFVars = {repr initializedFVars}"
-
     let mut newHypothesis := hypothesis
     let mut equalities : Array (FVarId × FVarId) := #[]
     for fvar in initializedFVars do
@@ -176,11 +173,7 @@ inductive GenerationStyle
 
 /-- Represents an expression in the RHS of the non-trivial pattern-match case
     in a backtrack element (sub-generator)
-  - Note: this datatype was formerly known as `GenCheckCall`
-  - TODO (Ernest): this is a super-set of QuickChick's `schedule_step`
-      (maybe just take `ret` out and have it be a separate thing, since we can only
-       have `return`s at the end of a schedule
-       - also Checkers don't have `return`s) -/
+  - Note: this datatype was formerly known as `GenCheckCall` -/
 inductive Action where
   /-- Invoke a checker for the inductive relation specified in the hypothesis `hyp`
       (`hyp` must be an inductive relation) -/
@@ -237,18 +230,6 @@ def getFVarsInConclusionArgs (ctor : InductiveConstructor) (genpos : Nat) : Meta
     i := i + 1
   return outarr
 
-
-def get_producer_outset (c: InductiveConstructor) (genpos: Nat): MetaM (Array FVarId) := do
-  if h: genpos ≥ c.conclusion_args.size then throwError "invalid gen position"
-  else
-    let initset ← getFVarsInConclusionArgs c genpos
-    let gen_arg := c.conclusion_args[genpos]
-    let outvar := extractFVarIds gen_arg
-    let mut outarr : Array FVarId := #[]
-    for i in initset do
-      if ¬ Array.elem i outvar then outarr:=outarr.push i
-    return outarr
-
 /-- Removes all free variables in an expression `e` from `fvars`, returning
     the resultant collection of `FVarId`s -/
 def getUninitializedFVars (e : Expr) (fvars : Array FVarId) : Array FVarId :=
@@ -291,16 +272,11 @@ def getLastUninitializedArgAndFVars
 
 /-- Produces a collection of `Actions` for the hypotheses of a constructor of an inductive relation -/
 def Actions_for_hypotheses (ctor : InductiveConstructor) (fvars : Array FVarId) : MetaM ActionsWithLocalContext := do
-  -- IO.println "entered Actions_for_hypotheses"
-  -- IO.println s!"hypotheses are {ctor.all_hypotheses}"
-
   let mut lctx := ctor.localCtx
   let mut actions := #[]
   let mut initializedFVars := fvars
   for (hyp, i) in ctor.all_hypotheses.zipIdx do
     let isHypOfInductiveCtor ← isHypothesisOfInductiveConstructor hyp ctor
-    -- IO.println s!"isHypOfInductiveCtor = {isHypOfInductiveCtor}"
-    -- IO.println s!"hyp = {hyp}"
 
     if isHypOfInductiveCtor then
       -- If all free variables in the hypothesis have been initialized,
@@ -312,11 +288,6 @@ def Actions_for_hypotheses (ctor : InductiveConstructor) (fvars : Array FVarId) 
         -- Find the index of last argument in the hypothesis that is uninitialized
         let (uninitializedArgIdx, uninitializedFVars, fVarsToBeInitialized)
           ← getLastUninitializedArgAndFVars hyp initializedFVars
-
-        withDebugFlag globalDebugFlag do
-          logInfo s!"inside Actions_for_hypotheses"
-          logInfo s!"hyp = {hyp}"
-          logInfo s!"uninitializedArgIdx = {uninitializedArgIdx}, uninitializedFVars = {repr uninitializedFVars}, fVarsToBeInitialized = {repr fVarsToBeInitialized}"
 
         -- Determine the type of the uninitialized variables
         for fid in uninitializedFVars do
