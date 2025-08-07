@@ -16,7 +16,7 @@ import Plausible.IR.Examples
 import Plausible.IR.Extractor
 
 import Plausible.New.Arbitrary
-import Plausible.New.STLC
+import Plausible.New.Examples.STLC
 
 import Lean.Elab.Command
 import Lean.Meta.Basic

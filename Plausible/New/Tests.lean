@@ -10,7 +10,7 @@ import Plausible.New.EnumeratorCombinators
 import Plausible.New.DeriveEnum
 import Plausible.New.DeriveChecker
 import Plausible.New.DeriveEnumSuchThat
-import Plausible.New.STLC
+import Plausible.New.Examples.STLC
 
 import Lean
 import Batteries
