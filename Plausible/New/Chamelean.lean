@@ -28,5 +28,5 @@ import Plausible.GeneratingGoodGenerators.UnificationMonad
 import Plausible.GeneratingGoodGenerators.ModeAnalysis
 import Plausible.GeneratingGoodGenerators.DeriveScheduledGenerator
 import Plausible.GeneratingGoodGenerators.Schedules
-import Plausible.GeneratingGoodGenerators.ScheduleUtils
+import Plausible.GeneratingGoodGenerators.DeriveSchedules
 import Plausible.GeneratingGoodGenerators.MExp

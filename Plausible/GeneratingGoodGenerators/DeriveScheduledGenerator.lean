@@ -3,7 +3,7 @@ import Lean.LocalContext
 
 import Plausible.GeneratingGoodGenerators.UnificationMonad
 import Plausible.GeneratingGoodGenerators.Schedules
-import Plausible.GeneratingGoodGenerators.ScheduleUtils
+import Plausible.GeneratingGoodGenerators.DeriveSchedules
 import Plausible.GeneratingGoodGenerators.MExp
 import Plausible.New.DeriveConstrainedProducers
 import Plausible.New.SubGenerators

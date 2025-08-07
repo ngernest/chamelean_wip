@@ -32,9 +32,6 @@ inductive MonadSort
       + The wrapper should expose `bind, return, backtrack` and pattern-matches
     - The cool thing about `MExp` is that we can interpret it differently
       based on the `MonadSort`
-
-    - TODO: we may want `MHole`, `MFail`, `MOutOfFuel`
-    - the other constructors in the Rocq [mexp]
 -/
 inductive MExp : Type where
   /-- `MRet e` represents `return e` in some monad -/
