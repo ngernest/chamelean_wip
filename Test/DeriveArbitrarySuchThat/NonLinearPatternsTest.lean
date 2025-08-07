@@ -36,4 +36,4 @@ info: Try this generator: instance : ArbitrarySizedSuchThat BinaryTree (fun t_1 
     fun size => aux_arb size size in1_1 in2_1
 -/
 #guard_msgs(info, drop warning) in
-#derive_scheduled_generator (fun (t : BinaryTree) => GoodTree in1 in2 t)
+#derive_generator (fun (t : BinaryTree) => GoodTree in1 in2 t)

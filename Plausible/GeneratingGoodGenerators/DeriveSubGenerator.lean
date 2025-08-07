@@ -435,13 +435,13 @@ def getScheduleForConstructor (inductiveName : Name) (ctorName : Name) (outputNa
 
 
 /-- Command for deriving a constrained generator for an inductive relation that uses generator schedules -/
-syntax (name := derive_scheduled_generator) "#derive_scheduled_generator" "(" "fun" "(" ident ":" term ")" "=>" term ")" : command
+syntax (name := derive_generator) "#derive_generator" "(" "fun" "(" ident ":" term ")" "=>" term ")" : command
 
-/-- Elaborator for the `#derive_scheduled_generator` command which derives constrained generator using generator schedules -/
-@[command_elab derive_scheduled_generator]
+/-- Elaborator for the `#derive_generator` command which derives constrained generator using generator schedules -/
+@[command_elab derive_generator]
 def elabDeriveScheduledGenerator : CommandElab := fun stx => do
   match stx with
-  | `(#derive_scheduled_generator ( fun ( $var:ident : $outputTypeSyntax:term ) => $body:term )) => do
+  | `(#derive_generator ( fun ( $var:ident : $outputTypeSyntax:term ) => $body:term )) => do
 
 
     -- Parse the body of the lambda for an application of the inductive relation

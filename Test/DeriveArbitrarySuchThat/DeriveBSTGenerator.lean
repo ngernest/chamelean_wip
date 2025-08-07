@@ -48,7 +48,7 @@ info: Try this generator: instance : ArbitrarySizedSuchThat Nat (fun x_1 => Betw
     fun size => aux_arb size size lo_1 hi_1
 -/
 #guard_msgs(info, drop warning) in
-#derive_scheduled_generator (fun (x : Nat) => Between lo x hi)
+#derive_generator (fun (x : Nat) => Between lo x hi)
 
 /-- `BST lo hi t` describes whether a tree `t` is a BST that contains values strictly within `lo` and `hi` -/
 inductive BST : Nat → Nat → BinaryTree → Prop where
@@ -78,4 +78,4 @@ info: Try this generator: instance : ArbitrarySizedSuchThat BinaryTree (fun t_1 
     fun size => aux_arb size size lo_1 hi_1
 -/
 #guard_msgs(info, drop warning) in
-#derive_scheduled_generator (fun (t : BinaryTree) => BST lo hi t)
+#derive_generator (fun (t : BinaryTree) => BST lo hi t)

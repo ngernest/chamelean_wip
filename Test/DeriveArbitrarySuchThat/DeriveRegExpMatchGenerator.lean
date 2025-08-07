@@ -51,10 +51,6 @@ def r : RegExp :=
         (RegExp.Char 1)
         (RegExp.Union (RegExp.Char 2) (RegExp.Char 3)))
 
-example: ExpMatch [] r := by apply ExpMatch.MStar0
-example: ExpMatch (3::1::[]) r := sorry
-example: ExpMatch (1::2::2::[]) r := sorry
-
 /-- reg_exp is `1230*[456]*` -/
 def r0 : RegExp :=
   RegExp.App
@@ -127,7 +123,7 @@ info: Try this generator: instance : ArbitrarySizedSuchThat NatString (fun s_1 =
     fun size => aux_arb size size re_1
 -/
 #guard_msgs(info, drop warning) in
-#derive_scheduled_generator (fun (s : NatString) => ExpMatch s re)
+#derive_generator (fun (s : NatString) => ExpMatch s re)
 
 -- To sample from this generator and print out 10 successful examples using the `Repr`
 -- instance for `NatString`, we can run the following:

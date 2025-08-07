@@ -10,7 +10,6 @@ import Plausible.New.EnumeratorCombinators
 import Plausible.New.DeriveEnum
 import Plausible.New.DeriveChecker
 import Plausible.New.DeriveEnumSuchThat
-import Plausible.New.DeriveArbitrarySuchThat
 import Plausible.New.STLC
 
 import Lean

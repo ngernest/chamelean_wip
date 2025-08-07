@@ -34,4 +34,4 @@ info: Try this generator: instance : ArbitrarySizedSuchThat Nat (fun n_1 => squa
     fun size => aux_arb size size m_1
 -/
 #guard_msgs(info, drop warning) in
-#derive_scheduled_generator (fun (n : Nat) => square_of n m)
+#derive_generator (fun (n : Nat) => square_of n m)

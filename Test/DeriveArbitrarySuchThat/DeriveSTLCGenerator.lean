@@ -42,7 +42,7 @@ info: Try this generator: instance : ArbitrarySizedSuchThat Nat (fun x_1 => look
     fun size => aux_arb size size Γ_1 τ_1
 -/
 #guard_msgs(info, drop warning) in
-#derive_scheduled_generator (fun (x : Nat) => lookup Γ x τ)
+#derive_generator (fun (x : Nat) => lookup Γ x τ)
 
 /--
 info: Try this generator: instance : ArbitrarySizedSuchThat type (fun τ_1 => lookup Γ_1 x_1 τ_1) where
@@ -79,7 +79,7 @@ info: Try this generator: instance : ArbitrarySizedSuchThat type (fun τ_1 => lo
     fun size => aux_arb size size Γ_1 x_1
 -/
 #guard_msgs(info, drop warning) in
-#derive_scheduled_generator (fun (τ : type) => lookup Γ x τ)
+#derive_generator (fun (τ : type) => lookup Γ x τ)
 
 /--
 info: Try this generator: instance : ArbitrarySizedSuchThat type (fun t_1 => typing G_1 e_1 t_1) where
@@ -139,7 +139,7 @@ info: Try this generator: instance : ArbitrarySizedSuchThat type (fun t_1 => typ
     fun size => aux_arb size size G_1 e_1
 -/
 #guard_msgs(info, drop warning) in
-#derive_scheduled_generator (fun (t : type) => typing G e t)
+#derive_generator (fun (t : type) => typing G e t)
 
 /--
 info: Try this generator: instance : ArbitrarySizedSuchThat term (fun e_1 => typing G_1 e_1 t_1) where
@@ -192,7 +192,7 @@ info: Try this generator: instance : ArbitrarySizedSuchThat term (fun e_1 => typ
     fun size => aux_arb size size G_1 t_1
 -/
 #guard_msgs(info, drop warning) in
-#derive_scheduled_generator (fun (e : term) => typing G e t)
+#derive_generator (fun (e : term) => typing G e t)
 
 -- To sample from this generator and print out 10 successful examples using the `Repr`
 -- instance for `term`, we can run the following:

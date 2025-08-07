@@ -9,7 +9,6 @@ import Plausible.New.TSyntaxCombinators
 import Plausible.New.DecOpt
 import Plausible.New.GeneratorCombinators
 import Plausible.New.ArbitrarySizedSuchThat
-import Plausible.New.DeriveArbitrarySuchThat
 import Plausible.New.Arbitrary
 import Plausible.New.Enumerators
 import Plausible.New.EnumeratorCombinators
@@ -31,6 +30,3 @@ import Plausible.GeneratingGoodGenerators.DeriveSubGenerator
 import Plausible.GeneratingGoodGenerators.Schedules
 import Plausible.GeneratingGoodGenerators.ScheduleUtils
 import Plausible.GeneratingGoodGenerators.MExp
-
--- GGG tests commented out for now
--- import Plausible.GeneratingGoodGenerators.GGGTests

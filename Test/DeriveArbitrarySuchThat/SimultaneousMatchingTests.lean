@@ -36,7 +36,7 @@ info: Try this generator: instance : ArbitrarySizedSuchThat (List Nat) (fun l_1 
     fun size => aux_arb size size x_1
 -/
 #guard_msgs(info, drop warning) in
-#derive_scheduled_generator (fun (l : List Nat) => InList x l)
+#derive_generator (fun (l : List Nat) => InList x l)
 
 
 /--
@@ -67,7 +67,7 @@ info: Try this generator: instance : ArbitrarySizedSuchThat (List Nat) (fun l_1 
     fun size => aux_arb size size a_1
 -/
 #guard_msgs(info, drop warning) in
-#derive_scheduled_generator (fun (l: List Nat) => MinOk l a)
+#derive_generator (fun (l: List Nat) => MinOk l a)
 
 /--
 info: Try this generator: instance : ArbitrarySizedSuchThat (List Nat) (fun l_1 => MinEx n_1 l_1 l'_1) where
@@ -106,7 +106,7 @@ info: Try this generator: instance : ArbitrarySizedSuchThat (List Nat) (fun l_1 
     fun size => aux_arb size size n_1 l'_1
 -/
 #guard_msgs(info, drop warning) in
-#derive_scheduled_generator (fun (l : List Nat) => MinEx n l l')
+#derive_generator (fun (l : List Nat) => MinEx n l l')
 
 -- Dummy `ArbitrarySizedSuchThat` instance needed so that the derived generator below compiles
 instance : ArbitrarySizedSuchThat (List Nat) (fun (l : List Nat) => l = [x] ++ l') where
@@ -153,7 +153,7 @@ info: Try this generator: instance : ArbitrarySizedSuchThat (List Nat) (fun l_1 
     fun size => aux_arb size size x_1 l'_1
 -/
 #guard_msgs(info, drop warning) in
-#derive_scheduled_generator (fun (l : List Nat) => MinEx3 x l l')
+#derive_generator (fun (l : List Nat) => MinEx3 x l l')
 
 /--
 info: Try this generator: instance : ArbitrarySizedSuchThat (List Nat) (fun l'_1 => MinEx2 x_1 l_1 l'_1) where
@@ -191,7 +191,7 @@ info: Try this generator: instance : ArbitrarySizedSuchThat (List Nat) (fun l'_1
     fun size => aux_arb size size x_1 l_1
 -/
 #guard_msgs(info, drop warning) in
-#derive_scheduled_generator (fun (l' : List Nat) => MinEx2 x l l')
+#derive_generator (fun (l' : List Nat) => MinEx2 x l l')
 
 /--
 info: Try this generator: instance : ArbitrarySizedSuchThat (List Nat) (fun l_1 => MinEx2 x_1 l_1 l'_1) where
@@ -231,4 +231,4 @@ info: Try this generator: instance : ArbitrarySizedSuchThat (List Nat) (fun l_1 
     fun size => aux_arb size size x_1 l'_1
 -/
 #guard_msgs(info, drop warning) in
-#derive_scheduled_generator (fun (l : List Nat) => MinEx2 x l l')
+#derive_generator (fun (l : List Nat) => MinEx2 x l l')
