@@ -129,7 +129,7 @@ We provide a command elaborator which elaborates the `#derive_checker` command:
 
 **Metaprogramming infrastructure**:
 - [`TSyntaxCombinators.lean`](./Plausible/New/TSyntaxCombinators.lean): Combinators over `TSyntax` for creating monadic `do`-blocks & other Lean expressions via metaprogramming
-- [`DeriveArbitrary.lean`](./Plausible/New/DeriveArbitrary.lean): Deriver for unconstrained generators (instances of the `Arbitrary` / `ArbitrarySized` typeclasses)
+- [`DeriveArbitrary.lean`](./Plausible/DeriveArbitrary.lean): Deriver for unconstrained generators (instances of the `Arbitrary` / `ArbitrarySized` typeclasses)
 - [`DeriveEnum.lean`](./Plausible/New/DeriveEnum.lean): Deriver for unconstrainted enumerators 
 (instances of the `Enum` / `EnumSized` typeclasses) 
 - [`DeriveConstrainedProducers.lean`](./Plausible/New/DeriveConstrainedProducers.lean): Contains most of the generalized logic for deriving constrained producers (used for both generators & enumerators)
