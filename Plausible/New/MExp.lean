@@ -10,6 +10,9 @@ import Plausible.New.Idents
 open Idents
 open Lean Parser Elab Term Command
 
+-- Adapted from QuickChick source code
+-- https://github.com/QuickChick/QuickChick/blob/internal-rewrite/plugin/newGenericLib.ml
+
 /-- The sort of monad we are compiling to, i.e. one of the following:
     - An unconstrained / constrained generator (`Gen` / `OptionT Gen`)
     - An unconstrained / constrained enumerator (`Enumerator` / `OptionT Enumerator`)
@@ -25,14 +28,10 @@ inductive MonadSort
 /-- An intermediate representation of monadic expressions that are
     used in generators/enumerators/checkers.
     - Schedules are compiled to `MExp`s, which are then compiled to Lean code
-
     - Note: `MExp`s make it easy to optimize generator code down the line
-      (e.g. combine pattern-matches when we have disjoint patterns)
-    - Going directly from schedules to Lean code (a wrapper on top of `TSyntax`) might be fine?
-      + The wrapper should expose `bind, return, backtrack` and pattern-matches
+      (e.g. combine pattern-matches when we have disjoint patterns
     - The cool thing about `MExp` is that we can interpret it differently
-      based on the `MonadSort`
--/
+      based on the `MonadSort` -/
 inductive MExp : Type where
   /-- `MRet e` represents `return e` in some monad -/
   | MRet (e : MExp)

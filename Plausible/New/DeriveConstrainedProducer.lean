@@ -27,6 +27,9 @@ open Plausible.IR
 
 ----------------------------------------------------------------------------------------------------------------------------------
 -- Adapted from "Generating Good Generators for Inductive Relations" (POPL '18) & "Testing Theorems, Fully Automatically" (2025)
+-- as well as the QuickChick source code
+-- https://github.com/QuickChick/QuickChick/blob/internal-rewrite/plugin/newGenericLib.ml
+-- https://github.com/QuickChick/QuickChick/blob/internal-rewrite/plugin/newUnifyQC.ml.cppo
 ----------------------------------------------------------------------------------------------------------------------------------
 
 /-- Creates the initial constraint map κ where all inputs are `Fixed`, the output & all universally-quantified variables is `Undef`
