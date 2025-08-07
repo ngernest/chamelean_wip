@@ -460,17 +460,17 @@ def deriveConstrainedProducer (outputVar : Ident) (outputTypeSyntax : TSyntax `t
   let argNamesTypes := argNames.zip argTypes
 
   -- Add the name & type of each argument to the inductive relation to the `LocalContext`
-  -- Then, derive `baseGenerators` & `inductiveGenerators` (the code for the sub-generators
+  -- Then, derive `baseProducers` & `inductiveProducers` (the code for the sub-producers
   -- that are invoked when `size = 0` and `size > 0` respectively),
   -- and obtain freshened versions of the output variable / arguments (`freshenedOutputName`, `freshArgIdents`)
-  let (baseGenerators, inductiveGenerators, freshenedOutputName, freshArgIdents, localCtx) ←
+  let (baseProducers, inductiveProducers, freshenedOutputName, freshArgIdents, localCtx) ←
     liftTermElabM $ withLocalDeclsDND argNamesTypes (fun _ => do
       let mut localCtx ← getLCtx
       let mut freshUnknowns := #[]
 
       -- For each arg to the inductive relation (as specified to the user),
       -- create a fresh name (to avoid clashing with names that may appear in constructors
-      -- of the inductive relation). Note that this requires updating the `LocalContext`
+      -- of the inductive relation). Note that this requires updating the `LocalContext`.
       for argName in argNames do
         let freshArgName := localCtx.getUnusedName argName
         localCtx := localCtx.renameUserName argName freshArgName
@@ -484,8 +484,8 @@ def deriveConstrainedProducer (outputVar : Ident) (outputTypeSyntax : TSyntax `t
       -- is treated as an input
       let freshenedInputNamesExcludingOutput := (Array.eraseIdx! freshUnknowns outputIdx).toList
 
-      let mut nonRecursiveGenerators := #[]
-      let mut recursiveGenerators := #[]
+      let mut nonRecursiveProducers := #[]
+      let mut recursiveProducers := #[]
 
       let freshSize' := mkIdent $ localCtx.getUnusedName `size'
 
@@ -498,11 +498,11 @@ def deriveConstrainedProducer (outputVar : Ident) (outputTypeSyntax : TSyntax `t
             emptyUnifyState)
         match scheduleOption with
         | some schedule =>
-          -- Obtain a sub-generator for this constructor, along with an array of all typeclass instances that need to be defined beforehand
-          -- (Under the hood, we compile the schedule to an `MExp`, then compile the `MExp` to a Lean term containing the code for the sub-generator.
+          -- Obtain a sub-producer for this constructor, along with an array of all typeclass instances that need to be defined beforehand.
+          -- (Under the hood, we compile the schedule to an `MExp`, then compile the `MExp` to a Lean term containing the code for the sub-producer.
           -- This is all done in a state monad: when we detect that a new instance is required, we append it to an array of `TSyntax term`s
           -- (where each term represents a typeclass instance)
-          let (subGenerator, instances) ← StateT.run (s := #[]) (do
+          let (subProducer, instances) ← StateT.run (s := #[]) (do
             let mexp ← scheduleToMExp schedule (.MId `size) (.MId `initSize)
             mexpToTSyntax mexp deriveSort)
 
@@ -514,38 +514,40 @@ def deriveConstrainedProducer (outputVar : Ident) (outputTypeSyntax : TSyntax `t
 
           if isRecursive then
             -- Following the QuickChick convention,
-            -- Recursive sub-generators have a weight of `.succ size'`
+            -- recursive sub-generators have a weight of `.succ size'`
             -- and sub-enumerators don't have any weight associated with them
-            let subGeneratorTerm ←
+            let subProducerTerm ←
               match producerSort with
-              | .Generator => `( ($(mkIdent ``Nat.succ) $freshSize', $subGenerator) )
-              | .Enumerator => pure subGenerator
-            recursiveGenerators := recursiveGenerators.push subGeneratorTerm
+              | .Generator => `( ($(mkIdent ``Nat.succ) $freshSize', $subProducer) )
+              | .Enumerator => pure subProducer
+            recursiveProducers := recursiveProducers.push subProducerTerm
           else
             -- Following the QuickChick convention,
-            -- Non-recursive sub-generators have a weight of 1
+            -- non-recursive sub-generators have a weight of 1
             -- (sub-enumerators don't have any weight associated with them)
             let subGeneratorTerm ←
               match producerSort with
-              | .Generator => `( (1, $subGenerator) )
-              | .Enumerator => pure subGenerator
-            nonRecursiveGenerators := nonRecursiveGenerators.push subGeneratorTerm
+              | .Generator => `( (1, $subProducer) )
+              | .Enumerator => pure subProducer
+            nonRecursiveProducers := nonRecursiveProducers.push subGeneratorTerm
 
-        | none => throwError m!"Unable to derive generator schedule for constructor {ctorName}"
+        | none => throwError m!"Unable to derive producer schedule for constructor {ctorName}"
 
       if (not requiredInstances.isEmpty) then
         let deduplicatedInstances := List.eraseDups requiredInstances.toList
         logWarning m!"Required typeclass instances (please derive these first if they aren't already defined):\n{deduplicatedInstances}"
 
-      let baseGenerators ← `([$nonRecursiveGenerators,*])
-      let inductiveGenerators ← `([$nonRecursiveGenerators,*, $recursiveGenerators,*])
+      -- Collect all the base / inductive producers into two Lean list terms
+      -- Base producers are invoked when `size = 0`, inductive producers are invoked when `size > 0`
+      let baseProducers ← `([$nonRecursiveProducers,*])
+      let inductiveProducers ← `([$nonRecursiveProducers,*, $recursiveProducers,*])
 
-      return (baseGenerators, inductiveGenerators, freshenedOutputName, Lean.mkIdent <$> freshUnknowns, localCtx))
+      return (baseProducers, inductiveProducers, freshenedOutputName, Lean.mkIdent <$> freshUnknowns, localCtx))
 
   -- Create an instance of the appropriate producer typeclass
   mkProducerTypeClassInstance'
-    baseGenerators
-    inductiveGenerators
+    baseProducers
+    inductiveProducers
     inductiveSyntax
     freshArgIdents
     freshenedOutputName
