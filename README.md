@@ -126,6 +126,7 @@ We provide a command elaborator which elaborates the `#derive_checker` command:
 - [`DeriveSchedules.lean`](./Plausible/New/DeriveSchedules.lean): Algorithm for deriving generator schedules, as described in *Testing Theorems* 
 - [`DeriveConstrainedProducer.lean`](./Plausible/New/DeriveConstrainedProducer.lean): Algorithm for deriving constrained generators using the aforementioned unification algorithm & generator schedules
 - [`MExp.lean`](./Plausible/New/MExp.lean): An intermediate representation for monadic expressions (`MExp`), used when compiling schedules to Lean code
+- [`MakeConstrainedProducerInstance.lean`](./Plausible/New/MakeConstrainedProducerInstance.lean): Auxiliary functions for creating instances of typeclasses for constrained producers (`ArbitrarySuchThat`, `EnumSuchThat`)
 
 **Metaprogramming infrastructure**:
 - [`TSyntaxCombinators.lean`](./Plausible/New/TSyntaxCombinators.lean): Combinators over `TSyntax` for creating monadic `do`-blocks & other Lean expressions via metaprogramming
