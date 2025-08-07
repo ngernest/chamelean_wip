@@ -16,7 +16,6 @@ import Plausible.New.Examples.STLC
 import Plausible.New.Examples.Trees
 import Plausible.New.DeriveArbitrary
 import Plausible.New.DeriveEnum
-import Plausible.New.SubEnumerators
 import Plausible.New.Utils
 import Plausible.New.Debug
 import Plausible.New.UnificationMonad

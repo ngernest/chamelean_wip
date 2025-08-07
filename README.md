@@ -137,7 +137,6 @@ We provide a command elaborator which elaborates the `#derive_checker` command:
 **Logic for handling constraints when deriving code**:
 - [`SubGenerators.lean`](./Plausible/New/SubGenerators.lean): Handles constraints when deriving sub-generators (handlers invoked by top-level derived generators)
 - [`SubCheckers.lean`](./Plausible/New/SubCheckers.lean): Handles constraints when deriving sub-checkers (handlers invoked by top-level derived checkers)
-- [`SubEnumerators.lean`](./Plausible/New/SubEnumerators.lean): Handles constraints when deriving sub-enumerators (handlers invoked by top-level derived enumerators)
 
 **Miscellany**:
 - [`LazyList.lean`](./Plausible/New/LazyList.lean): Implementation of lazy lists (used for enumerators)
