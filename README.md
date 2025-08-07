@@ -132,9 +132,6 @@ We provide a command elaborator which elaborates the `#derive_checker` command:
 - [`DeriveArbitrary.lean`](./Plausible/DeriveArbitrary.lean): Deriver for unconstrained generators (instances of the `Arbitrary` / `ArbitrarySized` typeclasses)
 - [`DeriveEnum.lean`](./Plausible/New/DeriveEnum.lean): Deriver for unconstrainted enumerators 
 (instances of the `Enum` / `EnumSized` typeclasses) 
-- [`DeriveConstrainedProducers.lean`](./Plausible/New/DeriveConstrainedProducers.lean): Contains most of the generalized logic for deriving constrained producers (used for both generators & enumerators)
-- [`DeriveGenerator.lean`](./Plausible/New/DeriveGenerator.lean): Top-level command elaborator for deriving for *constrained* generators (instances of the `ArbitrarySizedSuchThat` typeclass)
-- [`DeriveEnumSuchThat.lean`](./Plausible/New/DeriveEnumSuchThat.lean): Top-level command elaborator for deriving *constrained* enumerators (instances of the `EnumSizedSuchThat` typeclass) 
 - [`DeriveChecker.lean`](./Plausible/New/DeriveChecker.lean): Deriver for automatically deriving checkers (instances of the `DecOpt` typeclass)
 
 **Logic for handling constraints when deriving code**:
