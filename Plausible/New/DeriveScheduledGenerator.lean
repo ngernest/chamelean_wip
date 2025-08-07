@@ -266,18 +266,15 @@ def rewriteFunctionCallsUnifyM (hypotheses : Array Expr) (conclusion : Expr) (in
       let newEqualities := List.zip funcAppExprs freshVarExprs.toList
 
       let mut additionalHyps := #[]
+
+      -- For each (fresh variable, function call result) pair,
+      -- create a new hypothesis stating that `newVarExpr = funcAppExpr`,
+      -- and add it to the array of all hypotheses
       for (newVarExpr, funcAppExpr) in Array.zip freshVarExprs funcAppExprs.toArray do
-        -- Create a new hypothesis stating that `newVarExpr = funcAppExpr`, then
-        -- add it to the array of `hypotheses`
         let newHyp ← mkEq newVarExpr funcAppExpr
         additionalHyps := additionalHyps.push newHyp
 
       let updatedHypotheses := hypotheses ++ additionalHyps
-
-      -- Note: since we're doing a purely syntactic rewriting operation here,
-      -- it suffices to use `==` to compare `subExpr` with `funcAppExpr` instead of using `MetaM.isDefEq`
-      -- let rewrittenConclusion := Expr.replace
-      --   (fun subExpr => if subExpr == funcAppExpr then some newVarExprs else none) conclusion
 
       let rewrittenConclusion ← conclusion.traverseChildren (fun subExpr =>
         match List.lookup subExpr newEqualities with
