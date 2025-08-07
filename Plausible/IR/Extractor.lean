@@ -431,31 +431,6 @@ def processConstructorUnifyArgs (ctorName : Name) (ctorType: Expr) (inputVars : 
     }
   | none => throwError "Not a match"
 
-def constructor_header (con: InductiveConstructor) : MetaM String := withLCtx' con.localCtx do
-  return toString (con.ctorName) ++ " : " ++  toString (← Meta.ppExpr con.ctorExpr)
-
-def process_constructor_print (pc: InductiveConstructor) : MetaM Unit := withLCtx' pc.localCtx do
-  IO.println s!" Constructor Expr : {← Meta.ppExpr pc.ctorExpr}"
-  IO.println s!" Input Vars : {← Array.mapM Meta.ppExpr pc.input_vars}"
-  IO.println s!" Bound Vars : {pc.bound_vars}"
-  IO.println s!" Input maps : {(← Array.mapM Meta.ppExpr pc.inputVarsToConclusionArgsMap.unzip.1).zip (← Array.mapM Meta.ppExpr pc.inputVarsToConclusionArgsMap.unzip.2)}"
-  IO.println s!" Cond props : {← Array.mapM Meta.ppExpr pc.all_hypotheses}"
-  IO.println s!" Conclusion prop :  {← Meta.ppExpr pc.conclusion}"
-  IO.println s!" Builtin-typed vars : {pc.bound_vars_with_base_types}"
-  IO.println s!" Non-builtin-typed vars : {pc.bound_vars_with_non_base_types}"
-  IO.println s!" Builtin-typed props :  {← Array.mapM Meta.ppExpr pc.hypotheses_with_only_base_type_args}"
-  --IO.println s!" nonlinear_conds:  {← Array.mapM Meta.ppExpr pc.nonlinear_hypotheses}"
-  IO.println s!" Inductive_conds:  {← Array.mapM Meta.ppExpr pc.hypotheses_that_are_inductive_applications}"
-  IO.println s!" Recursive_conds:  {← Array.mapM Meta.ppExpr pc.recursive_hypotheses}"
-  IO.println s!" Input eqs:  {← Array.mapM Meta.ppExpr pc.inputEqs}"
-
-
-def print_constructors (ctors : Array InductiveConstructor) : MetaM Unit := do
-  let mut i := 0
-  for l in ctors do
-    IO.println s!"IRConstructor {i}: "
-    i := i+1
-    process_constructor_print l
 
 /-- Helper function for creating `n` names -/
 def mkDefaultInputNames_aux (n: Nat) : MetaM (Array String) := do
@@ -530,52 +505,6 @@ def getInductiveInfoWithArgs (inputExpr : Expr) (argNames : Array String) : Meta
     | some _ =>
       throwError s!"{inductive_name} is not an inductive relation"
   | none => throwError s!"{inputExpr} is not a type"
-
-/-- Takes in an inductive relation and extracts metadata corresponding to the `inductive`,
-    returning an `IR_info` -/
-def getInductiveInfo (input_expr : Expr) : MetaM InductiveInfo := do
-  let inp_names ← mkDefaultInputNames input_expr
-  getInductiveInfoWithArgs input_expr inp_names
-
-
-/-- Prints the fields of an `inductiveInfo` -/
-def print_InductiveInfo (inductiveInfo : InductiveInfo) : MetaM Unit := withLCtx' inductiveInfo.localCtx do
-  IO.println s!"Name of inductive relation: {inductiveInfo.inductive_name}"
-  IO.println s!"Input types: {inductiveInfo.input_types}"
-  IO.println s!"Input vars: { ← Array.mapM Meta.ppExpr inductiveInfo.input_vars }"
-  IO.println s!"Dependencies: {inductiveInfo.dependencies}"
-  IO.println ""
-  print_constructors inductiveInfo.constructors
-
----------------------------------------------------------------------------------------
--- Command `#get_InductiveInfo` for printing metadata associated with an inductive relation
----------------------------------------------------------------------------------------
-
-syntax (name := getRelationInfo) "#get_InductiveInfo" term : command
-
-@[command_elab getRelationInfo]
-def elabGetIRInfo : CommandElab := fun stx => do
-  match stx with
-  | `(#get_InductiveInfo $t) =>
-    Command.liftTermElabM do
-      let e ← elabTerm t none
-      let inductiveInfo ← getInductiveInfo e
-      print_InductiveInfo inductiveInfo
-  | _ => throwError "Invalid syntax"
-
-
-syntax (name := getRelationInfoWithName) "#get_InductiveInfo" term "with_name" term : command
-
-@[command_elab getRelationInfoWithName]
-def elabGetIRInfoWithName : CommandElab := fun stx => do
-  match stx with
-  | `(#get_InductiveInfo $t with_name $t2:term) =>
-    Command.liftTermElabM do
-      let e ← elabTerm t none
-      let inpname ← termToStringList t2
-      let inductiveInfo ← getInductiveInfoWithArgs e inpname.toArray
-      print_InductiveInfo inductiveInfo
-  | _ => throwError "Invalid syntax"
 
 
 end Plausible.IR

@@ -88,7 +88,7 @@ instance of the `ArbitrarySizedSuchThat` / `EnumSizedSuchThat` typeclass (along 
 #eval runSizedEnum (EnumSizedSuchThat.enumSizedST (fun t => balanced 5 t)) 3
 ```
 
-**3. Deriving checkers (partial decision procedures)** (for inductively-defined propositions)
+**3. Deriving checkers (partial decision procedures)** (for inductively-defined propositions)                                 
 A checker for an inductively-defined `Prop` is a `Nat -> Option Bool` function, which 
 takes a `Nat` argument as fuel and returns `none` if it can't decide whether the `Prop` holds (e.g. it runs out of fuel),
 and otherwise returns `some true/some false` depending on whether the `Prop` holds.
@@ -129,7 +129,7 @@ We provide a command elaborator which elaborates the `#derive_checker` command:
 
 **Metaprogramming infrastructure**:
 - [`TSyntaxCombinators.lean`](./Plausible/New/TSyntaxCombinators.lean): Combinators over `TSyntax` for creating monadic `do`-blocks & other Lean expressions via metaprogramming
-- [`DeriveArbitrary.lean`](./Plausible/New/DeriveArbitrary.lean): Deriver for unconstrained generators (instances of the `Arbitrary` / `ArbitrarySized` typeclasses)
+- [`DeriveArbitrary.lean`](./Plausible/DeriveArbitrary.lean): Deriver for unconstrained generators (instances of the `Arbitrary` / `ArbitrarySized` typeclasses)
 - [`DeriveEnum.lean`](./Plausible/New/DeriveEnum.lean): Deriver for unconstrainted enumerators 
 (instances of the `Enum` / `EnumSized` typeclasses) 
 - [`DeriveConstrainedProducers.lean`](./Plausible/New/DeriveConstrainedProducers.lean): Contains most of the generalized logic for deriving constrained producers (used for both generators & enumerators)

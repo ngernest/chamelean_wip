@@ -2,7 +2,6 @@ import Plausible.New.DeriveChecker
 import Plausible.New.SubGenerators
 import Plausible.New.SubCheckers
 import Plausible.New.DeriveConstrainedProducers
-import Plausible.New.Tests
 import Plausible.New.OptionTGen
 import Plausible.New.Idents
 import Plausible.New.TSyntaxCombinators
@@ -15,7 +14,6 @@ import Plausible.New.EnumeratorCombinators
 import Plausible.New.LazyList
 import Plausible.New.Examples.STLC
 import Plausible.New.Examples.Trees
-import Plausible.New.NKIExperiments
 import Plausible.New.DeriveArbitrary
 import Plausible.New.DeriveEnum
 import Plausible.New.DeriveEnumSuchThat
