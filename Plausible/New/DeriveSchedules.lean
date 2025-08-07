@@ -300,7 +300,15 @@ partial def dfs (boundVars : List Name) (remainingVars : List Name) (checkedHypo
 
     return constrainedProdPaths ++ unconstrainedProdPaths
 
-
+/-- Takes a `deriveSort` and returns the corresponding `ProducerSort`:
+    - If we're deriving a `Checker` or a `Enumerator`, the corresponding `ProducerSort` is an `Enumerator`,
+      since its more efficient to enumerate values when checking
+    - If we're deriving a `Generator` or a function which generates inputs to a `Theorem`,
+      the corresponding `ProducerSort` is a `Generator`, since we want to generate random inputs -/
+def convertDeriveSortToProducerSort (deriveSort : DeriveSort) : ProducerSort :=
+  match deriveSort with
+  | .Checker | .Enumerator => ProducerSort.Enumerator
+  | .Generator | .Theorem => ProducerSort.Generator
 
 /-- Computes all possible schedules for a constructor
     (each candidate schedule is represented as a `List ScheduleStep`).
@@ -317,10 +325,7 @@ def possibleSchedules (vars : List (Name × Expr)) (hypotheses : List Hypothesis
 
   let sortedHypotheses := mkSortedHypothesesVariablesMap hypotheses
 
-  let prodSort :=
-    match deriveSort with
-    | .Checker | .Enumerator => ProducerSort.Enumerator
-    | .Generator | .Theorem => ProducerSort.Generator
+  let prodSort := convertDeriveSortToProducerSort deriveSort
 
   let scheduleEnv := ⟨ vars, sortedHypotheses, deriveSort, prodSort, recCall, fixedVars ⟩
 

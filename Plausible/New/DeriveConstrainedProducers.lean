@@ -9,6 +9,7 @@ import Plausible.New.SubGenerators
 import Plausible.New.SubEnumerators
 import Plausible.New.Idents
 import Plausible.New.Utils
+import Plausible.New.Schedules
 
 open Plausible.IR
 open Lean Elab Command Meta Term Parser Std
@@ -207,7 +208,7 @@ def mkProducerTypeClassInstance (baseGenerators : TSyntax `term) (inductiveGener
  -/
 def mkProducerTypeClassInstance' (baseGenerators : TSyntax `term) (inductiveGenerators : TSyntax `term) (inductiveStx : TSyntax `term)
   (args : TSyntaxArray `term) (targetVar : Name)
-  (targetTypeSyntax : TSyntax `term) (producerType : ProducerType)
+  (targetTypeSyntax : TSyntax `term) (producerSort : ProducerSort)
   (topLevelLocalCtx : LocalContext) : CommandElabM (TSyntax `command) := do
     -- Produce a fresh name for the `size` argument for the lambda
     -- at the end of the generator function, as well as the `aux_arb` inner helper function
@@ -219,7 +220,7 @@ def mkProducerTypeClassInstance' (baseGenerators : TSyntax `term) (inductiveGene
     -- The (backtracking) combinator to be invoked
     -- (`OptionTGen.backtrack` for generators, `EnumeratorCombinators.enumerate` for enumerators)
     let combinatorFn :=
-      match producerType with
+      match producerSort with
       | .Generator => OptionTBacktrackFn
       | .Enumerator => enumerateFn
 
@@ -263,26 +264,26 @@ def mkProducerTypeClassInstance' (baseGenerators : TSyntax `term) (inductiveGene
     -- Figure out which typeclass should be derived
     -- (`ArbitrarySizedSuchThat` for generators, `EnumSizedSuchThat` for enumerators)
     let producerTypeClass :=
-      match producerType with
+      match producerSort with
       | .Generator => arbitrarySizedSuchThatTypeclass
       | .Enumerator => enumSizedSuchThatTypeclass
 
     -- Similarly, figure out the name of the function corresponding to the typeclass above
     let producerTypeClassFunction :=
-      match producerType with
+      match producerSort with
       | .Generator => unqualifiedArbitrarySizedSTFn
       | .Enumerator => unqualifiedEnumSizedSTFn
 
     -- Generators use `aux_arb` as the inner function, enumerators use `aux_enum`
     let innerFunctionIdent :=
-      match producerType with
+      match producerSort with
       | .Generator => mkFreshAccessibleIdent topLevelLocalCtx `aux_arb
       | .Enumerator => mkFreshAccessibleIdent topLevelLocalCtx `aux_enum
 
     -- Determine the appropriate type constructor to use as the producer's type
     -- (either `Gen` or `Enumerator`)
     let producerTypeConstructor :=
-      match producerType with
+      match producerSort with
       | .Generator => genTypeConstructor
       | .Enumerator => enumTypeConstructor
 

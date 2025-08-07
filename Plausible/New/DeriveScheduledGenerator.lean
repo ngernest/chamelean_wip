@@ -302,7 +302,7 @@ def rewriteFunctionCallsUnifyM (hypotheses : Array Expr) (conclusion : Expr) (in
         listed in order, which coincides with `inputNames ∪ { outputName }`
     - The name of the inductive relation we are targeting (`inductiveName`) -/
 def getScheduleForConstructor (inductiveName : Name) (ctorName : Name) (outputName : Name) (outputType : Expr) (inputNames : List Name)
-  (unknowns : Array Unknown) : UnifyM Schedule := do
+  (unknowns : Array Unknown) (deriveSort : DeriveSort) : UnifyM Schedule := do
   let ctorInfo ← getConstInfoCtor ctorName
   let ctorType := ctorInfo.type
 
@@ -389,7 +389,7 @@ def getScheduleForConstructor (inductiveName : Name) (ctorName : Name) (outputNa
 
       -- Determine the appropriate `ScheduleSort` (right now we only produce `ScheduleSort`s for `Generator`s)
       let scheduleSort ← getScheduleSort conclusionExpr
-        (outputVars := [outputName]) (some ctorName) (deriveSort := .Generator)
+        (outputVars := [outputName]) (some ctorName) deriveSort
         (returnOption := true)
 
       -- Check which universally-quantified variables have a `Fixed` range,
@@ -410,7 +410,7 @@ def getScheduleForConstructor (inductiveName : Name) (ctorName : Name) (outputNa
       let possibleSchedules ← possibleSchedules
         (vars := updatedForAllVars)
         (hypotheses := hypothesisExprs.toList)
-        (deriveSort := .Generator)
+        deriveSort
         (recCall := (inductiveName, [outputIdx]))
         (fixedVars := fixedVars)
 
@@ -429,14 +429,13 @@ def getScheduleForConstructor (inductiveName : Name) (ctorName : Name) (outputNa
 
       return fullSchedule))
 
+/-- Produces an instance of a typeclass for a constrained producer (either `ArbitrarySizedSuchThat` or `EnumSizedSuchThat`).
+    The arguments to this function are:
 
-/-- Command for deriving a constrained generator for an inductive relation that uses generator schedules -/
-syntax (name := derive_generator) "#derive_generator" "(" "fun" "(" ident ":" term ")" "=>" term ")" : command
-
-/-- Derives an instance of the `ArbitrarySuchThat` typeclass,
-    where `outputVar` and `outputTypeSyntax` are the name & type of the value to be generated,
-    and `constrainingProp` is a proposition which generated values need to satisfy -/
-def deriveArbitrarySuchThatInstance (outputVar : Ident) (outputTypeSyntax : TSyntax `term) (constrainingProp : TSyntax `term) : CommandElabM (TSyntax `command) := do
+    - `outputVar` and `outputTypeSyntax` are the name & type of the value to be generated,
+    - `constrainingProp` is the proposition constraining the generated values need to satisfy
+    - `deriveSort` is the sort of function we are deriving (either `.Generator` or `.Enumerator`) -/
+def deriveConstrainedProducer (outputVar : Ident) (outputTypeSyntax : TSyntax `term) (constrainingProp : TSyntax `term) (deriveSort : DeriveSort) : CommandElabM (TSyntax `command) := do
   -- Parse the body of the lambda for an application of the inductive relation
   let (inductiveSyntax, argIdents) ← parseInductiveApp constrainingProp
   let inductiveName := inductiveSyntax.getId
@@ -499,7 +498,7 @@ def deriveArbitrarySuchThatInstance (outputVar : Ident) (outputTypeSyntax : TSyn
       for ctorName in inductiveVal.ctors do
         let scheduleOption ← (UnifyM.runInMetaM
           (getScheduleForConstructor inductiveName ctorName freshenedOutputName
-            outputType freshenedInputNamesExcludingOutput freshUnknowns)
+            outputType freshenedInputNamesExcludingOutput freshUnknowns deriveSort)
             emptyUnifyState)
         match scheduleOption with
         | some schedule =>
@@ -508,7 +507,7 @@ def deriveArbitrarySuchThatInstance (outputVar : Ident) (outputTypeSyntax : TSyn
           -- This is all done in a state monad, where we keep appending to an array of typeclass instance names when we detect that a new instance is required)
           let (subGenerator, instances) ← StateT.run (s := #[]) (do
             let mexp ← scheduleToMExp schedule (.MId `size) (.MId `initSize)
-            mexpToTSyntax mexp .Generator)
+            mexpToTSyntax mexp deriveSort)
 
           requiredInstances := requiredInstances ++ instances
 
@@ -532,14 +531,31 @@ def deriveArbitrarySuchThatInstance (outputVar : Ident) (outputTypeSyntax : TSyn
 
       return (baseGenerators, inductiveGenerators, freshenedOutputName, Lean.mkIdent <$> freshUnknowns, localCtx))
 
-  -- Create an instance of the `ArbitrarySuchThat` typeclass
-  mkProducerTypeClassInstance'
-    baseGenerators inductiveGenerators
-    inductiveSyntax freshArgIdents
-    freshenedOutputName outputTypeSyntax
-    .Generator localCtx
+  let producerSort := convertDeriveSortToProducerSort deriveSort
 
-/-- Elaborator for the `#derive_generator` command which derives constrained generator using generator schedules -/
+  -- Create an instance of the appropriate producer typeclass
+  mkProducerTypeClassInstance'
+    baseGenerators
+    inductiveGenerators
+    inductiveSyntax
+    freshArgIdents
+    freshenedOutputName
+    outputTypeSyntax
+    producerSort
+    localCtx
+
+
+/-- Derives an instance of the `ArbitrarySuchThat` typeclass,
+    where `outputVar` and `outputTypeSyntax` are the name & type of the value to be generated,
+    and `constrainingProp` is a proposition which generated values need to satisfy -/
+def deriveArbitrarySuchThatInstance (outputVar : Ident) (outputTypeSyntax : TSyntax `term) (constrainingProp : TSyntax `term) : CommandElabM (TSyntax `command) :=
+  deriveConstrainedProducer outputVar outputTypeSyntax constrainingProp (deriveSort := .Generator)
+
+/-- Command for deriving a constrained generator for an inductive relation -/
+syntax (name := derive_generator) "#derive_generator" "(" "fun" "(" ident ":" term ")" "=>" term ")" : command
+
+/-- Elaborator for the `#derive_generator` command which derives a constrained generator
+    using generator schedules from Testing Theorems & the unification algorithm from Generating Good Generators -/
 @[command_elab derive_generator]
 def elabDeriveScheduledGenerator : CommandElab := fun stx => do
   match stx with
