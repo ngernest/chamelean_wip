@@ -94,7 +94,6 @@ def convertToCtorExpr (e : Expr) : MetaM (Option (Name × Array Expr)) :=
     return none
 
 
-
 /-- Takes an unknown `u`, and finds the `Range` `r` that corresponds to
     `u` in the `constraints` map.
 
@@ -219,7 +218,7 @@ def getScheduleSort (conclusion : HypothesisExpr) (outputVars : List Unknown) (c
     return .ProducerSchedule producerSort conclusion
 
 
-/-- `rewriteFunctionCallsInConclusionUnifyM hypotheses conclusion inductiveRelationName` does the following:
+/-- `rewriteFunctionCallsInConclusion hypotheses conclusion inductiveRelationName` does the following:
     1. Checks if the `conclusion` contains a function call where the function is *not* the same as the `inductiveRelationName`.
        (If no, we just return the pair `(hypotheses, conclusion)` as is.)
     2. If yes, we create a fresh variable & add an extra hypothesis where the fresh var is bound to the result of the function call.
@@ -229,7 +228,7 @@ def getScheduleSort (conclusion : HypothesisExpr) (outputVars : List Unknown) (c
     The updated hypotheses, conclusion, a list of the names & types of the fresh variables produced, and new `LocalContext` are subsequently returned.
     - Note: it is the caller's responsibility to check that `conclusion` does indeed contain
       a non-trivial function application (e.g. by using `containsNonTrivialFuncApp`) -/
-def rewriteFunctionCallsUnifyM (hypotheses : Array Expr) (conclusion : Expr) (inductiveRelationName : Name) (localCtx : LocalContext) : UnifyM (Array Expr × Expr × List (Name × Expr) × LocalContext) := do
+def rewriteFunctionCallsInConclusion (hypotheses : Array Expr) (conclusion : Expr) (inductiveRelationName : Name) (localCtx : LocalContext) : UnifyM (Array Expr × Expr × List (Name × Expr) × LocalContext) := do
   -- Find all sub-terms which are non-trivial function applications
   let funcAppExprs ← conclusion.foldlM (init := []) (fun acc subExpr => do
     if (← containsNonTrivialFuncApp subExpr inductiveRelationName)
@@ -335,7 +334,7 @@ def getScheduleForConstructor (inductiveName : Name) (ctorName : Name) (outputNa
     -- `freshNamesAndTypes` is a list containing the names & types of the fresh variables produced during this procedure.
     let (updatedHypotheses, updatedConclusion, freshNamesAndTypes, updatedLocalCtx) ←
       if conclusionNeedsRewriting then
-        rewriteFunctionCallsUnifyM hypotheses conclusion inductiveName (← getLCtx)
+        rewriteFunctionCallsInConclusion hypotheses conclusion inductiveName (← getLCtx)
       else
         pure (hypotheses, conclusion, [], ← getLCtx)
 
