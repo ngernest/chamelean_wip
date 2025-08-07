@@ -216,7 +216,6 @@ def getScheduleSort (conclusion : HypothesisExpr) (outputVars : List Unknown) (c
         let ctorName ← Option.getDM ctorNameOpt
           (throwError "No constructor name given for Non-theorem schedule")
         pure [ConstructorExpr.Ctor ctorName outputValues]
-    -- TODO: fix this (we shouldn't return the conclusion as is)
     return .ProducerSchedule producerSort conclusion
 
 
