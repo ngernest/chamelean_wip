@@ -436,115 +436,119 @@ def getScheduleForConstructor (inductiveName : Name) (ctorName : Name) (outputNa
 /-- Command for deriving a constrained generator for an inductive relation that uses generator schedules -/
 syntax (name := derive_generator) "#derive_generator" "(" "fun" "(" ident ":" term ")" "=>" term ")" : command
 
+/-- Derives an instance of the `ArbitrarySuchThat` typeclass,
+    where `outputVar` and `outputTypeSyntax` are the name & type of the value to be generated,
+    and `constrainingProp` is a proposition which generated values need to satisfy -/
+def deriveArbitrarySuchThatInstance (outputVar : Ident) (outputTypeSyntax : TSyntax `term) (constrainingProp : TSyntax `term) : CommandElabM (TSyntax `command) := do
+  -- Parse the body of the lambda for an application of the inductive relation
+  let (inductiveSyntax, argIdents) ← parseInductiveApp constrainingProp
+  let inductiveName := inductiveSyntax.getId
+
+  -- Figure out the name and type of the value we wish to generate (the "output")
+  let outputName := outputVar.getId
+  let outputType ← liftTermElabM $ elabTerm outputTypeSyntax none
+
+  -- Find the index of the argument in the inductive application for the value we wish to generate
+  -- (i.e. find `i` s.t. `argIdents[i] == outputName`)
+  let outputIdxOpt := findTargetVarIndex outputName argIdents
+  if let .none := outputIdxOpt then
+    throwError "cannot find index of value to be generated"
+  let outputIdx := Option.get! outputIdxOpt
+
+  -- Obtain Lean's `InductiveVal` data structure, which contains metadata about the inductive relation
+  let inductiveVal ← getConstInfoInduct inductiveName
+
+  -- Determine the type for each argument to the inductive
+  let (_, _, inductiveTypeComponents) ← liftTermElabM $ decomposeType inductiveVal.type
+
+  -- To obtain the type of each arg to the inductive,
+  -- we pop the last element (`Prop`) from `inductiveTypeComponents`
+  let argTypes := inductiveTypeComponents.pop
+  let argNames := (fun ident => ident.getId) <$> argIdents
+  let argNamesTypes := argNames.zip argTypes
+
+  -- Add the name & type of each argument to the inductive relation to the `LocalContext`
+  -- Then, derive `baseGenerators` & `inductiveGenerators` (the code for the sub-generators
+  -- that are invoked when `size = 0` and `size > 0` respectively),
+  -- and obtain freshened versions of the output variable / arguments (`freshenedOutputName`, `freshArgIdents`)
+  let (baseGenerators, inductiveGenerators, freshenedOutputName, freshArgIdents, localCtx) ←
+    liftTermElabM $ withLocalDeclsDND argNamesTypes (fun _ => do
+      let mut localCtx ← getLCtx
+      let mut freshUnknowns := #[]
+
+      -- For each arg to the inductive relation (as specified to the user),
+      -- create a fresh name (to avoid clashing with names that may appear in constructors
+      -- of the inductive relation). Note that this requires updating the `LocalContext`
+      for argName in argNames do
+        let freshArgName := localCtx.getUnusedName argName
+        localCtx := localCtx.renameUserName argName freshArgName
+        freshUnknowns := freshUnknowns.push freshArgName
+
+      -- Since the `output` also appears as an argument to the inductive relation,
+      -- we also need to freshen its name
+      let freshenedOutputName := freshUnknowns[outputIdx]!
+
+      -- Each argument to the inductive relation (except the one at `outputIdx`)
+      -- is treated as an input
+      let freshenedInputNamesExcludingOutput := (Array.eraseIdx! freshUnknowns outputIdx).toList
+
+      let mut weightedNonRecursiveGenerators := #[]
+      let mut weightedRecursiveGenerators := #[]
+
+      let freshSize' := mkIdent $ localCtx.getUnusedName `size'
+
+      let mut requiredInstances := #[]
+
+      for ctorName in inductiveVal.ctors do
+        let scheduleOption ← (UnifyM.runInMetaM
+          (getScheduleForConstructor inductiveName ctorName freshenedOutputName
+            outputType freshenedInputNamesExcludingOutput freshUnknowns)
+            emptyUnifyState)
+        match scheduleOption with
+        | some schedule =>
+          -- Obtain a sub-generator for this constructor, along with an array of all typeclass instances that need to be defined beforehand
+          -- (Under the hood, we compile the schedule to an `MExp`, then compile the `MExp` to a Lean term containing the code for the sub-generator.
+          -- This is all done in a state monad, where we keep appending to an array of typeclass instance names when we detect that a new instance is required)
+          let (subGenerator, instances) ← StateT.run (s := #[]) (do
+            let mexp ← scheduleToMExp schedule (.MId `size) (.MId `initSize)
+            mexpToTSyntax mexp .Generator)
+
+          requiredInstances := requiredInstances ++ instances
+
+          -- Determine whether the constructor is recursive
+          -- (i.e. if the constructor has a hypothesis that refers to the inductive relation we are targeting)
+          let isRecursive ← isConstructorRecursive inductiveName ctorName
+
+          if isRecursive then
+            weightedRecursiveGenerators := weightedRecursiveGenerators.push (← `( ($(mkIdent ``Nat.succ) $freshSize', $subGenerator) ))
+          else
+            weightedNonRecursiveGenerators := weightedNonRecursiveGenerators.push (← `( (1, $subGenerator) ))
+
+        | none => throwError m!"Unable to derive generator schedule for constructor {ctorName}"
+
+      if (not requiredInstances.isEmpty) then
+        let deduplicatedInstances := List.eraseDups requiredInstances.toList
+        logWarning m!"Required typeclass instances (please derive these first if they aren't already defined):\n{deduplicatedInstances}"
+
+      let baseGenerators ← `([$weightedNonRecursiveGenerators,*])
+      let inductiveGenerators ← `([$weightedNonRecursiveGenerators,*, $weightedRecursiveGenerators,*])
+
+      return (baseGenerators, inductiveGenerators, freshenedOutputName, Lean.mkIdent <$> freshUnknowns, localCtx))
+
+  -- Create an instance of the `ArbitrarySuchThat` typeclass
+  mkProducerTypeClassInstance'
+    baseGenerators inductiveGenerators
+    inductiveSyntax freshArgIdents
+    freshenedOutputName outputTypeSyntax
+    .Generator localCtx
+
 /-- Elaborator for the `#derive_generator` command which derives constrained generator using generator schedules -/
 @[command_elab derive_generator]
 def elabDeriveScheduledGenerator : CommandElab := fun stx => do
   match stx with
   | `(#derive_generator ( fun ( $var:ident : $outputTypeSyntax:term ) => $body:term )) => do
-
-
-    -- Parse the body of the lambda for an application of the inductive relation
-    let (inductiveSyntax, argIdents) ← parseInductiveApp body
-    let inductiveName := inductiveSyntax.getId
-
-    -- Figure out the name and type of the value we wish to generate (the "output")
-    let outputName := var.getId
-    let outputType ← liftTermElabM $ elabTerm outputTypeSyntax none
-
-    -- Find the index of the argument in the inductive application for the value we wish to generate
-    -- (i.e. find `i` s.t. `argIdents[i] == outputName`)
-    let outputIdxOpt := findTargetVarIndex outputName argIdents
-    if let .none := outputIdxOpt then
-      throwError "cannot find index of value to be generated"
-    let outputIdx := Option.get! outputIdxOpt
-
-    -- Obtain Lean's `InductiveVal` data structure, which contains metadata about the inductive relation
-    let inductiveVal ← getConstInfoInduct inductiveName
-
-    -- Determine the type for each argument to the inductive
-    let (_, _, inductiveTypeComponents) ← liftTermElabM $ decomposeType inductiveVal.type
-
-    -- To obtain the type of each arg to the inductive,
-    -- we pop the last element (`Prop`) from `inductiveTypeComponents`
-    let argTypes := inductiveTypeComponents.pop
-    let argNames := (fun ident => ident.getId) <$> argIdents
-    let argNamesTypes := argNames.zip argTypes
-
-    -- Add the name & type of each argument to the inductive relation to the `LocalContext`
-    -- Then, derive `baseGenerators` & `inductiveGenerators` (the code for the sub-generators
-    -- that are invoked when `size = 0` and `size > 0` respectively),
-    -- and obtain freshened versions of the output variable / arguments (`freshenedOutputName`, `freshArgIdents`)
-    let (baseGenerators, inductiveGenerators, freshenedOutputName, freshArgIdents, localCtx) ←
-      liftTermElabM $ withLocalDeclsDND argNamesTypes (fun _ => do
-        let mut localCtx ← getLCtx
-        let mut freshUnknowns := #[]
-
-        -- For each arg to the inductive relation (as specified to the user),
-        -- create a fresh name (to avoid clashing with names that may appear in constructors
-        -- of the inductive relation). Note that this requires updating the `LocalContext`
-        for argName in argNames do
-          let freshArgName := localCtx.getUnusedName argName
-          localCtx := localCtx.renameUserName argName freshArgName
-          freshUnknowns := freshUnknowns.push freshArgName
-
-        -- Since the `output` also appears as an argument to the inductive relation,
-        -- we also need to freshen its name
-        let freshenedOutputName := freshUnknowns[outputIdx]!
-
-        -- Each argument to the inductive relation (except the one at `outputIdx`)
-        -- is treated as an input
-        let freshenedInputNamesExcludingOutput := (Array.eraseIdx! freshUnknowns outputIdx).toList
-
-        let mut weightedNonRecursiveGenerators := #[]
-        let mut weightedRecursiveGenerators := #[]
-
-        let freshSize' := mkIdent $ localCtx.getUnusedName `size'
-
-        let mut requiredInstances := #[]
-
-        for ctorName in inductiveVal.ctors do
-          let scheduleOption ← (UnifyM.runInMetaM
-            (getScheduleForConstructor inductiveName ctorName freshenedOutputName
-              outputType freshenedInputNamesExcludingOutput freshUnknowns)
-              emptyUnifyState)
-          match scheduleOption with
-          | some schedule =>
-            -- Obtain a sub-generator for this constructor, along with an array of all typeclass instances that need to be defined beforehand
-            -- (Under the hood, we compile the schedule to an `MExp`, then compile the `MExp` to a Lean term containing the code for the sub-generator.
-            -- This is all done in a state monad, where we keep appending to an array of typeclass instance names when we detect that a new instance is required)
-            let (subGenerator, instances) ← StateT.run (s := #[]) (do
-              let mexp ← scheduleToMExp schedule (.MId `size) (.MId `initSize)
-              mexpToTSyntax mexp .Generator)
-
-            requiredInstances := requiredInstances ++ instances
-
-            -- Determine whether the constructor is recursive
-            -- (i.e. if the constructor has a hypothesis that refers to the inductive relation we are targeting)
-            let isRecursive ← isConstructorRecursive inductiveName ctorName
-
-            if isRecursive then
-              weightedRecursiveGenerators := weightedRecursiveGenerators.push (← `( ($(mkIdent ``Nat.succ) $freshSize', $subGenerator) ))
-            else
-              weightedNonRecursiveGenerators := weightedNonRecursiveGenerators.push (← `( (1, $subGenerator) ))
-
-          | none => throwError m!"Unable to derive generator schedule for constructor {ctorName}"
-
-        if (not requiredInstances.isEmpty) then
-          let deduplicatedInstances := List.eraseDups requiredInstances.toList
-          logWarning m!"Required typeclass instances (please derive these first if they aren't already defined):\n{deduplicatedInstances}"
-
-        let baseGenerators ← `([$weightedNonRecursiveGenerators,*])
-        let inductiveGenerators ← `([$weightedNonRecursiveGenerators,*, $weightedRecursiveGenerators,*])
-
-        return (baseGenerators, inductiveGenerators, freshenedOutputName, Lean.mkIdent <$> freshUnknowns, localCtx))
-
-    -- Create an instance of the `ArbitrarySuchThat` typeclass
-    let typeClassInstance ←
-      mkProducerTypeClassInstance'
-        baseGenerators inductiveGenerators
-        inductiveSyntax freshArgIdents
-        freshenedOutputName outputTypeSyntax
-        .Generator localCtx
+    -- Derive an instance of the `ArbitrarySuchThat` typeclass
+    let typeClassInstance ← deriveArbitrarySuchThatInstance var outputTypeSyntax body
 
     -- Pretty-print the derived generator
     let genFormat ← liftCoreM (PrettyPrinter.ppCommand typeClassInstance)
