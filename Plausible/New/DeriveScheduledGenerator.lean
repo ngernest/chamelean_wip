@@ -219,7 +219,6 @@ def getScheduleSort (conclusion : HypothesisExpr) (outputVars : List Unknown) (c
     return .ProducerSchedule producerSort conclusion
 
 
-
 /-- `rewriteFunctionCallsInConclusionUnifyM hypotheses conclusion inductiveRelationName` does the following:
     1. Checks if the `conclusion` contains a function call where the function is *not* the same as the `inductiveRelationName`.
        (If no, we just return the pair `(hypotheses, conclusion)` as is.)
@@ -231,13 +230,7 @@ def getScheduleSort (conclusion : HypothesisExpr) (outputVars : List Unknown) (c
     - Note: it is the caller's responsibility to check that `conclusion` does indeed contain
       a non-trivial function application (e.g. by using `containsNonTrivialFuncApp`) -/
 def rewriteFunctionCallsUnifyM (hypotheses : Array Expr) (conclusion : Expr) (inductiveRelationName : Name) (localCtx : LocalContext) : UnifyM (Array Expr × Expr × List (Name × Expr) × LocalContext) := do
-
-  -- Filter out cases where the function being called is the same as the inductive relation's name
-  -- Note: this analysis is more simplistic compared to the one performed by `containsNonTrivialFuncApp`,
-  -- which is why callers should have called `containsNonTrivialFuncApp` beforehand
-  -- let possibleFuncApp := Expr.find? (fun subExpr =>
-  --   subExpr.isApp && subExpr.getAppFn.constName.getRoot != inductiveRelationName) conclusion
-
+  -- Find all sub-terms which are non-trivial function applications
   let funcAppExprs ← conclusion.foldlM (init := []) (fun acc subExpr => do
     if (← containsNonTrivialFuncApp subExpr inductiveRelationName)
       then pure (subExpr :: acc)
@@ -436,6 +429,9 @@ def getScheduleForConstructor (inductiveName : Name) (ctorName : Name) (outputNa
     - `constrainingProp` is the proposition constraining the generated values need to satisfy
     - `deriveSort` is the sort of function we are deriving (either `.Generator` or `.Enumerator`) -/
 def deriveConstrainedProducer (outputVar : Ident) (outputTypeSyntax : TSyntax `term) (constrainingProp : TSyntax `term) (deriveSort : DeriveSort) : CommandElabM (TSyntax `command) := do
+  -- Determine what sort of producer we're deriving (a `Generator` or an `Enumerator`)
+  let producerSort := convertDeriveSortToProducerSort deriveSort
+
   -- Parse the body of the lambda for an application of the inductive relation
   let (inductiveSyntax, argIdents) ← parseInductiveApp constrainingProp
   let inductiveName := inductiveSyntax.getId
@@ -488,8 +484,8 @@ def deriveConstrainedProducer (outputVar : Ident) (outputTypeSyntax : TSyntax `t
       -- is treated as an input
       let freshenedInputNamesExcludingOutput := (Array.eraseIdx! freshUnknowns outputIdx).toList
 
-      let mut weightedNonRecursiveGenerators := #[]
-      let mut weightedRecursiveGenerators := #[]
+      let mut nonRecursiveGenerators := #[]
+      let mut recursiveGenerators := #[]
 
       let freshSize' := mkIdent $ localCtx.getUnusedName `size'
 
@@ -504,7 +500,8 @@ def deriveConstrainedProducer (outputVar : Ident) (outputTypeSyntax : TSyntax `t
         | some schedule =>
           -- Obtain a sub-generator for this constructor, along with an array of all typeclass instances that need to be defined beforehand
           -- (Under the hood, we compile the schedule to an `MExp`, then compile the `MExp` to a Lean term containing the code for the sub-generator.
-          -- This is all done in a state monad, where we keep appending to an array of typeclass instance names when we detect that a new instance is required)
+          -- This is all done in a state monad: when we detect that a new instance is required, we append it to an array of `TSyntax term`s
+          -- (where each term represents a typeclass instance)
           let (subGenerator, instances) ← StateT.run (s := #[]) (do
             let mexp ← scheduleToMExp schedule (.MId `size) (.MId `initSize)
             mexpToTSyntax mexp deriveSort)
@@ -516,9 +513,23 @@ def deriveConstrainedProducer (outputVar : Ident) (outputTypeSyntax : TSyntax `t
           let isRecursive ← isConstructorRecursive inductiveName ctorName
 
           if isRecursive then
-            weightedRecursiveGenerators := weightedRecursiveGenerators.push (← `( ($(mkIdent ``Nat.succ) $freshSize', $subGenerator) ))
+            -- Following the QuickChick convention,
+            -- Recursive sub-generators have a weight of `.succ size'`
+            -- and sub-enumerators don't have any weight associated with them
+            let subGeneratorTerm ←
+              match producerSort with
+              | .Generator => `( ($(mkIdent ``Nat.succ) $freshSize', $subGenerator) )
+              | .Enumerator => pure subGenerator
+            recursiveGenerators := recursiveGenerators.push subGeneratorTerm
           else
-            weightedNonRecursiveGenerators := weightedNonRecursiveGenerators.push (← `( (1, $subGenerator) ))
+            -- Following the QuickChick convention,
+            -- Non-recursive sub-generators have a weight of 1
+            -- (sub-enumerators don't have any weight associated with them)
+            let subGeneratorTerm ←
+              match producerSort with
+              | .Generator => `( (1, $subGenerator) )
+              | .Enumerator => pure subGenerator
+            nonRecursiveGenerators := nonRecursiveGenerators.push subGeneratorTerm
 
         | none => throwError m!"Unable to derive generator schedule for constructor {ctorName}"
 
@@ -526,12 +537,10 @@ def deriveConstrainedProducer (outputVar : Ident) (outputTypeSyntax : TSyntax `t
         let deduplicatedInstances := List.eraseDups requiredInstances.toList
         logWarning m!"Required typeclass instances (please derive these first if they aren't already defined):\n{deduplicatedInstances}"
 
-      let baseGenerators ← `([$weightedNonRecursiveGenerators,*])
-      let inductiveGenerators ← `([$weightedNonRecursiveGenerators,*, $weightedRecursiveGenerators,*])
+      let baseGenerators ← `([$nonRecursiveGenerators,*])
+      let inductiveGenerators ← `([$nonRecursiveGenerators,*, $recursiveGenerators,*])
 
       return (baseGenerators, inductiveGenerators, freshenedOutputName, Lean.mkIdent <$> freshUnknowns, localCtx))
-
-  let producerSort := convertDeriveSortToProducerSort deriveSort
 
   -- Create an instance of the appropriate producer typeclass
   mkProducerTypeClassInstance'
@@ -551,13 +560,19 @@ def deriveConstrainedProducer (outputVar : Ident) (outputTypeSyntax : TSyntax `t
 def deriveArbitrarySuchThatInstance (outputVar : Ident) (outputTypeSyntax : TSyntax `term) (constrainingProp : TSyntax `term) : CommandElabM (TSyntax `command) :=
   deriveConstrainedProducer outputVar outputTypeSyntax constrainingProp (deriveSort := .Generator)
 
+/-- Derives an instance of the `EnumSuchThat` typeclass,
+    where `outputVar` and `outputTypeSyntax` are the name & type of the value to be generated,
+    and `constrainingProp` is a proposition which generated values need to satisfy -/
+def deriveEnumSuchThatInstance (outputVar : Ident) (outputTypeSyntax : TSyntax `term) (constrainingProp : TSyntax `term) : CommandElabM (TSyntax `command) :=
+  deriveConstrainedProducer outputVar outputTypeSyntax constrainingProp (deriveSort := .Enumerator)
+
 /-- Command for deriving a constrained generator for an inductive relation -/
 syntax (name := derive_generator) "#derive_generator" "(" "fun" "(" ident ":" term ")" "=>" term ")" : command
 
 /-- Elaborator for the `#derive_generator` command which derives a constrained generator
     using generator schedules from Testing Theorems & the unification algorithm from Generating Good Generators -/
 @[command_elab derive_generator]
-def elabDeriveScheduledGenerator : CommandElab := fun stx => do
+def elabDeriveGenerator : CommandElab := fun stx => do
   match stx with
   | `(#derive_generator ( fun ( $var:ident : $outputTypeSyntax:term ) => $body:term )) => do
     -- Derive an instance of the `ArbitrarySuchThat` typeclass
@@ -572,3 +587,27 @@ def elabDeriveScheduledGenerator : CommandElab := fun stx => do
     elabCommand typeClassInstance
 
   | _ => throwUnsupportedSyntax
+
+/-- Command for deriving a constrained generator for an inductive relation -/
+syntax (name := derive_scheduled_enumerator) "#derive_scheduled_enumerator" "(" "fun" "(" ident ":" term ")" "=>" term ")" : command
+
+/-- Elaborator for the `#derive_generator` command which derives a constrained generator
+    using generator schedules from Testing Theorems & the unification algorithm from Generating Good Generators -/
+@[command_elab derive_scheduled_enumerator]
+def elabDeriveScheduledEnumerator : CommandElab := fun stx => do
+  match stx with
+  | `(#derive_scheduled_enumerator ( fun ( $var:ident : $outputTypeSyntax:term ) => $body:term )) => do
+    -- Derive an instance of the `ArbitrarySuchThat` typeclass
+    let typeClassInstance ← deriveEnumSuchThatInstance var outputTypeSyntax body
+
+    -- Pretty-print the derived generator
+    let genFormat ← liftCoreM (PrettyPrinter.ppCommand typeClassInstance)
+
+    -- Display the code for the derived generator to the user
+    logInfo m!"Try this generator: {Format.pretty genFormat}"
+
+    elabCommand typeClassInstance
+
+  | _ => throwUnsupportedSyntax
+
+-- #derive_scheduled_enumerator (fun (t : Tree) => bst lo hi t)
