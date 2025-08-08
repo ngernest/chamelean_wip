@@ -1,6 +1,6 @@
 import Lean.Expr
 import Batteries
-import Plausible.IR.Examples
+import Plausible.New.Examples.ExampleInductiveRelations
 import Plausible.New.Utils
 import Plausible.New.Schedules
 import Plausible.New.UnificationMonad

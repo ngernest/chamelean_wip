@@ -11,7 +11,7 @@ import Plausible.New.TSyntaxCombinators
 import Plausible.New.Utils
 import Plausible.New.Debug
 
-import Plausible.IR.Examples
+import Plausible.New.Examples.ExampleInductiveRelations
 
 import Plausible.New.Arbitrary
 import Plausible.New.Examples.STLC

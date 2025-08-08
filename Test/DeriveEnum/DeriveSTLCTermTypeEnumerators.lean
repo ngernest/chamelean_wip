@@ -1,7 +1,7 @@
 import Plausible.New.Enumerators
 import Plausible.New.EnumeratorCombinators
 import Plausible.New.DeriveEnum
-import Plausible.IR.Examples
+import Plausible.New.Examples.ExampleInductiveRelations
 
 set_option guard_msgs.diff true
 

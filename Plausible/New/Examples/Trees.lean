@@ -1,4 +1,4 @@
-import Plausible.IR.Examples
+import Plausible.New.Examples.ExampleInductiveRelations
 import Plausible.New.OptionTGen
 import Plausible.New.Arbitrary
 import Plausible.New.ArbitrarySizedSuchThat

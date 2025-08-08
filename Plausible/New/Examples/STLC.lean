@@ -1,4 +1,4 @@
-import Plausible.IR.Examples
+import Plausible.New.Examples.ExampleInductiveRelations
 import Plausible.New.OptionTGen
 import Plausible.New.DecOpt
 import Plausible.New.ArbitrarySizedSuchThat
@@ -182,7 +182,7 @@ instance : SampleableExt type :=
 --------------------------------------------------------------------------
 
 /-- Generator which produces `x : Nat` such that `lookup Γ x τ` holds -/
-def gen_lookup (Γ : List type) (τ : type) : Nat → OptionT Plausible.Gen Nat :=
+def genLookup (Γ : List type) (τ : type) : Nat → OptionT Plausible.Gen Nat :=
   let rec aux_arb (initSize : Nat) (size : Nat) (Γ_0 : List type) (τ_0 : type) : OptionT Plausible.Gen Nat :=
     match size with
     | Nat.zero =>
@@ -222,10 +222,10 @@ def gen_lookup (Γ : List type) (τ : type) : Nat → OptionT Plausible.Gen Nat 
 /-- `lookup Γ x τ` is an instance of the `ArbitrarySizedSuchThat` typeclass,
     which describes generators for values that satisfy a proposition -/
 instance : ArbitrarySizedSuchThat Nat (fun x => lookup Γ x τ) where
-  arbitrarySizedST := gen_lookup Γ τ
+  arbitrarySizedST := genLookup Γ τ
 
 /-- Generator which produces well-typed terms `e` such that `typing Γ e τ` holds -/
-def gen_typing (G_ : List type) (t_ : type) : Nat → OptionT Plausible.Gen term :=
+def genTyping (G_ : List type) (t_ : type) : Nat → OptionT Plausible.Gen term :=
   let rec aux_arb (initSize : Nat) (size : Nat) (G_0 : List type) (t_0 : type) : OptionT Plausible.Gen term :=
     match size with
     | Nat.zero =>

@@ -2,7 +2,7 @@ import Plausible.Gen
 import Plausible.New.Arbitrary
 import Plausible.New.GeneratorCombinators
 import Plausible.New.DeriveArbitrary
-import Plausible.IR.Examples
+import Plausible.New.Examples.ExampleInductiveRelations
 
 open Arbitrary GeneratorCombinators
 
