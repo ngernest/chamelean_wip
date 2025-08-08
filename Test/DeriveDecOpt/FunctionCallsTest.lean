@@ -16,4 +16,4 @@ info: Try this checker: instance : DecOpt (square_of n m) where
     fun size => aux_dec size size n m
 -/
 #guard_msgs(info, drop warning) in
-#derive_checker (square_of n m)
+#derive_scheduled_checker (square_of n m)

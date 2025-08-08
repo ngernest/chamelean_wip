@@ -280,9 +280,10 @@ partial def dfs (boundVars : List Name) (remainingVars : List Name) (checkedHypo
 
     -- Determine the right name for the recursive function in the producer
     let recursiveFunctionName :=
-      match env.prodSort with
+      match env.deriveSort with
       | .Generator => `aux_arb
       | .Enumerator => `aux_enum
+      | .Checker | .Theorem => `aux_dec
 
     -- Enumerate all paths for unconstrained generation / enumeration
     -- Each unconstrained path is a choice to instantiate one of the unbound variables arbitrarily

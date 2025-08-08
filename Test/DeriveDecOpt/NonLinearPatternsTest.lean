@@ -27,4 +27,4 @@ info: Try this checker: instance : DecOpt (GoodTree in1 in2 t) where
     fun size => aux_dec size size in1 in2 t
 -/
 #guard_msgs(info, drop warning) in
-#derive_checker (GoodTree in1 in2 t)
+#derive_scheduled_checker (GoodTree in1 in2 t)
