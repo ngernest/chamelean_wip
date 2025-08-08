@@ -10,7 +10,6 @@ set_option guard_msgs.diff true
 instance : EnumSizedSuchThat Nat (fun m => m = n * n) where
   enumSizedST := sorry
 
-
 /--
 info: Try this checker: instance : DecOpt (square_of n_1 m_1) where
   decOpt :=
