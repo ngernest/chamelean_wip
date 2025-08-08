@@ -1,10 +1,10 @@
 
 import Lean
-import Plausible.IR.Prelude
+
 import Batteries.Data.List.Basic
 
 open Lean Meta LocalContext Std
-open Plausible.IR
+
 
 /-- `containsNonTrivialFuncApp e inductiveRelationName` determines whether `e` contains a non-trivial function application
     (i.e. a function application where the function name is *not* the same as `inductiveRelationName`,

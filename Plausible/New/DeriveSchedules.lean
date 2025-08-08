@@ -6,7 +6,7 @@ import Plausible.New.Schedules
 import Plausible.New.UnificationMonad
 
 open Lean Meta
-open Plausible.IR
+
 
 -- Adapted from QuickChick source code
 -- https://github.com/QuickChick/QuickChick/blob/internal-rewrite/plugin/newGenericLib.ml

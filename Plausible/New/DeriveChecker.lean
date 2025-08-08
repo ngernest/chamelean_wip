@@ -1,5 +1,5 @@
 import Lean
-import Plausible.IR.Prelude
+
 import Plausible.New.MakeConstrainedProducerInstance
 import Plausible.New.DeriveConstrainedProducer
 import Plausible.New.Idents
@@ -8,7 +8,7 @@ import Plausible.New.UnificationMonad
 
 open Lean Std Elab Command Meta Term Parser
 open Idents
-open Plausible.IR
+
 
 
 /-- Unifies each argument in the conclusion of an inductive relation with the top-level arguments to the relation

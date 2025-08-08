@@ -10,7 +10,7 @@ import Plausible.New.DeriveArbitrary
 import Plausible.New.TSyntaxCombinators
 import Plausible.New.Utils
 import Plausible.New.Debug
-import Plausible.IR.Prelude
+
 import Plausible.IR.Examples
 
 import Plausible.New.Arbitrary
@@ -21,7 +21,7 @@ import Lean.Meta.Basic
 
 open Lean Elab Command Meta Term Parser
 open Idents
-open Plausible.IR
+
 
 ----------------------------------------------------------------------------------------------------------------------------------
 -- Adapted from "Generating Good Generators for Inductive Relations" (POPL '18) & "Testing Theorems, Fully Automatically" (2025)

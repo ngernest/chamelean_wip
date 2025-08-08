@@ -12,6 +12,6 @@ import Plausible.Attr
 import Plausible.Tactic
 
 import Plausible.IR.Examples
-import Plausible.IR.Prelude
+
 
 import Plausible.New.Chamelean

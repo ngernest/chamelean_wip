@@ -7,7 +7,7 @@ import Plausible.New.Idents
 import Plausible.New.Utils
 import Plausible.New.Schedules
 
-open Plausible.IR
+
 open Lean Elab Command Meta Term Parser Std
 open Idents
 
