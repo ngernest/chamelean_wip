@@ -60,15 +60,27 @@ instance : Alternative List where
   failure := List.nil
   orElse l l' := List.append l (l' ())
 
-/-- Decomposes an list `xs` into a pair `(xs', x)`
-   where `xs' = xs[0..=n-2]` and `x = xs[n - 1]` (where `n` is the length of `xs`).
-   - If `xs` is empty, this function returns `none`
-   - If `xs = #[x]`, this function returns `some (#[], x)`
-   - Note: this function is the same as `unsnoc` in Haskell's `Data.List` library -/
-def unsnoc (xs : List α) : Option (List α × α) :=
-  match xs.getLast? with
+/-- Decomposes an array `arr` into a pair `(xs, x)`
+   where `xs = arr[0..=n-2]` and `x = arr[n - 1]` (where `n` is the length of `arr`).
+   - If `arr` is empty, this function returns `none`
+   - If `arr = #[x]`, this function returns `some (#[], x)`
+   - Note: this function is morally the same as `unsnoc` in the Haskell's `Data.List` library -/
+def Array.unsnoc (arr : Array α) : Option (Array α × α) :=
+  match arr.back? with
   | none => none
-  | some x => some (xs.take (xs.length - 1), x)
+  | some a => some (arr.extract 0 (arr.size - 1), a)
+
+/-- Takes a type expression `tyExpr` representing an arrow type, and returns an array of type-expressions
+    where each element is a component of the arrow type.
+    For example, `getComponentsOfArrowType (A -> B -> C)` produces `#[A, B, C]`. -/
+partial def getComponentsOfArrowType (tyExpr : Expr) : MetaM (Array Expr) := do
+  let rec helper (e : Expr) (acc : Array Expr) : MetaM (Array Expr) := do
+    match e with
+    | Expr.forallE name domain body _ =>
+      withLocalDeclD name domain fun fvar => do
+        helper (body.instantiate1 fvar) (acc.push domain)
+    | e => return acc.push e
+  helper tyExpr #[]
 
 /-- Variant of `List.flatMap` where the function `f` expects two arguments:
     the current argument of the list and all *other* elements in the list (in order) excluding the current one.
@@ -176,7 +188,7 @@ def isConstructorRecursive (inductiveName : Name) (ctorName : Name) : MetaM Bool
   let ctorType := ctorInfo.type
 
   let componentsOfArrowType ← getComponentsOfArrowType ctorType
-  match splitLast? componentsOfArrowType with
+  match componentsOfArrowType.unsnoc with
   | some (hypotheses, _) =>
     for hyp in hypotheses do
       if hyp.getAppFn.constName == inductiveName then
