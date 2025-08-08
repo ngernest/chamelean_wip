@@ -1,9 +1,6 @@
 # Chamelean 
-An extension of Lean's Plausible property-based testing library which automatically derives
-checkers / enumerators / generators for inductive relations.
-
-(See the [`New`](./Plausible/New/) subdirectory for code that uses Lean's metaprogramming facilities (`TSyntax`) 
-to perform this procedure.)
+Chamelean is an extension of Lean's Plausible property-based testing library which automatically derives
+generators, enumerators and checkers for inductive relations.
 
 Our design is heavily inspired by [Coq/Rocq's QuickChick](https://github.com/QuickChick/QuickChick) library and the following papers:
 - [*Computing Correctly with Inductive Relations* (PLDI 2022)](https://lemonidas.github.io/pdf/ComputingCorrectly.pdf)
@@ -110,40 +107,40 @@ We provide a command elaborator which elaborates the `#derive_checker` command:
   + Note that some linter warnings are suppressed in [`scripts/nolints.json`](./scripts/nolints.json).
 
 **Typeclass definitions**:
-- [`Arbitrary.lean`](./Plausible/New/Arbitrary.lean): The `Arbitrary` & `ArbitrarySized` typeclasses for unconstrained generators, adapted from QuickChick
-- [`ArbitrarySizedSuchThat.lean`](./Plausible/New/ArbitrarySizedSuchThat.lean): The `ArbitrarySuchThat` & `ArbitrarySizedSuchThat` typeclasses for constrained generators, adapted from QuickChick
-- [`DecOpt.lean`](./Plausible/New/DecOpt.lean): The `DecOpt` typeclass for partially decidable propositions, adapted from QuickChick
-- [`Enumerators.lean`](./Plausible/New/Enumerators.lean): The `Enum, EnumSized, EnumSuchThat, EnumSizedSuchThat` typeclasses for constrained & unconstrained enumeration
+- [`Arbitrary.lean`](./Plausible/Chamelean/Arbitrary.lean): The `Arbitrary` & `ArbitrarySized` typeclasses for unconstrained generators, adapted from QuickChick
+- [`ArbitrarySizedSuchThat.lean`](./Plausible/Chamelean/ArbitrarySizedSuchThat.lean): The `ArbitrarySuchThat` & `ArbitrarySizedSuchThat` typeclasses for constrained generators, adapted from QuickChick
+- [`DecOpt.lean`](./Plausible/Chamelean/DecOpt.lean): The `DecOpt` typeclass for partially decidable propositions, adapted from QuickChick
+- [`Enumerators.lean`](./Plausible/Chamelean/Enumerators.lean): The `Enum, EnumSized, EnumSuchThat, EnumSizedSuchThat` typeclasses for constrained & unconstrained enumeration
 
 **Combinators for generators & enumerators**:
-- [`GeneratorCombinators.lean`](./Plausible/New/GeneratorCombinators.lean): Extra combinators for Plausible generators (e.g. analogs of the `sized` and `frequency` combinators from Haskell QuickCheck)
-- [`OptionTGen.lean`](./Plausible/New/OptionTGen.lean): Generator combinators that work over the `OptionT Gen` monad transformer (representing generators that may fail)
-- [`EnumeratorCombinators.lean`](./Plausible/New/EnumeratorCombinators.lean): Combinators over enumators 
+- [`GeneratorCombinators.lean`](./Plausible/Chamelean/GeneratorCombinators.lean): Extra combinators for Plausible generators (e.g. analogs of the `sized` and `frequency` combinators from Haskell QuickCheck)
+- [`OptionTGen.lean`](./Plausible/Chamelean/OptionTGen.lean): Generator combinators that work over the `OptionT Gen` monad transformer (representing generators that may fail)
+- [`EnumeratorCombinators.lean`](./Plausible/Chamelean/EnumeratorCombinators.lean): Combinators over enumators 
 
 **Algorithm for deriving constrained producers & checkers** (adapted from the QuickChick papers):
-- [`UnificationMonad.lean`](./Plausible/New/UnificationMonad.lean): The unification monad described in [*Generating Good Generators*](https://lemonidas.github.io/pdf/GeneratingGoodGenerators.pdf)
-- [`Schedules.lean`](./Plausible/New/Schedules.lean): Type definitions for generator schedules, as described in *Testing Theorems*
-- [`DeriveSchedules.lean`](./Plausible/New/DeriveSchedules.lean): Algorithm for deriving generator schedules, as described in *Testing Theorems* 
-- [`DeriveConstrainedProducer.lean`](./Plausible/New/DeriveConstrainedProducer.lean): Algorithm for deriving constrained generators using the aforementioned unification algorithm & generator schedules
-- [`MExp.lean`](./Plausible/New/MExp.lean): An intermediate representation for monadic expressions (`MExp`), used when compiling schedules to Lean code
-- [`MakeConstrainedProducerInstance.lean`](./Plausible/New/MakeConstrainedProducerInstance.lean): Auxiliary functions for creating instances of typeclasses for constrained producers (`ArbitrarySuchThat`, `EnumSuchThat`)
-- [`DeriveChecker.lean`](./Plausible/New/DeriveChecker.lean): Deriver for automatically deriving checkers (instances of the `DecOpt` typeclass)
+- [`UnificationMonad.lean`](./Plausible/Chamelean/UnificationMonad.lean): The unification monad described in [*Generating Good Generators*](https://lemonidas.github.io/pdf/GeneratingGoodGenerators.pdf)
+- [`Schedules.lean`](./Plausible/Chamelean/Schedules.lean): Type definitions for generator schedules, as described in *Testing Theorems*
+- [`DeriveSchedules.lean`](./Plausible/Chamelean/DeriveSchedules.lean): Algorithm for deriving generator schedules, as described in *Testing Theorems* 
+- [`DeriveConstrainedProducer.lean`](./Plausible/Chamelean/DeriveConstrainedProducer.lean): Algorithm for deriving constrained generators using the aforementioned unification algorithm & generator schedules
+- [`MExp.lean`](./Plausible/Chamelean/MExp.lean): An intermediate representation for monadic expressions (`MExp`), used when compiling schedules to Lean code
+- [`MakeConstrainedProducerInstance.lean`](./Plausible/Chamelean/MakeConstrainedProducerInstance.lean): Auxiliary functions for creating instances of typeclasses for constrained producers (`ArbitrarySuchThat`, `EnumSuchThat`)
+- [`DeriveChecker.lean`](./Plausible/Chamelean/DeriveChecker.lean): Deriver for automatically deriving checkers (instances of the `DecOpt` typeclass)
 
 **Derivers for unconstrained producers**:
 - [`DeriveArbitrary.lean`](./Plausible/DeriveArbitrary.lean): Deriver for unconstrained generators (instances of the `Arbitrary` / `ArbitrarySized` typeclasses)
-- [`DeriveEnum.lean`](./Plausible/New/DeriveEnum.lean): Deriver for unconstrainted enumerators 
+- [`DeriveEnum.lean`](./Plausible/Chamelean/DeriveEnum.lean): Deriver for unconstrainted enumerators 
 (instances of the `Enum` / `EnumSized` typeclasses) 
 
 **Miscellany**:
-- [`TSyntaxCombinators.lean`](./Plausible/New/TSyntaxCombinators.lean): Combinators over `TSyntax` for creating monadic `do`-blocks & other Lean expressions via metaprogramming
-- [`LazyList.lean`](./Plausible/New/LazyList.lean): Implementation of lazy lists (used for enumerators)
-- [`Idents.lean`](./Plausible/New/Idents.lean): Utilities for dealing with identifiers / producing fresh names 
-- [`Utils.lean`](./Plausible/New/Utils.lean): Other miscellaneous utils
+- [`TSyntaxCombinators.lean`](./Plausible/Chamelean/TSyntaxCombinators.lean): Combinators over `TSyntax` for creating monadic `do`-blocks & other Lean expressions via metaprogramming
+- [`LazyList.lean`](./Plausible/Chamelean/LazyList.lean): Implementation of lazy lists (used for enumerators)
+- [`Idents.lean`](./Plausible/Chamelean/Idents.lean): Utilities for dealing with identifiers / producing fresh names 
+- [`Utils.lean`](./Plausible/Chamelean/Utils.lean): Other miscellaneous utils
 
 **Examples**:
-- [`Examples.lean`](./Plausible/IR/Examples.lean): Some example inductive relations (BSTs, balanced trees, STLC)
-- [`STLC.lean`](./Plausible/New/Examples/STLC.lean): Example hand-written checkers & generators for well-typed STLC terms
-- [`Trees.lean`](./Plausible/New/Examples/Trees.lean): Example hand-written generators for balanced trees & BSTs
+- [`ExampleInductiveRelations.lean`](./Plausible/Chamelean/Examples/ExampleInductiveRelations.lean): Some example inductive relations (BSTs, balanced trees, STLC)
+- [`STLC.lean`](./Plausible/Chamelean/Examples/STLC.lean): Example hand-written checkers & generators for well-typed STLC terms
+- [`Trees.lean`](./Plausible/Chamelean/Examples/Trees.lean): Example hand-written checkers & generators for balanced trees & BSTs
 - [`DeriveRegExpGenerator.lean`](./Test/DeriveArbitrary/DeriveRegExpGenerator.lean): Example generators for regular expressions
 
 **Tests**:      
