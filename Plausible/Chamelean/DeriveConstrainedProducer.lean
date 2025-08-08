@@ -510,6 +510,8 @@ def deriveConstrainedProducer (outputVar : Ident) (outputTypeSyntax : TSyntax `t
   let (inductiveSyntax, argIdents) ← parseInductiveApp constrainingProp
   let inductiveName := inductiveSyntax.getId
 
+  logWarning m!"inductiveName = {inductiveName}, argIdents = {argIdents}"
+
   -- Figure out the name and type of the value we wish to generate (the "output")
   let outputName := outputVar.getId
   let outputType ← liftTermElabM $ elabTerm outputTypeSyntax none
@@ -685,3 +687,7 @@ def elabDeriveScheduledEnumerator : CommandElab := fun stx => do
     elabCommand typeClassInstance
 
   | _ => throwUnsupportedSyntax
+
+/- -/
+-- #guard_msgs(info) in
+-- #derive_generator (fun (n : Nat) => n = m)

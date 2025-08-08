@@ -14,11 +14,13 @@ open Idents
 /-- Extracts the name of the induction relation and its arguments -/
 def parseInductiveApp (body : Term) : CommandElabM (TSyntax `ident × TSyntaxArray `ident) := do
   match body with
+  | `($lhs:ident = $rhs:ident) =>
+    return (Lean.mkIdent ``Eq, #[lhs, rhs])
   | `($indRel:ident $args:ident*) => do
     return (indRel, args)
   | `($indRel:ident) => do
     return (indRel, #[])
-  | _ => throwErrorAt body "Expected inductive type application"
+  | _ => throwErrorAt body m!"{body} is not a valid application of an inductive relation, all arguments should be either literals or variables"
 
 /-- Analyzes the type of the inductive relation and matches each
     argument with its expected type, returning an array of
