@@ -44,6 +44,7 @@ import Test.DeriveDecOpt.SimultaneousMatchingTests
 import Test.DeriveDecOpt.ExistentialVariablesTest
 import Test.DeriveDecOpt.FunctionCallsTest
 import Test.DeriveDecOpt.DeriveSTLCChecker
+import Test.DeriveDecOpt.NonLinearPatternsTest
 
 -- Tests for `#derive_enumerator` (derives `EnumSuchThat`)
 import Test.DeriveEnumSuchThat.DeriveBSTEnumerator
@@ -52,6 +53,3 @@ import Test.DeriveEnumSuchThat.DeriveRegExpMatchEnumerator
 import Test.DeriveEnumSuchThat.SimultaneousMatchingTests
 import Test.DeriveEnumSuchThat.DeriveSTLCEnumerator
 import Test.DeriveEnumSuchThat.NonLinearPatternsTest
-
--- TODO: re-enable these failing tests after checker/enumerator deriver has been updated to use schedules
--- import Test.DeriveDecOpt.NonLinearPatternsTest
