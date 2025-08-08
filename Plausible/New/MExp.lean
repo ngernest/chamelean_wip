@@ -354,13 +354,13 @@ end
      (see https://www.seas.upenn.edu/~cis5520/22fa/lectures/stub/03-trees/DList.html)
 
     The arguments to this function are:
-    - The sort of schedule we're deriving (`scheduleSort`)
+    - The current step of the schedule (`step`)
     - The function parameter `k` represents the remainder of the `mexp`
       (the rest of the monadic `do`-block)
     - `mfuel` and `defFuel` are `MExp`s representing the current size and the initial size
       supplied to the generator/enumerator/checker we're deriving
 -/
-def scheduleStepToMExp (scheduleSort : ScheduleSort) (step : ScheduleStep) (_mfuel : MExp) (defFuel : MExp) (k : MExp) : CompileScheduleM MExp :=
+def scheduleStepToMExp (step : ScheduleStep) (defFuel : MExp) (k : MExp) : CompileScheduleM MExp :=
   match step with
   | .Unconstrained v src prodSort => do
     let producer ←
@@ -426,5 +426,5 @@ def scheduleToMExp (schedule : Schedule) (mfuel : MExp) (defFuel : MExp) : Compi
   -- Fold over the `scheduleSteps` and convert each of them to a functional `MExp`
   -- Note that the fold composes the `MExp`, and we use `foldr` since
   -- we want the `epilogue` to be the base-case of the fold
-  List.foldrM (fun step acc => scheduleStepToMExp scheduleSort step mfuel defFuel acc)
+  List.foldrM (fun step acc => scheduleStepToMExp step defFuel acc)
     epilogue scheduleSteps

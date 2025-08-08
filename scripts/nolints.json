@@ -114,6 +114,5 @@
   ["unusedArguments", "Plausible.RandT.up"],
   ["unusedArguments", "Plausible.RandT.down"],
   ["unusedArguments", "Plausible.NamedBinder"],
-  ["unusedArguments", "Plausible.Decorations.DecorationsOf"],
-  ["unusedArguments", "scheduleStepToMExp"]
+  ["unusedArguments", "Plausible.Decorations.DecorationsOf"]
 ]
