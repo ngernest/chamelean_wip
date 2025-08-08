@@ -1,7 +1,7 @@
-import Plausible.New.DecOpt
-import Plausible.New.Enumerators
-import Plausible.New.DeriveConstrainedProducer
-import Plausible.New.EnumeratorCombinators
+import Plausible.Chamelean.DecOpt
+import Plausible.Chamelean.Enumerators
+import Plausible.Chamelean.DeriveConstrainedProducer
+import Plausible.Chamelean.EnumeratorCombinators
 import Test.DeriveDecOpt.SimultaneousMatchingTests
 
 -- See `Test/CommonDefinitions/ListRelations.lean` for the definition of the inductive relations

@@ -1,5 +1,5 @@
-import Plausible.New.DecOpt
-import Plausible.New.DeriveChecker
+import Plausible.Chamelean.DecOpt
+import Plausible.Chamelean.DeriveChecker
 import Test.DeriveArbitrary.DeriveRegExpGenerator
 import Test.DeriveArbitrarySuchThat.DeriveRegExpMatchGenerator
 

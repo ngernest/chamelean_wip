@@ -1,12 +1,12 @@
 import Lean.Expr
 import Batteries
-import Plausible.IR.Examples
-import Plausible.New.Utils
-import Plausible.New.Schedules
-import Plausible.New.UnificationMonad
+import Plausible.Chamelean.Examples.ExampleInductiveRelations
+import Plausible.Chamelean.Utils
+import Plausible.Chamelean.Schedules
+import Plausible.Chamelean.UnificationMonad
 
 open Lean Meta
-open Plausible.IR
+
 
 -- Adapted from QuickChick source code
 -- https://github.com/QuickChick/QuickChick/blob/internal-rewrite/plugin/newGenericLib.ml

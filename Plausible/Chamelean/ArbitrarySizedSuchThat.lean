@@ -1,5 +1,5 @@
 import Plausible.Gen
-import Plausible.New.OptionTGen
+import Plausible.Chamelean.OptionTGen
 open Plausible
 
 /-- Sized generators of type `α` such that `P : α -> Prop` holds for all generated values.

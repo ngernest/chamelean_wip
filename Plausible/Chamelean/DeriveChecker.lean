@@ -1,14 +1,14 @@
 import Lean
-import Plausible.IR.Prelude
-import Plausible.New.MakeConstrainedProducerInstance
-import Plausible.New.DeriveConstrainedProducer
-import Plausible.New.Idents
-import Plausible.New.DecOpt
-import Plausible.New.UnificationMonad
+
+import Plausible.Chamelean.MakeConstrainedProducerInstance
+import Plausible.Chamelean.DeriveConstrainedProducer
+import Plausible.Chamelean.Idents
+import Plausible.Chamelean.DecOpt
+import Plausible.Chamelean.UnificationMonad
 
 open Lean Std Elab Command Meta Term Parser
 open Idents
-open Plausible.IR
+
 
 
 /-- Unifies each argument in the conclusion of an inductive relation with the top-level arguments to the relation
@@ -227,7 +227,7 @@ def deriveScheduledChecker (inductiveProp : TSyntax `term) : CommandElabM (TSynt
   let inductiveVal ← getConstInfoInduct inductiveName
 
   -- Determine the type for each argument to the inductive
-  let (_, _, inductiveTypeComponents) ← liftTermElabM $ decomposeType inductiveVal.type
+  let inductiveTypeComponents ← liftTermElabM $ getComponentsOfArrowType inductiveVal.type
 
   -- To obtain the type of each arg to the inductive,
   -- we pop the last element (`Prop`) from `inductiveTypeComponents`

@@ -1,8 +1,4 @@
-import Plausible.Sampleable
-import Plausible.New.DeriveArbitrary
-open Plausible
-
-set_option linter.missingDocs false
+-- This file contains various examples of inductive relations.
 
 /-- List membership expressed as an inductive relation:
    `inList x l` means `x ∈ l`. -/

@@ -1,5 +1,5 @@
-import Plausible.New.LazyList
-import Plausible.New.Utils
+import Plausible.Chamelean.LazyList
+import Plausible.Chamelean.Utils
 
 open LazyList
 
@@ -175,5 +175,5 @@ def runEnum [Enum α] (size : Nat) : IO (List α) :=
 /-- Samples from an `OptionT Enumerator` enumerator that is parameterized by its `size`,
     returning the enumerated list of `Option α` values in the `IO` monad
     - TODO: investigate why there are many duplicate values in the resultant `LazyList` -/
-def runSizedEnum [Enum α] (sizedEnum : Nat → OptionT Enumerator α) (size : Nat) : IO (List (Option α)) :=
+def runSizedEnum (sizedEnum : Nat → OptionT Enumerator α) (size : Nat) : IO (List (Option α)) :=
   return (LazyList.toList $ (sizedEnum size) size)

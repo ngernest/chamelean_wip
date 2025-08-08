@@ -1,4 +1,4 @@
-import Plausible.New.GeneratorCombinators
+import Plausible.Chamelean.GeneratorCombinators
 
 import Plausible.Gen
 import Plausible.Sampleable

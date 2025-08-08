@@ -1,6 +1,6 @@
-import Plausible.New.DecOpt
-import Plausible.New.DeriveChecker
-import Plausible.New.EnumeratorCombinators
+import Plausible.Chamelean.DecOpt
+import Plausible.Chamelean.DeriveChecker
+import Plausible.Chamelean.EnumeratorCombinators
 import Test.DeriveDecOpt.DeriveBSTChecker
 import Test.DeriveEnumSuchThat.DeriveSTLCEnumerator
 

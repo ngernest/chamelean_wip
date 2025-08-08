@@ -1,27 +1,27 @@
 import Lean.Expr
 import Lean.LocalContext
 
-import Plausible.New.UnificationMonad
-import Plausible.New.Schedules
-import Plausible.New.DeriveSchedules
-import Plausible.New.MExp
-import Plausible.New.MakeConstrainedProducerInstance
-import Plausible.New.DeriveArbitrary
-import Plausible.New.TSyntaxCombinators
-import Plausible.New.Utils
-import Plausible.New.Debug
-import Plausible.IR.Prelude
-import Plausible.IR.Examples
+import Plausible.Chamelean.UnificationMonad
+import Plausible.Chamelean.Schedules
+import Plausible.Chamelean.DeriveSchedules
+import Plausible.Chamelean.MExp
+import Plausible.Chamelean.MakeConstrainedProducerInstance
+import Plausible.Chamelean.DeriveArbitrary
+import Plausible.Chamelean.TSyntaxCombinators
+import Plausible.Chamelean.Utils
+import Plausible.Chamelean.Debug
 
-import Plausible.New.Arbitrary
-import Plausible.New.Examples.STLC
+import Plausible.Chamelean.Examples.ExampleInductiveRelations
+
+import Plausible.Chamelean.Arbitrary
+import Plausible.Chamelean.Examples.STLC
 
 import Lean.Elab.Command
 import Lean.Meta.Basic
 
 open Lean Elab Command Meta Term Parser
 open Idents
-open Plausible.IR
+
 
 ----------------------------------------------------------------------------------------------------------------------------------
 -- Adapted from "Generating Good Generators for Inductive Relations" (POPL '18) & "Testing Theorems, Fully Automatically" (2025)
@@ -478,7 +478,7 @@ def deriveConstrainedProducer (outputVar : Ident) (outputTypeSyntax : TSyntax `t
   let inductiveVal ← getConstInfoInduct inductiveName
 
   -- Determine the type for each argument to the inductive
-  let (_, _, inductiveTypeComponents) ← liftTermElabM $ decomposeType inductiveVal.type
+  let inductiveTypeComponents ← liftTermElabM $ getComponentsOfArrowType inductiveVal.type
 
   -- To obtain the type of each arg to the inductive,
   -- we pop the last element (`Prop`) from `inductiveTypeComponents`

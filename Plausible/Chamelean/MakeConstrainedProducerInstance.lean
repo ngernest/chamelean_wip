@@ -1,13 +1,13 @@
 import Lean
 import Std
 import Plausible.Gen
-import Plausible.New.TSyntaxCombinators
-import Plausible.New.OptionTGen
-import Plausible.New.Idents
-import Plausible.New.Utils
-import Plausible.New.Schedules
+import Plausible.Chamelean.TSyntaxCombinators
+import Plausible.Chamelean.OptionTGen
+import Plausible.Chamelean.Idents
+import Plausible.Chamelean.Utils
+import Plausible.Chamelean.Schedules
 
-open Plausible.IR
+
 open Lean Elab Command Meta Term Parser Std
 open Idents
 

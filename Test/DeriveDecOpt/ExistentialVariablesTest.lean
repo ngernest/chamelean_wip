@@ -1,8 +1,8 @@
 
-import Plausible.New.DecOpt
-import Plausible.New.DeriveChecker
-import Plausible.New.EnumeratorCombinators
-import Plausible.New.DeriveConstrainedProducer
+import Plausible.Chamelean.DecOpt
+import Plausible.Chamelean.DeriveChecker
+import Plausible.Chamelean.EnumeratorCombinators
+import Plausible.Chamelean.DeriveConstrainedProducer
 import Test.DeriveArbitrarySuchThat.SimultaneousMatchingTests
 
 open DecOpt

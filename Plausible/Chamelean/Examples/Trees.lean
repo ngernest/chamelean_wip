@@ -1,8 +1,8 @@
-import Plausible.IR.Examples
-import Plausible.New.OptionTGen
-import Plausible.New.Arbitrary
-import Plausible.New.ArbitrarySizedSuchThat
-import Plausible.New.DecOpt
+import Plausible.Chamelean.Examples.ExampleInductiveRelations
+import Plausible.Chamelean.OptionTGen
+import Plausible.Chamelean.Arbitrary
+import Plausible.Chamelean.ArbitrarySizedSuchThat
+import Plausible.Chamelean.DecOpt
 
 import Plausible.Gen
 open Plausible

@@ -1,13 +1,14 @@
 import Lean
-import Plausible.IR.Prelude
-import Plausible.New.Idents
-import Plausible.New.TSyntaxCombinators
-import Plausible.New.Enumerators
-import Plausible.New.Utils
-import Plausible.New.DeriveArbitrary
+
+import Plausible.Chamelean.Idents
+import Plausible.Chamelean.TSyntaxCombinators
+import Plausible.Chamelean.Enumerators
+import Plausible.Chamelean.Utils
+import Plausible.Chamelean.DeriveArbitrary
 
 open Lean Elab Command Meta Term Parser
-open Plausible.IR Idents
+
+open Idents
 
 /-- Creates an instance of the `ArbitrarySized` typeclass for an inductive type
     whose name is given by `targetTypeName`.

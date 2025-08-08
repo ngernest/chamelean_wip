@@ -1,7 +1,6 @@
-import Plausible.New.UnificationMonad
-import Plausible.IR.Prelude
+import Plausible.Chamelean.UnificationMonad
+import Plausible.Chamelean.Utils
 
-open Plausible.IR
 open Lean
 
 ----------------------------------------------
