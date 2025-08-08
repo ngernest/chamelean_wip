@@ -79,7 +79,6 @@ instance : Repr term where
   reprPrec (e : term) _ := termToString e
 
 
-
 /-- `lookup Γ n τ` checks whether the `n`th element of the context `Γ` has type `τ` -/
 inductive lookup : List type -> Nat -> type -> Prop where
   | Now : forall τ Γ, lookup (τ :: Γ) .zero τ
