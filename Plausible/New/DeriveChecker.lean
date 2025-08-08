@@ -399,6 +399,7 @@ def mkDecOptInstance (indProp : TSyntax `term) : CommandElabM (TSyntax `command)
 -- NEW Command elaborator driver
 -----------------------------------------------------------------------
 
+/-- Command which derives a checker using the new schedule and unificaiton-based algorithm -/
 syntax (name := derive_scheduled_checker) "#derive_scheduled_checker" "(" term ")" : command
 
 /-- Command elaborator that produces the function header for the checker -/
@@ -424,7 +425,39 @@ def elabDeriveScheduledChecker : CommandElab := fun stx => do
   | _ => throwUnsupportedSyntax
 
 
-
+/-
+info: Try this checker: instance : DecOpt (bst lo_1 hi_1 t_1) where
+  decOpt :=
+    let rec aux_dec (initSize : Nat) (size : Nat) (lo_1 : Nat) (hi_1 : Nat) (t_1 : Tree) : Option Bool :=
+      match size with
+      | Nat.zero =>
+        DecOpt.checkerBacktrack
+          [fun _ =>
+            match t_1 with
+            | Tree.Leaf => Option.some Bool.true
+            | _ => Option.some Bool.false]
+      | Nat.succ size' =>
+        DecOpt.checkerBacktrack
+          [fun _ =>
+            match t_1 with
+            | Tree.Leaf => Option.some Bool.true
+            | _ => Option.some Bool.false,
+            fun _ =>
+            match t_1 with
+            | Tree.Node x l r =>
+              match DecOpt.decOpt (between lo_1 x hi_1) initSize with
+              | Option.some Bool.true =>
+                match aux_dec initSize size' lo_1 x l with
+                | Option.some Bool.true =>
+                  match aux_dec initSize size' x hi_1 r with
+                  | Option.some Bool.true => Option.some Bool.true
+                  | _ => Option.some Bool.false
+                | _ => Option.some Bool.false
+              | _ => Option.some Bool.false
+            | _ => Option.some Bool.false]
+    fun size => aux_dec size size lo_1 hi_1 t_1
+-/
+-- #guard_msgs(info, drop warning) in
 -- #derive_scheduled_checker (bst lo hi t)
 
 

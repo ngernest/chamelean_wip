@@ -232,7 +232,7 @@ mutual
       -- for simplicity, but in the future we may want to distinguish them
       match deriveSort with
       | .Generator | .Enumerator => `($failFn)
-      | .Checker => `($(mkIdent `some) $(mkIdent `false))
+      | .Checker => `($(mkIdent ``some) $(mkIdent ``false))
       | .Theorem => throwError "compiling MExps for Theorem DeriveSorts not implemented"
     | .MRet e => do
       let e' ← mexpToTSyntax e deriveSort
