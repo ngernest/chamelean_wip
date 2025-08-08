@@ -175,9 +175,9 @@ def isConstructorRecursive (inductiveName : Name) (ctorName : Name) : MetaM Bool
   let ctorInfo ← getConstInfo ctorName
   let ctorType := ctorInfo.type
 
-  let (_, _, type_exprs_in_arrow_type) ← decomposeType ctorType
-  match splitLast? type_exprs_in_arrow_type with
-  | some (hypotheses, _conclusion) =>
+  let componentsOfArrowType ← getComponentsOfArrowType ctorType
+  match splitLast? componentsOfArrowType with
+  | some (hypotheses, _) =>
     for hyp in hypotheses do
       if hyp.getAppFn.constName == inductiveName then
         return true

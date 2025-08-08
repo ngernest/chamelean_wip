@@ -104,7 +104,6 @@
   ["docBlame", "instArbitrarySizedTerm.aux_arb"],
   ["docBlame", "instArbitrarySizedType.aux_arb"],
   ["docBlame", "Plausible.IR.getComponentsOfArrowType.helper"],
-  ["docBlame", "Plausible.IR.extractForAllBinders.go"],
   ["unusedArguments", "runSizedEnum"],
   ["unusedArguments", "analyzePartiallyDefined"],
   ["unusedArguments", "gen_typing.aux_arb"],

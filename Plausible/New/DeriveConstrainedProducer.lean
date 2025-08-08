@@ -478,7 +478,7 @@ def deriveConstrainedProducer (outputVar : Ident) (outputTypeSyntax : TSyntax `t
   let inductiveVal ← getConstInfoInduct inductiveName
 
   -- Determine the type for each argument to the inductive
-  let (_, _, inductiveTypeComponents) ← liftTermElabM $ decomposeType inductiveVal.type
+  let inductiveTypeComponents ← liftTermElabM $ getComponentsOfArrowType inductiveVal.type
 
   -- To obtain the type of each arg to the inductive,
   -- we pop the last element (`Prop`) from `inductiveTypeComponents`
