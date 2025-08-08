@@ -12,7 +12,6 @@ import Plausible.New.Utils
 import Plausible.New.Debug
 import Plausible.IR.Prelude
 import Plausible.IR.Examples
-import Plausible.IR.Extractor
 
 import Plausible.New.Arbitrary
 import Plausible.New.Examples.STLC
@@ -44,7 +43,7 @@ def mkInitialUnknownMap (inputNames: List Name) (outputName : Name) (outputType 
     The arguments to this function are:
     - `inputNames`: the names of all inputs to the producer
     - `outputName`, `outputType`: name & type of the output (variable to be produced)
-    - `forAllVariables`: the names & types for universally-quantified variables in the constructor's type
+  - `forAllVariables`: the names & types for universally-quantified variables in the constructor's type
     - `hypotheses`: the hypotheses for the constructor (represented as a constructor name applied to some list of arguments) -/
 def mkProducerInitialUnifyState (inputNames : List Name) (outputName : Name) (outputType : Expr) (forAllVariables : List (Name × Expr))
   (hypotheses : List (Name × List ConstructorExpr)) : UnifyState :=

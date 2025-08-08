@@ -6,7 +6,7 @@
   ["docBlame", "Plausible.IR.DecomposedInductiveHypothesis.localCtx"],
   ["docBlame", "Plausible.IR.GroupedActions.gen_list"],
   ["docBlame", "Plausible.IR.Array.traverse"],
-  ["docBlame", "Plausible.IR.containsNonTrivialFuncApp.checkSubTerm"],
+  ["docBlame", "containsNonTrivialFuncApp.checkSubTerm"],
   ["docBlame", "Plausible.IR.InductiveConstructor.inputEqs"],
   ["docBlame", "Plausible.IR.InductiveConstructor.localCtx"],
   ["docBlame", "Plausible.IR.InductiveInfo.constructors"],
