@@ -66,9 +66,7 @@ def mkProducerInitialUnifyState (inputNames : List Name) (outputName : Name) (ou
     - `hypotheses`: the hypotheses for the constructor (represented as a constructor name applied to some list of arguments)
 
     Note that this function is the same as `mkProducerInitialUnifyState`, except it doesn't take in the name & type of the output variable,
-    since checkers don't need to produce values (they just need to return an `Option Bool`).
-
-    -- TODO: refactor to avoid code-duplication -/
+    since checkers don't need to produce values (they just need to return an `Option Bool`). -/
 def mkCheckerInitialUnifyState (inputNames : List Name) (forAllVariables : List (Name × Expr)) (hypotheses : List (Name × List ConstructorExpr)) : UnifyState :=
   let forAllVarNames := Prod.fst <$> forAllVariables
   let inputConstraints := inputNames.zip (List.replicate inputNames.length .Fixed)
@@ -497,26 +495,6 @@ def getProducerScheduleForInductiveConstructor (inductiveName : Name) (ctorName 
   (unknowns : Array Unknown) (deriveSort : DeriveSort) : UnifyM Schedule :=
   getScheduleForInductiveRelationConstructor inductiveName ctorName inputNames deriveSort (some (outputName, outputType)) unknowns
 
-
--- def deriverPipeline (outputVar : Ident) (outputTypeSyntax : TSyntax `term) (constrainingProp : TSyntax `term) (deriveSort : DeriveSort) : CommandElabM (TSyntax `command) := do
---   -- Parse the body of the lambda for an application of the inductive relation
---   let (inductiveSyntax, argIdents) ← parseInductiveApp constrainingProp
---   let inductiveName := inductiveSyntax.getId
-
---   -- Obtain Lean's `InductiveVal` data structure, which contains metadata about the inductive relation
---   let inductiveVal ← getConstInfoInduct inductiveName
-
---   -- Determine the type for each argument to the inductive
---   let inductiveTypeComponents ← liftTermElabM $ getComponentsOfArrowType inductiveVal.type
-
---   -- To obtain the type of each arg to the inductive,
---   -- we pop the last element (`Prop`) from `inductiveTypeComponents`
---   let argTypes := inductiveTypeComponents.pop
---   let argNames := (fun ident => ident.getId) <$> argIdents
---   let argNamesTypes := argNames.zip argTypes
-
-
---   sorry
 
 /-- Produces an instance of a typeclass for a constrained producer (either `ArbitrarySizedSuchThat` or `EnumSizedSuchThat`).
     The arguments to this function are:

@@ -115,7 +115,7 @@ We provide a command elaborator which elaborates the `#derive_checker` command:
 **Combinators for generators & enumerators**:
 - [`GeneratorCombinators.lean`](./Plausible/Chamelean/GeneratorCombinators.lean): Extra combinators for Plausible generators (e.g. analogs of the `sized` and `frequency` combinators from Haskell QuickCheck)
 - [`OptionTGen.lean`](./Plausible/Chamelean/OptionTGen.lean): Generator combinators that work over the `OptionT Gen` monad transformer (representing generators that may fail)
-- [`EnumeratorCombinators.lean`](./Plausible/Chamelean/EnumeratorCombinators.lean): Combinators over enumators 
+- [`EnumeratorCombinators.lean`](./Plausible/Chamelean/EnumeratorCombinators.lean): Combinators over enumerators 
 
 **Algorithm for deriving constrained producers & checkers** (adapted from the QuickChick papers):
 - [`UnificationMonad.lean`](./Plausible/Chamelean/UnificationMonad.lean): The unification monad described in [*Generating Good Generators*](https://lemonidas.github.io/pdf/GeneratingGoodGenerators.pdf)
