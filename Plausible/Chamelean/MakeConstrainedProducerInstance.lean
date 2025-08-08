@@ -16,9 +16,9 @@ def parseInductiveApp (body : Term) : CommandElabM (TSyntax `ident × TSyntaxArr
   match body with
   | `($lhs:ident = $rhs:ident) =>
     return (Lean.mkIdent ``Eq, #[lhs, rhs])
-  | `($indRel:ident $args:ident*) => do
+  | `($indRel:ident $args:ident*) =>
     return (indRel, args)
-  | `($indRel:ident) => do
+  | `($indRel:ident) =>
     return (indRel, #[])
   | _ => throwErrorAt body m!"{body} is not a valid application of an inductive relation, all arguments should be either literals or variables"
 
