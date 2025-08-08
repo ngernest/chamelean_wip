@@ -324,21 +324,29 @@ def rewriteFunctionCallsInConclusion (hypotheses : Array Expr) (conclusion : Exp
         listed in order, which coincides with `inputNames ∪ { outputName }` -/
 def getScheduleForInductiveRelationConstructor (inductiveName : Name) (ctorName : Name) (inputNames : List Name) (deriveSort : DeriveSort) (outputNameTypeOption : Option (Name × Expr)) (unknownsArray : Array Unknown) : UnifyM Schedule := do
   let ctorInfo ← getConstInfoCtor ctorName
-  let ctorType := ctorInfo.type
+  let ctorType ←
+    if ctorName == ``Eq.refl then
+      let reflExpr ← mkAppOptM ``Eq.refl #[mkConst ``Nat]
+      inferType reflExpr
+    else
+      pure ctorInfo.type
 
   -- Stay within the forallTelescope scope for all processing
   forallTelescopeReducing ctorType (cleanupAnnotations := true) (fun forAllVarsAndHyps conclusion => do
     -- Collect all the universally-quantified variables + hypotheses
     -- Universally-quantified variables `x : τ` are represented using `(some x, τ)`
     -- Hypotheses are represented using `(none, hyp)` (first component is `none` since a hypothesis doesn't have a name)
-    let forAllVarsAndHypsWithTypes ← forAllVarsAndHyps.mapM (fun fvar => do
+    let forAllVarsAndHypsWithTypes ← forAllVarsAndHyps.filterMapM (fun fvar => do
       let localCtx ← getLCtx
       let localDecl := localCtx.get! fvar.fvarId!
       let userName := localDecl.userName
-      if not userName.hasMacroScopes then
-        return (some userName, localDecl.type)
+      let localDeclType := localDecl.type
+      if localDeclType.isSort then
+        return none
+      else if not userName.hasMacroScopes then
+        return some (some userName, localDeclType)
       else
-        return (none, localDecl.type))
+        return some (none, localDeclType))
 
     -- Extract the universally quantified variables
     let forAllVars := forAllVarsAndHypsWithTypes.filterMap (fun (nameOpt, ty) =>
@@ -385,13 +393,16 @@ def getScheduleForInductiveRelationConstructor (inductiveName : Name) (ctorName 
         -- (constructor name applied to some list of arguments, which are themselves `ConstructorExpr`s)
         hypothesisExprs := hypothesisExprs.push (← convertRangeToCtorAppForm hypRange)
 
+
+
       -- Creates the initial `UnifyState` needed for the unification algorithm
       let initialUnifyState ←
         match deriveSort with
         | .Generator | .Enumerator =>
            match outputNameTypeOption with
           | none => throwError "Output name & type not specified when deriving producer"
-          | some (outputName, outputType) => pure $ mkProducerInitialUnifyState inputNames outputName outputType forAllVars hypothesisExprs.toList
+          | some (outputName, outputType) =>
+            pure $ mkProducerInitialUnifyState inputNames outputName outputType forAllVars hypothesisExprs.toList
         | .Checker | .Theorem => pure $ mkCheckerInitialUnifyState inputNames forAllVars hypothesisExprs.toList
 
       -- Extend the current state with the contents of `initialUnifyState`
@@ -401,18 +412,20 @@ def getScheduleForInductiveRelationConstructor (inductiveName : Name) (ctorName 
       -- For producers, we simply use the `unknownsArray` that this function receives as an argument
       -- For checkers, there is no notion of `unknowns` (all arguments to the inductive relation are inputs to the checker),
       -- so we can just use `inputNames`
-      let unknowns:=
-        if deriveSort.isProducer then
-          unknownsArray
-        else
-          inputNames.toArray
+      let unknowns := if deriveSort.isProducer then unknownsArray else inputNames.toArray
       let unknownRanges ← unknowns.mapM processCorrespondingRange
       let unknownArgsAndRanges := unknowns.zip unknownRanges
 
+
       -- Compute the appropriate `Range` for each argument in the constructor's conclusion
       let conclusionArgs := updatedConclusion.getAppArgs
-      let conclusionRanges ← conclusionArgs.mapM convertExprToRangeInCurrentContext
-      let conclusionArgsAndRanges := conclusionArgs.zip conclusionRanges
+      let filteredConclusionArgs ← conclusionArgs.filterM (fun arg => do
+        -- Filter out arguments where `argTy = Type` (i.e. `Sort One`)
+        let argTy ← inferType arg
+        pure $ argTy != mkSort levelOne)
+
+      let conclusionRanges ← filteredConclusionArgs.mapM convertExprToRangeInCurrentContext
+      let conclusionArgsAndRanges := filteredConclusionArgs.zip conclusionRanges
 
       for ((_, r1), (_, r2)) in conclusionArgsAndRanges.zip unknownArgsAndRanges do
         unify r1 r2
@@ -436,7 +449,7 @@ def getScheduleForInductiveRelationConstructor (inductiveName : Name) (ctorName 
           pure ([outputName], (inductiveName, [outputIdx]))
         | .Checker | .Theorem => pure ([], (inductiveName, []))
 
-      -- Determine the appropriate `ScheduleSort` (right now we only produce `ScheduleSort`s for `Generator`s)
+      -- Determine the appropriate `ScheduleSort`
       let scheduleSort ← getScheduleSort
         conclusionExpr
         (outputVars := outputVars)
@@ -524,8 +537,17 @@ def deriveConstrainedProducer (outputVar : Ident) (outputTypeSyntax : TSyntax `t
   -- Obtain Lean's `InductiveVal` data structure, which contains metadata about the inductive relation
   let inductiveVal ← getConstInfoInduct inductiveName
 
+  -- For `Eq`, instantatiate the type paramater `α` with concrete types here
+  -- TODO: avoid specializing to `Nat`
+  let inductiveRelationType ←
+    if inductiveName == ``Eq then
+      -- Note that `mkSort levelZero` is how `Prop` is represented at the `Expr` level
+      liftCoreM $ mkArrowN #[mkConst `Nat, mkConst `Nat] (mkSort levelZero)
+    else
+      pure inductiveVal.type
+
   -- Determine the type for each argument to the inductive
-  let inductiveTypeComponents ← liftTermElabM $ getComponentsOfArrowType inductiveVal.type
+  let inductiveTypeComponents ← liftTermElabM $ getComponentsOfArrowType inductiveRelationType
 
   -- To obtain the type of each arg to the inductive,
   -- we pop the last element (`Prop`) from `inductiveTypeComponents`
@@ -537,7 +559,7 @@ def deriveConstrainedProducer (outputVar : Ident) (outputTypeSyntax : TSyntax `t
   -- Then, derive `baseProducers` & `inductiveProducers` (the code for the sub-producers
   -- that are invoked when `size = 0` and `size > 0` respectively),
   -- and obtain freshened versions of the output variable / arguments (`freshenedOutputName`, `freshArgIdents`)
-  let (baseProducers, inductiveProducers, freshenedOutputName, freshArgIdents, localCtx) ←
+  let (baseProducers, inductiveProducers, freshenedOutputName, freshArgNames, localCtx) ←
     liftTermElabM $ withLocalDeclsDND argNamesTypes (fun _ => do
       let mut localCtx ← getLCtx
       let mut freshUnknowns := #[]
@@ -616,14 +638,17 @@ def deriveConstrainedProducer (outputVar : Ident) (outputTypeSyntax : TSyntax `t
       let baseProducers ← `([$nonRecursiveProducers,*])
       let inductiveProducers ← `([$nonRecursiveProducers,*, $recursiveProducers,*])
 
-      return (baseProducers, inductiveProducers, freshenedOutputName, Lean.mkIdent <$> freshUnknowns, localCtx))
+      return (baseProducers, inductiveProducers, freshenedOutputName, freshUnknowns, localCtx))
+
+  -- Associate the freshened argument names with their types
+  let freshArgsAndTypes := freshArgNames.zip argTypes
 
   -- Create an instance of the appropriate producer typeclass
   mkConstrainedProducerTypeClassInstance
     baseProducers
     inductiveProducers
     inductiveSyntax
-    freshArgIdents
+    freshArgsAndTypes
     freshenedOutputName
     outputTypeSyntax
     producerSort

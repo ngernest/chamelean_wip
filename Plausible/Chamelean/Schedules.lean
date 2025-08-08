@@ -144,9 +144,18 @@ def exprToHypothesisExpr (e : Expr) : MetaM (Option HypothesisExpr) := do
 
   let env ← getEnv
 
+  let mut filteredArgs := #[]
+  for arg in args do
+    let argTy ← Meta.inferType arg
+    -- Filter out arguments where `argTy = Type` (i.e. `Sort One`)
+    if argTy == mkSort levelOne then
+      continue
+    else
+      filteredArgs := filteredArgs.push arg
+
   -- Only proceed if `ctorName` refers to a constructor or the name of an `inductive`
   if env.isConstructor ctorName || (← isInductive ctorName) then
-    let constructorArgs ← args.mapM exprToConstructorExpr
+    let constructorArgs ← filteredArgs.mapM exprToConstructorExpr
     return some (ctorName, constructorArgs.toList)
   else
     return none
