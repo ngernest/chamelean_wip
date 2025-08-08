@@ -56,4 +56,4 @@ info: Try this checker: instance : DecOpt (balancedTree n_1 t_1) where
     fun size => aux_dec size size n_1 t_1
 -/
 #guard_msgs(info, drop warning) in
-#derive_scheduled_checker (balancedTree n t)
+#derive_checker (balancedTree n t)

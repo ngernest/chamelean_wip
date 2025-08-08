@@ -52,4 +52,4 @@ info: Try this checker: instance : DecOpt (NatChain a_1 b_1) where
     fun size => aux_dec size size a_1 b_1
 -/
 #guard_msgs(info, drop warning) in
-#derive_scheduled_checker (NatChain a b)
+#derive_checker (NatChain a b)

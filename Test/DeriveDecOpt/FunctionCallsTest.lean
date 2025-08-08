@@ -32,4 +32,4 @@ info: Try this checker: instance : DecOpt (square_of n_1 m_1) where
     fun size => aux_dec size size n_1 m_1
 -/
 #guard_msgs(info, drop warning) in
-#derive_scheduled_checker (square_of n m)
+#derive_checker (square_of n m)

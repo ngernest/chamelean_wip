@@ -45,7 +45,7 @@ info: Try this checker: instance : DecOpt (Between lo_1 x_1 hi_1) where
     fun size => aux_dec size size lo_1 x_1 hi_1
 -/
 #guard_msgs(info, drop warning) in
-#derive_scheduled_checker (Between lo x hi)
+#derive_checker (Between lo x hi)
 
 /--
 info: Try this checker: instance : DecOpt (BST lo_1 hi_1 t_1) where
@@ -76,4 +76,4 @@ info: Try this checker: instance : DecOpt (BST lo_1 hi_1 t_1) where
     fun size => aux_dec size size lo_1 hi_1 t_1
 -/
 #guard_msgs(info, drop warning) in
-#derive_scheduled_checker (BST lo hi t)
+#derive_checker (BST lo hi t)

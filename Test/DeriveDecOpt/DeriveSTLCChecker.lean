@@ -41,7 +41,7 @@ info: Try this checker: instance : DecOpt (lookup Γ_1 x_1 τ_1) where
     fun size => aux_dec size size Γ_1 x_1 τ_1
 -/
 #guard_msgs(info, drop warning) in
-#derive_scheduled_checker (lookup Γ x τ)
+#derive_checker (lookup Γ x τ)
 
 /--
 info: Try this checker: instance : DecOpt (typing Γ_1 e_1 τ_1) where
@@ -104,4 +104,4 @@ info: Try this checker: instance : DecOpt (typing Γ_1 e_1 τ_1) where
     fun size => aux_dec size size Γ_1 e_1 τ_1
 -/
 #guard_msgs(info, drop warning) in
-#derive_scheduled_checker (typing Γ e τ)
+#derive_checker (typing Γ e τ)

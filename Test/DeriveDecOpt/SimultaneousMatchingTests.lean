@@ -31,7 +31,7 @@ info: Try this checker: instance : DecOpt (InList x_1 l_1) where
     fun size => aux_dec size size x_1 l_1
 -/
 #guard_msgs(info, drop warning) in
-#derive_scheduled_checker (InList x l)
+#derive_checker (InList x l)
 
 /--
 info: Try this checker: instance : DecOpt (MinOk l_1 a_1) where
@@ -66,7 +66,7 @@ info: Try this checker: instance : DecOpt (MinOk l_1 a_1) where
     fun size => aux_dec size size l_1 a_1
 -/
 #guard_msgs(info, drop warning) in
-#derive_scheduled_checker (MinOk l a)
+#derive_checker (MinOk l a)
 
 
 /--
@@ -111,4 +111,4 @@ info: Try this checker: instance : DecOpt (MinEx n_1 l_1 a_1) where
     fun size => aux_dec size size n_1 l_1 a_1
 -/
 #guard_msgs(info, drop warning) in
-#derive_scheduled_checker (MinEx n l a)
+#derive_checker (MinEx n l a)

@@ -163,7 +163,7 @@ def getCheckerScheduleForInductiveConstructor (inductiveName : Name) (ctorName :
 
     - Note: this function is identical to `mkTopLevelChecker`, except it doesn't take in a `NameMap` argument
     - TODO: refactor to avoid code duplication -/
-def mkTopLevelCheckerNEW (baseCheckers : TSyntax `term) (inductiveCheckers : TSyntax `term)
+def mkDecOptInstance (baseCheckers : TSyntax `term) (inductiveCheckers : TSyntax `term)
   (inductiveStx : TSyntax `term) (args : TSyntaxArray `term) (topLevelLocalCtx : LocalContext) : CommandElabM (TSyntax `command) := do
 
   -- Produce a fresh name for the `size` argument for the lambda
@@ -299,7 +299,7 @@ def deriveScheduledChecker (inductiveProp : TSyntax `term) : CommandElabM (TSynt
       return (baseCheckers, inductiveCheckers, Lean.mkIdent <$> freshUnknowns, localCtx))
 
   -- Create an instance of the `DecOpt` typeclass
-  mkTopLevelCheckerNEW
+  mkDecOptInstance
     baseCheckers
     inductiveCheckers
     inductiveSyntax
@@ -311,13 +311,13 @@ def deriveScheduledChecker (inductiveProp : TSyntax `term) : CommandElabM (TSynt
 -----------------------------------------------------------------------
 
 /-- Command which derives a checker using the new schedule and unificaiton-based algorithm -/
-syntax (name := derive_scheduled_checker) "#derive_scheduled_checker" "(" term ")" : command
+syntax (name := derive_checker) "#derive_checker" "(" term ")" : command
 
 /-- Command elaborator that produces the function header for the checker -/
-@[command_elab derive_scheduled_checker]
+@[command_elab derive_checker]
 def elabDeriveScheduledChecker : CommandElab := fun stx => do
   match stx with
-  | `(#derive_scheduled_checker ( $indProp:term )) => do
+  | `(#derive_checker ( $indProp:term )) => do
 
     -- Produce an instance of the `DecOpt` typeclass corresponding to the inductive proposition `indProp`
     let typeclassInstance ← deriveScheduledChecker indProp
