@@ -44,6 +44,12 @@ inductive DeriveSort
   | Theorem
   deriving Repr, BEq, Ord
 
+/-- Determines if a `DeriveSort` corresponds to a producer
+    (only generators & enumerators are considered producers) -/
+def DeriveSort.isProducer : DeriveSort → Bool
+  | .Generator | .Enumerator => true
+  | .Checker | .Theorem => false
+
 /-- The type of schedule we wish to derive -/
 inductive ScheduleSort
   /-- tuple of produced outputs from conclusion of constructor -/

@@ -449,6 +449,26 @@ def getProducerScheduleForInductiveConstructor (inductiveName : Name) (ctorName 
 
       return fullSchedule))
 
+-- def deriverPipeline (outputVar : Ident) (outputTypeSyntax : TSyntax `term) (constrainingProp : TSyntax `term) (deriveSort : DeriveSort) : CommandElabM (TSyntax `command) := do
+--   -- Parse the body of the lambda for an application of the inductive relation
+--   let (inductiveSyntax, argIdents) ← parseInductiveApp constrainingProp
+--   let inductiveName := inductiveSyntax.getId
+
+--   -- Obtain Lean's `InductiveVal` data structure, which contains metadata about the inductive relation
+--   let inductiveVal ← getConstInfoInduct inductiveName
+
+--   -- Determine the type for each argument to the inductive
+--   let inductiveTypeComponents ← liftTermElabM $ getComponentsOfArrowType inductiveVal.type
+
+--   -- To obtain the type of each arg to the inductive,
+--   -- we pop the last element (`Prop`) from `inductiveTypeComponents`
+--   let argTypes := inductiveTypeComponents.pop
+--   let argNames := (fun ident => ident.getId) <$> argIdents
+--   let argNamesTypes := argNames.zip argTypes
+
+
+--   sorry
+
 /-- Produces an instance of a typeclass for a constrained producer (either `ArbitrarySizedSuchThat` or `EnumSizedSuchThat`).
     The arguments to this function are:
 

@@ -209,3 +209,11 @@ def replicateM [Monad m] (n : Nat) (action : m α) : m (List α) :=
     (akin to Haskell's `sequence`) -/
 def List.sequence (xs : List (Option α)) : Option (List α) :=
   List.traverse id xs
+
+/-- Helper function for splitting a list of triples into a triple of lists -/
+def splitThreeLists (abcs : List (α × β × γ)) : List α × List β × List γ :=
+  match abcs with
+  | [] => ([], [], [])
+  | (a,b,c) :: xs =>
+    let (as, bs, cs) := splitThreeLists xs
+    (a::as, b::bs, c::cs)

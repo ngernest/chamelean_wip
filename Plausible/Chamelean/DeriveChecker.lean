@@ -161,6 +161,7 @@ def getCheckerScheduleForInductiveConstructor (inductiveName : Name) (ctorName :
     - the name of the inductive relation (`inductiveStx`)
     - the arguments (`args`) to the inductive relation
 
+    - Note: this function is identical to `mkTopLevelChecker`, except it doesn't take in a `NameMap` argument
     - TODO: refactor to avoid code duplication -/
 def mkDecOptInstance (baseCheckers : TSyntax `term) (inductiveCheckers : TSyntax `term)
   (inductiveStx : TSyntax `term) (args : TSyntaxArray `term) (topLevelLocalCtx : LocalContext) : CommandElabM (TSyntax `command) := do
