@@ -23,6 +23,7 @@ import Test.DeriveArbitrary.StructureTest
 import Test.DeriveArbitrary.BitVecStructureTest
 import Test.DeriveArbitrarySuchThat.DeriveSTLCGenerator
 import Test.DeriveArbitrarySuchThat.NonLinearPatternsTest
+import Test.DeriveArbitrarySuchThat.EqualityTest
 
 -- Tests for instances of `Enum` for simple types
 import Test.Enum.EnumInstancesTest
@@ -45,6 +46,7 @@ import Test.DeriveDecOpt.ExistentialVariablesTest
 import Test.DeriveDecOpt.FunctionCallsTest
 import Test.DeriveDecOpt.DeriveSTLCChecker
 import Test.DeriveDecOpt.NonLinearPatternsTest
+import Test.DeriveDecOpt.EqualityTest
 
 -- Tests for `#derive_enumerator` (derives `EnumSuchThat`)
 import Test.DeriveEnumSuchThat.DeriveBSTEnumerator

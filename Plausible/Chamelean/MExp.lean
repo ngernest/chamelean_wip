@@ -370,14 +370,14 @@ def scheduleStepToMExp (step : ScheduleStep) (defFuel : MExp) (k : MExp) : Compi
         unconstrainedProducer prodSort ty
       | Source.Rec f args => pure $ recCall f args
     pure $ .MBind (prodSortToMonadSort prodSort) producer [v] k
-  | .SuchThat varsTys prod ps => do
+  | .SuchThat varsTys producerSource prodSort => do
     let producer ←
-      match prod with
+      match producerSource with
       | Source.NonRec hypExpr =>
-        constrainedProducer ps varsTys (hypothesisExprToMExp hypExpr) defFuel
+        constrainedProducer prodSort varsTys (hypothesisExprToMExp hypExpr) defFuel
       | Source.Rec f args => pure (recCall f args)
     let vars := Prod.fst <$> varsTys
-    pure $ .MBind (prodSortToOptionTMonadSort ps) producer vars k
+    pure $ .MBind (prodSortToOptionTMonadSort prodSort) producer vars k
   | .Check src _ =>
 
     -- TODO: double check if we need to pattern-match on `scheduleSort` here

@@ -71,7 +71,7 @@ def findTargetVarIndex (targetVar : Name) (args : TSyntaxArray `term) : Option N
     - a list of `baseGenerators` (each represented as a Lean term), to be invoked when `size == 0`
     - a list of `inductiveGenerators`, to be invoked when `size > 0`
     - the name of the inductive relation (`inductiveStx`)
-    - the arguments (`args`) to the inductive relation
+    - the names and types to the inductive relation (`argNameTypes`)
     - the name and type for the value we wish to generate (`targetVar`, `targetTypeSyntax`)
     - the `producerType`, which determines what typeclass is to be produced
       + If `producerType = .Generator`, an `ArbitrarySizedSuchThat` instance is produced
@@ -81,7 +81,8 @@ def mkConstrainedProducerTypeClassInstance
   (baseGenerators : TSyntax `term)
   (inductiveGenerators : TSyntax `term)
   (inductiveStx : TSyntax `term)
-  (args : TSyntaxArray `term) (targetVar : Name)
+  (argNameTypes : Array (Name × Expr))
+  (targetVar : Name)
   (targetTypeSyntax : TSyntax `term)
   (producerSort : ProducerSort)
   (topLevelLocalCtx : LocalContext) : CommandElabM (TSyntax `command) := do
@@ -89,8 +90,6 @@ def mkConstrainedProducerTypeClassInstance
     -- at the end of the generator function, as well as the `aux_arb` inner helper function
     let freshSizeIdent := mkFreshAccessibleIdent topLevelLocalCtx `size
     let freshSize' := mkFreshAccessibleIdent topLevelLocalCtx `size'
-
-    let inductiveName := inductiveStx.raw.getId
 
     -- The (backtracking) combinator to be invoked
     -- (`OptionTGen.backtrack` for generators, `EnumeratorCombinators.enumerate` for enumerators)
@@ -113,10 +112,6 @@ def mkConstrainedProducerTypeClassInstance
     let sizeParam ← `(Term.letIdBinder| ($sizeIdent : $natIdent))
     let matchExpr ← liftTermElabM $ mkMatchExpr sizeIdent caseExprs
 
-    -- Add parameters for each argument to the inductive relation
-    -- (except the target variable, which we'll filter out later)
-    let paramInfo ← analyzeInductiveArgs inductiveName args
-
     -- Inner params are for the inner `aux_arb` / `aux_enum` function
     let mut innerParams := #[]
     innerParams := innerParams.push initSizeParam
@@ -124,7 +119,7 @@ def mkConstrainedProducerTypeClassInstance
 
     -- Outer params are for the top-level lambda function which invokes `aux_arb` / `aux_enum`
     let mut outerParams := #[]
-    for (paramName, paramType) in paramInfo do
+    for (paramName, paramType) in argNameTypes do
       -- Only add a function parameter is the argument to the inductive relation is not the target variable
       -- (We skip the target variable since that's the value we wish to generate)
       if paramName != targetVar then
@@ -132,8 +127,9 @@ def mkConstrainedProducerTypeClassInstance
         outerParams := outerParams.push outerParamIdent
 
         let innerParamIdent := mkIdent paramName
+        let innerParamType ← liftTermElabM $ PrettyPrinter.delab paramType
 
-        let innerParam ← `(Term.letIdBinder| ($innerParamIdent : $paramType))
+        let innerParam ← `(Term.letIdBinder| ($innerParamIdent : $innerParamType))
         innerParams := innerParams.push innerParam
 
     -- Figure out which typeclass should be derived
@@ -165,6 +161,8 @@ def mkConstrainedProducerTypeClassInstance
     -- Determine the appropriate type of the final producer
     -- (either `OptionT Plausible.Gen α` or `OptionT Enum α`)
     let optionTProducerType ← `($optionTTypeConstructor $producerTypeConstructor $targetTypeSyntax)
+
+    let args := (fun (arg, _) => mkIdent arg) <$> argNameTypes
 
     -- Produce an instance of the appropriate typeclass containing the definition for the derived producer
     `(instance : $producerTypeClass $targetTypeSyntax (fun $(mkIdent targetVar) => $inductiveStx $args*) where
