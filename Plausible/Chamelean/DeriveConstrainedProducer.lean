@@ -537,7 +537,7 @@ def deriveConstrainedProducer (outputVar : Ident) (outputTypeSyntax : TSyntax `t
   -- Obtain Lean's `InductiveVal` data structure, which contains metadata about the inductive relation
   let inductiveVal ← getConstInfoInduct inductiveName
 
-  -- For `Eq`, instantatiate the type paramter `α` with concrete types here
+  -- For `Eq`, instantatiate the type paramater `α` with concrete types here
   -- TODO: avoid specializing to `Nat`
   let inductiveRelationType ←
     if inductiveName == ``Eq then
@@ -640,6 +640,7 @@ def deriveConstrainedProducer (outputVar : Ident) (outputTypeSyntax : TSyntax `t
 
       return (baseProducers, inductiveProducers, freshenedOutputName, freshUnknowns, localCtx))
 
+  -- Associate the freshened argument names with their types
   let freshArgsAndTypes := freshArgNames.zip argTypes
 
   -- Create an instance of the appropriate producer typeclass

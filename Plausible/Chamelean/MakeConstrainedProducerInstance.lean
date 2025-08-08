@@ -126,10 +126,9 @@ def mkConstrainedProducerTypeClassInstance
         let outerParamIdent := mkIdent paramName
         outerParams := outerParams.push outerParamIdent
 
-        let innerParamIdent := mkIdent paramName
+        -- Inner parameters are for the inner `aux_arb` / `aux_enum` function
         let innerParamType ← liftTermElabM $ PrettyPrinter.delab paramType
-
-        let innerParam ← `(Term.letIdBinder| ($innerParamIdent : $innerParamType))
+        let innerParam ← `(Term.letIdBinder| ($(mkIdent paramName) : $innerParamType))
         innerParams := innerParams.push innerParam
 
     -- Figure out which typeclass should be derived
@@ -162,6 +161,7 @@ def mkConstrainedProducerTypeClassInstance
     -- (either `OptionT Plausible.Gen α` or `OptionT Enum α`)
     let optionTProducerType ← `($optionTTypeConstructor $producerTypeConstructor $targetTypeSyntax)
 
+    -- Extract all the args to the inductive relation
     let args := (fun (arg, _) => mkIdent arg) <$> argNameTypes
 
     -- Produce an instance of the appropriate typeclass containing the definition for the derived producer

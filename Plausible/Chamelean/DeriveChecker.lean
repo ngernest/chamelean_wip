@@ -32,12 +32,13 @@ def getCheckerScheduleForInductiveConstructor (inductiveName : Name) (ctorName :
     - a list of `baseCheckers` (each represented as a Lean term), to be invoked when `size == 0`
     - a list of `inductiveCheckers`, to be invoked when `size > 0`
     - the name of the inductive relation (`inductiveStx`)
-    - the arguments (`args`) to the inductive relation
-
-    - Note: this function is identical to `mkTopLevelChecker`, except it doesn't take in a `NameMap` argument
-    - TODO: refactor to avoid code duplication -/
-def mkDecOptInstance (baseCheckers : TSyntax `term) (inductiveCheckers : TSyntax `term)
-  (inductiveStx : TSyntax `term) (args : TSyntaxArray `term) (topLevelLocalCtx : LocalContext) : CommandElabM (TSyntax `command) := do
+    - the arguments (`args`) to the inductive relation -/
+def mkDecOptInstance
+  (baseCheckers : TSyntax `term)
+  (inductiveCheckers : TSyntax `term)
+  (inductiveStx : TSyntax `term)
+  (argNameTypes : Array (Name × Expr))
+  (topLevelLocalCtx : LocalContext) : CommandElabM (TSyntax `command) := do
 
   -- Produce a fresh name for the `size` argument for the lambda
   -- at the end of the checker function, as well as the `aux_dec` inner helper function
@@ -45,8 +46,6 @@ def mkDecOptInstance (baseCheckers : TSyntax `term) (inductiveCheckers : TSyntax
   let freshSize' := mkFreshAccessibleIdent topLevelLocalCtx `size'
   let auxDecIdent := mkFreshAccessibleIdent topLevelLocalCtx `aux_dec
   let checkerType ← `($optionTypeConstructor $boolIdent)
-
-  let inductiveName := inductiveStx.raw.getId
 
   -- Create the cases for the pattern-match on the size argument
   let mut caseExprs := #[]
@@ -62,9 +61,6 @@ def mkDecOptInstance (baseCheckers : TSyntax `term) (inductiveCheckers : TSyntax
   let sizeParam ← `(Term.letIdBinder| ($sizeIdent : $natIdent))
   let matchExpr ← liftTermElabM $ mkMatchExpr sizeIdent caseExprs
 
-  -- Add parameters for each argument to the inductive relation
-  let paramInfo ← analyzeInductiveArgs inductiveName args
-
   -- Inner params are for the inner `aux_dec` function
   let mut innerParams := #[]
   innerParams := innerParams.push initSizeParam
@@ -72,22 +68,32 @@ def mkDecOptInstance (baseCheckers : TSyntax `term) (inductiveCheckers : TSyntax
 
   -- Outer params are for the top-level lambda function which invokes `aux_dec`
   let mut outerParams := #[]
-  for (paramName, paramType) in paramInfo do
+  for (paramName, paramType) in argNameTypes do
     let outerParamIdent := mkIdent paramName
     outerParams := outerParams.push outerParamIdent
 
-    -- Inner parameters are for the inner `aux_arb` function
-    let innerParam ← `(Term.letIdBinder| ($(mkIdent paramName) : $paramType))
+    -- Inner parameters are for the inner `aux_dec` function
+    let innerParamType ← liftTermElabM $ PrettyPrinter.delab paramType
+    let innerParam ← `(Term.letIdBinder| ($(mkIdent paramName) : $innerParamType))
     innerParams := innerParams.push innerParam
 
+  -- Extract all the args to the inductive relation
+  let args := (fun (arg, _) => mkIdent arg) <$> argNameTypes
+
+  -- If we are deriving a checker for `Eq`, we need to provide an explicit type application
+  -- Otherwise, we can just use the name of the inductive relation as-is
+  let inductiveName := inductiveStx.raw.getId
+  let inductiveProp ←
+    -- TODO: avoid specializing to `Nat`
+    if inductiveName == `Eq then `(@$(mkIdent ``Eq) $(mkIdent ``Nat))
+    else `($inductiveStx)
+
   -- Produces an instance of the `DecOpt` typeclass containing the definition for the derived generator
-  `(instance : $decOptTypeclass ($inductiveStx $args*) where
+  `(instance : $decOptTypeclass ($inductiveProp $args*) where
       $unqualifiedDecOptFn:ident :=
         let rec $auxDecIdent:ident $innerParams* : $checkerType :=
           $matchExpr
         fun $freshSizeIdent => $auxDecIdent $freshSizeIdent $freshSizeIdent $outerParams*)
-
-
 
 /-- Derives a checker which checks the `inductiveProp` (an inductive relation, represented as a `TSyntax term`)
     using the unification algorithm from Generating Good Generators and the schedules discuseed in Testing Theorems -/
@@ -99,8 +105,17 @@ def deriveScheduledChecker (inductiveProp : TSyntax `term) : CommandElabM (TSynt
   -- Obtain Lean's `InductiveVal` data structure, which contains metadata about the inductive relation
   let inductiveVal ← getConstInfoInduct inductiveName
 
+  -- For `Eq`, instantatiate the type paramater `α` with concrete types here
+  -- TODO: avoid specializing to `Nat`
+  let inductiveRelationType ←
+    if inductiveName == ``Eq then
+      -- Note that `mkSort levelZero` is how `Prop` is represented at the `Expr` level
+      liftCoreM $ mkArrowN #[mkConst `Nat, mkConst `Nat] (mkSort levelZero)
+    else
+      pure inductiveVal.type
+
   -- Determine the type for each argument to the inductive
-  let inductiveTypeComponents ← liftTermElabM $ getComponentsOfArrowType inductiveVal.type
+  let inductiveTypeComponents ← liftTermElabM $ getComponentsOfArrowType inductiveRelationType
 
   -- To obtain the type of each arg to the inductive,
   -- we pop the last element (`Prop`) from `inductiveTypeComponents`
@@ -112,7 +127,7 @@ def deriveScheduledChecker (inductiveProp : TSyntax `term) : CommandElabM (TSynt
   -- Then, derive `baseProducers` & `inductiveProducers` (the code for the sub-producers
   -- that are invoked when `size = 0` and `size > 0` respectively),
   -- and obtain freshened versions of the output variable / arguments (`freshenedOutputName`, `freshArgIdents`)
-  let (baseCheckers, inductiveCheckers, freshArgIdents, localCtx) ←
+  let (baseCheckers, inductiveCheckers, freshArgNames, localCtx) ←
     liftTermElabM $ withLocalDeclsDND argNamesTypes (fun _ => do
       let mut localCtx ← getLCtx
       let mut freshUnknowns := #[]
@@ -169,14 +184,17 @@ def deriveScheduledChecker (inductiveProp : TSyntax `term) : CommandElabM (TSynt
       let baseCheckers ← `([$nonRecursiveCheckers,*])
       let inductiveCheckers ← `([$nonRecursiveCheckers,*, $recursiveCheckers,*])
 
-      return (baseCheckers, inductiveCheckers, Lean.mkIdent <$> freshUnknowns, localCtx))
+      return (baseCheckers, inductiveCheckers, freshUnknowns, localCtx))
+
+  -- Associate the freshened argument names with their types
+  let freshArgsAndTypes := freshArgNames.zip argTypes
 
   -- Create an instance of the `DecOpt` typeclass
   mkDecOptInstance
     baseCheckers
     inductiveCheckers
     inductiveSyntax
-    freshArgIdents
+    freshArgsAndTypes
     localCtx
 
 ----------------------------------------------------------------------
