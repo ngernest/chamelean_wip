@@ -4,20 +4,12 @@ import Plausible.Chamelean.Examples.ExampleInductiveRelations
 import Plausible.Chamelean.Utils
 import Plausible.Chamelean.Schedules
 import Plausible.Chamelean.UnificationMonad
+import Plausible.Chamelean.MakeConstrainedProducerInstance
 
 open Lean Meta
 
-
 -- Adapted from QuickChick source code
 -- https://github.com/QuickChick/QuickChick/blob/internal-rewrite/plugin/newGenericLib.ml
-
-/-- Helper function for splitting a list of triples into a triple of lists -/
-def splitThreeLists (abcs : List (α × β × γ)) : List α × List β × List γ :=
-  match abcs with
-  | [] => ([], [], [])
-  | (a,b,c) :: xs =>
-    let (as, bs, cs) := splitThreeLists xs
-    (a::as, b::bs, c::cs)
 
 /-- Extracts all the unique variable names that appear in a hypothesis of a constructor for an inductive relation
     (this looks underneath constructor applications).
@@ -63,7 +55,6 @@ def isRecCall (binding : List Name) (hyp : HypothesisExpr) (recCall : Name × Li
       throwError m!"Arguments to hypothesis {hyp} contain both fixed and yet-to-be-bound variables (not allowed)"
     else pure none) args
   let (inductiveName, recCallOutputIdxes) := recCall
-
 
   let result := (ctorName == inductiveName && (recCallOutputIdxes.mergeSort) == (outputPositions.mergeSort))
   logWarning m!"isRecCall: recCallOutputIdxes = {recCallOutputIdxes}, outputPositions = {outputPositions}"

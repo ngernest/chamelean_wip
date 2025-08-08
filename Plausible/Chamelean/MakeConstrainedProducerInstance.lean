@@ -20,18 +20,6 @@ def parseInductiveApp (body : Term) : CommandElabM (TSyntax `ident × TSyntaxArr
     return (indRel, #[])
   | _ => throwErrorAt body "Expected inductive type application"
 
-/-- Extracts the name of the induction relation and its arguments
-    (variant of `parseInductiveApp` that returns the name of the
-    inductive relation as a `TSyntax term` instead of a `Name`,
-    and the arguments to the `inductive` as an `Array` of `TSyntax term`s ) -/
-def deconstructInductiveApplication (body : Term) : CommandElabM (TSyntax `term × Array (TSyntax `term)) := do
-  match body with
-  | `($indRel:ident $args:term*) =>
-    return (indRel, args)
-  | `($indRel:ident) =>
-    return (indRel, #[])
-  | _ => throwError "Expected inductive type application"
-
 /-- Analyzes the type of the inductive relation and matches each
     argument with its expected type, returning an array of
     (parameter name, type expression) pairs -/
