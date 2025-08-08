@@ -15,5 +15,5 @@ info: Try this generator: instance : ArbitrarySizedSuchThat Nat (fun m_1 => Eq m
       | Nat.succ size' => OptionTGen.backtrack [(1, return n_1), ]
     fun size => aux_arb size size n_1
 -/
-#guard_msgs(info) in
+#guard_msgs(info, drop warning) in
 #derive_generator (fun (m : Nat) => m = n)

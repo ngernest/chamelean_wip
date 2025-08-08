@@ -22,45 +22,6 @@ def parseInductiveApp (body : Term) : CommandElabM (TSyntax `ident × TSyntaxArr
     return (indRel, #[])
   | _ => throwErrorAt body m!"{body} is not a valid application of an inductive relation, all arguments should be either literals or variables"
 
-/-- Analyzes the type of the inductive relation and matches each
-    argument with its expected type, returning an array of
-    (parameter name, type expression) pairs -/
-def analyzeInductiveArgs (inductiveName : Name) (args : Array Term) :
-  CommandElabM (Array (Name × TSyntax `term)) := do
-
-  -- Extract the no. of parameters & indices for the inductive
-  let inductInfo ← getConstInfoInduct inductiveName
-  let numParams := inductInfo.numParams
-  let numIndices := inductInfo.numIndices
-  let numArgs := numParams + numIndices
-
-  if args.size != numArgs then
-    throwError s!"Expected {numArgs} arguments but received {args.size} arguments instead"
-
-  -- Extract the type of the inductive relation
-  let inductType := inductInfo.type
-
-  liftTermElabM $
-    forallTelescope inductType (fun xs _ => do
-      let mut paramInfo : Array (Name × TSyntax `term) := #[]
-
-      for i in [:args.size] do
-        -- Match each argument with its expected type
-        let arg := args[i]!
-        let paramFVar := xs[i]!
-        let paramType ← inferType paramFVar
-
-        -- Extract parameter name from the argument syntax
-        let paramName ← extractParamName arg
-
-        -- Use Lean's delaborator to express the parameter type
-        -- using concrete surface-level syntax
-        let typeSyntax ← PrettyPrinter.delab paramType
-
-        paramInfo := paramInfo.push (paramName, typeSyntax)
-
-      pure paramInfo)
-
 /-- Finds the index of the argument in the inductive application for the value we wish to generate
     (i.e. finds `i` s.t. `args[i] == targetVar`) -/
 def findTargetVarIndex (targetVar : Name) (args : TSyntaxArray `term) : Option Nat :=
