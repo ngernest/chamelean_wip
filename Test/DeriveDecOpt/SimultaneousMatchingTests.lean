@@ -16,17 +16,17 @@ info: Try this checker: instance : DecOpt (InList x_1 l_1) where
         DecOpt.checkerBacktrack
           [fun _ =>
             match l_1 with
-            | List.cons u_2 l => DecOpt.andOptList [DecOpt.decOpt (BEq.beq u_2 x_1) initSize, Option.some Bool.true]
+            | List.cons u_2 l => DecOpt.decOpt (BEq.beq u_2 x_1) initSize
             | _ => Option.some Bool.false]
       | Nat.succ size' =>
         DecOpt.checkerBacktrack
           [fun _ =>
             match l_1 with
-            | List.cons u_2 l => DecOpt.andOptList [DecOpt.decOpt (BEq.beq u_2 x_1) initSize, Option.some Bool.true]
+            | List.cons u_2 l => DecOpt.decOpt (BEq.beq u_2 x_1) initSize
             | _ => Option.some Bool.false,
             fun _ =>
             match l_1 with
-            | List.cons y l => DecOpt.andOptList [aux_dec initSize size' x_1 l, Option.some Bool.true]
+            | List.cons y l => aux_dec initSize size' x_1 l
             | _ => Option.some Bool.false]
     fun size => aux_dec size size x_1 l_1
 -/
@@ -58,10 +58,7 @@ info: Try this checker: instance : DecOpt (MinOk l_1 a_1) where
             | _ => Option.some Bool.false,
             fun _ =>
             match a_1 with
-            | List.cons x l' =>
-              DecOpt.andOptList
-                [aux_dec initSize size' l_1 l',
-                  DecOpt.andOptList [DecOpt.decOpt (InList x l_1) initSize, Option.some Bool.true]]
+            | List.cons x l' => DecOpt.andOptList [aux_dec initSize size' l_1 l', DecOpt.decOpt (InList x l_1) initSize]
             | _ => Option.some Bool.false]
     fun size => aux_dec size size l_1 a_1
 -/
@@ -102,10 +99,7 @@ info: Try this checker: instance : DecOpt (MinEx n_1 l_1 a_1) where
             match a_1 with
             | List.cons x l' =>
               match n_1 with
-              | Nat.succ n =>
-                DecOpt.andOptList
-                  [DecOpt.decOpt (InList x l_1) initSize,
-                    DecOpt.andOptList [aux_dec initSize size' n l_1 l', Option.some Bool.true]]
+              | Nat.succ n => DecOpt.andOptList [DecOpt.decOpt (InList x l_1) initSize, aux_dec initSize size' n l_1 l']
               | _ => Option.some Bool.false
             | _ => Option.some Bool.false]
     fun size => aux_dec size size n_1 l_1 a_1

@@ -23,7 +23,7 @@ inductive MonadSort
   | Enumerator
   | OptionTEnumerator
   | Checker
-  deriving Repr
+  deriving Repr, BEq
 
 /-- An intermediate representation of monadic expressions that are
     used in generators/enumerators/checkers.
@@ -72,7 +72,7 @@ inductive MExp : Type where
   /-- Signifies running out of fuel -/
   | MOutOfFuel
 
-  deriving Repr, Inhabited
+  deriving Repr, Inhabited, BEq
 
 
 /-- Converts a `ProducerSort` to a `MonadSort`
@@ -102,9 +102,21 @@ def enumSizedST (prop : MExp) (fuel : MExp) : MExp :=
 def arbitrarySizedST (prop : MExp) (fuel : MExp) : MExp :=
   .MApp (.MConst ``ArbitrarySizedSuchThat.arbitrarySizedST) [prop, fuel]
 
-/-- `mSome x` is an `MExp` representing `Option.some x` -/
-def mSome (x : MExp) : MExp :=
+/-- `mexpSome x` is an `MExp` representing `Option.some x`.
+    We call this function `mexpSome` to avoid name clashes with the existing `some` constructor
+    for `Option` types. -/
+def mexpSome (x : MExp) : MExp :=
   .MApp (.MConst ``Option.some) [x]
+
+/-- `someTrue` is an `MExp` representing `some true`
+    - This expression is often used when deriving checkers, so we define it here as an abbreviation. -/
+def someTrue : MExp :=
+  mexpSome (.MConst ``true)
+
+/-- `someFalse` is an `MExp` representing `some false`
+    - This expression is often used when deriving checkers, so we define it here as an abbreviation. -/
+def someFalse : MExp :=
+  mexpSome (.MConst ``false)
 
 
 /-- Converts a `List α` to a "tuple", where the function `pair`
@@ -267,8 +279,14 @@ mutual
         let cases := #[trueCase, wildCardCase]
         `(match $m1:term with $cases:matchAlt*)
       | .Checker, .Checker =>
-        -- For checkers, we can just invoke `DecOpt.andOptList`
-        `($andOptListFn [$m1:term, $k1:term])
+        -- If the continuation of the bind is just returning `some True`,
+        -- we can just inline the checker call `m1` to avoid the extra indirection
+        -- of calling checker combinator functions
+        if k == someTrue then
+          `($m1:term)
+        else
+          -- For checkers, we can just invoke `DecOpt.andOptList`
+          `($andOptListFn [$m1:term, $k1:term])
       | .Checker, .Enumerator =>
         -- If a checker invokes an unconstrained enumerator,
         -- we call `EnumeratorCombinators.enumerating`
@@ -396,8 +414,7 @@ def scheduleToMExp (schedule : Schedule) (mfuel : MExp) (defFuel : MExp) : Compi
       | [] => panic! "No outputs being returned in producer schedule"
       | [output] => MExp.MRet output
       | outputs => tupleOfList (fun e1 e2 => .MApp (.MConst ``Prod.mk) [e1, e2]) outputs outputs[0]?
-      -- MExp.MRet (.MApp (.MConst ``Prod.mk) outputs)
-    | .CheckerSchedule => mSome (.MConst ``true)
+    | .CheckerSchedule => someTrue
     | .TheoremSchedule conclusion typeClassUsed =>
       -- Create a pattern-match on the result of hte checker
       -- on the conclusion, returning `some true` or `some false` accordingly
@@ -405,9 +422,7 @@ def scheduleToMExp (schedule : Schedule) (mfuel : MExp) (defFuel : MExp) : Compi
       let scrutinee :=
         if typeClassUsed then decOptChecker conclusionMExp mfuel
         else conclusionMExp
-      matchOptionBool scrutinee
-        (mSome (.MConst ``true))
-        (mSome (.MConst ``false))
+      matchOptionBool scrutinee someTrue someFalse
   -- Fold over the `scheduleSteps` and convert each of them to a functional `MExp`
   -- Note that the fold composes the `MExp`, and we use `foldr` since
   -- we want the `epilogue` to be the base-case of the fold

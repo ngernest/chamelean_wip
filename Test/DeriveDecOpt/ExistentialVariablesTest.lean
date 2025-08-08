@@ -38,7 +38,7 @@ info: Try this checker: instance : DecOpt (NatChain a_1 b_1) where
             EnumeratorCombinators.enumeratingOpt (EnumSizedSuchThat.enumSizedST (fun x => LT.lt a_1 x) initSize)
               (fun x =>
                 EnumeratorCombinators.enumeratingOpt (EnumSizedSuchThat.enumSizedST (fun y => LT.lt x y) initSize)
-                  (fun y => DecOpt.andOptList [DecOpt.decOpt (LT.lt y b_1) initSize, Option.some Bool.true]) initSize)
+                  (fun y => DecOpt.decOpt (LT.lt y b_1) initSize) initSize)
               initSize]
       | Nat.succ size' =>
         DecOpt.checkerBacktrack
@@ -46,7 +46,7 @@ info: Try this checker: instance : DecOpt (NatChain a_1 b_1) where
             EnumeratorCombinators.enumeratingOpt (EnumSizedSuchThat.enumSizedST (fun x => LT.lt a_1 x) initSize)
               (fun x =>
                 EnumeratorCombinators.enumeratingOpt (EnumSizedSuchThat.enumSizedST (fun y => LT.lt x y) initSize)
-                  (fun y => DecOpt.andOptList [DecOpt.decOpt (LT.lt y b_1) initSize, Option.some Bool.true]) initSize)
+                  (fun y => DecOpt.decOpt (LT.lt y b_1) initSize) initSize)
               initSize,
             ]
     fun size => aux_dec size size a_1 b_1

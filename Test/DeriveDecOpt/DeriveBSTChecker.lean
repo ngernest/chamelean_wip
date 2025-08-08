@@ -18,9 +18,7 @@ info: Try this checker: instance : DecOpt (Between lo_1 x_1 hi_1) where
             | Nat.succ (Nat.succ m) =>
               match x_1 with
               | Nat.succ u_3 =>
-                DecOpt.andOptList
-                  [DecOpt.decOpt (BEq.beq u_3 lo_1) initSize,
-                    DecOpt.andOptList [DecOpt.decOpt (LE.le lo_1 m) initSize, Option.some Bool.true]]
+                DecOpt.andOptList [DecOpt.decOpt (BEq.beq u_3 lo_1) initSize, DecOpt.decOpt (LE.le lo_1 m) initSize]
               | _ => Option.some Bool.false
             | _ => Option.some Bool.false]
       | Nat.succ size' =>
@@ -30,16 +28,14 @@ info: Try this checker: instance : DecOpt (Between lo_1 x_1 hi_1) where
             | Nat.succ (Nat.succ m) =>
               match x_1 with
               | Nat.succ u_3 =>
-                DecOpt.andOptList
-                  [DecOpt.decOpt (BEq.beq u_3 lo_1) initSize,
-                    DecOpt.andOptList [DecOpt.decOpt (LE.le lo_1 m) initSize, Option.some Bool.true]]
+                DecOpt.andOptList [DecOpt.decOpt (BEq.beq u_3 lo_1) initSize, DecOpt.decOpt (LE.le lo_1 m) initSize]
               | _ => Option.some Bool.false
             | _ => Option.some Bool.false,
             fun _ =>
             match hi_1 with
             | Nat.succ o =>
               match x_1 with
-              | Nat.succ m => DecOpt.andOptList [aux_dec initSize size' lo_1 m o, Option.some Bool.true]
+              | Nat.succ m => aux_dec initSize size' lo_1 m o
               | _ => Option.some Bool.false
             | _ => Option.some Bool.false]
     fun size => aux_dec size size lo_1 x_1 hi_1
@@ -69,9 +65,7 @@ info: Try this checker: instance : DecOpt (BST lo_1 hi_1 t_1) where
             | BinaryTree.Node x l r =>
               DecOpt.andOptList
                 [DecOpt.decOpt (Between lo_1 x hi_1) initSize,
-                  DecOpt.andOptList
-                    [aux_dec initSize size' lo_1 x l,
-                      DecOpt.andOptList [aux_dec initSize size' x hi_1 r, Option.some Bool.true]]]
+                  DecOpt.andOptList [aux_dec initSize size' lo_1 x l, aux_dec initSize size' x hi_1 r]]
             | _ => Option.some Bool.false]
     fun size => aux_dec size size lo_1 hi_1 t_1
 -/
