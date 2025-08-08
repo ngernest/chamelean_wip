@@ -1,5 +1,5 @@
-import Plausible.New.Enumerators
-import Plausible.New.LazyList
+import Plausible.Chamelean.Enumerators
+import Plausible.Chamelean.LazyList
 
 open LazyList
 

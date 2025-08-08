@@ -1,11 +1,11 @@
-import Plausible.New.Arbitrary
-import Plausible.New.ArbitrarySizedSuchThat
-import Plausible.New.Enumerators
-import Plausible.New.DecOpt
-import Plausible.New.TSyntaxCombinators
-import Plausible.New.Schedules
-import Plausible.New.UnificationMonad
-import Plausible.New.Idents
+import Plausible.Chamelean.Arbitrary
+import Plausible.Chamelean.ArbitrarySizedSuchThat
+import Plausible.Chamelean.Enumerators
+import Plausible.Chamelean.DecOpt
+import Plausible.Chamelean.TSyntaxCombinators
+import Plausible.Chamelean.Schedules
+import Plausible.Chamelean.UnificationMonad
+import Plausible.Chamelean.Idents
 
 open Idents
 open Lean Parser Elab Term Command

@@ -1,6 +1,6 @@
-import Plausible.New.Arbitrary
-import Plausible.New.ArbitrarySizedSuchThat
-import Plausible.New.DeriveConstrainedProducer
+import Plausible.Chamelean.Arbitrary
+import Plausible.Chamelean.ArbitrarySizedSuchThat
+import Plausible.Chamelean.DeriveConstrainedProducer
 import Test.CommonDefinitions.FunctionCallInConclusion
 
 open DecOpt

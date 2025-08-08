@@ -1,9 +1,9 @@
 
-import Plausible.New.OptionTGen
-import Plausible.New.DecOpt
-import Plausible.New.Enumerators
-import Plausible.New.DeriveConstrainedProducer
-import Plausible.New.EnumeratorCombinators
+import Plausible.Chamelean.OptionTGen
+import Plausible.Chamelean.DecOpt
+import Plausible.Chamelean.Enumerators
+import Plausible.Chamelean.DeriveConstrainedProducer
+import Plausible.Chamelean.EnumeratorCombinators
 import Test.DeriveArbitrarySuchThat.DeriveBalancedTreeGenerator
 
 set_option guard_msgs.diff true

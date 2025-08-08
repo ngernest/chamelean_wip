@@ -1,10 +1,10 @@
 import Plausible.Gen
-import Plausible.New.OptionTGen
-import Plausible.New.DecOpt
-import Plausible.New.Arbitrary
-import Plausible.New.ArbitrarySizedSuchThat
+import Plausible.Chamelean.OptionTGen
+import Plausible.Chamelean.DecOpt
+import Plausible.Chamelean.Arbitrary
+import Plausible.Chamelean.ArbitrarySizedSuchThat
 import Test.DeriveArbitrary.DeriveSTLCTermTypeGenerators
-import Plausible.New.DeriveConstrainedProducer
+import Plausible.Chamelean.DeriveConstrainedProducer
 
 open ArbitrarySizedSuchThat OptionTGen
 

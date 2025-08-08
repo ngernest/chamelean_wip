@@ -1,7 +1,7 @@
-import Plausible.New.Enumerators
-import Plausible.New.EnumeratorCombinators
-import Plausible.New.DeriveEnum
-import Plausible.New.Examples.ExampleInductiveRelations
+import Plausible.Chamelean.Enumerators
+import Plausible.Chamelean.EnumeratorCombinators
+import Plausible.Chamelean.DeriveEnum
+import Plausible.Chamelean.Examples.ExampleInductiveRelations
 
 set_option guard_msgs.diff true
 

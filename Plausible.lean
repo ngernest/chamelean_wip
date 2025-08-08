@@ -11,7 +11,7 @@ import Plausible.Functions
 import Plausible.Attr
 import Plausible.Tactic
 
-import Plausible.New.Examples.ExampleInductiveRelations
+import Plausible.Chamelean.Examples.ExampleInductiveRelations
 
 
-import Plausible.New.Chamelean
+import Plausible.Chamelean.Chamelean

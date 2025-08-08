@@ -1,10 +1,10 @@
 import Lean
 
-import Plausible.New.Idents
-import Plausible.New.TSyntaxCombinators
-import Plausible.New.Enumerators
-import Plausible.New.Utils
-import Plausible.New.DeriveArbitrary
+import Plausible.Chamelean.Idents
+import Plausible.Chamelean.TSyntaxCombinators
+import Plausible.Chamelean.Enumerators
+import Plausible.Chamelean.Utils
+import Plausible.Chamelean.DeriveArbitrary
 
 open Lean Elab Command Meta Term Parser
 

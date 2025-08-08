@@ -1,6 +1,6 @@
-import Plausible.New.Arbitrary
-import Plausible.New.DeriveEnum
-import Plausible.New.EnumeratorCombinators
+import Plausible.Chamelean.Arbitrary
+import Plausible.Chamelean.DeriveEnum
+import Plausible.Chamelean.EnumeratorCombinators
 import Test.DeriveArbitrary.DeriveNKIBinopGenerator
 
 set_option guard_msgs.diff true

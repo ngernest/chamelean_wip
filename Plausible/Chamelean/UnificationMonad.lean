@@ -2,7 +2,7 @@
 import Std.Data.HashMap
 import Lean.Expr
 import Lean.Exception
-import Plausible.New.Idents
+import Plausible.Chamelean.Idents
 
 
 open Lean Idents

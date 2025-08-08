@@ -1,8 +1,8 @@
 import Plausible.Gen
-import Plausible.New.Arbitrary
-import Plausible.New.GeneratorCombinators
-import Plausible.New.DeriveArbitrary
-import Plausible.New.Examples.ExampleInductiveRelations
+import Plausible.Chamelean.Arbitrary
+import Plausible.Chamelean.GeneratorCombinators
+import Plausible.Chamelean.DeriveArbitrary
+import Plausible.Chamelean.Examples.ExampleInductiveRelations
 
 open Arbitrary GeneratorCombinators
 
