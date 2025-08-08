@@ -7,9 +7,9 @@ open DecOpt
 set_option guard_msgs.diff true
 
 -- Dummy `EnumSizedSuchThat` instances needed so that the derived checker below compiles
--- TODO: figure out how to handle equality
+-- TODO: figure out how to handle equality when deriving enumerators
 instance : EnumSizedSuchThat Nat (fun m => m = n * n) where
-  enumSizedST := sorry
+  enumSizedST (_size : Nat) := return n * n
 
 /--
 info: Try this checker: instance : DecOpt (square_of n_1 m_1) where
