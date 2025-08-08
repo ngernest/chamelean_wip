@@ -275,10 +275,14 @@ def deriveScheduledChecker (inductiveProp : TSyntax `term) : CommandElabM (TSynt
           -- (i.e. if the constructor has a hypothesis that refers to the inductive relation we are targeting)
           let isRecursive ← isConstructorRecursive inductiveName ctorName
 
+          -- Sub-checkers need to be thunked, since we don't want the `checkerBacktrack` combinator
+          -- (which expects a list of sub-checkers as inputs) to evaluate all the sub-checkers eagerly
+          let thunkedSubChecker ← `(fun _ => $subChecker)
+
           if isRecursive then
-            recursiveCheckers := recursiveCheckers.push subChecker
+            recursiveCheckers := recursiveCheckers.push thunkedSubChecker
           else
-            nonRecursiveCheckers := nonRecursiveCheckers.push subChecker
+            nonRecursiveCheckers := nonRecursiveCheckers.push thunkedSubChecker
 
         | none => throwError m!"Unable to derive producer schedule for constructor {ctorName}"
 
@@ -418,6 +422,10 @@ def elabDeriveScheduledChecker : CommandElab := fun stx => do
     elabCommand typeclassInstance
 
   | _ => throwUnsupportedSyntax
+
+
+
+-- #derive_scheduled_checker (bst lo hi t)
 
 
 ----------------------------------------------------------------------
