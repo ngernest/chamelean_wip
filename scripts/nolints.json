@@ -87,6 +87,7 @@
   ["docBlame", "instEnumSizedTree.aux_enum"],
   ["docBlame", "genBST.aux_arb"],
   ["docBlame", "genBalancedTree.aux_arb"],
+  ["docBlame", "instDecOptBetween.aux_dec"],
   ["docBlame", "instDecOptBst.aux_arb"],
   ["docBlame", "instDecOptBalanced.aux_arb"],
   ["docBlame", "Plausible.Shrinkable.shrink"],
