@@ -19,38 +19,37 @@ inductive NatChain (a b : Nat) : Prop where
     (y < b) →
     NatChain a b
 
+
+-- Dummy `EnumSizedSuchThat` instances needed so that the derived checker below compiles
+instance : EnumSizedSuchThat Nat (fun x => a < x) where
+  enumSizedST := sorry
+
+instance : EnumSizedSuchThat Nat (fun y => x < y) where
+  enumSizedST := sorry
+
 /--
-info: Try this checker: instance : DecOpt (NatChain a b) where
+info: Try this checker: instance : DecOpt (NatChain a_1 b_1) where
   decOpt :=
     let rec aux_dec (initSize : Nat) (size : Nat) (a_1 : Nat) (b_1 : Nat) : Option Bool :=
       match size with
       | Nat.zero =>
         DecOpt.checkerBacktrack
           [fun _ =>
-            EnumeratorCombinators.enumerating Enum.enum
+            EnumeratorCombinators.enumeratingOpt (EnumSizedSuchThat.enumSizedST (fun x => LT.lt a_1 x) initSize)
               (fun x =>
-                EnumeratorCombinators.enumerating Enum.enum
-                  (fun y =>
-                    DecOpt.andOptList
-                      [DecOpt.decOpt (@LT.lt Nat instLTNat a_1 x) initSize,
-                        DecOpt.decOpt (@LT.lt Nat instLTNat x y) initSize,
-                        DecOpt.decOpt (@LT.lt Nat instLTNat y b_1) initSize])
-                  initSize)
+                EnumeratorCombinators.enumeratingOpt (EnumSizedSuchThat.enumSizedST (fun y => LT.lt x y) initSize)
+                  (fun y => DecOpt.andOptList [DecOpt.decOpt (LT.lt y b_1) initSize, Option.some Bool.true]) initSize)
               initSize]
       | Nat.succ size' =>
         DecOpt.checkerBacktrack
           [fun _ =>
-            EnumeratorCombinators.enumerating Enum.enum
+            EnumeratorCombinators.enumeratingOpt (EnumSizedSuchThat.enumSizedST (fun x => LT.lt a_1 x) initSize)
               (fun x =>
-                EnumeratorCombinators.enumerating Enum.enum
-                  (fun y =>
-                    DecOpt.andOptList
-                      [DecOpt.decOpt (@LT.lt Nat instLTNat a_1 x) initSize,
-                        DecOpt.decOpt (@LT.lt Nat instLTNat x y) initSize,
-                        DecOpt.decOpt (@LT.lt Nat instLTNat y b_1) initSize])
-                  initSize)
-              initSize]
-    fun size => aux_dec size size a b
+                EnumeratorCombinators.enumeratingOpt (EnumSizedSuchThat.enumSizedST (fun y => LT.lt x y) initSize)
+                  (fun y => DecOpt.andOptList [DecOpt.decOpt (LT.lt y b_1) initSize, Option.some Bool.true]) initSize)
+              initSize,
+            ]
+    fun size => aux_dec size size a_1 b_1
 -/
 #guard_msgs(info, drop warning) in
 #derive_scheduled_checker (NatChain a b)

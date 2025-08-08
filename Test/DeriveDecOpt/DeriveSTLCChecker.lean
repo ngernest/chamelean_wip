@@ -97,7 +97,7 @@ info: Try this checker: instance : DecOpt (typing Γ_1 e_1 τ_1) where
             fun _ =>
             match e_1 with
             | term.App e1 e2 =>
-              EnumeratorCombinators.enumeratingOpt (EnumSuchThat.enumST (fun τ1 => aux_dec initSize size' Γ_1 e2 τ1))
+              EnumeratorCombinators.enumeratingOpt (aux_dec initSize size' Γ_1 e2 τ1)
                 (fun τ1 => DecOpt.andOptList [aux_dec initSize size' Γ_1 e1 (type.Fun τ1 τ_1), Option.some Bool.true])
                 initSize
             | _ => Option.some Bool.false]

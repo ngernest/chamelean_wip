@@ -150,6 +150,8 @@ def getCheckerScheduleForInductiveConstructor (inductiveName : Name) (ctorName :
       -- convert them to the appropriate `ScheduleStep`s, and prepends them to the `naiveSchedule`
       let fullSchedule := addConclusionPatternsAndEqualitiesToSchedule finalState.patterns finalState.equalities (updatedNaiveSchedule, scheduleSort)
 
+      logWarning m!"checker schedule = {repr fullSchedule}"
+
       return fullSchedule)
   )
 
@@ -424,41 +426,35 @@ def elabDeriveScheduledChecker : CommandElab := fun stx => do
 
   | _ => throwUnsupportedSyntax
 
+inductive squareOf : Nat → Nat → Prop where
+  | sq : forall n, squareOf n (n * n)
 
-/-
-info: Try this checker: instance : DecOpt (bst lo_1 hi_1 t_1) where
+-- Dummy EnumSizedSuchThat instance
+instance : EnumSizedSuchThat Nat fun m_1 => m_1 = n_1 * n_1 where
+  enumSizedST := sorry
+
+/--
+info: Try this checker: instance : DecOpt (squareOf n_1 m_1) where
   decOpt :=
-    let rec aux_dec (initSize : Nat) (size : Nat) (lo_1 : Nat) (hi_1 : Nat) (t_1 : Tree) : Option Bool :=
+    let rec aux_dec (initSize : Nat) (size : Nat) (n_1 : Nat) (m_1 : Nat) : Option Bool :=
       match size with
       | Nat.zero =>
         DecOpt.checkerBacktrack
           [fun _ =>
-            match t_1 with
-            | Tree.Leaf => Option.some Bool.true
-            | _ => Option.some Bool.false]
+            EnumeratorCombinators.enumeratingOpt
+              (EnumSizedSuchThat.enumSizedST (fun m_1 => Eq m_1 (HMul.hMul n_1 n_1)) initSize)
+              (fun m_1 => Option.some Bool.true) initSize]
       | Nat.succ size' =>
         DecOpt.checkerBacktrack
           [fun _ =>
-            match t_1 with
-            | Tree.Leaf => Option.some Bool.true
-            | _ => Option.some Bool.false,
-            fun _ =>
-            match t_1 with
-            | Tree.Node x l r =>
-              match DecOpt.decOpt (between lo_1 x hi_1) initSize with
-              | Option.some Bool.true =>
-                match aux_dec initSize size' lo_1 x l with
-                | Option.some Bool.true =>
-                  match aux_dec initSize size' x hi_1 r with
-                  | Option.some Bool.true => Option.some Bool.true
-                  | _ => Option.some Bool.false
-                | _ => Option.some Bool.false
-              | _ => Option.some Bool.false
-            | _ => Option.some Bool.false]
-    fun size => aux_dec size size lo_1 hi_1 t_1
+            EnumeratorCombinators.enumeratingOpt
+              (EnumSizedSuchThat.enumSizedST (fun m_1 => Eq m_1 (HMul.hMul n_1 n_1)) initSize)
+              (fun m_1 => Option.some Bool.true) initSize,
+            ]
+    fun size => aux_dec size size n_1 m_1
 -/
--- #guard_msgs(info, drop warning) in
--- #derive_scheduled_checker (bst lo hi t)
+#guard_msgs(info, drop warning) in
+#derive_scheduled_checker (squareOf n m)
 
 
 ----------------------------------------------------------------------

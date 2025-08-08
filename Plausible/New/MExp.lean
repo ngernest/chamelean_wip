@@ -283,7 +283,7 @@ mutual
               mkTuple vars
           -- If a checker invokes a contrained enumerator,
           -- we call `EnumeratorCombinators.enumeratingOpt`
-          `($enumeratingOptFn ($enumSTFn (fun $args:term => $m1:term)) (fun $args:term => $k1:term) $initSizeIdent)
+          `($enumeratingOptFn $m1:term (fun $args:term => $k1:term) $initSizeIdent)
       | .Theorem, _ => throwError "Theorem DeriveSort not implemented yet"
       | _, _ => throwError m!"Invalid monadic bind for deriveSort {repr deriveSort}"
     | .MMatch scrutinee cases => do
@@ -361,17 +361,19 @@ def scheduleStepToMExp (scheduleSort : ScheduleSort) (step : ScheduleStep) (_mfu
     let vars := Prod.fst <$> varsTys
     pure $ .MBind (prodSortToOptionTMonadSort ps) producer vars k
   | .Check src _ =>
+
+    -- TODO: double check if we need to pattern-match on `scheduleSort` here
     let checker :=
       match src with
       | Source.NonRec hypExpr =>
         decOptChecker (hypothesisExprToMExp hypExpr) defFuel
-      | Source.Rec f args => recCall f args
+      | Source.Rec f args =>
+        recCall f args
+
     -- TODO: handle checking hypotheses w/ negative polarity (currently not handled)
 
     -- TODO: double check if this is right
     pure $ .MBind .Checker checker [] k
-    -- TODO: old code below
-    --   pure $ .MMatch checker [(.CtorPattern ``some [.UnknownPattern ``true], k), (wildCardPattern, .MFail)]
   | .Match scrutinee pattern =>
     pure $ .MMatch (.MId scrutinee) [(pattern, k), (wildCardPattern, .MFail)]
 
