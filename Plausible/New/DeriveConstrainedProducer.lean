@@ -6,14 +6,12 @@ import Plausible.New.Schedules
 import Plausible.New.DeriveSchedules
 import Plausible.New.MExp
 import Plausible.New.MakeConstrainedProducerInstance
-import Plausible.New.SubGenerators
 import Plausible.New.DeriveArbitrary
 import Plausible.New.TSyntaxCombinators
 import Plausible.New.Utils
 import Plausible.New.Debug
 import Plausible.IR.Prelude
 import Plausible.IR.Examples
-import Plausible.IR.Extractor
 
 import Plausible.New.Arbitrary
 import Plausible.New.Examples.STLC
@@ -27,9 +25,12 @@ open Plausible.IR
 
 ----------------------------------------------------------------------------------------------------------------------------------
 -- Adapted from "Generating Good Generators for Inductive Relations" (POPL '18) & "Testing Theorems, Fully Automatically" (2025)
+-- as well as the QuickChick source code
+-- https://github.com/QuickChick/QuickChick/blob/internal-rewrite/plugin/newGenericLib.ml
+-- https://github.com/QuickChick/QuickChick/blob/internal-rewrite/plugin/newUnifyQC.ml.cppo
 ----------------------------------------------------------------------------------------------------------------------------------
 
-/-- Creates the initial constraint map κ where all inputs are `Fixed`, the output & all universally-quantified variables is `Undef`
+/-- Creates the initial constraint map where all inputs are `Fixed`, while the output & all universally-quantified variables are `Undef`.
     - `forAllVariables` is a list of (variable name, variable type) pairs -/
 def mkInitialUnknownMap (inputNames: List Name) (outputName : Name) (outputType : Expr) (forAllVariables : List (Name × Expr)) : UnknownMap :=
   let inputConstraints := inputNames.zip (List.replicate inputNames.length .Fixed)
@@ -38,13 +39,14 @@ def mkInitialUnknownMap (inputNames: List Name) (outputName : Name) (outputType 
   let forAllVarsConstraints := (fun (x, ty) => (x, .Undef ty)) <$> filteredForAllVariables
   Std.HashMap.ofList $ inputConstraints ++ outputConstraints ++ forAllVarsConstraints
 
-/-- Creates the initial `UnifyState` corresponding to a constructor of an inductive relation
-   - `inputNames`: the names of all inputs to the generator
-   - `outputName`, `outputType`: name & type of the output (variable to be generated)
-   - `forAllVariables`: the names & types for universally-quantified variables in the constructor's type
-   - `hypotheses`: the hypotheses for the constructor (represented as a constructor name applied to some list of arguments) -/
-def mkInitialUnifyState (inputNames : List Name) (outputName : Name) (outputType : Expr) (forAllVariables : List (Name × Expr))
-  (hypotheses : List (Name × List ConstructorExpr)): UnifyState :=
+/-- Creates the initial `UnifyState` for a producer, with the `UnifyState` corresponding to a constructor of an inductive relation.
+    The arguments to this function are:
+    - `inputNames`: the names of all inputs to the producer
+    - `outputName`, `outputType`: name & type of the output (variable to be produced)
+  - `forAllVariables`: the names & types for universally-quantified variables in the constructor's type
+    - `hypotheses`: the hypotheses for the constructor (represented as a constructor name applied to some list of arguments) -/
+def mkProducerInitialUnifyState (inputNames : List Name) (outputName : Name) (outputType : Expr) (forAllVariables : List (Name × Expr))
+  (hypotheses : List (Name × List ConstructorExpr)) : UnifyState :=
   let forAllVarNames := Prod.fst <$> forAllVariables
   let constraints := mkInitialUnknownMap inputNames outputName outputType forAllVariables
   let unknowns := Std.HashSet.ofList (outputName :: (inputNames ++ forAllVarNames))
@@ -54,6 +56,29 @@ def mkInitialUnifyState (inputNames : List Name) (outputName : Name) (outputType
     unknowns := unknowns
     outputName := outputName
     outputType := outputType
+    inputNames := inputNames
+    hypotheses := hypotheses }
+
+/-- Creates the initial `UnifyState` for a checker, with the `UnifyState` corresponding to a constructor of an inductive relation.
+    The arguments to this function are:
+    - `inputNames`: the names of all inputs to the producer
+    - `forAllVariables`: the names & types for universally-quantified variables in the constructor's type
+    - `hypotheses`: the hypotheses for the constructor (represented as a constructor name applied to some list of arguments)
+
+    Note that this function is the same as `mkProducerInitialUnifyState`, except it doesn't take in the name & type of the output variable,
+    since checkers don't need to produce values (they just need to return an `Option Bool`).
+
+    -- TODO: refactor to avoid code-duplication -/
+def mkCheckerInitialUnifyState (inputNames : List Name) (forAllVariables : List (Name × Expr)) (hypotheses : List (Name × List ConstructorExpr)) : UnifyState :=
+  let forAllVarNames := Prod.fst <$> forAllVariables
+  let inputConstraints := inputNames.zip (List.replicate inputNames.length .Fixed)
+  let filteredForAllVariables := forAllVariables.filter (fun (x, _) => x ∉ inputNames)
+  let forAllVarsConstraints := (fun (x, ty) => (x, .Undef ty)) <$> filteredForAllVariables
+  let constraints := Std.HashMap.ofList $ inputConstraints ++ forAllVarsConstraints
+  let unknowns := Std.HashSet.ofList (inputNames ++ forAllVarNames)
+  { emptyUnifyState with
+    constraints := constraints
+    unknowns := unknowns
     inputNames := inputNames
     hypotheses := hypotheses }
 
@@ -92,7 +117,6 @@ def convertToCtorExpr (e : Expr) : MetaM (Option (Name × Array Expr)) :=
     return some (ctorName, actualArgs)
   else
     return none
-
 
 
 /-- Takes an unknown `u`, and finds the `Range` `r` that corresponds to
@@ -196,10 +220,14 @@ def convertRangeToCtorAppForm (r : Range) : UnifyM (Name × List ConstructorExpr
   | _ => throwError m!"Unable to convert {r} to a constructor expression"
 
 /-- Given a `conclusion` to a constructor, a list of `outputVars` and a `deriveSort`,
-    figures out the appropriate `ScheduleSort`. The `returnOption` boolean argument
-    is used to determine whether producers should return their results wrapped in an `Option` or not.
+    figures out the appropriate `ScheduleSort`.
 
-    - Note: callers should supply `none` as the `ctorNameOpt` argument if `deriveSort := .Theorem` -/
+    - The `returnOption` boolean argument is used to determine
+      whether producers should return their results wrapped in an `Option` or not.
+
+    - The `ctorNameOpt` argument is an (optional) constructor name for the produced value
+      + This is `none` for checkers/theorem schedules as they don't produce constructor applications like generators/enumerators.
+    - Note: callers should supply `none` as the `ctorNameOpt` argument if `deriveSort := .Theorem`  or `.Checker` -/
 def getScheduleSort (conclusion : HypothesisExpr) (outputVars : List Unknown) (ctorNameOpt : Option Name) (deriveSort : DeriveSort) (returnOption : Bool) : UnifyM ScheduleSort :=
   match deriveSort with
   | .Checker => return .CheckerSchedule
@@ -219,7 +247,7 @@ def getScheduleSort (conclusion : HypothesisExpr) (outputVars : List Unknown) (c
     return .ProducerSchedule producerSort conclusion
 
 
-/-- `rewriteFunctionCallsInConclusionUnifyM hypotheses conclusion inductiveRelationName` does the following:
+/-- `rewriteFunctionCallsInConclusion hypotheses conclusion inductiveRelationName` does the following:
     1. Checks if the `conclusion` contains a function call where the function is *not* the same as the `inductiveRelationName`.
        (If no, we just return the pair `(hypotheses, conclusion)` as is.)
     2. If yes, we create a fresh variable & add an extra hypothesis where the fresh var is bound to the result of the function call.
@@ -229,7 +257,7 @@ def getScheduleSort (conclusion : HypothesisExpr) (outputVars : List Unknown) (c
     The updated hypotheses, conclusion, a list of the names & types of the fresh variables produced, and new `LocalContext` are subsequently returned.
     - Note: it is the caller's responsibility to check that `conclusion` does indeed contain
       a non-trivial function application (e.g. by using `containsNonTrivialFuncApp`) -/
-def rewriteFunctionCallsUnifyM (hypotheses : Array Expr) (conclusion : Expr) (inductiveRelationName : Name) (localCtx : LocalContext) : UnifyM (Array Expr × Expr × List (Name × Expr) × LocalContext) := do
+def rewriteFunctionCallsInConclusion (hypotheses : Array Expr) (conclusion : Expr) (inductiveRelationName : Name) (localCtx : LocalContext) : UnifyM (Array Expr × Expr × List (Name × Expr) × LocalContext) := do
   -- Find all sub-terms which are non-trivial function applications
   let funcAppExprs ← conclusion.foldlM (init := []) (fun acc subExpr => do
     if (← containsNonTrivialFuncApp subExpr inductiveRelationName)
@@ -292,9 +320,8 @@ def rewriteFunctionCallsUnifyM (hypotheses : Array Expr) (conclusion : Expr) (in
     - The names of inputs `inputNames` (arguments to the generator)
     - An array of `unknowns` (the arguments to the inductive relation)
       + Note: `unknowns == inputNames ∪ { outputName }`, i.e. `unknowns` contains all args to the inductive relation
-        listed in order, which coincides with `inputNames ∪ { outputName }`
-    - The name of the inductive relation we are targeting (`inductiveName`) -/
-def getScheduleForConstructor (inductiveName : Name) (ctorName : Name) (outputName : Name) (outputType : Expr) (inputNames : List Name)
+        listed in order, which coincides with `inputNames ∪ { outputName }` -/
+def getProducerScheduleForInductiveConstructor (inductiveName : Name) (ctorName : Name) (outputName : Name) (outputType : Expr) (inputNames : List Name)
   (unknowns : Array Unknown) (deriveSort : DeriveSort) : UnifyM Schedule := do
   let ctorInfo ← getConstInfoCtor ctorName
   let ctorType := ctorInfo.type
@@ -335,7 +362,7 @@ def getScheduleForConstructor (inductiveName : Name) (ctorName : Name) (outputNa
     -- `freshNamesAndTypes` is a list containing the names & types of the fresh variables produced during this procedure.
     let (updatedHypotheses, updatedConclusion, freshNamesAndTypes, updatedLocalCtx) ←
       if conclusionNeedsRewriting then
-        rewriteFunctionCallsUnifyM hypotheses conclusion inductiveName (← getLCtx)
+        rewriteFunctionCallsInConclusion hypotheses conclusion inductiveName (← getLCtx)
       else
         pure (hypotheses, conclusion, [], ← getLCtx)
 
@@ -359,7 +386,7 @@ def getScheduleForConstructor (inductiveName : Name) (ctorName : Name) (outputNa
         hypothesisExprs := hypothesisExprs.push (← convertRangeToCtorAppForm hypRange)
 
       -- Creates the initial `UnifyState` needed for the unification algorithm
-      let initialUnifyState := mkInitialUnifyState inputNames outputName outputType forAllVars hypothesisExprs.toList
+      let initialUnifyState := mkProducerInitialUnifyState inputNames outputName outputType forAllVars hypothesisExprs.toList
 
       -- Extend the current state with the contents of `initialUnifyState`
       UnifyM.extendState initialUnifyState
@@ -493,7 +520,7 @@ def deriveConstrainedProducer (outputVar : Ident) (outputTypeSyntax : TSyntax `t
 
       for ctorName in inductiveVal.ctors do
         let scheduleOption ← (UnifyM.runInMetaM
-          (getScheduleForConstructor inductiveName ctorName freshenedOutputName
+          (getProducerScheduleForInductiveConstructor inductiveName ctorName freshenedOutputName
             outputType freshenedInputNamesExcludingOutput freshUnknowns deriveSort)
             emptyUnifyState)
         match scheduleOption with
@@ -611,5 +638,3 @@ def elabDeriveScheduledEnumerator : CommandElab := fun stx => do
     elabCommand typeClassInstance
 
   | _ => throwUnsupportedSyntax
-
--- #derive_enumerator (fun (t : Tree) => bst lo hi t)

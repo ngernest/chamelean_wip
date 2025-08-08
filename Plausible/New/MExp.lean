@@ -10,6 +10,9 @@ import Plausible.New.Idents
 open Idents
 open Lean Parser Elab Term Command
 
+-- Adapted from QuickChick source code
+-- https://github.com/QuickChick/QuickChick/blob/internal-rewrite/plugin/newGenericLib.ml
+
 /-- The sort of monad we are compiling to, i.e. one of the following:
     - An unconstrained / constrained generator (`Gen` / `OptionT Gen`)
     - An unconstrained / constrained enumerator (`Enumerator` / `OptionT Enumerator`)
@@ -20,19 +23,15 @@ inductive MonadSort
   | Enumerator
   | OptionTEnumerator
   | Checker
-  deriving Repr
+  deriving Repr, BEq
 
 /-- An intermediate representation of monadic expressions that are
     used in generators/enumerators/checkers.
     - Schedules are compiled to `MExp`s, which are then compiled to Lean code
-
     - Note: `MExp`s make it easy to optimize generator code down the line
-      (e.g. combine pattern-matches when we have disjoint patterns)
-    - Going directly from schedules to Lean code (a wrapper on top of `TSyntax`) might be fine?
-      + The wrapper should expose `bind, return, backtrack` and pattern-matches
+      (e.g. combine pattern-matches when we have disjoint patterns
     - The cool thing about `MExp` is that we can interpret it differently
-      based on the `MonadSort`
--/
+      based on the `MonadSort` -/
 inductive MExp : Type where
   /-- `MRet e` represents `return e` in some monad -/
   | MRet (e : MExp)
@@ -73,7 +72,7 @@ inductive MExp : Type where
   /-- Signifies running out of fuel -/
   | MOutOfFuel
 
-  deriving Repr, Inhabited
+  deriving Repr, Inhabited, BEq
 
 
 /-- Converts a `ProducerSort` to a `MonadSort`
@@ -103,9 +102,21 @@ def enumSizedST (prop : MExp) (fuel : MExp) : MExp :=
 def arbitrarySizedST (prop : MExp) (fuel : MExp) : MExp :=
   .MApp (.MConst ``ArbitrarySizedSuchThat.arbitrarySizedST) [prop, fuel]
 
-/-- `mSome x` is an `MExp` representing `Option.some x` -/
-def mSome (x : MExp) : MExp :=
+/-- `mexpSome x` is an `MExp` representing `Option.some x`.
+    We call this function `mexpSome` to avoid name clashes with the existing `some` constructor
+    for `Option` types. -/
+def mexpSome (x : MExp) : MExp :=
   .MApp (.MConst ``Option.some) [x]
+
+/-- `someTrue` is an `MExp` representing `some true`
+    - This expression is often used when deriving checkers, so we define it here as an abbreviation. -/
+def someTrue : MExp :=
+  mexpSome (.MConst ``true)
+
+/-- `someFalse` is an `MExp` representing `some false`
+    - This expression is often used when deriving checkers, so we define it here as an abbreviation. -/
+def someFalse : MExp :=
+  mexpSome (.MConst ``false)
 
 
 /-- Converts a `List α` to a "tuple", where the function `pair`
@@ -233,7 +244,7 @@ mutual
       -- for simplicity, but in the future we may want to distinguish them
       match deriveSort with
       | .Generator | .Enumerator => `($failFn)
-      | .Checker => `($(mkIdent `some) $(mkIdent `false))
+      | .Checker => `($(mkIdent ``some) $(mkIdent ``false))
       | .Theorem => throwError "compiling MExps for Theorem DeriveSorts not implemented"
     | .MRet e => do
       let e' ← mexpToTSyntax e deriveSort
@@ -242,19 +253,19 @@ mutual
       -- Compile the monadic expression `m` and the continuation `k` to `TSyntax term`s
       let m1 ← mexpToTSyntax m deriveSort
       let k1 ← mexpToTSyntax k deriveSort
-      -- If there are multiple variables that are bound to the result
-      -- of the monadic expression `m`, convert them to a tuple
-      let compiledArgs ←
-        if vars.isEmpty then
-          throwError m!"empty list of vars supplied to MBind, m1 = {m1}, k1 = {k1}"
-        else
-          mkTuple vars
 
       match deriveSort, monadSort with
       | .Generator, .Gen
       | .Generator, .OptionTGen
       | .Enumerator, .Enumerator
       | .Enumerator, .OptionTEnumerator =>
+        -- If there are multiple variables that are bound to the result
+        -- of the monadic expression `m`, convert them to a tuple
+        let compiledArgs ←
+          if vars.isEmpty then
+            throwError m!"empty list of vars supplied to MBind, deriveSort = {repr deriveSort}, monadSort = {repr monadSort}, m1 = {m1}, k1 = {k1}"
+          else
+            mkTuple vars
 
         -- If we have a producer, we can just produce a monadic bind
         `(do let $compiledArgs:term ← $m1:term ; $k1:term)
@@ -263,21 +274,34 @@ mutual
         -- If a producer invokes a checker, we have to invoke the checker
         -- provided by the `DecOpt` instance for the proposition, then pattern
         -- match on its result
-        let trueCase ← `(Term.matchAltExpr| | $(mkIdent `some) $(mkIdent `true) => $k1)
+        let trueCase ← `(Term.matchAltExpr| | $(mkIdent ``some) $(mkIdent ``true) => $k1)
         let wildCardCase ← `(Term.matchAltExpr| | _ => $failFn)
         let cases := #[trueCase, wildCardCase]
         `(match $m1:term with $cases:matchAlt*)
       | .Checker, .Checker =>
-        -- For checkers, we can just invoke `DecOpt.andOptList`
-        `($andOptListFn [$m1:term, $k1:term])
+        -- If the continuation of the bind is just returning `some True`,
+        -- we can just inline the checker call `m1` to avoid the extra indirection
+        -- of calling checker combinator functions
+        if k == someTrue then
+          `($m1:term)
+        else
+          -- For checkers, we can just invoke `DecOpt.andOptList`
+          `($andOptListFn [$m1:term, $k1:term])
       | .Checker, .Enumerator =>
         -- If a checker invokes an unconstrained enumerator,
         -- we call `EnumeratorCombinators.enumerating`
         `($enumeratingFn $m1:term $k1:term $initSizeIdent)
-      | .Checker, .OptionTEnumerator =>
-        -- If a checker invokes a contrained enumerator,
-        -- we call `EnumeratorCombinators.enumeratingOpt`
-        `($enumeratingOptFn $m1:term $k1:term $initSizeIdent)
+      | .Checker, .OptionTEnumerator => do
+          -- If there are multiple variables that are bound to the result
+          -- of the enumerator `m`, convert them to a tuple
+          let args ←
+            if vars.isEmpty then
+              throwError m!"empty list of vars supplied to MBind, deriveSort = {repr deriveSort}, monadSort = {repr monadSort}, m1 = {m1}, k1 = {k1}"
+            else
+              mkTuple vars
+          -- If a checker invokes a contrained enumerator,
+          -- we call `EnumeratorCombinators.enumeratingOpt`
+          `($enumeratingOptFn $m1:term (fun $args:term => $k1:term) $initSizeIdent)
       | .Theorem, _ => throwError "Theorem DeriveSort not implemented yet"
       | _, _ => throwError m!"Invalid monadic bind for deriveSort {repr deriveSort}"
     | .MMatch scrutinee cases => do
@@ -324,15 +348,19 @@ mutual
 
 end
 
-/-- Compiles a `ScheduleStep` to an `MExp`
-    - Note that we represent `MExp`s as a function `MExp → MExp`,
-      akin to difference lists in Haskell
+/-- Compiles a `ScheduleStep` to an `MExp`.
+     Note that `MExp` that is returned by this function is represented
+     as a function `MExp → MExp`, akin to difference lists in Haskell
+     (see https://www.seas.upenn.edu/~cis5520/22fa/lectures/stub/03-trees/DList.html)
+
+    The arguments to this function are:
+    - The current step of the schedule (`step`)
     - The function parameter `k` represents the remainder of the `mexp`
       (the rest of the monadic `do`-block)
     - `mfuel` and `defFuel` are `MExp`s representing the current size and the initial size
       supplied to the generator/enumerator/checker we're deriving
 -/
-def scheduleStepToMExp (step : ScheduleStep) (_mfuel : MExp) (defFuel : MExp) (k : MExp) : CompileScheduleM MExp :=
+def scheduleStepToMExp (step : ScheduleStep) (defFuel : MExp) (k : MExp) : CompileScheduleM MExp :=
   match step with
   | .Unconstrained v src prodSort => do
     let producer ←
@@ -351,13 +379,19 @@ def scheduleStepToMExp (step : ScheduleStep) (_mfuel : MExp) (defFuel : MExp) (k
     let vars := Prod.fst <$> varsTys
     pure $ .MBind (prodSortToOptionTMonadSort ps) producer vars k
   | .Check src _ =>
+
+    -- TODO: double check if we need to pattern-match on `scheduleSort` here
     let checker :=
       match src with
       | Source.NonRec hypExpr =>
         decOptChecker (hypothesisExprToMExp hypExpr) defFuel
-      | Source.Rec f args => recCall f args
+      | Source.Rec f args =>
+        recCall f args
+
     -- TODO: handle checking hypotheses w/ negative polarity (currently not handled)
-    pure $ .MMatch checker [(.CtorPattern ``some [.UnknownPattern ``true], k), (wildCardPattern, .MFail)]
+
+    -- TODO: double check if this is right
+    pure $ .MBind .Checker checker [] k
   | .Match scrutinee pattern =>
     pure $ .MMatch (.MId scrutinee) [(pattern, k), (wildCardPattern, .MFail)]
 
@@ -380,8 +414,7 @@ def scheduleToMExp (schedule : Schedule) (mfuel : MExp) (defFuel : MExp) : Compi
       | [] => panic! "No outputs being returned in producer schedule"
       | [output] => MExp.MRet output
       | outputs => tupleOfList (fun e1 e2 => .MApp (.MConst ``Prod.mk) [e1, e2]) outputs outputs[0]?
-      -- MExp.MRet (.MApp (.MConst ``Prod.mk) outputs)
-    | .CheckerSchedule => mSome (.MConst ``true)
+    | .CheckerSchedule => someTrue
     | .TheoremSchedule conclusion typeClassUsed =>
       -- Create a pattern-match on the result of hte checker
       -- on the conclusion, returning `some true` or `some false` accordingly
@@ -389,11 +422,9 @@ def scheduleToMExp (schedule : Schedule) (mfuel : MExp) (defFuel : MExp) : Compi
       let scrutinee :=
         if typeClassUsed then decOptChecker conclusionMExp mfuel
         else conclusionMExp
-      matchOptionBool scrutinee
-        (mSome (.MConst ``true))
-        (mSome (.MConst ``false))
+      matchOptionBool scrutinee someTrue someFalse
   -- Fold over the `scheduleSteps` and convert each of them to a functional `MExp`
   -- Note that the fold composes the `MExp`, and we use `foldr` since
   -- we want the `epilogue` to be the base-case of the fold
-  List.foldrM (fun step acc => scheduleStepToMExp step mfuel defFuel acc)
+  List.foldrM (fun step acc => scheduleStepToMExp step defFuel acc)
     epilogue scheduleSteps

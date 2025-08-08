@@ -27,9 +27,9 @@ instance [Decidable P] : DecOpt P where
 
 namespace DecOpt
 
-/-- `checkerBacktrack` takes a list of checker handlers and returns:
-    - `some true` if *any* handler does so
-    - `some false` if *all* handlers do so
+/-- `checkerBacktrack` takes a list of (thunked) sub-checkers  and returns:
+    - `some true` if *any* sub-checker does so
+    - `some false` if *all* sub-checkers do so
     - `none` otherwise
     (see section 2 of "Computing Correctly with Inductive Relations") -/
 def checkerBacktrack (checkers : List (Unit → Option Bool)) : Option Bool :=

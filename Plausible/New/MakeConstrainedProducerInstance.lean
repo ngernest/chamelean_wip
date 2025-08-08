@@ -1,11 +1,8 @@
 import Lean
 import Std
-import Plausible.IR.Prelude
-import Plausible.IR.Constructor
-import Plausible.IR.Action
 import Plausible.Gen
+import Plausible.New.TSyntaxCombinators
 import Plausible.New.OptionTGen
-import Plausible.New.SubGenerators
 import Plausible.New.Idents
 import Plausible.New.Utils
 import Plausible.New.Schedules

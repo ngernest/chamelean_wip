@@ -8,9 +8,10 @@ import Plausible.New.Idents
 open Lean Idents
 
 
---------------------------------------------------------------------------------
 -- Adapted from "Generating Good Generators for Inductive Relations", POPL '18
---------------------------------------------------------------------------------
+-- and the QuickChick source code
+-- https://github.com/QuickChick/QuickChick/blob/internal-rewrite/plugin/newUnifyQC.ml.cppo
+
 
 /-- An `Unknown` is a Lean `Name` correpsonding to a variable -/
 abbrev Unknown := Name

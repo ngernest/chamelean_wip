@@ -8,6 +8,9 @@ import Plausible.New.UnificationMonad
 open Lean Meta
 open Plausible.IR
 
+-- Adapted from QuickChick source code
+-- https://github.com/QuickChick/QuickChick/blob/internal-rewrite/plugin/newGenericLib.ml
+
 /-- Helper function for splitting a list of triples into a triple of lists -/
 def splitThreeLists (abcs : List (α × β × γ)) : List α × List β × List γ :=
   match abcs with
@@ -60,7 +63,12 @@ def isRecCall (binding : List Name) (hyp : HypothesisExpr) (recCall : Name × Li
       throwError m!"Arguments to hypothesis {hyp} contain both fixed and yet-to-be-bound variables (not allowed)"
     else pure none) args
   let (inductiveName, recCallOutputIdxes) := recCall
-  return (ctorName == inductiveName && List.isSublist (recCallOutputIdxes.mergeSort) (outputPositions.mergeSort))
+
+
+  let result := (ctorName == inductiveName && (recCallOutputIdxes.mergeSort) == (outputPositions.mergeSort))
+  logWarning m!"isRecCall: recCallOutputIdxes = {recCallOutputIdxes}, outputPositions = {outputPositions}"
+
+  return result
 
 
 /-- Given a list of `hypotheses`, creates an association list mapping each hypothesis to a list of variable names.
@@ -277,9 +285,10 @@ partial def dfs (boundVars : List Name) (remainingVars : List Name) (checkedHypo
 
     -- Determine the right name for the recursive function in the producer
     let recursiveFunctionName :=
-      match env.prodSort with
+      match env.deriveSort with
       | .Generator => `aux_arb
       | .Enumerator => `aux_enum
+      | .Checker | .Theorem => `aux_dec
 
     -- Enumerate all paths for unconstrained generation / enumeration
     -- Each unconstrained path is a choice to instantiate one of the unbound variables arbitrarily
@@ -339,6 +348,7 @@ partial def dfs (boundVars : List Name) (remainingVars : List Name) (checkedHypo
 
           let constrainingRelation ←
             if (← isRecCall outputVars hyp env.recCall) then
+              logWarning m!"constrained prop path: isRecCall is true, outputVars = {outputVars}, hyp = {hyp}, recCall = {env.recCall}"
               let inputArgs := filterWithIndex (fun i _ => i ∉ (Prod.snd env.recCall)) hypArgs
               pure (Source.Rec recursiveFunctionName inputArgs)
             else

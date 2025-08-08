@@ -106,6 +106,48 @@ def tempSize := 10
 ```
 -/
 
+/-- Hand-written `DecOpt` instance for the inductive relation `between lo x hi`, which means `lo < x < hi` -/
+instance : DecOpt (between lo_1 x_1 hi_1) where
+  decOpt :=
+    let rec aux_dec (initSize : Nat) (size : Nat) (lo_1 : Nat) (x_1 : Nat) (hi_1 : Nat) : Option Bool :=
+      match size with
+      | Nat.zero =>
+        DecOpt.checkerBacktrack
+          [fun _ =>
+            match hi_1 with
+            | Nat.succ (Nat.succ m) =>
+              match x_1 with
+              | Nat.succ u_3 =>
+                DecOpt.andOpt (DecOpt.decOpt (BEq.beq u_3 lo_1) initSize) (DecOpt.decOpt (LE.le lo_1 m) initSize)
+              | _ => Option.some Bool.false
+            | _ => Option.some Bool.false]
+      | Nat.succ size' =>
+        DecOpt.checkerBacktrack
+          [fun _ =>
+            match hi_1 with
+            | Nat.succ (Nat.succ m) =>
+              match x_1 with
+              | Nat.succ u_3 =>
+                match DecOpt.decOpt (BEq.beq u_3 lo_1) initSize with
+                | Option.some Bool.true =>
+                  match DecOpt.decOpt (LE.le lo_1 m) initSize with
+                  | Option.some Bool.true => Option.some Bool.true
+                  | _ => Option.some Bool.false
+                | _ => Option.some Bool.false
+              | _ => Option.some Bool.false
+            | _ => Option.some Bool.false,
+            fun _ =>
+            match hi_1 with
+            | Nat.succ o =>
+              match x_1 with
+              | Nat.succ m =>
+                match aux_dec initSize size' lo_1 m o with
+                | Option.some Bool.true => Option.some Bool.true
+                | _ => Option.some Bool.false
+              | _ => Option.some Bool.false
+            | _ => Option.some Bool.false]
+    fun size => aux_dec size size lo_1 x_1 hi_1
+
 
 /-- Handwritten `DecOpt` instance for the proposition `bst lo hi t` -/
 instance : DecOpt (bst lo hi t) where

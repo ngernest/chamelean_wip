@@ -6,6 +6,44 @@ import Batteries.Data.List.Basic
 open Lean Meta LocalContext Std
 open Plausible.IR
 
+/-- `containsNonTrivialFuncApp e inductiveRelationName` determines whether `e` contains a non-trivial function application
+    (i.e. a function application where the function name is *not* the same as `inductiveRelationName`,
+    and where the function is also *not* a constructor of an inductive data type) -/
+def containsNonTrivialFuncApp (e : Expr) (inductiveRelationName : Name) : MetaM Bool := do
+  -- Helper function to check whether a sub-term is a non-trivial function application
+  let rec checkSubTerm (subExpr : Expr) : MetaM Bool :=
+    if subExpr.isApp then
+      let fn := subExpr.getAppFn
+      if fn.isConst then
+        let constName := fn.constName!
+        if constName.getRoot != inductiveRelationName.getRoot then do
+          let info ← getConstInfo constName
+          return !info.isCtor
+        else
+          return false
+      else
+        return false
+    else
+      return false
+
+  match e with
+  | .app f arg =>
+    if (← checkSubTerm f)
+      then return true
+    else
+      checkSubTerm arg
+  | .lam _ _ body _ => checkSubTerm body
+  | .forallE _ _ body _ => checkSubTerm body
+  | .letE _ _ value body _ => do
+    if (← checkSubTerm value) then
+      return true
+    else
+      checkSubTerm body
+  | .mdata _ expr => checkSubTerm expr
+  | .proj _ _ struct => checkSubTerm struct
+  | _ => return false
+
+
 /-- `Monad` instance for List.
     Note that:
     - The Lean standard library does not have a Monad instance for List (see https://leanprover-community.github.io/archive/stream/270676-lean4/topic/Option.20do.20notation.20regression.3F.html#231433226)
