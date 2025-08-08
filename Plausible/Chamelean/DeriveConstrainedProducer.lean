@@ -307,8 +307,7 @@ def rewriteFunctionCallsInConclusion (hypotheses : Array Expr) (conclusion : Exp
 
 /-- Unifies each argument in the conclusion of an inductive relation with the top-level arguments to the relation
     (using the unification algorithm from Generating Good Generations),
-    and subsequently computes a *naive* generator schedule for a sub-generator corresponding to the constructor
-    (using the schedules discussed in Testing Theorems).
+    and subsequently computes a *naive* schedule for a generator/enumerator/checker (indicated by the `deriveSort`).
 
     Note: this function processes the entire type of the constructor within the same `LocalContext`
     (the one produced by `forallTelescopeReducing`).
@@ -316,13 +315,16 @@ def rewriteFunctionCallsInConclusion (hypotheses : Array Expr) (conclusion : Exp
     This function takes the following as arguments:
     - The name of the inductive relation `inductiveName`
     - The constructor name `ctorName`
-    - The name (`outputName`) and type (`outputType`) of the output (value to be generated)
-    - The names of inputs `inputNames` (arguments to the generator)
-    - An array of `unknowns` (the arguments to the inductive relation)
-      + Note: `unknowns == inputNames ∪ { outputName }`, i.e. `unknowns` contains all args to the inductive relation
+    - The sort of function we are deriving (`deriveSort`) (either a generator, enumerator or a checker)
+    - The names of inputs `inputNames` (arguments to the derived function)
+    - An option `outputNameTypeOption` containing the name & type of the output (value to be produced)
+      + This option should be `some` pair if `deriveSort = .Generator` or `.Enumerator`, and none otherwise
+    - An array of unknowns (`unknownsArray`), which are provided to the unification algorithm
+      + This array should be non-empty if `deriveSort = .Generator` or `.Enumerator`, and empty otherwise
+      + Note: when `deriveSort == .Generator / .Enumerator`, it is the caller's responsibility to ensure that
+        `unknowns == inputNames ∪ { outputName }`, i.e. `unknowns` contains all args to the inductive relation
         listed in order, which coincides with `inputNames ∪ { outputName }` -/
-def getProducerScheduleForInductiveConstructor (inductiveName : Name) (ctorName : Name) (outputName : Name) (outputType : Expr) (inputNames : List Name)
-  (unknowns : Array Unknown) (deriveSort : DeriveSort) : UnifyM Schedule := do
+def getScheduleForInductiveRelationConstructor (inductiveName : Name) (ctorName : Name) (inputNames : List Name) (deriveSort : DeriveSort) (outputNameTypeOption : Option (Name × Expr)) (unknownsArray : Array Unknown) : UnifyM Schedule := do
   let ctorInfo ← getConstInfoCtor ctorName
   let ctorType := ctorInfo.type
 
@@ -386,12 +388,26 @@ def getProducerScheduleForInductiveConstructor (inductiveName : Name) (ctorName 
         hypothesisExprs := hypothesisExprs.push (← convertRangeToCtorAppForm hypRange)
 
       -- Creates the initial `UnifyState` needed for the unification algorithm
-      let initialUnifyState := mkProducerInitialUnifyState inputNames outputName outputType forAllVars hypothesisExprs.toList
+      let initialUnifyState ←
+        match deriveSort with
+        | .Generator | .Enumerator =>
+           match outputNameTypeOption with
+          | none => throwError "Output name & type not specified when deriving producer"
+          | some (outputName, outputType) => pure $ mkProducerInitialUnifyState inputNames outputName outputType forAllVars hypothesisExprs.toList
+        | .Checker | .Theorem => pure $ mkCheckerInitialUnifyState inputNames forAllVars hypothesisExprs.toList
 
       -- Extend the current state with the contents of `initialUnifyState`
       UnifyM.extendState initialUnifyState
 
       -- Get the ranges corresponding to each of the unknowns
+      -- For producers, we simply use the `unknownsArray` that this function receives as an argument
+      -- For checkers, there is no notion of `unknowns` (all arguments to the inductive relation are inputs to the checker),
+      -- so we can just use `inputNames`
+      let unknowns:=
+        if deriveSort.isProducer then
+          unknownsArray
+        else
+          inputNames.toArray
       let unknownRanges ← unknowns.mapM processCorrespondingRange
       let unknownArgsAndRanges := unknowns.zip unknownRanges
 
@@ -400,16 +416,34 @@ def getProducerScheduleForInductiveConstructor (inductiveName : Name) (ctorName 
       let conclusionRanges ← conclusionArgs.mapM convertExprToRangeInCurrentContext
       let conclusionArgsAndRanges := conclusionArgs.zip conclusionRanges
 
-      for ((_u1, r1), (_u2, r2)) in conclusionArgsAndRanges.zip unknownArgsAndRanges do
+      for ((_, r1), (_, r2)) in conclusionArgsAndRanges.zip unknownArgsAndRanges do
         unify r1 r2
 
       -- Convert the conclusion from an `Expr` to a `HypothesisExpr`
       let conclusionExpr ← Option.getDM (← exprToHypothesisExpr conclusion)
         (throwError m!"Unable to convert conclusion {conclusion} to a HypothesisExpr")
 
+      let ctorNameOpt :=
+        match deriveSort with
+        | .Generator | .Enumerator => some ctorName
+        | .Checker | .Theorem => none
+
+      let (outputVars, recCall) ←
+        match deriveSort with
+        | .Generator | .Enumerator =>
+          match outputNameTypeOption with
+          | none => throwError "Error: output name & type not specified when deriving producer"
+          | some (outputName, _) =>
+          let outputIdx := unknowns.idxOf outputName
+          pure ([outputName], (inductiveName, [outputIdx]))
+        | .Checker | .Theorem => pure ([], (inductiveName, []))
+
       -- Determine the appropriate `ScheduleSort` (right now we only produce `ScheduleSort`s for `Generator`s)
-      let scheduleSort ← getScheduleSort conclusionExpr
-        (outputVars := [outputName]) (some ctorName) deriveSort
+      let scheduleSort ← getScheduleSort
+        conclusionExpr
+        (outputVars := outputVars)
+        (ctorNameOpt := ctorNameOpt)
+        (deriveSort := deriveSort)
         (returnOption := true)
 
       -- Check which universally-quantified variables have a `Fixed` range,
@@ -423,16 +457,13 @@ def getProducerScheduleForInductiveConstructor (inductiveName : Name) (ctorName 
       -- Include any fresh variables produced (when rewriting function calls in conclusions)
       -- in the list of universally-quantified variables
       let updatedForAllVars := forAllVars ++ freshNamesAndTypes
-
-      let outputIdx := unknowns.idxOf outputName
-
-      -- Compute all possible generator schedules for this constructor
+      -- Compute all possible checker schedules for this constructor
       let possibleSchedules ← possibleSchedules
         (vars := updatedForAllVars)
         (hypotheses := hypothesisExprs.toList)
         deriveSort
-        (recCall := (inductiveName, [outputIdx]))
-        (fixedVars := fixedVars)
+        recCall
+        fixedVars
 
       -- A *naive* schedule is the first schedule contained in `possibleSchedules`
       let originalNaiveSchedule ← Option.getDM (possibleSchedules.head?) (throwError m!"Unable to compute any possible schedules")
@@ -445,9 +476,27 @@ def getProducerScheduleForInductiveConstructor (inductiveName : Name) (ctorName 
       -- Takes the `patterns` and `equalities` fields from `UnifyState` (created after
       -- the conclusion of a constructor has been unified with the top-level arguments to the inductive relation),
       -- convert them to the appropriate `ScheduleStep`s, and prepends them to the `naiveSchedule`
-      let fullSchedule := addConclusionPatternsAndEqualitiesToSchedule finalState.patterns finalState.equalities (updatedNaiveSchedule, scheduleSort)
+      pure $ addConclusionPatternsAndEqualitiesToSchedule finalState.patterns finalState.equalities (updatedNaiveSchedule, scheduleSort))
+  )
 
-      return fullSchedule))
+
+/-- Unifies each argument in the conclusion of an inductive relation with the top-level arguments to the relation
+    (using the unification algorithm from Generating Good Generations),
+    and subsequently computes a *naive* generator schedule for a sub-generator corresponding to the constructor
+    (using the schedules discussed in Testing Theorems).
+
+    This function takes the following as arguments:
+    - The name of the inductive relation `inductiveName`
+    - The constructor name `ctorName`
+    - The name (`outputName`) and type (`outputType`) of the output (value to be generated)
+    - The names of inputs `inputNames` (arguments to the generator)
+    - An array of `unknowns` (the arguments to the inductive relation)
+      + Note: `unknowns == inputNames ∪ { outputName }`, i.e. `unknowns` contains all args to the inductive relation
+        listed in order, which coincides with `inputNames ∪ { outputName }` -/
+def getProducerScheduleForInductiveConstructor (inductiveName : Name) (ctorName : Name) (outputName : Name) (outputType : Expr) (inputNames : List Name)
+  (unknowns : Array Unknown) (deriveSort : DeriveSort) : UnifyM Schedule :=
+  getScheduleForInductiveRelationConstructor inductiveName ctorName inputNames deriveSort (some (outputName, outputType)) unknowns
+
 
 -- def deriverPipeline (outputVar : Ident) (outputTypeSyntax : TSyntax `term) (constrainingProp : TSyntax `term) (deriveSort : DeriveSort) : CommandElabM (TSyntax `command) := do
 --   -- Parse the body of the lambda for an application of the inductive relation

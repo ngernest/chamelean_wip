@@ -4,9 +4,9 @@ import Plausible.Chamelean.Examples.ExampleInductiveRelations
 import Plausible.Chamelean.Utils
 import Plausible.Chamelean.Schedules
 import Plausible.Chamelean.UnificationMonad
+import Plausible.Chamelean.MakeConstrainedProducerInstance
 
 open Lean Meta
-
 
 -- Adapted from QuickChick source code
 -- https://github.com/QuickChick/QuickChick/blob/internal-rewrite/plugin/newGenericLib.ml
@@ -55,7 +55,6 @@ def isRecCall (binding : List Name) (hyp : HypothesisExpr) (recCall : Name × Li
       throwError m!"Arguments to hypothesis {hyp} contain both fixed and yet-to-be-bound variables (not allowed)"
     else pure none) args
   let (inductiveName, recCallOutputIdxes) := recCall
-
 
   let result := (ctorName == inductiveName && (recCallOutputIdxes.mergeSort) == (outputPositions.mergeSort))
   logWarning m!"isRecCall: recCallOutputIdxes = {recCallOutputIdxes}, outputPositions = {outputPositions}"
